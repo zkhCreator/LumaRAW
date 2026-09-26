@@ -1,0 +1,269 @@
+"""SQLite catalog, history, and durable export queue; originals stay untouched.
+
+Inputs: explicit local paths and validated recipes. Outputs: paginated rows/jobs.
+Responsibilities: store references, edits, undo history, and export snapshots.
+Boundaries: never copy/write original photos; never eagerly load full catalogs.
+Each connection belongs to its creating thread. Bulk insertion commits in batches.
+"""
+from contextlib import contextmanager
+import json
+import os
+from pathlib import Path
+import sqlite3
+import time
+
+from .model import Recipe, ExportOptions, SYNC_GROUPS, IMAGE_EXTENSIONS
+
+class Catalog:
+    def __init__(self, root):
+        self.root = Path(root).resolve()
+        self.root.mkdir(parents=True, exist_ok=True)
+        self.db = sqlite3.connect(self.root / 'catalog.sqlite', timeout=10)
+        self.db.row_factory = sqlite3.Row
+        self.db.executescript('''
+            PRAGMA journal_mode=WAL;
+            PRAGMA busy_timeout=10000;
+            CREATE TABLE IF NOT EXISTS photos (
+                id INTEGER PRIMARY KEY, path TEXT NOT NULL UNIQUE, name TEXT NOT NULL,
+                bytes INTEGER NOT NULL, mtime INTEGER NOT NULL, rating INTEGER DEFAULT 0,
+                recipe TEXT NOT NULL, metadata TEXT DEFAULT '{}', error TEXT DEFAULT '',
+                revision INTEGER DEFAULT 0, created REAL NOT NULL);
+            CREATE INDEX IF NOT EXISTS photo_rating ON photos(rating, id);
+            CREATE TABLE IF NOT EXISTS history (
+                id INTEGER PRIMARY KEY, photo_id INTEGER NOT NULL, recipe TEXT NOT NULL,
+                label TEXT NOT NULL, created REAL NOT NULL);
+            CREATE INDEX IF NOT EXISTS history_photo ON history(photo_id, id);
+            CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);
+            CREATE TABLE IF NOT EXISTS jobs (
+                id INTEGER PRIMARY KEY, photo_id INTEGER NOT NULL, source TEXT NOT NULL,
+                recipe TEXT NOT NULL, destination TEXT NOT NULL, format TEXT NOT NULL,
+                state TEXT NOT NULL DEFAULT 'pending', error TEXT DEFAULT '',
+                peak_mb REAL DEFAULT 0, created REAL NOT NULL);
+        ''')
+        columns = {row[1] for row in self.db.execute('PRAGMA table_info(jobs)')}
+        if 'output' not in columns:
+            self.db.execute("ALTER TABLE jobs ADD COLUMN output TEXT NOT NULL DEFAULT ''")
+        photo_columns={r[1] for r in self.db.execute('PRAGMA table_info(photos)')}
+        for name,definition in [('flag','INTEGER DEFAULT 0'),('sha256',"TEXT DEFAULT ''"),('taken','INTEGER DEFAULT 0'),('camera',"TEXT DEFAULT ''"),('burst','INTEGER DEFAULT 0'),('missing','INTEGER DEFAULT 0')]:
+            if name not in photo_columns: self.db.execute(f'ALTER TABLE photos ADD COLUMN {name} {definition}')
+        for name,definition in [('options',"TEXT DEFAULT '{}'"),('priority','INTEGER DEFAULT 0')]:
+            if name not in columns: self.db.execute(f'ALTER TABLE jobs ADD COLUMN {name} {definition}')
+        self.db.executescript('CREATE TABLE IF NOT EXISTS versions(id INTEGER PRIMARY KEY,photo_id INTEGER NOT NULL,name TEXT NOT NULL,recipe TEXT NOT NULL,created REAL NOT NULL); CREATE INDEX IF NOT EXISTS photo_hash ON photos(sha256);')
+        self.db.commit()
+
+    def setting(self, key, default=None):
+        row = self.db.execute('SELECT value FROM settings WHERE key=?', (key,)).fetchone()
+        return json.loads(row[0]) if row else default
+
+    def set_setting(self, key, value):
+        with self.db:
+            self.db.execute('INSERT OR REPLACE INTO settings(key,value) VALUES(?,?)', (key, json.dumps(value)))
+
+    def close(self):
+        self.db.close()
+
+    def recover_jobs(self):
+        # Never replay interrupted exports automatically: user decides to retry.
+        with self.db:
+            self.db.execute("UPDATE jobs SET state='interrupted',error='Job was unfinished at exit; an explicit retry is required' WHERE state='running'")
+
+    def import_paths(self, paths, cancelled=lambda: False):
+        count = skipped = 0
+        for path in paths:
+            if cancelled():
+                break
+            p = Path(path)
+            if p.is_symlink() or p.suffix.lower() not in IMAGE_EXTENSIONS:
+                skipped += 1
+                continue
+            try:
+                p = p.resolve(strict=True)
+                stat = p.stat()
+                if not p.is_file():
+                    continue
+                cur = self.db.execute(
+                    'INSERT OR IGNORE INTO photos(path,name,bytes,mtime,recipe,created) VALUES(?,?,?,?,?,?)',
+                    (str(p), p.name, stat.st_size, stat.st_mtime_ns, json.dumps(Recipe().dict()), time.time()))
+                count += cur.rowcount
+                skipped += 1 - cur.rowcount
+                if (count + skipped) % 100 == 0:
+                    self.db.commit()
+            except OSError:
+                skipped += 1
+        self.db.commit()
+        return count, skipped
+
+    def count(self, stars=False):
+        return self.db.execute('SELECT count(*) FROM photos' + (' WHERE rating>=3' if stars else '')).fetchone()[0]
+
+    def page(self, offset=0, limit=60, stars=False):
+        return [dict(r) for r in self.db.execute(
+            'SELECT * FROM photos' + (' WHERE rating>=3' if stars else '') + ' ORDER BY id DESC LIMIT ? OFFSET ?',
+            (min(max(limit, 1), 60), max(offset, 0)))]
+
+    def photo(self, photo_id):
+        row = self.db.execute('SELECT * FROM photos WHERE id=?', (photo_id,)).fetchone()
+        return dict(row) if row else None
+
+    def recipe(self, photo_id):
+        return Recipe.parse(json.loads(self.photo(photo_id)['recipe']))
+
+    def edit(self, photo_id, recipe, label='Adjustments'):
+        previous = self.photo(photo_id)
+        data = json.dumps(recipe.dict())
+        if data == previous['recipe']:
+            return
+        with self.db:
+            self.db.execute('INSERT INTO history(photo_id,recipe,label,created) VALUES(?,?,?,?)',
+                            (photo_id, previous['recipe'], label, time.time()))
+            self.db.execute('UPDATE photos SET recipe=?,revision=revision+1 WHERE id=?', (data, photo_id))
+            self.db.execute('DELETE FROM history WHERE photo_id=? AND id NOT IN (SELECT id FROM history WHERE photo_id=? ORDER BY id DESC LIMIT 50)', (photo_id, photo_id))
+
+    def undo(self, photo_id):
+        row = self.db.execute('SELECT * FROM history WHERE photo_id=? ORDER BY id DESC LIMIT 1', (photo_id,)).fetchone()
+        if row:
+            with self.db:
+                self.db.execute('UPDATE photos SET recipe=?,revision=revision+1 WHERE id=?', (row['recipe'], photo_id))
+                self.db.execute('DELETE FROM history WHERE id=?', (row['id'],))
+        return self.recipe(photo_id)
+
+    def update_metadata(self, photo_id, metadata):
+        with self.db:
+            self.db.execute("UPDATE photos SET metadata=?,error='' WHERE id=?", (json.dumps(metadata), photo_id))
+
+    def set_error(self, photo_id, message):
+        with self.db:
+            self.db.execute('UPDATE photos SET error=? WHERE id=?', (message, photo_id))
+
+    def rate(self, photo_id, rating):
+        with self.db:
+            self.db.execute('UPDATE photos SET rating=? WHERE id=?', (max(0, min(5, rating)), photo_id))
+
+    def enqueue(self, ids, destination, fmt, options=None):
+        options = ExportOptions.parse(options)
+        if fmt not in ('tiff16', 'jpeg'):
+            raise ValueError('Unsupported export format')
+        dest = Path(destination).resolve()
+        dest.mkdir(parents=True, exist_ok=True)
+        count = 0
+        with self.db:
+            # Snapshot each recipe, so later edits do not silently change an export.
+            for photo_id in ids:
+                row = self.photo(photo_id)
+                if row:
+                    self.db.execute('INSERT INTO jobs(photo_id,source,recipe,destination,format,created,options,priority) VALUES(?,?,?,?,?,?,?,?)',
+                                    (photo_id, row['path'], row['recipe'], str(dest), fmt, time.time(),json.dumps(options.dict()),options.priority))
+                    count += 1
+        return count
+
+    def all_ids(self, stars=False):
+        for row in self.db.execute('SELECT id FROM photos' + (' WHERE rating>=3' if stars else '') + ' ORDER BY id'):
+            yield row[0]
+
+    def next_job(self):
+        # One atomic statement reserves the job even if another connection is active.
+        with self.db:
+            row = self.db.execute("UPDATE jobs SET state='running' WHERE id=(SELECT id FROM jobs WHERE state='pending' ORDER BY priority DESC,id LIMIT 1) RETURNING *").fetchone()
+        return dict(row) if row else None
+
+    def finish_job(self, job_id, state, error='', peak_mb=0, output=''):
+        with self.db:
+            self.db.execute('UPDATE jobs SET state=?,error=?,peak_mb=?,output=? WHERE id=?', (state, error, peak_mb, output, job_id))
+
+    def jobs(self, limit=60):
+        return [dict(r) for r in self.db.execute('SELECT * FROM jobs ORDER BY id DESC LIMIT ?', (limit,))]
+
+    def job_counts(self):
+        return dict(self.db.execute('SELECT state,count(*) FROM jobs GROUP BY state'))
+
+    def cancel_pending(self):
+        with self.db:
+            self.db.execute("UPDATE jobs SET state='cancelled' WHERE state='pending'")
+
+    def retry_failed(self):
+        with self.db:
+            self.db.execute("UPDATE jobs SET state='pending',error='' WHERE state IN ('failed','interrupted','cancelled')")
+
+
+    def filter_sql(self,mode='all',search=''):
+        clauses=[];params=[]
+        if mode=='stars': clauses.append('rating>=3')
+        elif mode=='rejects': clauses.append('flag=-1')
+        elif mode=='keepers': clauses.append('flag=1')
+        elif mode=='missing': clauses.append('missing=1')
+        elif mode=='duplicates': clauses.append("sha256!='' AND sha256 IN (SELECT sha256 FROM photos WHERE sha256!='' GROUP BY sha256 HAVING count(*)>1)")
+        elif mode.startswith('burst:'):
+            clauses.append('burst=?');params.append(int(mode.split(':')[1]))
+        if search:
+            clauses.append('instr(lower(name),lower(?))>0');params.append(search[:200])
+        return (' WHERE '+' AND '.join(clauses) if clauses else ''),params
+
+    def filtered_page(self,offset=0,mode='all',search=''):
+        where,params=self.filter_sql(mode,search)
+        return [dict(r) for r in self.db.execute('SELECT * FROM photos'+where+' ORDER BY id DESC LIMIT 60 OFFSET ?',params+[max(0,offset)])]
+
+    def filtered_count(self,mode='all',search=''):
+        where,params=self.filter_sql(mode,search)
+        return self.db.execute('SELECT count(*) FROM photos'+where,params).fetchone()[0]
+
+    def filtered_ids(self,mode='all',search=''):
+        where,params=self.filter_sql(mode,search)
+        for row in self.db.execute('SELECT id FROM photos'+where+' ORDER BY id',params): yield row[0]
+
+    def flag(self,photo_id,value):
+        if value not in (-1,0,1): raise ValueError('Invalid pick flag')
+        with self.db: self.db.execute('UPDATE photos SET flag=? WHERE id=?',(value,photo_id))
+
+    def bursts(self):
+        return [dict(r) for r in self.db.execute('SELECT burst,camera,min(taken) AS taken,count(*) AS count FROM photos WHERE burst>0 GROUP BY burst HAVING count(*)>1 ORDER BY taken DESC LIMIT 200')]
+
+    def save_version(self,photo_id,name):
+        if not name.strip(): raise ValueError('Version name must not be empty')
+        with self.db:
+            self.db.execute('INSERT INTO versions(photo_id,name,recipe,created) VALUES(?,?,?,?)',(photo_id,name[:120],self.photo(photo_id)['recipe'],time.time()))
+
+    def versions(self,photo_id):
+        return [dict(r) for r in self.db.execute('SELECT * FROM versions WHERE photo_id=? ORDER BY id DESC',(photo_id,))]
+
+    def restore_version(self,photo_id,version_id):
+        row=self.db.execute('SELECT recipe FROM versions WHERE id=? AND photo_id=?',(version_id,photo_id)).fetchone()
+        if not row: raise ValueError('Edit version does not exist')
+        recipe=Recipe.parse(json.loads(row[0]));self.edit(photo_id,recipe,'Restore Edit Version');return recipe
+
+    def sync(self,source_id,target_ids,groups):
+        source=self.recipe(source_id).dict();keys=[key for group in groups for key in SYNC_GROUPS[group]];count=0
+        for id_ in target_ids:
+            if id_==source_id: continue
+            values=self.recipe(id_).dict();values.update({key:source[key] for key in keys})
+            self.edit(id_,Recipe.parse(values),'Selective Sync');count+=1
+        return count
+
+    def relink(self,photo_id,new_path):
+        p=Path(new_path).resolve(strict=True)
+        if p.suffix.lower() not in IMAGE_EXTENSIONS or not p.is_file(): raise ValueError('Not a supported photo')
+        old=self.photo(photo_id)
+        if Path(old['path']).exists(): raise ValueError('The original is still available; only missing files can be relinked')
+        # If a fingerprint exists, require the exact original, not an unrelated file.
+        if old['sha256']:
+            from .library import hash_file
+            if hash_file(p)!=old['sha256']: raise ValueError('New file content differs from the indexed original')
+        stat=p.stat()
+        with self.db:
+            self.db.execute("UPDATE photos SET path=?,name=?,bytes=?,mtime=?,missing=0,error='' WHERE id=?",(str(p),p.name,stat.st_size,stat.st_mtime_ns,photo_id))
+            self.db.execute("UPDATE jobs SET source=? WHERE photo_id=? AND state IN ('pending','interrupted','failed','cancelled')",(str(p),photo_id))
+
+    def prioritize(self,job_id,priority=9):
+        with self.db: self.db.execute("UPDATE jobs SET priority=? WHERE id=? AND state='pending'",(max(0,min(9,priority)),job_id))
+
+
+def walk_images(root, cancelled=lambda: False):
+    """Stream directory entries without following symlinks or retaining a file list."""
+    for directory, dirs, files in os.walk(root, followlinks=False):
+        dirs[:] = [d for d in dirs if not d.startswith('.') and not Path(directory, d).is_symlink()]
+        if cancelled():
+            return
+        for name in files:
+            if cancelled():
+                return
+            if not name.startswith('.') and Path(name).suffix.lower() in IMAGE_EXTENSIONS:
+                yield str(Path(directory, name))

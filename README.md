@@ -1,0 +1,138 @@
+# LumaRAW
+
+A native macOS RAW darkroom with non-destructive editing, Metal-accelerated color processing, and a shared CLI/MCP interface for agents.
+
+LumaRAW references your originals without changing them. The SwiftUI app and your agent work through the same local catalog service, with revision checks to prevent conflicting edits. No account, API key, or cloud service is required.
+
+**Status:** source release, version 0.4.0. The packaged build targets Apple Silicon and macOS 14 or later; current validation was performed on macOS 26. Windows support is an architectural target, not a shipped application.
+
+## Features
+
+| Area | Capabilities |
+| --- | --- |
+| RAW development | Nikon NEF/NRW and other LibRaw formats, as-shot white balance, exposure, highlights/shadows, relative temperature/tint, monochrome, and presets |
+| Color | Custom tone curves, color mixer, camera-bound chart calibration, `.cube` LUTs, ICC soft proofing, and gamut warnings |
+| Detail and composition | Full-resolution 1:1 viewports, noise reduction, sharpening, defringing, rotation, crop, straighten, and perspective |
+| Local adjustments | Radial, gradient, luminance-range, and brush masks; manual lens distortion, vignette, and chromatic-aberration correction |
+| Library | Ratings, pick/reject flags, duplicate and missing-file indexing, edit versions, selective sync, recipe bundles, and backup/restore |
+| Export | JPEG and 16-bit TIFF with embedded sRGB, Display P3, Adobe RGB, or ProPhoto RGB ICC profiles; persistent queue, pause/cancel/retry, and collision-safe filenames |
+| Agents | 27 MCP tools, equivalent JSON CLI commands, and a bundled skill; app and agent edits share conflict detection |
+
+## Build and run
+
+Requirements: an Apple Silicon Mac, Xcode Command Line Tools, and [uv](https://docs.astral.sh/uv/). The Python requirement is 3.12 or 3.13; dependencies are pinned in `uv.lock`.
+
+```sh
+git clone https://github.com/zkhCreator/LumaRAW.git
+cd LumaRAW
+uv sync --frozen
+uv run --frozen python scripts/build_macos.py --build-root /absolute/new-build-directory
+open /absolute/new-build-directory/LumaRAW.app
+```
+
+Replace `/absolute/new-build-directory` with a new directory that does not already exist. The build compiles the Metal backend and SwiftUI shell, packages the Python engine, and applies a local ad-hoc signature. The resulting app does not require a separate Python installation. Developer ID signing, notarization, and public binary distribution are separate release steps.
+
+Open `Package.swift` for Swift development. A standalone Swift executable needs `LUMARAW_ENGINE` set to the engine executable; use the build script for a self-contained app.
+
+The default catalog is `~/Library/Application Support/LumaRAW Native`. Use `--catalog /absolute/catalog` or `LUMARAW_CATALOG` for a separate library. Imports reference original file locations; they do not copy photos. Back up a catalog before migration, and do not open the same SQLite catalog simultaneously with an older Qt application.
+
+## Editing workflow
+
+1. Press **⌘I** to import photos or folders. Drag-and-drop and Finder file-open events are also supported.
+2. Double-click a photo to develop it. Use the inspector for light, color, detail, composition, lens, and local adjustments.
+3. Use **Tools** to draw a crop or mask, or enable the split before/after view. Press **\\** to toggle the original preview.
+4. Choose **1:1 Detail** to inspect a full-resolution viewport. Inspector sliders move the viewport horizontally and vertically.
+5. Press **1–5** to rate, **0** to clear the rating, **P** to pick, **X** to reject, or **U** to clear the flag. With the gallery focused, arrow keys select photos and Return opens Develop.
+6. Command-click or Shift-click to toggle multiple selections. **Photo → Sync Selected Photos** copies selected adjustment groups; composition, masks, and camera profiles are excluded by default.
+7. Press **⇧⌘E** to export. Choose a format, color space, long-edge size, and filename template. Existing files are preserved.
+
+Adjustments save automatically. Each photo supports up to 50 undo steps, named edit versions, and portable recipe bundles. The full recipe editor supports precise curve points and brush paths. Submitted exports retain their original recipe snapshot even if you continue editing.
+
+## Metal acceleration
+
+Choose **Settings → Acceleration** to select **Auto**, **CPU**, or **Metal**. Auto prefers Metal where supported and records any fallback. Settings show the actual device and recent processing time.
+
+Metal accelerates grading and output color conversion. **NEF parsing, decompression, white balance, and AHD demosaicing remain on the CPU through LibRaw.** Geometry, neighborhood filters, and some mask/LUT operations also use the CPU. The app, CLI, and MCP share this backend policy.
+
+On a limited Apple M4 / Nikon D4 sample, full-size TIFF export improved from 2.70 to 1.10 seconds for a default recipe, and from 4.87 to 1.14 seconds for a curve/color-mixer recipe. These include process startup and encoding; they are not universal speedup claims. See [Metal design](METAL.md) and [validation scope](VERIFICATION.md).
+
+## MCP and agent skill
+
+The **Agent Connection** page provides the exact MCP configuration for your installed app. A portable example is in [examples/mcp.json](examples/mcp.json):
+
+```json
+{
+  "mcpServers": {
+    "lumaraw": {
+      "command": "/Applications/LumaRAW.app/Contents/Resources/Engine/LumaRAWEngine",
+      "args": ["--mcp"]
+    }
+  }
+}
+```
+
+Update `command` if the app is installed elsewhere. Add `"--catalog", "/absolute/catalog"` to use a separate catalog. Without that option, MCP and the app share the default catalog. Configure your client explicitly; LumaRAW does not change other applications or global agent settings.
+
+The [LumaRAW skill](skills/lumaraw/SKILL.md) is also bundled in `LumaRAW.app/Contents/Resources/skills/lumaraw/`. Copy the whole `lumaraw` skill folder into your agent's skill directory or reference it directly. It covers revision conflicts, selective sync, immutable exports, memory limits, and result verification.
+
+### CLI
+
+```sh
+ENGINE='/Applications/LumaRAW.app/Contents/Resources/Engine/LumaRAWEngine'
+"$ENGINE" status
+"$ENGINE" recipe_schema
+"$ENGINE" list_photos --params '{"offset":0}'
+"$ENGINE" get_photo --params '{"photo_id":1}'
+"$ENGINE" edit_photo --params '{"photo_id":1,"expected_revision":0,"patch":{"exposure":0.35,"highlights":-20}}'
+"$ENGINE" preview_photo --params '{"photo_id":1,"detail":{"width":1024,"height":768}}'
+"$ENGINE" enqueue_exports --params '{"photo_ids":[1],"destination":"/absolute/exports","format":"tiff16","options":{"space":"prophoto"},"request_key":"export-001"}'
+"$ENGINE" list_jobs
+```
+
+Use the current revision from `get_photo` when editing. Long JSON can be passed on stdin. CLI responses use `{ok,result}` or `{ok,error,type}`; MCP stdio uses JSON-RPC. Run from source with `uv run --frozen lumaraw <method>`.
+
+`recipe_schema` is the authority for supported parameters, presets, and sync groups. Group names are now English: `White Balance`, `Light`, `Color`, `Tone Curve`, `Detail`, `Lens`, `Composition`, `Local Masks`, `Camera Profile`, and `LUT`. Clients using the earlier local build's translated group names must refresh the schema. Existing recipe fields, originals, and user-entered names are unchanged.
+
+## Architecture
+
+```text
+SwiftUI app ── JSON CLI ──┐
+                         ├── Local catalog broker ── SQLite + persistent queue
+Agent ─────── MCP stdio ──┘             │
+                              Disposable image worker
+                                       │
+                         LibRaw decode → CPU / Metal → new output file
+```
+
+The portable Python core owns recipes, color, storage, and jobs. SwiftUI owns presentation and native interaction. Metal sits behind a narrow C ABI with a CPU reference/fallback. Windows can reuse the core and command contracts with a separate native shell. See [ARCHITECTURE.md](ARCHITECTURE.md).
+
+## Validation and limits
+
+```sh
+uv sync --frozen
+uv run --frozen python scripts/build_metal.py
+LUMARAW_TEST_NEF=/absolute/photo.NEF LUMARAW_REQUIRE_METAL=1 uv run --frozen pytest -q
+```
+
+Without a real NEF fixture, RAW integration tests explicitly skip. Metal tests can skip when the optional backend is absent unless `LUMARAW_REQUIRE_METAL=1` is set. See [TESTING.md](TESTING.md) for native, packaged-engine, recovery, and official MCP-client probes.
+
+- Non-destructive editing leaves original files unchanged. It does not make demosaicing or color transforms mathematically reversible; JPEG is lossy and 16-bit TIFF is not reversible sensor RAW.
+- Nikon NX Studio, Picture Control, and Active D-Lighting matching are not guaranteed. HE/HE* support depends on LibRaw. Camera-specific accuracy needs real captures and reference measurements; synthetic chart tests verify algorithms only.
+- Lens correction uses manual coefficients, without an automatic lens database. High-bit-depth ordinary TIFF/PNG import is rejected rather than silently reduced; 16-bit TIFF export is supported.
+- RAW decoding still allocates a full frame. Postprocessing uses strips and one image worker per catalog. The effective budget is capped at 70% of available memory, with estimates and 50 ms RSS sampling; this is not an OS hard limit or a machine-wide quota.
+- Complete EXIF/GPS/MakerNotes copying, DCP, spot removal, cloud sync, and a comprehensive camera compatibility matrix are not implemented.
+- Windows, Intel, older macOS, VoiceOver, full keyboard traversal, and end-to-end monitor color management are not fully validated. Native controls alone do not establish accessibility acceptance.
+
+## License and source publication
+
+Original code is licensed under [MIT](LICENSE). Dependencies and ICC assets retain their own terms and attribution; see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+
+Project documentation, UI labels, built-in names, errors, examples, and agent instructions use English. User filenames and catalog content retain their original text and Unicode support.
+
+Run `python3 scripts/check_public.py --strict` on a clean source snapshot. To package a development checkout while excluding generated local data:
+
+```sh
+python3 scripts/package_public.py /absolute/new-source.zip
+```
+
+See [PUBLIC_RELEASE.md](PUBLIC_RELEASE.md) for the publication boundary. Private catalogs, RAW fixtures, logs, credentials, and old binary deliveries do not belong in the source repository.

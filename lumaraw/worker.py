@@ -1,0 +1,61 @@
+"""One request per disposable image subprocess.
+
+Reads bounded JSON from stdin, returns one JSON result; no pixel buffers cross IPC.
+The GUI owns scheduling, cancellation, and RSS monitoring. Process exit releases
+LibRaw/NumPy native allocations even after failure. Original files are read-only.
+"""
+import json
+import sys
+import time
+
+
+def main():
+    try:
+        request = json.loads(sys.stdin.buffer.readline(256*1024))
+        # Stop orphaned image work when the owning broker disappears.
+        if request.get('parent_pid'):
+            import os, threading
+            import psutil
+            parent=psutil.Process(request['parent_pid'])
+            def monitor_parent():
+                while True:
+                    time.sleep(.2)
+                    if not parent.is_running():os._exit(75)
+            threading.Thread(target=monitor_parent,daemon=True).start()
+        from . import accelerators, performance
+        accelerators.configure(request.get('compute_backend','auto'),request['budget_mb'])
+        performance.reset();started=time.perf_counter()
+        from .model import Recipe
+        from .imaging import make_preview, make_thumbnail, export_image, trim_cache
+        recipe = Recipe.parse(request.get('recipe', {}))
+        operation = request['operation']
+        if operation in ('preview','detail','reference'):
+            result = make_preview(request['path'], recipe, request['cache'], request['budget_mb'],detail=request.get('detail'),display=request.get('display'))
+        elif operation == 'calibrate':
+            from .calibration import calibrate
+            result = calibrate(request['path'],request['reference'],request['source_rect'],request['reference_rect'],request['cache'],request['budget_mb'],request['name'],request['lighting'])
+        elif operation == 'thumbnail':
+            result = make_thumbnail(request['path'], request['cache'], request['budget_mb'])
+        elif operation == 'export':
+            result = export_image(request['path'], recipe, request['destination'], request['format'],
+                                  request['budget_mb'], request['job_id'],options=request.get('options'),cache=request['cache'])
+        else:
+            raise ValueError('Unknown worker operation')
+        if 'cache' in request:
+            try:
+                trim_cache(request['cache'], maximum_mb=1024,keep=[result.get('preview', ''), result.get('before', ''), result.get('thumbnail', ''),*result.get('cache_keep',[])])
+            except OSError:
+                # Cache housekeeping cannot turn a committed export into a failed job.
+                result['cache_warning'] = 'Cache cleanup is not yet complete'
+        result['processing']={**accelerators.report(),'stages':performance.report(),'worker_seconds':round(time.perf_counter()-started,6)}
+        print(json.dumps({'ok': True, **result}), flush=True)
+    except Exception as error:
+        name = type(error).__name__
+        message = str(error)
+        if 'LibRaw' in name:
+            message = f'RAW decoding failed ({name}). The file may be damaged or use unsupported compression; Nikon HE / HE* support depends on LibRaw.'
+        print(json.dumps({'ok': False, 'error': message, 'type': name}), flush=True)
+        sys.exit(1)
+
+if __name__ == '__main__':
+    main()

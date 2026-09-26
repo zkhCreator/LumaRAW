@@ -1,0 +1,69 @@
+"""Compare packaged CPU/Metal workers using the same read-only NEF and recipe.
+
+Records cold/warm wall times, stages, RSS, output parity and source digest. GPU
+initialization/copies are included. Cold means empty app cache, not OS disk cache.
+Sequential workers prevent the benchmark from creating its own memory contention.
+"""
+import argparse,hashlib,json,os,shutil,statistics,subprocess,threading,time
+from pathlib import Path
+import psutil
+import numpy as np
+from PIL import Image
+import tifffile
+
+def digest(p):
+    h=hashlib.sha256()
+    with Path(p).open('rb') as f:
+        while b:=f.read(1024*1024):h.update(b)
+    return h.hexdigest()
+
+def main():
+    parser=argparse.ArgumentParser();parser.add_argument('--engine',required=True,type=Path);parser.add_argument('--fixture',required=True,type=Path);parser.add_argument('--work',required=True,type=Path);parser.add_argument('--preset',choices=['creative','neutral'],default='creative');a=parser.parse_args()
+    if a.work.exists():raise SystemExit('Choose new work directory')
+    a.work.mkdir(parents=True);a.work=a.work.resolve();a.engine=a.engine.resolve();a.fixture=a.fixture.resolve()
+    before=digest(a.fixture);runs=[]
+    recipe={'exposure':.35,'highlights':-25,'shadows':20,'contrast':12,'vibrance':18,'curve_midtones':4,'blue_hue':-9,'blue_sat':12}
+    if a.preset=='neutral':recipe={}
+    def run(mode,operation,label,cache):
+        dest=a.work/f'{label}-{mode}';dest.mkdir()
+        budget=min(4096,int(psutil.virtual_memory().available/1024**2*.7))
+        request={'operation':operation,'path':str(a.fixture),'recipe':recipe,'cache':str(cache),'budget_mb':budget,'compute_backend':mode,'destination':str(dest),'format':'tiff16','job_id':len(runs)+1,'options':{'space':'prophoto','max_edge':0}}
+        if operation=='detail':request['detail']={'width':1280,'height':900}
+        start=time.perf_counter()
+        p=subprocess.Popen([str(a.engine),'--worker'],stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=subprocess.PIPE,env={**os.environ,'OMP_NUM_THREADS':'2','OPENBLAS_NUM_THREADS':'1','VECLIB_MAXIMUM_THREADS':'2'})
+        peak=[0.];done=threading.Event()
+        def sample():
+            while not done.wait(.02):
+                try:peak[0]=max(peak[0],psutil.Process(p.pid).memory_info().rss/1024**2)
+                except psutil.NoSuchProcess:break
+        thread=threading.Thread(target=sample);thread.start()
+        stdout,stderr=p.communicate(json.dumps(request).encode()+b'\n',timeout=300);done.set();thread.join()
+        elapsed=time.perf_counter()-start
+        result=json.loads(stdout);assert p.returncode==0 and result['ok'],result
+        if operation!='export':
+            saved=dest/'preview.png';shutil.copy2(result['preview'],saved);result['preview']=str(saved)
+        if mode=='metal':assert result['processing']['metal_grade_tiles']>0,result
+        item={'label':label,'mode':mode,'operation':operation,'wall_seconds':round(elapsed,6),'rss_peak_mb':round(peak[0],2),'processing':result['processing'],'output':result.get('output',result.get('preview'))};runs.append(item)
+        return item
+    pairs=[]
+    # Alternate order between passes. The source cache is private per backend.
+    for i in range(3):
+        values={mode:run(mode,'preview','cold-preview' if i==0 else f'warm-preview-{i}',a.work/f'cache-{mode}') for mode in (['cpu','metal'] if i%2==0 else ['metal','cpu'])}
+        pairs.append(values)
+    for op in ['export','detail']:
+        pairs.append({mode:run(mode,op,op,a.work/f'cache-{mode}') for mode in ['metal','cpu']})
+    differences=[]
+    for pair in pairs:
+        def pixels(item):return tifffile.imread(item['output']) if item['operation']=='export' else np.array(Image.open(item['output']))
+        cpu=pixels(pair['cpu']);gpu=pixels(pair['metal']);assert cpu.shape==gpu.shape
+        diff=np.abs(cpu.astype(np.int32)-gpu.astype(np.int32));limit=8 if cpu.dtype==np.uint16 else 1
+        differences.append({'label':pair['cpu']['label'],'shape':list(cpu.shape),'dtype':str(cpu.dtype),'max_code_difference':int(diff.max()),'mean_code_difference':float(diff.mean()),'limit':limit})
+        assert diff.max()<=limit,differences[-1]
+    assert digest(a.fixture)==before
+    summary=[]
+    for pair in pairs:
+        cpu=pair['cpu'];gpu=pair['metal'];cs=cpu['processing']['stages']['grade_and_output']['seconds'];gs=gpu['processing']['stages']['grade_and_output']['seconds']
+        summary.append({'label':cpu['label'],'cpu_wall_seconds':cpu['wall_seconds'],'metal_wall_seconds':gpu['wall_seconds'],'end_to_end_speedup':round(cpu['wall_seconds']/gpu['wall_seconds'],3),'grade_output_speedup_including_init_and_copies':round(cs/gs,3)})
+    result={'engine_sha256':digest(a.engine),'source_sha256':before,'original_unchanged':True,'recipe':recipe,'comparisons':summary,'pixel_parity':differences,'runs':runs,'scope':'One real Nikon NEF on this host; not a general benchmark. Empty app cache does not mean cold OS/Metal cache.'}
+    (a.work/'report.json').write_text(json.dumps(result,indent=2));print(json.dumps(summary,indent=2))
+if __name__=='__main__':main()
