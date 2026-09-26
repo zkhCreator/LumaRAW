@@ -89,7 +89,7 @@ class Service:
         jsonschema.validate(p,TOOLS[method]['inputSchema'])
         if method=='status':
             with self.catalog() as c:
-                return {'version':'0.4.0','api_version':1,'catalog':str(self.root),'photos':c.count(),'counts':c.job_counts(),'paused':self.paused,'active':self.active,**self.memory_status(),'peak_mb':round(self.peak,1)}
+                return {'version':'0.4.1','api_version':1,'catalog':str(self.root),'photos':c.count(),'counts':c.job_counts(),'paused':self.paused,'active':self.active,**self.memory_status(),'peak_mb':round(self.peak,1)}
         if method=='recipe_schema':return {'defaults':Recipe().dict(),'limits':LIMITS,'presets':{k:v.dict() for k,v in PRESETS.items()},'groups':SYNC_GROUPS}
         if method in ('preview_photo','thumbnail','calibrate_camera'):
             if method=='preview_photo' and p.get('client_id'):

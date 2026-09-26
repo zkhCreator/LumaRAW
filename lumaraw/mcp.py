@@ -41,7 +41,7 @@ def run(root,source=None,sink=None):
                 else:
                     initialized=True
                     result={'protocolVersion':params['protocolVersion'] if params['protocolVersion'] in VERSIONS else VERSIONS[0],
-                        'capabilities':{'tools':{'listChanged':False}},'serverInfo':{'name':'lumaraw','version':'0.4.0'},
+                        'capabilities':{'tools':{'listChanged':False}},'serverInfo':{'name':'lumaraw','version':'0.4.1'},
                         'instructions':'Local non-destructive RAW editor. Read get_photo before editing; pass expected_revision. Exports return job IDs. Check list_jobs for final output. Original files are read-only.'}
             elif method=='ping':result={}
             elif not ready:error=(-32002,'Initialize and send notifications/initialized first')

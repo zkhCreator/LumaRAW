@@ -1,6 +1,6 @@
 [project]
 name = "lumaraw-native"
-version = "0.4.0"
+version = "0.4.1"
 description = "Portable RAW engine, shared desktop service, CLI and MCP"
 license = "MIT"
 license-files = ["LICENSE", "THIRD_PARTY_NOTICES.md", "licenses/**/*"]

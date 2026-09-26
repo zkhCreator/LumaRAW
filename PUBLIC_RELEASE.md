@@ -24,7 +24,7 @@ Public application binaries require a separate privacy and dependency-license re
 
 ## GitHub Releases
 
-Pushing a stable version tag such as `v0.4.0` runs `.github/workflows/release.yml`.
+Pushing a stable version tag such as `v0.4.1` runs `.github/workflows/release.yml`.
 The workflow requires a matching version in `pyproject.toml` and reviewed English
 notes in `.github/release-notes/<tag>.md`. It packages the checked source, verifies
 archive contents, and publishes the source ZIP, per-file manifest, and SHA-256
@@ -39,5 +39,5 @@ was partially created.
 To prepare the same assets locally from a clean source directory:
 
 ```sh
-python3 -B scripts/prepare_release.py --tag v0.4.0 --output /absolute/new-release-directory
+python3 -B scripts/prepare_release.py --tag v0.4.1 --output /absolute/new-release-directory
 ```

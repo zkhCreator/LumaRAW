@@ -315,9 +315,9 @@ def export_image(path,recipe,destination,fmt,budget_mb,job_id,options=None,cache
                 for y in range(0,h,ROWS):
                     rgb,_=render_strip(plan,0,y,w,min(ROWS,h-y),options.space,options.output_sharpen)
                     yield np.rint(rgb*65535).astype(np.uint16)
-            description=json.dumps({'application':'LumaRAW 0.4.0','source':source_path.name,'recipe':recipe.dict(),'options':options.dict()},ensure_ascii=True)
+            description=json.dumps({'application':'LumaRAW 0.4.1','source':source_path.name,'recipe':recipe.dict(),'options':options.dict()},ensure_ascii=True)
             tifffile.imwrite(temp,data=strips(),shape=(h,w,3),dtype=np.uint16,photometric='rgb',rowsperstrip=ROWS,metadata=None,
-                             description=description,software='LumaRAW 0.4.0',iccprofile=icc_profile(options.space),bigtiff=h*w*6>3_800_000_000)
+                             description=description,software='LumaRAW 0.4.1',iccprofile=icc_profile(options.space),bigtiff=h*w*6>3_800_000_000)
         else:
             fd,name=tempfile.mkstemp(prefix=f'.lumaraw-{job_id}-',suffix='.pixels',dir=dest);os.close(fd);scratch=Path(name)
             pixels=np.memmap(scratch,mode='w+',dtype=np.uint8,shape=(h,w,3))

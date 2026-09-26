@@ -4,7 +4,7 @@ A native macOS RAW darkroom with non-destructive editing, Metal-accelerated colo
 
 LumaRAW references your originals without changing them. The SwiftUI app and your agent work through the same local catalog service, with revision checks to prevent conflicting edits. No account, API key, or cloud service is required.
 
-**Status:** source release, version 0.4.0. The packaged build targets Apple Silicon and macOS 14 or later; current validation was performed on macOS 26. Windows support is an architectural target, not a shipped application.
+**Status:** source release, version 0.4.1. The packaged build targets Apple Silicon and macOS 14 or later; current validation was performed on macOS 26. Windows support is an architectural target, not a shipped application.
 
 ## Features
 

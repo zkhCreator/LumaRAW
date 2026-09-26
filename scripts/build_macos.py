@@ -36,7 +36,7 @@ def main():
     shutil.copy2(source/'LICENSE',resources/'LICENSE')
     (contents/'Info.plist').write_bytes(plistlib.dumps({
         'CFBundleExecutable':'LumaRAW','CFBundleIdentifier':'local.lumaraw.native','CFBundleName':'LumaRAW',
-        'CFBundleDisplayName':'LumaRAW','CFBundleShortVersionString':'0.4.0','CFBundleVersion':'5',
+        'CFBundleDisplayName':'LumaRAW','CFBundleShortVersionString':'0.4.1','CFBundleVersion':'6',
         'CFBundleDevelopmentRegion':'en','CFBundleLocalizations':['en'],
         'CFBundlePackageType':'APPL','CFBundleIconFile':'LumaRAW.icns','LSMinimumSystemVersion':'14.0',
         'NSHighResolutionCapable':True,'NSPrincipalClass':'NSApplication',
