@@ -16,7 +16,7 @@ import zlib
 ROOT_FILES = {'.gitignore', 'LICENSE', 'README.md', 'ARCHITECTURE.md', 'METAL.md',
               'TESTING.md', 'VERIFICATION.md', 'THIRD_PARTY_NOTICES.md',
               'PUBLIC_RELEASE.md', 'Package.swift', 'launch.py', 'pyproject.toml', 'uv.lock'}
-ROOT_DIRS = {'assets', 'licenses', 'lumaraw', 'metal', 'native', 'scripts', 'skills', 'tests', 'examples'}
+ROOT_DIRS = {'.github', 'assets', 'licenses', 'lumaraw', 'metal', 'native', 'scripts', 'skills', 'tests', 'examples'}
 RUNTIME = {'.git', '.venv', 'venv', '__pycache__', '.pytest_cache', '.build', 'build', 'dist',
            'work', 'outputs', 'cache', 'catalog', 'exports', 'fixtures', 'evidence', '.swiftpm'}
 GENERATED = {'.pyc', '.pyo', '.dylib', '.so', '.dll', '.exe', '.zip', '.dmg', '.log',
@@ -48,6 +48,10 @@ def allowed(path):
         return path.name in ROOT_FILES
     if path.parts[0] not in ROOT_DIRS:
         return False
+    if path.parts[0] == '.github':
+        return path.as_posix() == '.github/workflows/release.yml' or (
+            path.parent.as_posix() == '.github/release-notes' and
+            re.fullmatch(r'v[0-9]+\.[0-9]+\.[0-9]+\.md', path.name) is not None)
     if path.parts[0] == 'licenses':
         return True  # Upstream attribution texts retain original names and emails.
     return path.suffix.lower() in {'.py', '.swift', '.mm', '.h', '.metal', '.md', '.json', '.svg', '.png', '.icns', '.icc'}

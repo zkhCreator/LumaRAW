@@ -21,3 +21,23 @@ Pattern checks do not prove the absence of every unknown secret or personal deta
 Runtime catalogs contain original photo paths. Probe output may contain local paths and EXIF. Keep those files local. The MCP example uses `/Applications/LumaRAW.app`; do not replace it with a private machine configuration in the repository.
 
 Public application binaries require a separate privacy and dependency-license review, signing, and notarization. A source scan does not clear previously built application packages.
+
+## GitHub Releases
+
+Pushing a stable version tag such as `v0.4.0` runs `.github/workflows/release.yml`.
+The workflow requires a matching version in `pyproject.toml` and reviewed English
+notes in `.github/release-notes/<tag>.md`. It packages the checked source, verifies
+archive contents, and publishes the source ZIP, per-file manifest, and SHA-256
+checksums. It never uploads local application bundles or photo libraries.
+
+The official checkout action is pinned to a commit and does not persist checkout
+credentials. Publication uses GitHub's temporary repository token, scoped to the
+release job; no personal token or signing key is needed. The workflow does not
+overwrite an existing release. Inspect a failed run before retrying if a release
+was partially created.
+
+To prepare the same assets locally from a clean source directory:
+
+```sh
+python3 -B scripts/prepare_release.py --tag v0.4.0 --output /absolute/new-release-directory
+```

@@ -91,3 +91,35 @@ def test_package_is_checked_and_reproducible(tmp_path):
     (root / 'private.txt').write_text('unknown')
     with pytest.raises(ValueError): package(root, tmp_path / 'rejected.zip')
     assert not (tmp_path / 'rejected.zip').exists()
+
+
+def test_release_version_and_archive_manifest(tmp_path):
+    from prepare_release import prepare
+    import hashlib
+    import json
+    root = tmp_path / 'source'; root.mkdir()
+    (root / 'README.md').write_text('Public source')
+    (root / 'pyproject.toml').write_text('[project]\nversion="1.2.3"\n')
+    notes = root / '.github' / 'release-notes'; notes.mkdir(parents=True)
+    (notes / 'v1.2.3.md').write_text('English release notes')
+    with pytest.raises(ValueError, match='does not match'):
+        prepare(root, tmp_path / 'bad-version', 'v1.2.4')
+    assert not (tmp_path / 'bad-version').exists()
+    with pytest.raises(ValueError, match='stable'):
+        prepare(root, tmp_path / 'bad-tag', '../private')
+    output = tmp_path / 'release'
+    assert prepare(root, output, 'v1.2.3') == 3
+    manifest = json.loads((output / 'source-manifest.json').read_text())
+    with zipfile.ZipFile(output / 'LumaRAW-1.2.3-source.zip') as archive:
+        for name, digest in manifest.items():
+            assert hashlib.sha256(archive.read('LumaRAW-public/' + name)).hexdigest() == digest
+    for line in (output / 'SHA256SUMS.txt').read_text().splitlines():
+        digest, name = line.split('  ')
+        assert hashlib.sha256((output / name).read_bytes()).hexdigest() == digest
+    with pytest.raises(FileExistsError): prepare(root, output, 'v1.2.3')
+
+
+def test_unapproved_github_file_blocks_release(tmp_path):
+    root = tmp_path / 'source'; (root / '.github').mkdir(parents=True)
+    (root / '.github' / 'local.json').write_text('unreviewed')
+    assert any(f['category'] == 'unknown-file' for f in audit(root)[1])

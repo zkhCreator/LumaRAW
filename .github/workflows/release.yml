@@ -1,0 +1,48 @@
+# Purpose: publish an explicitly pushed stable version tag as a checked source release.
+# Inputs: matching project version and English release notes committed with the tag.
+# Outputs: GitHub Release with source ZIP, per-file manifest, and checksums.
+# No private photos, local app bundles, or user-provided credentials are used.
+name: Publish source release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: source-release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - name: Check out the tagged source
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - name: Check source and prepare release assets
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          python3 -B scripts/prepare_release.py --tag "$RELEASE_TAG" --output "$RUNNER_TEMP/lumaraw-release"
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          gh release create "$RELEASE_TAG" \
+            "$RUNNER_TEMP/lumaraw-release/"*-source.zip \
+            "$RUNNER_TEMP/lumaraw-release/source-manifest.json" \
+            "$RUNNER_TEMP/lumaraw-release/SHA256SUMS.txt" \
+            --verify-tag --target "$GITHUB_SHA" \
+            --title "LumaRAW $RELEASE_TAG — English source release" \
+            --notes-file "$RUNNER_TEMP/lumaraw-release/release-notes.md" \
+            --latest
