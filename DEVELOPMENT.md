@@ -35,10 +35,20 @@ when a clear function is more maintainable. Avoid unrelated formatting churn.
   source-wide replacements require a preview bound to the data being replaced.
 - Add indexes for common query paths. Use a deterministic ID tie-breaker for
   pagination and never decode image pixels merely to search the library.
+  Bound serialized response bytes as well as row counts: a 60-row page containing
+  full nested metadata can still exceed the broker's 1 MiB frame. Keep summaries
+  compact and provide explicit paged detail access instead of silent truncation.
 - Test migration with existing photos, edits and jobs. Backups include all new
   catalog state; export jobs keep their original recipe and destination snapshots.
   Construct legacy fixtures with the actual earlier migration chain; changing only
   `user_version` on a newer schema does not prove upgrade compatibility.
+- Freeze descriptive metadata and resolved keyword export policies in the same
+  transaction as recipes/options and idempotency receipts. Old jobs must not
+  acquire present-day metadata during migration or retry. Queue pages return small
+  metadata receipts, not full XMP snapshots. Validate XML/packet bounds before
+  queuing; encode metadata independently of pixels. Never embed internal recipes,
+  local paths or source filenames as image descriptions. ICC remains required
+  even when the chosen descriptive-metadata policy is None.
 - Keep Library sources separate from metadata filters. Folder counts describe
   catalog membership independently of the filtered/stacked photo page. Imports,
   variants, removal and relinking must maintain these counts transactionally.

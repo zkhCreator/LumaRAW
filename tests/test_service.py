@@ -80,6 +80,7 @@ def test_english_schema_groups_sync_without_changing_other_adjustments(service):
 def test_idempotency_snapshot_original_and_no_overwrite(service,tmp_path):
     s,paths=service;before=hashlib.sha256(Path(paths[0]).read_bytes()).hexdigest()
     first=enqueue(s,tmp_path/'export');assert enqueue(s,tmp_path/'export')==first
+    assert s.dispatch('get_job',{'job_id':first['job_ids'][0]})['recipe']['exposure']==0
     with pytest.raises(ValueError):enqueue(s,tmp_path/'different')
     s.dispatch('edit_photo',{'photo_id':1,'expected_revision':0,'patch':{'exposure':2}})
     s.dispatch('queue_control',{'action':'resume'});result=wait_jobs(s)
@@ -87,9 +88,11 @@ def test_idempotency_snapshot_original_and_no_overwrite(service,tmp_path):
     output=Path(result['jobs'][0]['output']);assert output.exists()
     with tifffile.TiffFile(output) as tif:
         assert tif.asarray().dtype.name=='uint16'
-        assert json.loads(tif.pages[0].description)['recipe']['exposure']==0
+        assert 270 not in tif.pages[0].tags
+        first_mean=tif.asarray().mean()
     digest=hashlib.sha256(output.read_bytes()).hexdigest()
     enqueue(s,tmp_path/'export',key='second');assert wait_jobs(s)['counts']=={'done':2}
+    assert tifffile.imread(wait_jobs(s)['jobs'][0]['output']).mean()>first_mean*1.5
     assert hashlib.sha256(output.read_bytes()).hexdigest()==digest
     assert hashlib.sha256(Path(paths[0]).read_bytes()).hexdigest()==before
 

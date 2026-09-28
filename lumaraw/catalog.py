@@ -177,14 +177,24 @@ class Catalog:
         dest.mkdir(parents=True, exist_ok=True)
         count = 0
         with self.db:
-            # Snapshot each recipe, so later edits do not silently change an export.
+            self.db.execute('BEGIN IMMEDIATE')
+            # Freeze recipe and descriptive metadata in the same transaction.
             for photo_id in ids:
                 row = self.photo(photo_id)
                 if row:
-                    self.db.execute('INSERT INTO jobs(photo_id,source,recipe,destination,format,created,options,priority,source_id) VALUES(?,?,?,?,?,?,?,?,?)',
-                                    (photo_id, row['path'], row['recipe'], str(dest), fmt, time.time(),json.dumps(options.dict()),options.priority,row['source_id']))
+                    self.enqueue_one(row, dest, fmt, options)
                     count += 1
         return count
+
+    def enqueue_one(self, row, destination, fmt, options):
+        """Insert one complete snapshot inside the caller's batch transaction."""
+        from .keyword_exports import KeywordExports, encode, receipt
+        snapshot = KeywordExports(self).snapshot(row['id'], options)
+        return self.db.execute(
+            'INSERT INTO jobs(photo_id,source,recipe,destination,format,created,options,priority,source_id,'
+            'metadata_snapshot,export_metadata) VALUES(?,?,?,?,?,?,?,?,?,?,?)',
+            (row['id'],row['path'],row['recipe'],str(destination),fmt,time.time(),json.dumps(options.dict()),
+             options.priority,row['source_id'],encode(snapshot),json.dumps(receipt(snapshot)))).lastrowid
 
     def all_ids(self, stars=False):
         for row in self.db.execute('SELECT id FROM photos' + (' WHERE rating>=3' if stars else '') + ' ORDER BY id'):
@@ -201,7 +211,12 @@ class Catalog:
             self.db.execute('UPDATE jobs SET state=?,error=?,peak_mb=?,output=? WHERE id=?', (state, error, peak_mb, output, job_id))
 
     def jobs(self, limit=60):
-        return [dict(r) for r in self.db.execute('SELECT * FROM jobs ORDER BY id DESC LIMIT ?', (limit,))]
+        return [dict(r) for r in self.db.execute('SELECT '+self.job_columns()+' FROM jobs ORDER BY id DESC LIMIT ?', (limit,))]
+
+    def job_columns(self):
+        # Queue pages expose the small frozen receipt, never sixty full packets.
+        return ','.join('"'+row[1].replace('"','""')+'"' for row in self.db.execute('PRAGMA table_info(jobs)')
+                        if row[1] != 'metadata_snapshot')
 
     def job_counts(self):
         return dict(self.db.execute('SELECT state,count(*) FROM jobs GROUP BY state'))

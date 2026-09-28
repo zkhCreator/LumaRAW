@@ -7,6 +7,8 @@ encoded for the GUI. LibRaw itself still decodes a full frame in one child proce
 Manual lens coefficients are user corrections, not an auto-selected lens database.
 Review callers can omit the before image and request a smaller fitted preview;
 full-resolution detail coordinates and export pixels retain the same pipeline.
+Export metadata is a frozen catalog snapshot encoded separately from pixels;
+internal recipes, source names and asset paths are never embedded as descriptions.
 """
 from dataclasses import replace
 import hashlib
@@ -325,9 +327,13 @@ def estimate_export_bytes(width,height,options,fmt):
     return int(width*height*(6 if fmt=='tiff16' else 9)+4*1024**2)
 
 
-def export_image(path,recipe,destination,fmt,budget_mb,job_id,options=None,cache=None):
+def export_image(path,recipe,destination,fmt,budget_mb,job_id,options=None,cache=None,metadata_snapshot=None):
     options=ExportOptions.parse(options) if not isinstance(options,ExportOptions) else options
     if fmt not in ('tiff16','jpeg'): raise ValueError('Unknown export format')
+    from .export_metadata import xmp_packet, jpeg_segments
+    snapshot=metadata_snapshot or {}
+    packet=xmp_packet(snapshot)
+    segments=jpeg_segments(snapshot) if fmt=='jpeg' else b''
     dest=Path(destination).resolve(strict=True);source_path=Path(path).resolve(strict=True)
     own_cache=None
     if cache is None:
@@ -346,16 +352,16 @@ def export_image(path,recipe,destination,fmt,budget_mb,job_id,options=None,cache
                 for y in range(0,h,ROWS):
                     rgb,_=render_strip(plan,0,y,w,min(ROWS,h-y),options.space,options.output_sharpen)
                     yield np.rint(rgb*65535).astype(np.uint16)
-            description=json.dumps({'application':'LumaRAW 0.4.1','source':source_path.name,'recipe':recipe.dict(),'options':options.dict()},ensure_ascii=True)
             tifffile.imwrite(temp,data=strips(),shape=(h,w,3),dtype=np.uint16,photometric='rgb',rowsperstrip=ROWS,metadata=None,
-                             description=description,software='LumaRAW 0.4.1',iccprofile=icc_profile(options.space),bigtiff=h*w*6>3_800_000_000)
+                             software='LumaRAW 0.4.1',iccprofile=icc_profile(options.space),bigtiff=h*w*6>3_800_000_000,
+                             extratags=[(700,'B',len(packet),packet,True)] if packet else [])
         else:
             fd,name=tempfile.mkstemp(prefix=f'.lumaraw-{job_id}-',suffix='.pixels',dir=dest);os.close(fd);scratch=Path(name)
             pixels=np.memmap(scratch,mode='w+',dtype=np.uint8,shape=(h,w,3))
             for y in range(0,h,ROWS):
                 rgb,_=render_strip(plan,0,y,w,min(ROWS,h-y),options.space,options.output_sharpen)
                 pixels[y:y+len(rgb)]=np.rint(rgb*255).astype(np.uint8)
-            pixels.flush();Image.fromarray(pixels).save(temp,format='JPEG',quality=options.quality,subsampling=0,icc_profile=icc_profile(options.space));del pixels
+            pixels.flush();Image.fromarray(pixels).save(temp,format='JPEG',quality=options.quality,subsampling=0,icc_profile=icc_profile(options.space),extra=segments);del pixels
         with temp.open('rb') as f: os.fsync(f.fileno())
         stem=options.name.format(stem=source_path.stem,seq=job_id,width=w,height=h,space=options.space)
         # Sanitize only the source-derived stem; templates themselves were validated.

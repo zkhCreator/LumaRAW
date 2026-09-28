@@ -2,7 +2,8 @@
 
 Inputs: a photo and optional adjacent XMP sidecar. Outputs: supported descriptive
 fields, exact keyword paths, source fingerprints and unsupported-feature notes.
-Reads sidecars and standard TIFF/JPEG/PNG packets without decoding pixels. Sidecar
+Reads sidecars and TIFF/JPEG/PNG packets, including verified extended JPEG XMP,
+without decoding pixels. Sidecar
 properties override embedded properties. Never writes files or catalog rows and
 never translates Adobe Develop/ACR settings into a different rendering engine.
 Absent properties are omitted, not interpreted as permission to clear a catalog.
@@ -156,7 +157,7 @@ def embedded_packets(reader):
                 packets.append(entry[8:8+size] if size<=4 else reader.read(struct.unpack(order+'I',entry[8:])[0],size))
         return packets
     if head[:2] == b'\xff\xd8':
-        offset, packets = 2, []
+        offset, packets, chunks = 2, [], []
         signature = b'http://ns.adobe.com/xap/1.0/\0'
         extended = b'http://ns.adobe.com/xmp/extension/\0'
         for _ in range(4096):
@@ -166,7 +167,7 @@ def embedded_packets(reader):
             while marker[1] == 255:
                 marker = b'\xff'+reader.read(offset,1);offset += 1
             if marker[1] in (0xda,0xd9):
-                return packets
+                return assemble_jpeg(packets, chunks)
             if marker[1] == 1 or 0xd0 <= marker[1] <= 0xd7:
                 continue
             size = int.from_bytes(reader.read(offset,2),'big')
@@ -175,7 +176,17 @@ def embedded_packets(reader):
             if marker[1] == 0xe1:
                 prefix = reader.read(offset+2,min(size-2,len(extended)))
                 if prefix.startswith(extended):
-                    raise ValueError('Extended JPEG XMP requires an unsupported packet assembly')
+                    data = reader.read(offset+2+len(extended),size-2-len(extended))
+                    if len(data) <= 40:
+                        raise ValueError('Truncated extended JPEG XMP chunk')
+                    try:
+                        guid = data[:32].decode('ascii').upper()
+                    except UnicodeDecodeError as error:
+                        raise ValueError('Invalid extended JPEG XMP identifier') from error
+                    total,start = struct.unpack('>II',data[32:40])
+                    if total>MAX_PACKET or start+len(data)-40>total:
+                        raise ValueError('Extended JPEG XMP exceeds packet bounds')
+                    chunks.append((guid,total,start,data[40:]))
                 if prefix.startswith(signature):
                     packets.append(reader.read(offset+2+len(signature),size-2-len(signature)))
             offset += size
@@ -210,6 +221,46 @@ def embedded_packets(reader):
             offset += size+12
         raise ValueError('Too many PNG chunks')
     return []
+
+
+def assemble_jpeg(packets, chunks):
+    """Join only the extension explicitly referenced by standard XMP."""
+    import hashlib
+    key = '{http://ns.adobe.com/xmp/note/}HasExtendedXMP'
+    identifiers = set()
+    for packet in packets:
+        try:
+            root = ET.fromstring(packet, parser=ET.XMLParser(target=BoundedTree()))
+        except ET.ParseError as error:
+            raise ValueError('Malformed JPEG XMP XML') from error
+        for element in root.iter():
+            if key in element.attrib:
+                identifiers.add(element.attrib[key].upper())
+            if element.tag == key and element.text:
+                identifiers.add(element.text.upper())
+    if not identifiers:
+        return packets
+    if len(identifiers) != 1:
+        raise ValueError('Conflicting extended JPEG XMP identifiers')
+    identifier = identifiers.pop()
+    if len(identifier) != 32 or any(char not in '0123456789ABCDEF' for char in identifier):
+        raise ValueError('Invalid extended JPEG XMP identifier')
+    matches = [chunk for chunk in chunks if chunk[0] == identifier]
+    if not matches:
+        raise ValueError('Extended JPEG XMP is missing')
+    total = matches[0][1]
+    if not 0 < total <= MAX_PACKET or any(chunk[1] != total for chunk in matches):
+        raise ValueError('Invalid extended JPEG XMP size')
+    offset, parts = 0, []
+    for _, _, start, data in sorted(matches, key=lambda chunk: chunk[2]):
+        if start != offset or offset+len(data) > total:
+            raise ValueError('Extended JPEG XMP has overlapping or missing chunks')
+        parts.append(data)
+        offset += len(data)
+    combined = b''.join(parts)
+    if offset != total or hashlib.md5(combined, usedforsecurity=False).hexdigest().upper() != identifier:
+        raise ValueError('Extended JPEG XMP is incomplete or has an invalid checksum')
+    return [*packets, combined]
 
 
 def read_xmp(path):

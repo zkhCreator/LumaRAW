@@ -15,11 +15,17 @@ struct LibraryKeyword: Identifiable {
     let selectedCount: Int
     let selection: [Int]
     let revision: Int
+    let includeExport: Bool
+    let exportContaining: Bool
+    let exportSynonyms: Bool
     init?(_ row: [String:Any], revision: Int, selection: [Int]) {
         guard let id=row["id"] as? Int,let name=row["name"] as? String else { return nil }
         self.id=id;self.name=name;self.revision=revision;self.selection=selection
         path=row["path"] as? String ?? name;parentID=row["parent_id"] as? Int
         synonyms=row["synonyms"] as? [String] ?? []
+        includeExport=(row["include_export"] as? Int ?? 1) != 0
+        exportContaining=(row["export_containing"] as? Int ?? 1) != 0
+        exportSynonyms=(row["export_synonyms"] as? Int ?? 1) != 0
         hasChildren=row["has_children"] as? Bool ?? false
         photoCount=row["photo_count"] as? Int ?? 0;selectedCount=row["selected_count"] as? Int ?? 0
     }
@@ -101,12 +107,15 @@ extension Store {
         showKeywordEditor=true
     }
 
-    func saveKeyword(name: String, synonyms: [String], parentID: Int?, original: LibraryKeyword?, revision: Int, targets: [Photo]=[]) async -> Bool {
+    func saveKeyword(name: String, synonyms: [String], parentID: Int?, original: LibraryKeyword?, revision: Int, targets: [Photo]=[], includeExport: Bool?=nil, exportContaining: Bool?=nil, exportSynonyms: Bool?=nil) async -> Bool {
         guard !keywordBusy else { return false }
         keywordBusy=true;defer { keywordBusy=false }
         var params: [String:Any]=["name":name,"synonyms":synonyms,
             "parent_id":parentID as Any? ?? NSNull(),"expected_revision":revision]
         if let original { params["keyword_id"]=original.id }
+        if let includeExport { params["include_export"]=includeExport }
+        if let exportContaining { params["export_containing"]=exportContaining }
+        if let exportSynonyms { params["export_synonyms"]=exportSynonyms }
         if !targets.isEmpty { params["targets"]=targets.map { ["photo_id":$0.id,"expected_metadata_revision":$0.metadataRevision] } }
         do {
             _=try await Backend.call("save_keyword",params)

@@ -8,6 +8,7 @@ struct InspectorView:View {
     @State private var light=true
     @State private var color=true
     @State private var reset=false
+    @State private var exportMetadataPhoto: Int?
     var body:some View {
         ScrollView {
             VStack(alignment:.leading,spacing:18){
@@ -20,6 +21,7 @@ struct InspectorView:View {
                         if !p.title.isEmpty { Text(p.title).font(.headline) }
                         if !p.keywords.isEmpty { Text(p.keywords.joined(separator:", ")).font(.caption).foregroundStyle(.secondary) }
                         Button("Edit Metadata…") { Task { await s.prepareMetadataEditor() } }
+                        Button("Will Export…") { exportMetadataPhoto=p.id }
                         Button("Go to Folder in Library") { Task { await s.showPhotoFolder(p) } }
                     }
                     HStack(spacing:7){ForEach(1..<6){value in Button{s.rate(p.rating==value ? 0:value)}label:{Image(systemName:p.rating>=value ? "star.fill":"star").foregroundStyle(p.rating>=value ? Color.yellow:Color.secondary)}.accessibilityLabel("Rate \(value) \(value == 1 ? "star" : "stars")")};Spacer();Button{s.flag(p.flag==1 ? 0:1)}label:{Image(systemName:p.flag==1 ? "flag.fill":"flag")}}
@@ -98,6 +100,9 @@ struct InspectorView:View {
                 }
             }.padding(18).disabled(s.photo==nil || s.browsing || s.loading)
         }.background(.background)
+        .sheet(isPresented:Binding(get:{exportMetadataPhoto != nil},set:{if !$0 { exportMetadataPhoto=nil }})) {
+            if let exportMetadataPhoto { ExportMetadataSheet(photoID:exportMetadataPhoto) }
+        }
         .confirmationDialog("Reset all adjustments for this photo?",isPresented:$reset,titleVisibility:.visible){Button("Reset Adjustments",role:.destructive){s.apply(s.defaults)};Button("Cancel",role:.cancel){}}message:{Text("The original is unchanged. You can undo this action.")}
     }
     func bool(_ key:String)->Binding<Bool>{Binding(get:{s.recipe[key] as? Bool ?? false},set:{s.set(key,$0)})}

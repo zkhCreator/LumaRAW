@@ -26,6 +26,8 @@ Official references checked September 2026:
 - [Metadata storage and supported workflows](https://helpx.adobe.com/lightroom-classic/desktop/organize-photos-in-lightroom-classic/metadata-basics-actions.html)
 - [XMP basic properties](https://developer.adobe.com/xmp/docs/xmp-namespaces/xmp/) and [Dublin Core properties](https://developer.adobe.com/xmp/docs/xmp-namespaces/dc/)
 - [Hierarchical keywords, synonyms and export options](https://helpx.adobe.com/lightroom-classic/desktop/organize-photos-in-lightroom-classic/keywords.html)
+- [Export metadata and hierarchy settings](https://helpx.adobe.com/lightroom-classic/desktop/export-photos/export-files-disk-or-cd.html)
+- [XMP specifications, including Part 3 storage and Extended JPEG](https://developer.adobe.com/xmp/docs/xmp-specifications/)
 
 ## Feature inventory
 
@@ -36,7 +38,7 @@ gaps. Nothing below is full Lightroom parity merely because historical tests pas
 | --- | --- | --- |
 | Import and catalogs | Partial: referenced originals, backup/restore | Import preview/selection, copy workflows, metadata/develop presets, tethered capture, catalog switching/merge |
 | Library navigation | Partial: bounded grid/filmstrip, folder tree/search/favorites/labels, durable missing-folder relocation and folder synchronization, direct/recursive sources, filters/sorting, regular/smart/Quick collections and nested sets | Multi-source selection, complete sync Import Dialog/duplicate policy, folder move/rename, relocation overlap/collision handling, collection drag/drop/color labels, full smart criteria/import-export, source-selection memory, desktop acceptance |
-| Organization | Partial: duplicate/missing detection, hierarchical keywords/synonyms, title/caption/copyright, labels, batch metadata, virtual copies, manual/split/capture-time scoped stacks | Keyword export policies/sets/import-export/undo/Painter, complete IPTC, stack interaction acceptance, rename and sidecars |
+| Organization | Partial: duplicate/missing detection, hierarchical keywords/synonyms/export flags/Will Export preview, title/caption/copyright, labels, batch metadata, virtual copies, manual/split/capture-time scoped stacks | Keyword policy reference acceptance, sets/import-export/undo/Painter, complete IPTC, stack interaction acceptance, rename and sidecars |
 | Culling | Partial: Loupe/Compare/Survey, linked detail, anchored page selection | Desktop acceptance, cross-page selection, Develop reference view, auto advance, persistent workspace state |
 | Basic development | Partial: light/WB/color | Calibrated absolute WB, eyedropper, texture/clarity/dehaze, complete HSL/B&W and color grading |
 | Curves and profiles | Partial: custom composite curve, LUT/ICC | Interactive RGB curves, camera/profile browser, compatible preset import/export |
@@ -45,7 +47,7 @@ gaps. Nothing below is full Lightroom parity merely because historical tests pas
 | Local editing | Partial: radial/gradient/brush/luma | Mask list/edit/reorder/intersection, range masks, clone/heal, red-eye (non-AI) |
 | History and presets | Partial: 50-step undo, shared named snapshots | Redo, navigable history, preset management and import-time/batch application |
 | Preview/performance | Partial: Metal, proxies, 1:1 viewport, developed thumbnail fast path | Real-RAW catalog/slider latency, offline previews, cache controls and desktop acceptance |
-| Export | Partial: JPEG/16-bit TIFF, ICC, durable jobs | Presets, metadata policies, watermark, additional formats, publish workflows |
+| Export | Partial: JPEG/16-bit TIFF, ICC, durable jobs with frozen catalog XMP and keyword hierarchy options | Presets, complete EXIF/IPTC/contact/location metadata policies, watermark, additional formats, publish workflows |
 | External editing and video | Missing | External-editor setup and derivative round trips; supported video import/playback, frame capture, trimming and export |
 | Merge | Missing | Non-AI HDR merge and panorama with bounded resources and reference acceptance |
 | Map | Missing | GPS metadata, map navigation, track import, location editing with explicit persistence |
@@ -57,9 +59,10 @@ gaps. Nothing below is full Lightroom parity merely because historical tests pas
 
 ## Active increment
 
-Durable folder synchronization, selectable recursive imports, missing-family
-catalog removal, supported external metadata reads and large-catalog performance.
-Keyword export workflows follow; the remaining inventory stays in scope.
+Keyword export policies, Will Export previews, frozen export metadata and actual
+JPEG/TIFF XMP output. First close the reproduced folder-sync metadata response
+size gap, then continue keyword sets and vocabulary exchange. The remaining
+inventory stays in scope.
 
 ## Evidence log
 
@@ -107,7 +110,7 @@ whole-desktop latency, or performance guarantees on other hardware. Reproduce vi
 
 ### Next work
 
-Continue with keyword export workflows, complete synchronization import options, relocation edge cases, stack ordinal badges and
+Continue with bounded folder-sync metadata review, keyword sets and vocabulary exchange, complete synchronization import options, relocation edge cases, stack ordinal badges and
 cross-page cover focus. Offline preview caches,
 cache-size controls and native polling/process-startup costs remain pending. Then close Develop and
 export gaps in the inventory. Preserve pending desktop/older-OS acceptance rather
@@ -808,3 +811,77 @@ sets and XMP writing. Extreme metadata payloads across broker pages still need
 acceptance. Rendered desktop, keyboard/VoiceOver and macOS 14 runtime remain
 unverified. Physical folder move/rename and the rest of the non-AI inventory stay
 in scope.
+
+### Keyword export and frozen metadata increment
+
+Keyword forms persist Include on Export, Export Containing Keywords and Export
+Synonyms. A read-only Will Export sheet shows the active photo's resolved words
+and hierarchy in 60-item pages. Excluded names/synonyms are omitted, including
+from hierarchy paths; containing traversal stops at each ancestor's policy.
+Duplicate words are folded consistently while assignments retain their stable IDs.
+The Export sheet offers None, Copyright Only, or Catalog Descriptions and Keywords,
+plus optional hierarchy. These choices do not claim complete Lightroom metadata
+policy support or arbitrary checkbox-combination equivalence.
+
+Submission freezes descriptive fields, keyword rules and resolved arrays together
+with recipes/options and the idempotency receipt. Existing queued jobs migrate
+with empty metadata instead of inheriting later edits. Queue pages expose compact
+counts/digests rather than large packets. JPEG writes standard or Adobe Extended
+XMP; TIFF writes tag 700. TIFF descriptions no longer contain internal recipes or
+source/asset paths. ICC and pixel processing remain independent of metadata.
+Extended JPEG reads validate identifiers, sizes, chunk continuity and checksums.
+XML-invalid or overlarge snapshots fail the entire submission before image work.
+
+Required-Metal Python regression: **298 passed, no skips**, including the pinned
+Nikon D3S NEF, exact decoded-pixel/ICC comparisons, UTF-8 XMP, extension corruption,
+atomic invalid-batch rollback, genuine v10 migration/rollback, backup/restore and
+a snapshot larger than 256 KiB through a real image worker.
+
+All **15 native suites passed 264 assertions against the final packaged engine**,
+including 16 export-metadata checks. The macOS 14-target build and local ad-hoc
+signature verification passed on macOS 26.6.2; its embedded manifest matches
+generation 9 / schema 11 / 73 tools. The public source scanner checked 239 files
+without findings. State/IPC checks do not establish desktop or older-OS acceptance.
+
+The final packaged engine also passed the real Nikon D3S synchronization/copy
+probe. Full-size 4284×2844 JPEG/TIFF16 retained each variant's submitted title,
+rating, public keyword and synonym after later catalog changes; a private ancestor
+was absent. ICC profiles and actual Metal dispatch were present, and original and
+private-copy hashes stayed unchanged. Discovery/application took 25.856 ms, two
+exports took 2.265 seconds, and worker peak was 275.7 MB. Metadata reads were warm,
+pixels started cold and the second variant could reuse decoding. Native compilation
+ran concurrently; these timings are integration diagnostics, not throughput claims.
+
+Synthetic warm metadata/SQLite timings on macOS 26.6.2 arm64, 128 GB RAM. Both
+catalogs have 1,010 keywords and two direct assignments per photo; leaf synonyms
+expand exported words. Preview and queue reads use 30 samples; each submission
+size uses five samples. Image jobs remain paused throughout.
+
+| Operation | 10,000 photos median / p95 | 100,000 photos median / p95 |
+| --- | ---: | ---: |
+| Keyword preview | 1.541 / 1.707 ms | 1.571 / 6.840 ms |
+| Hierarchy preview | 1.522 / 1.666 ms | 1.548 / 1.849 ms |
+| Submit 60 frozen exports | 10.284 / 10.460 ms | 10.718 / 10.779 ms |
+| Submit 1,000 frozen exports | 116.593 / 141.014 ms | 125.168 / 126.787 ms |
+| Read 60 public jobs | 3.633 / 4.194 ms | 3.666 / 4.245 ms |
+| Peak process RSS | 52.84 MB | 59.72 MB |
+
+The 60-job public JSON was 43,396 / 43,522 bytes while all 5,300 submitted snapshots
+used 1,664,250 bytes per catalog. No workers ran. These measurements exclude real
+photographs, RAW processing, IPC and desktop latency. Reproduce with
+tests/export_metadata_probe.py.
+
+Remaining metadata parity includes camera EXIF, legacy IPTC IIM, full IPTC/contact/
+GPS policies, custom labels, sidecar writing and vocabulary exchange. Large exported
+synonym expansions can exceed the reader's 100 direct-keyword assignment limit;
+hierarchy/flat-keyword reimport semantics still need reference acceptance. Keyword
+sets, suggestions, undo and Painter remain pending. Rendered Mac interactions,
+VoiceOver and macOS 14 runtime are unverified; build/state tests do not establish
+those checks. The complete non-AI inventory remains in scope.
+
+Follow-up evidence: 60 generated 4×4 PNGs, each with a valid 5,000-character XMP
+caption containing four-byte Unicode, produce a ready sync plan with 60 metadata
+updates. Its serialized response is 1,215,035 bytes, exceeding the 1,048,576-byte
+broker limit. This is a confirmed review/transport gap, not an image-processing
+failure. Keep the full scanned values in staging; provide compact list summaries
+and bounded detail access before claiming this edge case is accepted.

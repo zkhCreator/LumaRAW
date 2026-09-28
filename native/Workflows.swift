@@ -13,6 +13,9 @@ struct ExportSheet:View {
     @State private var destination=""
     @State private var edge=0
     @State private var quality=96
+    @State private var metadata="catalog"
+    @State private var keywordHierarchy=false
+    @State private var metadataPhoto: Int?
     @State private var submitting=false
     var body:some View {
         VStack(alignment:.leading,spacing:20){
@@ -25,11 +28,20 @@ struct ExportSheet:View {
                 Picker("Size",selection:$edge){Text("Full Size").tag(0);Text("Long Edge: 4096 px").tag(4096);Text("Long Edge: 2048 px").tag(2048);Text("Long Edge: 1280 px").tag(1280)}
                 if format=="jpeg"{Stepper("JPEG Quality: \(quality)",value:$quality,in:1...100)}
                 TextField("Filename Template",text:$name)
+                Picker("Metadata",selection:$metadata) {
+                    Text("None").tag("none");Text("Copyright Only").tag("copyright");Text("Catalog Descriptions and Keywords").tag("catalog")
+                }
+                Toggle("Write Keywords as Lightroom Hierarchy",isOn:$keywordHierarchy).disabled(metadata != "catalog")
+                Text("Includes supported catalog fields and keyword export rules. Camera EXIF, GPS and Develop settings are not copied.").font(.caption).foregroundStyle(.secondary)
+                Button("Preview Metadata for Active Photo…") { metadataPhoto=s.selected ?? s.selection.sorted().first }.disabled(s.selected == nil && s.selection.isEmpty)
                 Text("Available: {stem} {seq} {width} {height} {space}").font(.caption).foregroundStyle(.secondary)
                 HStack{Text(destination.isEmpty ? "Choose an export folder":destination).lineLimit(2).font(.callout).textSelection(.enabled);Spacer();Button("Choose…"){let panel=NSOpenPanel();panel.canChooseDirectories=true;panel.canChooseFiles=false;panel.canCreateDirectories=true;if panel.runModal() == .OK{destination=panel.url?.path ?? ""}}}
             }.formStyle(.grouped)
-            HStack{Text("Existing files are preserved · ICC embedded").font(.caption).foregroundStyle(.secondary);Spacer();Button("Cancel"){dismiss()}.keyboardShortcut(.cancelAction);Button(submitting ? "Submitting…":"Add to Queue"){submitting=true;Task{await s.export(destination,format,["space":space,"max_edge":edge,"quality":quality,"name":name]);submitting=false}}.buttonStyle(.borderedProminent).keyboardShortcut(.defaultAction).disabled(destination.isEmpty || submitting)}
+            HStack{Text("Existing files are preserved · ICC embedded").font(.caption).foregroundStyle(.secondary);Spacer();Button("Cancel"){dismiss()}.keyboardShortcut(.cancelAction);Button(submitting ? "Submitting…":"Add to Queue"){submitting=true;Task{await s.export(destination,format,["space":space,"max_edge":edge,"quality":quality,"name":name,"metadata":metadata,"keyword_hierarchy":keywordHierarchy]);submitting=false}}.buttonStyle(.borderedProminent).keyboardShortcut(.defaultAction).disabled(destination.isEmpty || submitting)}
         }.padding(24).frame(width:660)
+            .sheet(isPresented:Binding(get:{metadataPhoto != nil},set:{if !$0 { metadataPhoto=nil }})) {
+                if let metadataPhoto { ExportMetadataSheet(photoID:metadataPhoto,metadata:metadata,hierarchy:keywordHierarchy) }
+            }
     }
 }
 struct QueueView:View {

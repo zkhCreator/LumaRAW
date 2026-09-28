@@ -95,6 +95,9 @@ struct KeywordEditor: View {
     @State private var includePhotos=false
     @State private var name: String
     @State private var synonyms: String
+    @State private var includeExport: Bool
+    @State private var exportContaining: Bool
+    @State private var exportSynonyms: Bool
     @State private var parentID: Int?
     @State private var parentName: String
     @State private var choosingParent=false
@@ -104,6 +107,9 @@ struct KeywordEditor: View {
         self.original=original;self.revision=revision;self.targets=targets
         _name=State(initialValue:original?.name ?? "")
         _synonyms=State(initialValue:original?.synonyms.joined(separator:", ") ?? "")
+        _includeExport=State(initialValue:original?.includeExport ?? true)
+        _exportContaining=State(initialValue:original?.exportContaining ?? true)
+        _exportSynonyms=State(initialValue:original?.exportSynonyms ?? true)
         _parentID=State(initialValue:original?.parentID ?? parent?.id)
         let oldPath=original?.path.components(separatedBy:" | ").dropLast().joined(separator:" | ") ?? ""
         _parentName=State(initialValue:parent?.path ?? (oldPath.isEmpty ? "None":oldPath))
@@ -116,6 +122,9 @@ struct KeywordEditor: View {
                 TextField("Keyword",text:$name)
                 TextField("Synonyms, separated by commas",text:$synonyms)
                 Button("Inside: \(parentName)") { choosingParent=true }
+                Toggle("Include on Export",isOn:$includeExport)
+                Toggle("Export Containing Keywords",isOn:$exportContaining)
+                Toggle("Export Synonyms",isOn:$exportSynonyms).disabled(!includeExport)
                 if original == nil {
                     Toggle("Add to \(targets.count) Selected Photos",isOn:$includePhotos).disabled(targets.isEmpty)
                 }
@@ -129,7 +138,7 @@ struct KeywordEditor: View {
                     saving=true
                     Task {
                         let aliases=synonyms.components(separatedBy:",").map { $0.trimmingCharacters(in:.whitespacesAndNewlines) }.filter { !$0.isEmpty }
-                        if await s.saveKeyword(name:name,synonyms:aliases,parentID:parentID,original:original,revision:revision,targets:includePhotos ? targets:[]) { dismiss() }
+                        if await s.saveKeyword(name:name,synonyms:aliases,parentID:parentID,original:original,revision:revision,targets:includePhotos ? targets:[],includeExport:includeExport,exportContaining:exportContaining,exportSynonyms:exportSynonyms) { dismiss() }
                         saving=false
                     }
                 }.keyboardShortcut(.defaultAction).disabled(name.trimmingCharacters(in:.whitespacesAndNewlines).isEmpty)

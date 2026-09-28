@@ -88,7 +88,7 @@ def test_tiff16_precision_icc_and_no_source_overwrite(tmp_path, raster):
         assert a.dtype == np.uint16
         assert a.shape == original.shape
         assert tiff.pages[0].tags[34675].value[36:40] == b'acsp'
-        assert json.loads(tiff.pages[0].description)['recipe']['exposure'] == 0
+        assert 270 not in tiff.pages[0].tags  # Internal recipes/paths never become image descriptions.
     assert not list(tmp_path.glob('.lumaraw-*'))
 
 

@@ -111,8 +111,11 @@ batch leaves every target unchanged.
 strings. A replacement string list accepts `parent | child`, `parent > child` or
 `child < parent`; ambiguous bare leaf names fail. `filters.keyword_id` selects a
 stable tag plus descendants; name and synonym filters can match multiple branches.
-Tag IDs are never reused after deletion. Synonyms are searchable catalog terms;
-XMP and exported-image keyword policies are not yet implemented. Limits are 32
+Tag IDs are never reused after deletion. Synonyms are searchable catalog terms.
+Keyword forms accept optional `include_export`, `export_containing` and
+`export_synonyms` booleans. Omitted flags preserve existing values; new tags default
+to true. Parents can stop further ancestor traversal. Excluded names/synonyms are
+also omitted from hierarchy paths. Limits are 32
 levels, 30 synonyms per tag and 100 direct tags per photo.
 
 ## Folder sources
@@ -244,6 +247,15 @@ original applies to its family, including eligible jobs from removed copies.
 
 - `lumaraw_sync_photos` copies only named groups and requires every target's current revision; `Composition`, `Local Masks`, `Camera Profile` and `LUT` are separate explicit choices.
 - `lumaraw_enqueue_exports` requires a new `request_key` per logical submission. Persist and reuse that same key for an uncertain submission retry. The same key with changed arguments is rejected. Queue parameters are immutable snapshots; later edits do not change pending exports.
+- `preview_export_metadata` reads one photo's resolved metadata with `kind:keywords`
+  or `hierarchy`, a 60-item `offset` page and optional export policies. Export
+  options accept `metadata:catalog` (default), `copyright` or `none`, and
+  `keyword_hierarchy` (default false). These cover supported catalog descriptions,
+  ratings/labels and keywords; they do not claim full EXIF/IPTC/GPS copying. Respect
+  the user's intended metadata scope. Metadata and resolved keywords are frozen
+  with recipes at submission. Public jobs return `export_metadata` counts/policy/
+  digest, while full snapshots stay in the catalog. Legacy jobs retain empty
+  snapshots. Original metadata files are never rewritten by export.
 - Supply `photo_ids`, `destination`, `format` (`tiff16` or `jpeg`) and optional `options` (`space`: `srgb`, `p3`, `adobe`, `prophoto`; `max_edge`; `quality`; `name`). Inspect `lumaraw_list_jobs` until all requested IDs complete. It lists the most recent 60; use `lumaraw_get_job` for an individual durable receipt beyond that page.
 - Report actual output paths, failures and cancellations. A job queued is not a job completed. Recovered tasks remain interrupted; retry only when consistent with the user's requested work. After an interrupted publication, inspect the destination before retrying. Existing files are never overwritten.
 - Pause takes effect after the current image. Cancel stops an active worker and pending jobs. A file published just before cancellation can remain. `retry` covers failed/interrupted jobs; `retry_cancelled` is a separate explicit action.

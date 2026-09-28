@@ -93,7 +93,7 @@ small raster files and separate disposable catalogs, then runs the
 14-assertion thumbnail, 21-assertion collection-tree, 19-assertion virtual-copy,
 10-assertion service-connection, 22-assertion stack, 19-assertion auto-stack,
 24-assertion folder, 25-assertion keyword, 17-assertion folder-relocation and
-17-assertion folder-synchronization suites.
+17-assertion folder-synchronization, and 16-assertion export-metadata suites.
 Each suite has its own
 fresh image directory, so a relink test cannot move another suite's fixture. The library suite checks
 live smart membership, text search/sort, pagination, empty-filter selection,
@@ -127,6 +127,28 @@ migration. `test_xmp_read.py` verifies supported RDF fields, sidecar precedence,
 standard embedded TIFF/JPEG/PNG packets, bounded XML/headers, unsupported values
 and unchanged source hashes. These fixtures do not prove Adobe pixel equivalence.
 
+The export-metadata native suite covers keyword flags, read-only preview paging
+and revisions, metadata choices, immutable submitted receipts and an actual JPEG
+containing the submitted keywords after later catalog edits. `test_keyword_exports.py`
+adds genuine v10 migration/rollback, intermediate ancestor policy boundaries,
+batch XML failure rollback, backup/restore and a snapshot larger than 256 KiB
+through a real worker. `test_export_metadata.py` verifies JPEG Extended XMP
+reassembly/checksums and TIFF tag 700, Unicode text, malformed/bounded payloads,
+unchanged source hashes and identical decoded pixels/ICC with and without metadata.
+These are format and application contracts; current Lightroom checkbox combinations
+and full metadata round trips still require reference-app acceptance.
+
+```sh
+.venv/bin/python tests/export_metadata_probe.py --work work/export-metadata-10k --rows 10000 --samples 30
+.venv/bin/python tests/export_metadata_probe.py --work work/export-metadata-100k --rows 100000 --samples 30
+```
+
+This warm metadata-only probe measures preview pages and frozen export submission
+against synthetic catalogs with 1,010 tags and two assignments per photo. It
+samples 60- and 1,000-photo submissions five times, previews/queue pages 30 times,
+and checks compact public receipts, snapshot storage and RSS. Jobs stay paused;
+there are no image workers, actual photographs, IPC or rendered UI measurements.
+
 ```sh
 .venv/bin/python tests/folder_sync_probe.py --work work/folder-sync-10k --rows 10000
 .venv/bin/python tests/folder_sync_probe.py --work work/folder-sync-100k --rows 100000
@@ -147,7 +169,8 @@ for metadata performance and are not evidence of supported image decoding.
 This packaged integration probe discovers a private RAW copy through folder sync,
 reads a generated sidecar, reports unsupported Adobe Develop settings, and creates
 a virtual copy. A later metadata sync preserves the copy's independent description
-and two already-frozen exports. It checks full-size JPEG/16-bit TIFF, ICC tags,
+and two already-frozen exports. Exported XMP must retain each variant's submitted
+title and keywords/synonyms while excluding a private ancestor. It checks full-size JPEG/16-bit TIFF, ICC tags,
 positive Metal dispatch and unchanged fixture/copy hashes. Integration timing may
 include concurrent compiler activity; it is not a controlled throughput benchmark.
 

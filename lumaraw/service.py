@@ -35,6 +35,7 @@ from .source_identity import cached_thumbnail
 from .runtime import engine_identity, EngineChangedError
 from .folder_sync import FolderSync
 from .folder_sync_runner import FolderSyncRunner
+from .keyword_exports import KeywordExports
 
 class ConflictError(ValueError): pass
 
@@ -44,7 +45,7 @@ def executable_args():
 def unpack(row):
     if row:
         row=dict(row)
-        for key in ('recipe','metadata','options','processing'):
+        for key in ('recipe','metadata','options','processing','export_metadata'):
             if key in row and isinstance(row[key],str): row[key]=json.loads(row[key])
     return row
 
@@ -205,6 +206,7 @@ class Service:
                 offset=min(offset,max(0,((total-1)//60)*60))
                 return {'photos':c.filtered_page(offset,mode,search,filters,collection,p.get('sort','imported'),p.get('descending',True),stacked,folder,subfolders),'total':total,'offset':offset,'page_size':60,'stack_revision':Stacks(c).revision(),'folder_revision':Folders(c).revision(),'keyword_revision':Keywords(c).revision()}
             if method=='stack_state':return {'revision':Stacks(c).revision()}
+            if method=='preview_export_metadata':return KeywordExports(c).preview(**p)
             if method=='stack_photos':return Stacks(c).change(**p)
             if method=='set_stack_visibility':return Stacks(c).visibility(**p)
             if method=='preview_auto_stack':return AutoStacks(c).preview(**p)
@@ -273,14 +275,14 @@ class Service:
                 dest=Path(p['destination']).expanduser().resolve();dest.mkdir(parents=True,exist_ok=True)
                 ids=[]
                 with c.db:
+                    c.db.execute('BEGIN IMMEDIATE')
                     for row in rows:
-                        cur=c.db.execute('INSERT INTO jobs(photo_id,source,recipe,destination,format,created,options,priority,source_id) VALUES(?,?,?,?,?,?,?,?,?)',
-                            (row['id'],row['path'],row['recipe'],str(dest),p['format'],time.time(),json.dumps(options.dict()),options.priority,row['source_id']));ids.append(cur.lastrowid)
+                        ids.append(c.enqueue_one(row,dest,p['format'],options))
                     result={'job_ids':ids,'queued':len(ids)}
                     c.db.execute('INSERT INTO requests VALUES(?,?,?)',(p['request_key'],digest,json.dumps(result)))
                 self.wake.set();return result
             if method=='get_job':
-                row=c.db.execute('SELECT * FROM jobs WHERE id=?',(p['job_id'],)).fetchone()
+                row=c.db.execute('SELECT '+c.job_columns()+' FROM jobs WHERE id=?',(p['job_id'],)).fetchone()
                 if not row:raise ValueError('Job does not exist')
                 return unpack(dict(row))
             if method=='list_jobs':return {'jobs':[{k:v for k,v in unpack(j).items() if k!='recipe'} for j in c.jobs(60)],'counts':c.job_counts(),'paused':self.paused,'active':self.active}
@@ -371,6 +373,9 @@ class Service:
             memory=self.memory_status();budget=memory['effective_budget_mb']
             request={**request,'cache':str(self.cache),'budget_mb':budget,'parent_pid':os.getpid(),
                      'compute_backend':self.compute_backend,'engine_identity':self.worker_identity}
+            payload=json.dumps(request,ensure_ascii=False,allow_nan=False).encode()+b'\n'
+            if len(payload)>8*1024*1024:
+                raise ValueError('Image worker request exceeds 8 MiB')
             env={**os.environ,'OMP_NUM_THREADS':'2','OPENBLAS_NUM_THREADS':'1','VECLIB_MAXIMUM_THREADS':'2'}
             with tempfile.TemporaryFile() as output,tempfile.TemporaryFile() as errors:
                 with self.state_lock:
@@ -380,7 +385,7 @@ class Service:
                     self.active={'operation':request['operation'],'pid':process.pid,'job_id':request.get('job_id'),'client_id':request.get('client_id'),'generation':request.get('generation')};self.process=process;self.cancelled=False
                 peak=0;failure=None;started=time.monotonic()
                 try:
-                    process.stdin.write(json.dumps(request,allow_nan=False).encode()+b'\n');process.stdin.close()
+                    process.stdin.write(payload);process.stdin.close()
                     while process.poll() is None:
                         try:
                             peak=max(peak,psutil.Process(process.pid).memory_info().rss/1024**2)
@@ -424,7 +429,8 @@ class Service:
             if not job:continue
             try:
                 result=self.run_worker({'operation':'export','path':job['source'],'recipe':json.loads(job['recipe']),
-                    'destination':job['destination'],'format':job['format'],'job_id':job['id'],'options':json.loads(job['options'])})
+                    'destination':job['destination'],'format':job['format'],'job_id':job['id'],'options':json.loads(job['options']),
+                    'metadata_snapshot':json.loads(job['metadata_snapshot'])})
                 with self.catalog() as c:
                     c.finish_job(job['id'],'done',peak_mb=result['peak_mb'],output=result['output'])
                     with c.db:c.db.execute('UPDATE jobs SET processing=? WHERE id=?',(json.dumps(result.get('processing',{})),job['id']))

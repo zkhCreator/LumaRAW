@@ -44,7 +44,7 @@ Keep the explicit publication allowlist current when adding public documentation
   and MCP use the same versioned command/service contracts.
 - Revision conflicts fail visibly. Never retry a stale mutation by overwriting a
   newer revision. Validate all targets before transactional batch mutations.
-- Freeze export recipes/options at submission. Preserve collision-safe output,
+- Freeze export recipes/options/metadata at submission. Preserve collision-safe output,
   idempotent requests, cancellation and explicit crash-recovery decisions.
 - Use bounded queries, pages, worker concurrency, caches and memory. Never load
   a whole catalog to filter or sort it. Keep CPU reference/fallback behavior and

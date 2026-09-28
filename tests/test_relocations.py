@@ -284,7 +284,10 @@ def test_v8_migration_preserves_tables_and_rolls_back_trigger_replacement(tmp_pa
         c = Catalog(tmp_path/'legacy')
     path = tmp_path/'legacy-photo.png';Image.new('RGB',(8,8)).save(path)
     c.import_paths([path]);c.edit(1,Recipe(exposure=1.25));c.save_version(1,'Keep')
-    c.enqueue([1],tmp_path/'legacy-output','jpeg')
+    # Populate the actual v8 job shape without current export-snapshot methods.
+    with c.db:
+        c.db.execute('INSERT INTO jobs(photo_id,source,recipe,destination,format,created,source_id) '
+                     "SELECT id,path,recipe,?,'jpeg',0,source_id FROM photos WHERE id=1",(str(tmp_path/'legacy-output'),))
     with c.db:
         tag = c.db.execute("INSERT INTO keywords(name,normalized) VALUES('Coast','coast')").lastrowid
         c.db.execute('INSERT INTO keyword_photos VALUES(?,?)',(1,tag))

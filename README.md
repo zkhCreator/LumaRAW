@@ -16,8 +16,8 @@ LumaRAW references your originals without changing them. The SwiftUI app and you
 | Local adjustments | Radial, gradient, luminance-range, and brush masks; manual lens distortion, vignette, and chromatic-aberration correction |
 | Library | Folder tree/search/favorites/labels, ratings, flags, catalog metadata/keywords, regular/live smart collections, nested sets, Quick/target collections, SQL filters/sorting, manual/capture-time stacks, duplicate/missing indexing, virtual copies/shared snapshots, selective sync, and backup/restore |
 | Culling | Grid/Loupe/Compare/Survey, anchored page selections, active-photo review actions, linked or independent full-resolution comparison viewports |
-| Export | JPEG and 16-bit TIFF with embedded sRGB, Display P3, Adobe RGB, or ProPhoto RGB ICC profiles; persistent queue, pause/cancel/retry, and collision-safe filenames |
-| Agents | 72 MCP tools, equivalent JSON CLI commands, and a bundled skill; app and agent edits share conflict detection |
+| Export | JPEG and 16-bit TIFF with embedded sRGB, Display P3, Adobe RGB, or ProPhoto RGB ICC profiles; frozen catalog XMP/keyword policies, persistent queue, pause/cancel/retry, and collision-safe filenames |
+| Agents | 73 MCP tools, equivalent JSON CLI commands, and a bundled skill; app and agent edits share conflict detection |
 
 ## Build and run
 
@@ -140,8 +140,23 @@ also includes nested keywords and clears other source/filter restrictions.
 The metadata editor accepts qualified paths such as `Places | Coast` (also `>` or
 reversed `<`). Equal leaf names under different parents retain separate IDs;
 ambiguous unqualified names require a path. Keyword changes remain in the catalog.
-XMP/export keyword policies, keyword sets, Painter, import/export of word lists,
-unused-tag purge and metadata undo remain pending.
+Keyword forms include **Include on Export**, **Export Containing Keywords** and
+**Export Synonyms**. Each parent can stop traversal to higher ancestors; excluded
+names and their synonyms are omitted from flat keywords and hierarchy paths.
+**Will Export…** in the inspector previews resolved words and hierarchy pages.
+Keyword sets, Painter, vocabulary file exchange, unused-tag purge and metadata
+undo remain pending.
+
+The export sheet offers **None**, **Copyright Only**, or **Catalog Descriptions
+and Keywords**, plus optional Lightroom hierarchy paths. The catalog option
+includes title, caption, copyright, rating/rejection and standard color labels.
+Exported JPEG/TIFF files contain XMP; large JPEG keyword packets use Extended XMP.
+Recipes, local asset paths and source filenames are not embedded as descriptions.
+ICC profiles remain embedded regardless of metadata policy. Camera EXIF, GPS,
+complete IPTC and Adobe Develop metadata copying remain incomplete.
+Recipes, metadata and resolved keyword policies are frozen together at submission;
+later edits, renames, removals and policy changes do not alter pending jobs.
+Legacy queued jobs retain their original empty descriptive-metadata snapshot.
 
 Use **Collections → New Collection** to create a regular collection or a smart
 collection with live rules. Add/remove selected photos from a regular collection

@@ -159,7 +159,11 @@ class ExportOptions:
     output_sharpen: float = 0
     name: str = '{stem}-Luma-{seq}'
     priority: int = 0
+    metadata: str = 'catalog'
+    keyword_hierarchy: bool = False
     def __post_init__(self):
+        if self.metadata not in ('none','copyright','catalog') or type(self.keyword_hierarchy) is not bool:
+            raise ValueError('Unsupported export metadata policy')
         if self.space not in ('srgb','adobe','p3','prophoto'):
             raise ValueError('Unsupported output color space')
         if type(self.max_edge) is not int or not 0 <= self.max_edge <= 16000 or type(self.quality) is not int or not 1 <= self.quality <= 100:

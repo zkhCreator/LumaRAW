@@ -18,6 +18,7 @@ import tifffile
 
 from bundle_probe import digest
 from lumaraw.bridge import call,endpoint
+from lumaraw.xmp_read import read_xmp
 
 
 def main():
@@ -73,18 +74,26 @@ def main():
         master=next(p for p in rpc('list_photos',{'stacked':False})['photos'] if p['path']==str(source))
         master=rpc('get_photo',{'photo_id':master['id']})
         assert master['title']=='Raw discovery' and master['rating']==4 and master['recipe']['exposure']==0
+        private=rpc('save_keyword',{'name':'Private category','include_export':False,
+            'expected_revision':rpc('library_state')['keyword_revision']})['keyword_id']
+        tag=rpc('save_keyword',{'name':'Coast','synonyms':['Shore'],'parent_id':private,
+            'expected_revision':rpc('library_state')['keyword_revision'],
+            'targets':[{'photo_id':master['id'],'expected_metadata_revision':master['metadata_revision']}]})['keyword_id']
+        master=rpc('get_photo',{'photo_id':master['id']})
         copy=rpc('create_virtual_copies',{'targets':[{'photo_id':master['id'],
             'expected_revision':master['revision'],'expected_metadata_revision':master['metadata_revision']}]})['photos'][0]
         rpc('edit_photo',{'photo_id':copy['id'],'expected_revision':copy['revision'],'patch':{'exposure':1.0}})
+        rpc('edit_metadata',{'targets':[{'photo_id':copy['id'],'expected_metadata_revision':copy['metadata_revision']}],
+            'patch':{'title':'Variant snapshot'}})
         jobs=[]
         for photo_id,fmt in ((master['id'],'tiff16'),(copy['id'],'jpeg')):
             jobs+=rpc('enqueue_exports',{'photo_ids':[photo_id],'destination':str(root/'exports'),'format':fmt,
-                'options':{'max_edge':0},'request_key':f'folder-sync-{fmt}'})['job_ids']
+                'options':{'max_edge':0,'keyword_hierarchy':True},'request_key':f'folder-sync-{fmt}'})['job_ids']
         frozen=[rpc('get_job',{'job_id':id_}) for id_ in jobs]
         sidecar.write_text(sidecar.read_text().replace('Raw discovery','After queue'))
         _,updated=sync(folder)
         assert updated['modified']==1
-        assert rpc('get_photo',{'photo_id':copy['id']})['title']=='Raw discovery'
+        assert rpc('get_photo',{'photo_id':copy['id']})['title']=='Variant snapshot'
         assert [rpc('get_job',{'job_id':id_}) for id_ in jobs]==frozen
         started=time.perf_counter();rpc('queue_control',{'action':'resume'})
         deadline=time.monotonic()+120
@@ -95,6 +104,9 @@ def main():
         assert all(row['state']=='done' for row in receipts),receipts
         dimensions=[]
         for row in receipts:
+            exported=read_xmp(row['output'])['patch']
+            assert exported['title']==('Raw discovery' if row['photo_id']==master['id'] else 'Variant snapshot')
+            assert exported['rating']==4 and exported['keyword_paths']==[['Coast'],['Shore']]
             assert row['processing']['metal_grade_tiles']+row['processing']['metal_output_tiles']>0
             with Image.open(row['output']) as image:
                 dimensions.append(list(image.size));assert image.info.get('icc_profile')
@@ -105,6 +117,7 @@ def main():
         report={'ok':True,'fixture':fixture.name,'fixture_sha256':before,'fixture_bytes':fixture.stat().st_size,
             'source_and_copy_unchanged':True,'discovery_sync_ms':round(sync_ms,3),'camera':master['camera'],
             'unsupported_develop_reported':True,'copy_metadata_independent':True,'frozen_jobs_preserved':True,
+            'exported_metadata_snapshot_preserved':True,
             'full_size_dimensions':dimensions,'output_formats':['tiff16','jpeg'],
             'two_exports_seconds':round(time.perf_counter()-started,3),
             'cache':'Warm metadata after copying; cold pixel cache; second variant can reuse decoded source.',
@@ -119,4 +132,3 @@ def main():
 
 
 if __name__=='__main__':main()
-

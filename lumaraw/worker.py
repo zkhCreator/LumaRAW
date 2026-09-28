@@ -12,7 +12,10 @@ import time
 
 def main():
     try:
-        request = json.loads(sys.stdin.buffer.readline(256*1024))
+        payload = sys.stdin.buffer.readline(8*1024*1024+1)
+        if len(payload)>8*1024*1024:
+            raise ValueError('Image worker request exceeds 8 MiB')
+        request = json.loads(payload)
         if 'engine_identity' in request:
             from .runtime import engine_identity, EngineChangedError
             if request['engine_identity'] != engine_identity():
@@ -44,7 +47,8 @@ def main():
                                     recipe=recipe if request.get('kind') == 'developed' else None)
         elif operation == 'export':
             result = export_image(request['path'], recipe, request['destination'], request['format'],
-                                  request['budget_mb'], request['job_id'],options=request.get('options'),cache=request['cache'])
+                                  request['budget_mb'], request['job_id'],options=request.get('options'),cache=request['cache'],
+                                  metadata_snapshot=request.get('metadata_snapshot'))
         else:
             raise ValueError('Unknown worker operation')
         if 'cache' in request:

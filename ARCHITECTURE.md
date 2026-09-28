@@ -60,7 +60,7 @@ the manifest; binaries remain subject to release signing/notarization controls.
 
 - `get_photo` returns a revision. Edits, undo, version restore, recipe import, and sync require the expected revision. Stale writes fail; the caller must read again and reconcile.
 - Service database access is serialized. Sync validates every target before one transaction writes all changes. Ratings and flags are separate explicit operations.
-- Export submission freezes the recipe, source, destination, and output options. The request key, normalized argument digest, and job IDs are stored atomically. The same key and arguments return the original result; different arguments with that key fail.
+- Export submission freezes the recipe, source, destination, output options and resolved descriptive metadata. The request key, normalized argument digest, and job IDs are stored atomically. The same key and arguments return the original result; different arguments with that key fail.
 - Originals are never written. Output is written to a temporary `.part`, flushed, then hard-linked to a new collision-safe name. A late cancellation preserves an output already published.
 - Running and pending jobs become interrupted after abnormal service restart. A sealed idle handoff has the narrowly scoped pending-job exception described above. They are never silently replayed. A forced exit can leave an uncertain publication outcome; inspect the destination before retrying.
 - Image workers monitor the broker and exit when it disappears. This is not an operating-system transaction over the entire process tree.
@@ -214,10 +214,35 @@ IDs match nothing and cannot be reused. Subtree edits use SQL rather than loadin
 the entire dictionary into native or Python arrays. Large edits still hold the
 catalog lock; durable background metadata jobs remain pending.
 
-The keyword layer does not write XMP or exported image keywords. Export flags,
-vocabulary file exchange, keyword sets/suggestions, Painter and metadata undo need
-separate workflows and evidence; hierarchical catalog storage does not establish
-those.
+The keyword layer stores export flags but does not encode image metadata.
+Vocabulary file exchange, keyword sets/suggestions, Painter and metadata undo
+remain separate workflows; hierarchical catalog storage does not establish those.
+
+`keyword_exports.py` owns schema version 11, adding three keyword export flags
+and immutable per-job metadata snapshots/receipts. Projection walks explicitly
+assigned tags and their ancestors until a containing-keyword flag stops traversal.
+Excluded names and their synonyms do not appear in flat lists or hierarchy paths;
+synonyms of included nodes expand only when enabled. Equal flat words are deduped
+case-insensitively, while distinct hierarchy paths remain separate. Older keyword
+edit clients preserve flags they do not supply. Tag changes invalidate affected
+photo metadata revisions as before.
+
+New jobs freeze catalog descriptions, resolved tags and options with recipes and
+request-key receipts in one transaction. Migrated jobs keep empty metadata; no
+later lookup enriches them. Public job queries exclude full snapshots in SQL and
+return compact counts/policy/digests. Preview pages expose one captured photo's
+fields and at most 60 words/paths. Worker requests use bounded UTF-8 JSON up to
+8 MiB to carry one snapshot, rather than one packet per job in queue pages.
+
+`export_metadata.py` validates XML and bounds XMP to 2 MiB before queuing. TIFF
+embeds tag 700; JPEG uses standard APP1 or Extended XMP, with a standard descriptive
+packet and offset-addressed keyword chunks checked by the specification's MD5
+identifier. The reader accepts reordered complete chunks and rejects gaps,
+overlaps, mismatched identifiers, checksum failures and oversized data. This format
+checksum does not establish cryptographic authenticity. Pixel/ICC encoding is
+unchanged; internal recipes, source filenames and local asset paths are no longer
+written into TIFF ImageDescription. The None/Copyright/Catalog choices describe
+supported catalog fields, not complete source EXIF/IPTC preservation.
 
 `relocations.py` owns schema version 9 and durable missing-folder plans. It snapshots
 folder IDs/counts and physical source families into indexed staging tables. Scans
@@ -273,7 +298,7 @@ counts; document types/entities are rejected. Sidecar properties override standa
 TIFF/JPEG/PNG XMP. Missing properties leave catalog data unchanged. Titles, captions,
 copyright, integer ratings, standard labels and hierarchical/flat keywords are
 supported; unknown custom labels and Adobe Develop settings are reported as notes.
-Extended JPEG XMP, BigTIFF/other embedded containers, full IPTC, ACR sidecars and
+BigTIFF/other embedded containers, full IPTC, ACR sidecars and
 XMP writing remain incomplete. Source headers are never decoded into pixels here.
 
 Restart requires explicit continuation, preserving file deselections. Cancellation

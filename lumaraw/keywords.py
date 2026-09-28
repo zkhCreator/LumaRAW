@@ -2,7 +2,8 @@
 
 Inputs: validated tag forms, selected photo revisions and literal search text.
 Outputs: paged tags, qualified keyword paths and transactional catalog mutations.
-No pixels, original/sidecar writes or export metadata. Synonyms aid lookup; they
+No pixels, original/sidecar writes or metadata encoding. Export policy projection
+belongs to keyword_exports; this module stores its flags. Synonyms aid lookup; they
 are not separate assignments. Stable IDs distinguish equal names under different
 parents. The legacy photo_keywords name is a read-only direct-assignment view.
 """
@@ -142,7 +143,8 @@ class Keywords:
         return {'keywords':items, 'total':total, 'offset':offset, 'page_size':60,
                 'keyword_revision':self.revision(), 'selected_total':len(ids)}
 
-    def save(self, name, expected_revision, keyword_id=None, parent_id=None, synonyms=(), targets=()):
+    def save(self, name, expected_revision, keyword_id=None, parent_id=None, synonyms=(), targets=(),
+             include_export=None, export_containing=None, export_synonyms=None):
         name = valid_name(name)
         aliases = {folded(valid_name(alias)):valid_name(alias) for alias in synonyms}
         with self.db:
@@ -152,6 +154,12 @@ class Keywords:
                 raise ValueError('Add to selected photos is available only when creating a keyword')
             photo_ids = self.check_targets(targets)
             previous = self.get(keyword_id) if keyword_id is not None else None
+            policies = {'include_export':include_export, 'export_containing':export_containing,
+                        'export_synonyms':export_synonyms}
+            if any(value is not None and type(value) is not bool for value in policies.values()):
+                raise ValueError('Keyword export options must be booleans')
+            policies = {key:int(value) if value is not None else previous[key] if previous else 1
+                        for key,value in policies.items()}
             parents = self.ancestors(parent_id) if parent_id is not None else []
             if any(row['id'] == keyword_id for row in parents):
                 raise ValueError('A keyword cannot be moved into itself or its descendants')
@@ -179,6 +187,8 @@ class Keywords:
                                             (name, folded(name), parent_id)).lastrowid
             self.db.executemany('INSERT INTO keyword_synonyms VALUES(?,?,?)',
                                 [(keyword_id, key, value) for key, value in aliases.items()])
+            self.db.execute('UPDATE keywords SET include_export=?,export_containing=?,export_synonyms=? WHERE id=?',
+                            (*policies.values(),keyword_id))
             self.assign(keyword_id, photo_ids, 'add')
             self.db.execute('UPDATE keyword_state SET revision=revision+1')
         return {'keyword_id':keyword_id, 'keyword_revision':self.revision()}
