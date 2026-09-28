@@ -168,8 +168,11 @@ def test_pages_unicode_literal_search_and_depth_cap(library):
 
 def test_schema_seven_migration_rollback_legacy_names_and_backup(tmp_path, monkeypatch):
     import lumaraw.keywords as module
+    import lumaraw.catalog as catalog_module
+    from legacy_catalog import migrate_to
     real = module.migrate
-    monkeypatch.setattr(module, 'migrate', lambda db:None)
+    current_chain = catalog_module.migrate
+    monkeypatch.setattr(catalog_module, 'migrate', lambda db:migrate_to(db, 7))
     c = Catalog(tmp_path / 'legacy')
     assert c.db.execute('PRAGMA user_version').fetchone()[0] == 7
     path = tmp_path / 'photo.png'
@@ -186,7 +189,7 @@ def test_schema_seven_migration_rollback_legacy_names_and_backup(tmp_path, monke
     assert c.db.execute('SELECT keyword FROM photo_keywords').fetchone()[0] == 'Legacy|literal'
     assert not c.db.execute("SELECT 1 FROM sqlite_master WHERE name='keywords'").fetchone()
     c.close()
-    monkeypatch.setattr(module, 'migrate', real)
+    monkeypatch.setattr(catalog_module, 'migrate', current_chain)
     s = Service(tmp_path / 'legacy')
     try:
         assert photo(s, 1)['keywords'] == ['Legacy|literal']

@@ -42,6 +42,12 @@ when a clear function is more maintainable. Avoid unrelated formatting churn.
 - Keep Library sources separate from metadata filters. Folder counts describe
   catalog membership independently of the filtered/stacked photo page. Imports,
   variants, removal and relinking must maintain these counts transactionally.
+- Whole-folder reconnection stages a durable, bounded plan before changing paths.
+  Hash/stat I/O must release the catalog lock; cancellation remains available.
+  Revalidate source revisions, destination identity and file fingerprints before
+  one atomic remap. Deferring for image/export work retains the plan for explicit
+  retry; uncertain replies are read back rather than replayed. Preserve recipes,
+  metadata, whole stacks and frozen export options across the complete family.
 - Keyword assignments reference stable tag IDs. Names are unique only within one
   parent; never merge equal leaf names from different branches. Preserve qualified
   paths and invalidate affected photo metadata revisions on ancestor rename/move.

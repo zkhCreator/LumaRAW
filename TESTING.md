@@ -92,7 +92,7 @@ small raster files and separate disposable catalogs, then runs the
 15-assertion state, 13-assertion library, 12-assertion culling, 20-assertion review,
 14-assertion thumbnail, 21-assertion collection-tree, 19-assertion virtual-copy,
 10-assertion service-connection, 22-assertion stack, 19-assertion auto-stack,
-24-assertion folder and 25-assertion keyword suites.
+24-assertion folder, 25-assertion keyword and 17-assertion folder-relocation suites.
 Each suite has its own
 fresh image directory, so a relink test cannot move another suite's fixture. The library suite checks
 live smart membership, text search/sort, pagination, empty-filter selection,
@@ -106,6 +106,41 @@ The keyword suite checks lazy hierarchy/pages, Grid/active-photo scope, mixed se
 captured create-and-assign targets, stale revisions, parent filters, ancestor
 rename, synonym lookup, external updates and empty-page polling. It exercises the
 real native Store and IPC without automating the rendered desktop.
+
+The relocation suite moves only its generated fixture directory, scans a nested
+tree with a missing file and a virtual copy, applies explicitly, and checks source
+IDs, native folder/photo refresh, labels, keywords, persisted-plan resume, cancel
+and stale-reply rejection. `tests/test_relocations.py` additionally checks indexed
+hash mismatch, path collisions, merged folders, export admission/snapshots, file
+and directory replacement, source reappearance, responsive cancellation, failed
+write rollback, genuine v8 migration, later pages and active-plan backup/restore.
+
+```sh
+.venv/bin/python tests/relocation_probe.py --work work/relocation-10k --rows 10000
+.venv/bin/python tests/relocation_probe.py --work work/relocation-100k --rows 100000
+```
+
+This metadata probe stages 1,001 synthetic folders into an existing empty
+replacement directory. All originals are missing, exercising full issue paging
+without hashes or pixel workers. It records preparation, each 60-original scan,
+final stat validation plus atomic commit, concurrent 60-photo browsing and RSS.
+The concurrent reader intentionally measures catalog-lock contention. These are
+in-process service timings, not disk hash throughput, RAW speed or desktop latency.
+
+```sh
+.venv/bin/python tests/relocation_raw_probe.py \
+  --engine /absolute/LumaRAW.app/Contents/Resources/Engine/LumaRAWEngine \
+  --fixture /absolute/nikon.NEF --work work/relocation-raw-01
+```
+
+This packaged integration probe copies the explicit fixture into its new work
+directory, indexes it, creates a virtual copy and pauses two frozen exports. It
+moves only that private copy's folder, verifies/reconnects the folder, then exports
+full-size 16-bit TIFF/JPEG with real Metal dispatch and embedded ICC profiles.
+It checks source/job snapshots and hashes both the user fixture and generated copy
+afterward. Hash reads are warm after copying/indexing; the pixel cache starts cold
+and the second variant can reuse decoding. Timing is diagnostic, not a standalone
+processing benchmark.
 
 `tests/test_keywords.py` covers genuine v7 migration and denied-write rollback,
 legacy literal names, backup/restore, duplicate leaf identities, Unicode/literal

@@ -33,7 +33,7 @@ gaps. Nothing below is full Lightroom parity merely because historical tests pas
 | Area | Current implementation | Remaining acceptance / work |
 | --- | --- | --- |
 | Import and catalogs | Partial: referenced originals, backup/restore | Import preview/selection, copy workflows, metadata/develop presets, tethered capture, catalog switching/merge |
-| Library navigation | Partial: bounded grid/filmstrip, folder tree/search/favorites/labels, direct/recursive sources, filters/sorting, regular/smart/Quick collections and nested sets | Multi-source selection, folder sync/relocation/move/rename, collection drag/drop/color labels, full smart criteria/import-export, source-selection memory, desktop acceptance |
+| Library navigation | Partial: bounded grid/filmstrip, folder tree/search/favorites/labels, durable missing-folder relocation, direct/recursive sources, filters/sorting, regular/smart/Quick collections and nested sets | Multi-source selection, folder synchronization/move/rename, relocation overlap/collision handling, collection drag/drop/color labels, full smart criteria/import-export, source-selection memory, desktop acceptance |
 | Organization | Partial: duplicate/missing detection, hierarchical keywords/synonyms, title/caption/copyright, labels, batch metadata, virtual copies, manual/split/capture-time scoped stacks | Keyword export policies/sets/import-export/undo/Painter, complete IPTC, stack interaction acceptance, rename and sidecars |
 | Culling | Partial: Loupe/Compare/Survey, linked detail, anchored page selection | Desktop acceptance, cross-page selection, Develop reference view, auto advance, persistent workspace state |
 | Basic development | Partial: light/WB/color | Calibrated absolute WB, eyedropper, texture/clarity/dehaze, complete HSL/B&W and color grading |
@@ -55,9 +55,9 @@ gaps. Nothing below is full Lightroom parity merely because historical tests pas
 
 ## Active increment
 
-Keyword hierarchy, stable identities, synonyms, batch assignment and native
-tree/forms. Folder synchronization/relocation follows; the remaining inventory
-stays in scope.
+Durable missing-folder reconnection, native review/resume/cancel and bulk-path
+performance. Folder synchronization and keyword export workflows follow; the
+remaining inventory stays in scope.
 
 ## Evidence log
 
@@ -105,7 +105,7 @@ whole-desktop latency, or performance guarantees on other hardware. Reproduce vi
 
 ### Next work
 
-Continue with keyword export workflows, folder synchronization/relocation, stack ordinal badges and
+Continue with keyword export workflows, folder synchronization, relocation edge cases, stack ordinal badges and
 cross-page cover focus. Offline preview caches,
 cache-size controls and native polling/process-startup costs remain pending. Then close Develop and
 export gaps in the inventory. Preserve pending desktop/older-OS acceptance rather
@@ -641,3 +641,82 @@ took 1.598 / 15.907 seconds (one sample), excluding file import and EXIF. Query
 plans use the parent and assignment covering indexes. These measurements exclude
 IPC, desktop presentation and RAW processing; large metadata writes still need
 background jobs. Reproduce with `tests/keyword_probe.py`.
+
+### Missing-folder relocation increment
+
+Schema v9 stages a complete missing folder subtree into durable, indexed plans.
+Each scan processes at most 60 physical originals outside the catalog lock,
+verifying known content hashes and reporting unindexed files, absent files and
+destination collisions separately. Native **Find Missing Folder…** provides a
+replacement directory picker, scan progress, paged issues, explicit application,
+cancellation and **Resume Folder Relocation…** after closing/restarting.
+
+Before application, bounded stat checks compare the scanned inode/device/size/mtime
+and directory identity. Source-family/index/folder revisions are revalidated. One
+transaction remaps paths and counts while preserving photo/copy IDs, recipes,
+keywords, folder/collection stacks, versions and frozen export settings. Eligible
+job source paths follow the family; an affected running export or occupied image
+slot defers application for explicit retry. Original files are read-only. New
+folder locations inherit IDs; existing destination nodes retain their IDs and
+merge favorites, preferring existing color labels. One active plan and 32 terminal
+receipts are retained; staging is removed when a plan finishes or is cancelled.
+
+The final Python suite passed **230 tests, no skips**, including required actual
+Metal execution and the pinned real NEF fixture. Sixteen relocation tests cover
+hash mismatch, destination collisions, merge/counts, copies/metadata/stacks/jobs,
+late file changes, source reappearance, export admission, responsive scan/final
+validation cancellation, commit rollback, populated v8 migration rollback,
+interrupted scans and a 129-original plan backed up/resumed across page boundaries.
+Native source-engine validation passed **17 assertions** for the new workflow.
+
+All **13 native suites passed 231 assertions against the final packaged engine**.
+The self-contained Mac build compiled with a macOS 14 deployment target, passed
+ad-hoc signature verification and embedded the exact final source digest (engine
+generation 7, catalog schema 9, 66 tools). Public source audit passed for 222 files;
+catalogs, photographs, binaries and private receipts remain excluded. These checks
+do not establish macOS 14 runtime or rendered desktop acceptance.
+
+A separate final packaged-engine probe reconnected a generated copy of the pinned
+10,656,312-byte Nikon D3S NEF, including its virtual copy and two already queued
+export snapshots. Both full-size 4284×2844 outputs (16-bit TIFF and JPEG) completed
+with embedded ICC profiles and positive Metal tile counters. The original fixture
+and generated source hashes stayed identical. The two exports plus validation
+took 2.272 seconds and the reported worker peak was 275.4 MB; native regression
+compilation was running concurrently, so this is integration evidence rather than
+a controlled throughput comparison. Hash verification took 7.753 ms with warm OS
+cache after copying/indexing. The pixel cache started cold and could be reused by
+the second variant. Reproduce with `tests/relocation_raw_probe.py`.
+
+Synthetic metadata results on M3 Max / 128 GB / macOS 26.6.2, with no concurrent
+build/test workload. Each catalog has 1,001 folders; the replacement root exists
+but all photos are missing, so no hashes or pixels are read. A concurrent reader
+requests a 60-photo page every 20 ms after its previous response:
+
+| Measurement | 10k originals | 100k originals |
+| --- | ---: | ---: |
+| Stage plan (one sample) | 26.543 ms | 288.143 ms |
+| Complete scan | 673.469 ms | 15,047.709 ms |
+| Scan page median / p95 | 3.527 / 7.125 ms | 8.665 / 11.605 ms |
+| Apply with final validation | 492.346 ms | 6,469.708 ms |
+| Atomic SQL commit, included above | 153.194 ms | 3,093.090 ms |
+| Concurrent browse median / p95 | 4.745 / 5.628 ms | 5.474 / 10.546 ms |
+| Longest concurrent browse wait | 140.600 ms | 3,094.158 ms |
+| Peak process RSS | 41.42 MB | 74.78 MB |
+
+The scan comprised 167 / 1,667 requests; concurrent reads numbered 33 / 554.
+Worker RSS remained zero. Metadata setup took 2.392 / 23.319 seconds. The final
+commit necessarily holds the catalog lock and creates a visible multi-second
+pause at 100k scale; responsiveness during scanning must not conceal that tail.
+Maintained issue counts and a partial issue index avoid repeatedly counting or
+walking the complete staged tree. The earlier 100k implementation took 17.354
+seconds for scanning; these are single runs, not a statistical throughput claim.
+Reproduce with `tests/relocation_probe.py`. No RAW, hash throughput, IPC or desktop
+performance is inferred from these results.
+
+Remaining acceptance includes rendered picker/sheet interactions, keyboard and
+VoiceOver, macOS 14 runtime, Lightroom comparisons, overlapping old/new trees,
+catalog photo collision resolution and external-client source recovery after a
+folder ID is merged away. The initiating native source falls back to the result
+root when merged. Folder synchronization, physical move/rename and empty-folder
+workflows remain separate incomplete features. This increment is not full folder
+or Lightroom parity.

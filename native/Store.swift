@@ -38,6 +38,8 @@ import UniformTypeIdentifiers
     @Published var activeCollection: LibraryCollection?
     @Published var folderID: Int?
     @Published var activeFolder: LibraryFolder?
+    @Published var showFolderRelocation=false
+    @Published var relocationFolder: LibraryFolder?
     @Published var includeSubfolders=true
     @Published var folderSearch=""
     @Published var folderFavorites=false

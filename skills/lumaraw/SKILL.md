@@ -136,6 +136,25 @@ or `hide_parent`; a parent with direct photos cannot be hidden. These commands d
 not create, rename, move or delete physical folders. Do not infer that a displayed
 empty/unavailable folder authorizes deleting originals or removing catalog photos.
 
+For an explicitly chosen replacement of a missing folder, call
+`prepare_folder_relocation` with `folder_id`, `destination` and the global
+`expected_revision` from `library_state.folder_revision`. Read the returned plan
+and run `scan_folder_relocation(plan_id,expected_revision)` using each new plan
+revision while its state is `planning` or `interrupted`. Each scan reads at most
+60 physical originals outside the catalog lock. `get_folder_relocation` returns
+the latest or specified plan and 60 issue rows (`issues_only:false` includes all
+rows). Review verified/unverified/missing/conflict counts and folder merges before
+`apply_folder_relocation`; conflicts prevent applying. An unindexed file is matched
+by relative path, not a content hash. Application reconnects the entire subtree,
+including virtual copies, without moving originals. Existing destination photo
+collisions and overlapping trees are rejected. Recipes, metadata, stacks and
+export snapshots survive. Active image/export work returns the plan to `ready`
+with an explanation; retry only explicitly, using the new revision.
+`cancel_folder_relocation(plan_id)` discards an unfinished plan. Always inspect
+its returned state: a commit that already finished stays `applied`. Restarted scans
+require explicit resumption. Do not retry an uncertain apply response; read the
+plan's receipt. One active plan and 32 terminal receipts are retained per catalog.
+
 ## Photo stacks
 
 `list_photos` defaults to source-scoped stacks and includes `stack_revision` plus

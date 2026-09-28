@@ -17,7 +17,7 @@ LumaRAW references your originals without changing them. The SwiftUI app and you
 | Library | Folder tree/search/favorites/labels, ratings, flags, catalog metadata/keywords, regular/live smart collections, nested sets, Quick/target collections, SQL filters/sorting, manual/capture-time stacks, duplicate/missing indexing, virtual copies/shared snapshots, selective sync, and backup/restore |
 | Culling | Grid/Loupe/Compare/Survey, anchored page selections, active-photo review actions, linked or independent full-resolution comparison viewports |
 | Export | JPEG and 16-bit TIFF with embedded sRGB, Display P3, Adobe RGB, or ProPhoto RGB ICC profiles; persistent queue, pause/cancel/retry, and collision-safe filenames |
-| Agents | 61 MCP tools, equivalent JSON CLI commands, and a bundled skill; app and agent edits share conflict detection |
+| Agents | 66 MCP tools, equivalent JSON CLI commands, and a bundled skill; app and agent edits share conflict detection |
 
 ## Build and run
 
@@ -101,6 +101,18 @@ target even beyond the first page. Folder rename/move, synchronization, multi-fo
 selection and empty-directory import remain unfinished.
 Use **Folder Options → Refresh Folders** after a volume goes offline or returns;
 directory availability is checked when folder pages are read.
+
+For a folder moved outside the app, choose **Find Missing Folder…** from its
+sidebar menu. Select its new directory, review the bounded scan and click
+**Reconnect**. Known hashes are verified; files without an indexed hash are
+identified by relative path and are clearly counted. Missing files retain their
+new paths and missing status. Conflicts block the complete operation. Edits,
+copies, keywords, stacks and pending export settings are preserved atomically.
+Existing destination folders combine memberships and favorites while retaining
+their own color labels. **Folder Options → Resume Folder Relocation…** reopens a
+saved plan; cancellation discards staging without moving any originals. Active
+image work defers application until an explicit retry. Overlapping old/new folder
+trees and colliding catalog photo paths are not supported.
 
 The **Keyword List** supports nested keywords, synonyms, search and 60-item pages.
 Its checkboxes add/remove tags on the Grid selection, or just the active photo in

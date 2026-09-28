@@ -30,6 +30,7 @@ from .stacks import Stacks
 from .auto_stacks import AutoStacks
 from .folders import Folders
 from .keywords import Keywords
+from .relocations import Relocations, RelocationBusy, identity as relocation_identity, inspect_file
 from .source_identity import cached_thumbnail
 from .runtime import engine_identity, EngineChangedError
 
@@ -53,8 +54,11 @@ class Service:
         self.stopping=threading.Event();self.wake=threading.Event();self.active=None;self.peak=0
         self.cancel_jobs=set();self.preview_versions={};self.upgrading=False
         self.worker_identity=engine_identity()
+        self.relocation_lock=threading.Lock()
+        self.relocation_cancel={}
         self.last_activity=time.monotonic()
         with self.catalog() as c:
+            Relocations(c).recover()
             handoff=c.setting('clean_handoff')
             clean=(identity is not None and handoff == {'target':identity}
                    and c.job_counts().get('running',0)==0)
@@ -107,6 +111,12 @@ class Service:
             with self.catalog() as c:
                 return {'version':'0.4.1','api_version':1,'catalog':str(self.root),'photos':c.count(),'counts':c.job_counts(),'paused':self.paused,'active':self.active,**self.memory_status(),'peak_mb':round(self.peak,1)}
         if method=='recipe_schema':return {'defaults':Recipe().dict(),'limits':LIMITS,'presets':{k:v.dict() for k,v in PRESETS.items()},'groups':SYNC_GROUPS}
+        if method in ('scan_folder_relocation','apply_folder_relocation'):
+            return self.run_relocation(method,p)
+        if method=='cancel_folder_relocation':
+            with self.state_lock:
+                if event:=self.relocation_cancel.get(p['plan_id']):event.set()
+            with self.catalog() as c:return Relocations(c).terminal(p['plan_id'],'cancelled')
         if method=='cancel_preview':
             with self.state_lock:
                 client=p['client_id'];generation=p['generation']
@@ -161,6 +171,8 @@ class Service:
             return {**result,'photo_id':row['id'],'revision':row['revision'],'source':row['path']}
         if method=='queue_control':return self.control(p)
         with self.catalog() as c:
+            if method=='prepare_folder_relocation':return Relocations(c).prepare(**p)
+            if method=='get_folder_relocation':return Relocations(c).get(**p)
             if method=='photo_summaries':return {'photos':c.summaries(p['photo_ids']),'stack_revision':Stacks(c).revision(),'folder_revision':Folders(c).revision(),'keyword_revision':Keywords(c).revision()}
             if method=='library_state':return {'stack_revision':Stacks(c).revision(),'folder_revision':Folders(c).revision(),'keyword_revision':Keywords(c).revision()}
             if method=='list_keywords':return Keywords(c).list(**p)
@@ -295,6 +307,54 @@ class Service:
             if method=='import_asset':return {'asset':library.import_asset(p['path'],self.root,p['kind'])}
             if method=='save_recipe':self.require(c,p['photo_id']);library.save_recipe(p['path'],c.recipe(p['photo_id']));return {'path':p['path']}
         raise ValueError('Operation is not implemented')
+
+    def run_relocation(self, method, params):
+        if not self.relocation_lock.acquire(blocking=False):
+            raise ValueError('Another folder verification is active; wait for it or cancel it')
+        plan_id=params['plan_id'];event=threading.Event();plan=None;image_admitted=False
+        with self.state_lock:self.relocation_cancel[plan_id]=event
+        cancelled=lambda:event.is_set() or self.stopping.is_set()
+        def check_location():
+            if cancelled():raise InterruptedError('Folder relocation cancelled')
+            if os.path.exists(plan['source']):
+                raise ValueError('The original folder is available again; scan its location before relinking')
+            if relocation_identity(plan['destination'],directory=True) != json.loads(plan['destination_identity']):
+                raise ValueError('The replacement directory changed; choose it and scan again')
+        try:
+            if method=='scan_folder_relocation':
+                with self.catalog() as c:plan,rows=Relocations(c).start_scan(**params)
+                check_location()
+                checked=[inspect_file(row,cancelled) for row in rows]
+                check_location()
+                with self.catalog() as c:return Relocations(c).finish_scan(plan_id,plan['revision'],checked)
+            with self.catalog() as c:plan=Relocations(c).start_apply(**params)
+            check_location();after=0
+            while True:
+                with self.catalog() as c:rows=Relocations(c).validation_page(plan_id,plan['revision'],after)
+                if not rows:break
+                for row in rows:
+                    if cancelled():raise InterruptedError('Folder relocation cancelled')
+                    if relocation_identity(row['destination']) != json.loads(row['fingerprint']):
+                        raise ValueError('A proposed file changed after scanning; scan again before relinking')
+                after=rows[-1]['source_id']
+                with self.catalog() as c:
+                    Relocations(c).check(plan_id,plan['revision'],('verifying',))
+                    with c.db:c.db.execute('UPDATE folder_relocations SET checked=checked+? WHERE id=?',(len(rows),plan_id))
+            check_location()
+            image_admitted=self.image_lock.acquire(blocking=False)
+            if not image_admitted:raise RelocationBusy('Image processing is active; apply this plan after it finishes')
+            with self.catalog() as c:return Relocations(c).apply(plan_id,plan['revision'])
+        except RelocationBusy as error:
+            with self.catalog() as c:return Relocations(c).defer_apply(plan_id,plan['revision'],str(error))
+        except InterruptedError:
+            with self.catalog() as c:return Relocations(c).terminal(plan_id,'cancelled')
+        except Exception as error:
+            if plan is None:raise
+            with self.catalog() as c:return Relocations(c).terminal(plan_id,'failed',str(error))
+        finally:
+            if image_admitted:self.image_lock.release()
+            with self.state_lock:self.relocation_cancel.pop(plan_id,None)
+            self.relocation_lock.release()
 
     def run_worker(self,request):
         with self.image_lock:

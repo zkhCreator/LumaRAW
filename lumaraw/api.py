@@ -39,6 +39,11 @@ tool('list_folders','Read at most 60 catalog folder roots or children, with dire
 tool('get_folder','Read exactly one folder or the folder containing a photo, including ancestors and navigation offsets. No directory writes.',{'folder_id':ID,'photo_id':ID},read=True)
 tool('edit_folder','Change catalog-only folder favorite/color label with optimistic metadata revision.',{'folder_id':ID,'expected_revision':REV,'patch':obj({'favorite':BOOL,'color_label':{'enum':list(COLORS)}})},['folder_id','expected_revision','patch'])
 tool('set_folder_visibility','Show a root folder parent or hide an empty parent in favor of its children. Changes catalog presentation only; requires the folder tree revision.',{'folder_id':ID,'expected_revision':REV,'action':{'enum':['show_parent','hide_parent']}},['folder_id','expected_revision','action'])
+tool('prepare_folder_relocation','Stage a missing folder subtree at a chosen existing directory. Preserves original files; only one active relocation plan per catalog.',{'folder_id':ID,'destination':PATH,'expected_revision':REV},['folder_id','destination','expected_revision'])
+tool('get_folder_relocation','Read a relocation receipt and at most 60 proposed paths. Omit plan_id for the latest plan; issues_only defaults true.',{'plan_id':ID,'offset':integer(),'issues_only':BOOL},read=True)
+tool('scan_folder_relocation','Check at most 60 staged source families, hashing only indexed originals. No catalog lock is held during file reads; continue while state is planning.',{'plan_id':ID,'expected_revision':REV},['plan_id','expected_revision'])
+tool('apply_folder_relocation','Recheck staged file identities and atomically relink the complete folder tree, variants, stacks and inactive export sources. Conflicting original paths block application.',{'plan_id':ID,'expected_revision':REV},['plan_id','expected_revision'])
+tool('cancel_folder_relocation','Cancel staged verification and discard its temporary mapping; never undo an already committed relocation.',{'plan_id':ID},['plan_id'])
 tool('stack_state','Read the current stack revision for optimistic grouping and visibility changes.',read=True)
 AUTO_SOURCE={'folder':PATH,'collection_id':ID}
 AUTO_TIME={**AUTO_SOURCE,'seconds':{'type':'number','minimum':0,'maximum':3600}}

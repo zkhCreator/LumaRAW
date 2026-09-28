@@ -214,9 +214,39 @@ IDs match nothing and cannot be reused. Subtree edits use SQL rather than loadin
 the entire dictionary into native or Python arrays. Large edits still hold the
 catalog lock; durable background metadata jobs remain pending.
 
-This layer does not write XMP or exported image keywords. Export flags, vocabulary
-file exchange, keyword sets/suggestions, Painter and metadata undo need separate
-workflows and evidence; hierarchical catalog storage does not establish those.
+The keyword layer does not write XMP or exported image keywords. Export flags,
+vocabulary file exchange, keyword sets/suggestions, Painter and metadata undo need
+separate workflows and evidence; hierarchical catalog storage does not establish
+those.
+
+`relocations.py` owns schema version 9 and durable missing-folder plans. It snapshots
+folder IDs/counts and physical source families into indexed staging tables. Scans
+hash at most 60 originals per command without holding the service catalog lock.
+Known hashes must match; unknown hashes are reported separately; absent files can
+remain missing at their new paths. Before applying, a second bounded stat pass
+checks inode/device/size/mtime against the scan and checks the replacement directory
+identity and continued absence of the old root. Revisions protect source families,
+index metadata and structural folder membership. Metadata/recipe edits may continue.
+
+Application acquires the image slot without waiting and rejects affected running
+exports. One SQL transaction remaps photos/copies, folder membership, source
+revisions, folder stacks and eligible job source paths. Export recipes/options and
+destinations stay frozen. A transaction-scoped maintenance switch suppresses only
+the per-photo folder-path trigger; aggregate folder counts are adjusted by mapped
+folder and ancestor instead. Rollback restores the switch and all paths/counts.
+Nonmerged folders retain source IDs; merged nodes retain destination IDs, combine
+favorites and use destination color labels unless unset. Merged-away IDs retire.
+The native initiating source falls back to the result root if its ID was merged.
+
+One active plan per catalog prevents concurrent remaps. Cancellation can interrupt
+hash/stat work, but cannot reverse an already committed transaction; its receipt
+reports the actual final state. A crash during verification leaves an explicitly
+resumable plan. Image/export contention returns a ready plan for explicit retry.
+Terminal plans drop their mapping and retain at most 32 small receipts. Backups
+include staging. Missing-folder reconnection never moves files, synchronizes new
+imports, removes missing catalog photos or deduplicates destination collisions.
+Overlapping old/new trees are rejected. Filesystem validation and SQLite commit are
+not an OS-wide filesystem transaction; later external file changes remain possible.
 
 `source_identity.py` provides stat-based cache identities without importing pixel
 libraries. The broker returns a page of completed thumbnail paths in one command;

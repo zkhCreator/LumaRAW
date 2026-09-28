@@ -29,6 +29,7 @@ struct FoldersSidebar: View {
                     Task { await s.changeSubfolderInclusion(value) }
                 }))
                 Button("Refresh Folders") { Task { await s.refreshFolders() } }
+                Button("Resume Folder Relocation…") { s.relocationFolder=nil;s.showFolderRelocation=true }
             } label: { Label("Folder Options",systemImage:"line.3.horizontal.decrease.circle") }
                 .menuStyle(.borderlessButton)
             FolderBranch(parent:nil)
@@ -71,6 +72,7 @@ struct FolderTreeRow: View {
         }
         .contextMenu {
             Button("Show in Finder") { NSWorkspace.shared.selectFile(nil,inFileViewerRootedAtPath:folder.path) }.disabled(folder.missing)
+            Button("Find Missing Folder…") { s.relocationFolder=folder;s.showFolderRelocation=true }.disabled(!folder.missing)
             Button(folder.favorite ? "Unmark Favorite":"Mark Favorite") {
                 Task { await s.changeFolder(folder,patch:["favorite":!folder.favorite]) }
             }
