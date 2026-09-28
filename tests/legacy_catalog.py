@@ -11,10 +11,11 @@ from lumaraw.stacks import migrate as stacks
 from lumaraw.capture_time import migrate as capture
 from lumaraw.folders import migrate as folders
 from lumaraw.keywords import migrate as keywords
+from lumaraw.relocations import migrate as relocations
 
 
 def migrate_to(db, version):
-    migrations = (migrate_metadata, collections, copies, stacks, migrate_identities, capture, folders, keywords)
+    migrations = (migrate_metadata, collections, copies, stacks, migrate_identities, capture, folders, keywords, relocations)
     if not 0 <= version <= len(migrations):
         raise ValueError('Unsupported legacy fixture version')
     for migration in migrations[:version]:

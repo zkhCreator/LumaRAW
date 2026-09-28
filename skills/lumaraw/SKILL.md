@@ -155,6 +155,27 @@ its returned state: a commit that already finished stays `applied`. Restarted sc
 require explicit resumption. Do not retry an uncertain apply response; read the
 plan's receipt. One active plan and 32 terminal receipts are retained per catalog.
 
+For an explicitly chosen available folder, `prepare_folder_sync` takes `folder_id`,
+the global folder `expected_revision`, and required `scan_metadata`. Continue
+`scan_folder_sync(plan_id,expected_revision)` while `planning` or `interrupted`,
+adopting each returned revision. `get_folder_sync` pages 60 files with `kind`
+`changes`, `all`, `new`, `missing`, `updated`, `error` or `unchanged`. Review counts,
+metadata values, notes and errors before applying. `select_folder_sync_items`
+uses a revision, `selected`, and a `kind` of `new`, `missing` or `updated`; choose
+at most 60 `item_ids`, a `folder` subtree, or omit both to select the whole kind.
+
+`apply_folder_sync` defaults to `import_new:true`, `remove_missing:false`,
+`read_metadata:true`. Set `read_metadata:false` when metadata was not scanned.
+Removing missing originals requires the user's explicit workflow choice: all
+their copies, edits, snapshots and memberships are removed from the catalog.
+Originals and export receipts stay untouched. New files are referenced in place;
+supported XMP updates affect masters' descriptive metadata, not independent copy
+metadata or Develop recipes. This is not complete IPTC/ACR/Adobe Develop import.
+Scan errors block application. Read the receipt after an uncertain reply; never
+repeat a mutation automatically. Busy image/export work returns a ready plan for
+explicit retry. `cancel_folder_sync(plan_id)` discards an unfinished plan, but
+cannot undo a committed result. Closing/restarting preserves review selections.
+
 ## Photo stacks
 
 `list_photos` defaults to source-scoped stacks and includes `stack_revision` plus

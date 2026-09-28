@@ -79,7 +79,7 @@ def exchange(conn,request,timeout=620):
     data=json.dumps(request,allow_nan=False).encode()
     if len(data)>MAX_MESSAGE:raise ValueError('Request too large')
     conn.send_bytes(data)
-    if not conn.poll(timeout):raise TimeoutError('Service request timed out; check export status with list_jobs')
+    if not conn.poll(timeout):raise TimeoutError('Service request timed out; its outcome is unknown. Read operation status before retrying.')
     return json.loads(conn.recv_bytes(MAX_MESSAGE))
 
 

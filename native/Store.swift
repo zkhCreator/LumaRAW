@@ -40,6 +40,8 @@ import UniformTypeIdentifiers
     @Published var activeFolder: LibraryFolder?
     @Published var showFolderRelocation=false
     @Published var relocationFolder: LibraryFolder?
+    @Published var showFolderSync=false
+    @Published var syncFolder: LibraryFolder?
     @Published var includeSubfolders=true
     @Published var folderSearch=""
     @Published var folderFavorites=false

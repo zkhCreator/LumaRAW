@@ -44,6 +44,13 @@ tool('get_folder_relocation','Read a relocation receipt and at most 60 proposed 
 tool('scan_folder_relocation','Check at most 60 staged source families, hashing only indexed originals. No catalog lock is held during file reads; continue while state is planning.',{'plan_id':ID,'expected_revision':REV},['plan_id','expected_revision'])
 tool('apply_folder_relocation','Recheck staged file identities and atomically relink the complete folder tree, variants, stacks and inactive export sources. Conflicting original paths block application.',{'plan_id':ID,'expected_revision':REV},['plan_id','expected_revision'])
 tool('cancel_folder_relocation','Cancel staged verification and discard its temporary mapping; never undo an already committed relocation.',{'plan_id':ID},['plan_id'])
+tool('prepare_folder_sync','Stage synchronization of an existing folder and all descendants. Originals are read-only; metadata is optional and removal requires an explicit apply option.',{'folder_id':ID,'expected_revision':REV,'scan_metadata':BOOL},['folder_id','expected_revision','scan_metadata'])
+tool('get_folder_sync','Read a saved synchronization plan and at most 60 items. Omit plan_id for the latest plan.',{'plan_id':ID,'offset':integer(),'kind':{'enum':['all','changes','new','missing','updated','error','unchanged']}},read=True)
+tool('scan_folder_sync','Read at most 256 directory entries or metadata for 60 originals per request; continue while planning. Filesystem reads release the catalog lock.',{'plan_id':ID,'expected_revision':REV},['plan_id','expected_revision'])
+tool('select_folder_sync_items','Select/deselect new, missing or updated files in a ready plan. Choose up to 60 item_ids, a folder subtree, or all items of one kind.',{'plan_id':ID,'expected_revision':REV,'selected':BOOL,'kind':{'enum':['new','missing','updated']},'item_ids':array(ID,60),'folder':PATH},['plan_id','expected_revision','selected'])
+tool('apply_folder_sync','Revalidate and apply the reviewed plan atomically. Import in place, optionally remove missing originals and their variants from the catalog, and optionally read supported descriptive metadata onto masters.',{'plan_id':ID,'expected_revision':REV,'import_new':BOOL,'remove_missing':BOOL,'read_metadata':BOOL},['plan_id','expected_revision'])
+TOOLS['apply_folder_sync']['annotations']['destructiveHint']=True
+tool('cancel_folder_sync','Discard an unfinished synchronization plan; a completed transaction remains applied.',{'plan_id':ID},['plan_id'])
 tool('stack_state','Read the current stack revision for optimistic grouping and visibility changes.',read=True)
 AUTO_SOURCE={'folder':PATH,'collection_id':ID}
 AUTO_TIME={**AUTO_SOURCE,'seconds':{'type':'number','minimum':0,'maximum':3600}}

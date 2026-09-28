@@ -33,6 +33,8 @@ from .keywords import Keywords
 from .relocations import Relocations, RelocationBusy, identity as relocation_identity, inspect_file
 from .source_identity import cached_thumbnail
 from .runtime import engine_identity, EngineChangedError
+from .folder_sync import FolderSync
+from .folder_sync_runner import FolderSyncRunner
 
 class ConflictError(ValueError): pass
 
@@ -56,9 +58,11 @@ class Service:
         self.worker_identity=engine_identity()
         self.relocation_lock=threading.Lock()
         self.relocation_cancel={}
+        self.folder_sync=FolderSyncRunner(self)
         self.last_activity=time.monotonic()
         with self.catalog() as c:
             Relocations(c).recover()
+            FolderSync(c).recover()
             handoff=c.setting('clean_handoff')
             clean=(identity is not None and handoff == {'target':identity}
                    and c.job_counts().get('running',0)==0)
@@ -107,6 +111,8 @@ class Service:
         self.last_activity=time.monotonic();p={} if p is None else p
         if method not in TOOLS: raise ValueError('Unknown operation: '+method)
         jsonschema.validate(p,TOOLS[method]['inputSchema'])
+        if method in ('prepare_folder_sync','get_folder_sync','scan_folder_sync','select_folder_sync_items','apply_folder_sync','cancel_folder_sync'):
+            return self.folder_sync.dispatch(method,p)
         if method=='status':
             with self.catalog() as c:
                 return {'version':'0.4.1','api_version':1,'catalog':str(self.root),'photos':c.count(),'counts':c.job_counts(),'paused':self.paused,'active':self.active,**self.memory_status(),'peak_mb':round(self.peak,1)}
@@ -455,3 +461,4 @@ class Service:
 
     def close(self):
         self.stopping.set();self.wake.set();self.thread.join(timeout=6)
+        self.folder_sync.close()

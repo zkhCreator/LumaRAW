@@ -23,6 +23,8 @@ Official references checked September 2026:
 - [Stacking shortcuts, Adobe's Julieanne Kost](https://jkost.com/blog/2024/07/stacking-similar-photos-in-lightroom-classic.html)
 - [Folder hierarchy, subfolder inclusion and synchronization](https://helpx.adobe.com/lightroom-classic/desktop/manage-catalogs-and-files/create-folders.html)
 - [Missing-photo and missing-folder relinking](https://helpx.adobe.com/lightroom-classic/desktop/manage-catalogs-and-files/locate-missing-photos.html)
+- [Metadata storage and supported workflows](https://helpx.adobe.com/lightroom-classic/desktop/organize-photos-in-lightroom-classic/metadata-basics-actions.html)
+- [XMP basic properties](https://developer.adobe.com/xmp/docs/xmp-namespaces/xmp/) and [Dublin Core properties](https://developer.adobe.com/xmp/docs/xmp-namespaces/dc/)
 - [Hierarchical keywords, synonyms and export options](https://helpx.adobe.com/lightroom-classic/desktop/organize-photos-in-lightroom-classic/keywords.html)
 
 ## Feature inventory
@@ -33,7 +35,7 @@ gaps. Nothing below is full Lightroom parity merely because historical tests pas
 | Area | Current implementation | Remaining acceptance / work |
 | --- | --- | --- |
 | Import and catalogs | Partial: referenced originals, backup/restore | Import preview/selection, copy workflows, metadata/develop presets, tethered capture, catalog switching/merge |
-| Library navigation | Partial: bounded grid/filmstrip, folder tree/search/favorites/labels, durable missing-folder relocation, direct/recursive sources, filters/sorting, regular/smart/Quick collections and nested sets | Multi-source selection, folder synchronization/move/rename, relocation overlap/collision handling, collection drag/drop/color labels, full smart criteria/import-export, source-selection memory, desktop acceptance |
+| Library navigation | Partial: bounded grid/filmstrip, folder tree/search/favorites/labels, durable missing-folder relocation and folder synchronization, direct/recursive sources, filters/sorting, regular/smart/Quick collections and nested sets | Multi-source selection, complete sync Import Dialog/duplicate policy, folder move/rename, relocation overlap/collision handling, collection drag/drop/color labels, full smart criteria/import-export, source-selection memory, desktop acceptance |
 | Organization | Partial: duplicate/missing detection, hierarchical keywords/synonyms, title/caption/copyright, labels, batch metadata, virtual copies, manual/split/capture-time scoped stacks | Keyword export policies/sets/import-export/undo/Painter, complete IPTC, stack interaction acceptance, rename and sidecars |
 | Culling | Partial: Loupe/Compare/Survey, linked detail, anchored page selection | Desktop acceptance, cross-page selection, Develop reference view, auto advance, persistent workspace state |
 | Basic development | Partial: light/WB/color | Calibrated absolute WB, eyedropper, texture/clarity/dehaze, complete HSL/B&W and color grading |
@@ -55,9 +57,9 @@ gaps. Nothing below is full Lightroom parity merely because historical tests pas
 
 ## Active increment
 
-Durable missing-folder reconnection, native review/resume/cancel and bulk-path
-performance. Folder synchronization and keyword export workflows follow; the
-remaining inventory stays in scope.
+Durable folder synchronization, selectable recursive imports, missing-family
+catalog removal, supported external metadata reads and large-catalog performance.
+Keyword export workflows follow; the remaining inventory stays in scope.
 
 ## Evidence log
 
@@ -105,7 +107,7 @@ whole-desktop latency, or performance guarantees on other hardware. Reproduce vi
 
 ### Next work
 
-Continue with keyword export workflows, folder synchronization, relocation edge cases, stack ordinal badges and
+Continue with keyword export workflows, complete synchronization import options, relocation edge cases, stack ordinal badges and
 cross-page cover focus. Offline preview caches,
 cache-size controls and native polling/process-startup costs remain pending. Then close Develop and
 export gaps in the inventory. Preserve pending desktop/older-OS acceptance rather
@@ -115,9 +117,10 @@ Folder navigation acceptance includes imported-directory hierarchy, alphabetical
 children, bounded counts/pages, optional inclusion of descendants, and locating a
 selected photo's folder. Source navigation must remain distinct from metadata
 filters. Favorites, labels, missing-folder relinking, synchronization and explicit
-filesystem rename/move workflows remain separate unfinished requirements; a tree
-view alone does not complete folder parity. The navigation/favorites/labels portion
-is implemented below; synchronization and filesystem workflows remain pending.
+filesystem rename/move workflows need distinct acceptance; a tree alone does not
+complete folder parity. Navigation/favorites/labels, missing-folder relocation and
+the synchronization increment are implemented below; their remaining gaps and
+filesystem move/rename workflows stay in scope.
 
 Full completion still requires closing all non-AI gaps above. Historical receipts
 in `VERIFICATION.md` do not validate this increment.
@@ -720,3 +723,88 @@ folder ID is merged away. The initiating native source falls back to the result
 root when merged. Folder synchronization, physical move/rename and empty-folder
 workflows remain separate incomplete features. This increment is not full folder
 or Lightroom parity.
+
+
+### Folder synchronization increment
+
+Schema v10 adds a durable recursive scan and review plan. The native folder menu
+starts **Synchronize Folder…**; individual files, a change category or a folder
+subtree can be selected. New files are referenced in place, missing source families
+can explicitly be removed from the catalog, and supported external metadata can
+be read onto masters. Removal defaults off and removes copies/edits/snapshots/
+memberships together; original files and export snapshots/receipts are preserved.
+Copies retain independent descriptive metadata and recipes. Capture clocks remain
+source-wide, including timezone provenance and exact fractional precision.
+
+Directory discovery is capped at 256 entries per request; file scans and review
+pages at 60 originals. Filesystem and XMP reads run outside the catalog lock.
+Restarted directory iterations replay into unique staging rows, and explicit
+file deselections survive interrupted application and backup/restore. Late file,
+directory, sidecar, source-family and applicable edit changes prevent application.
+Read errors are distinct from missing files. Image/export contention retains the
+review for explicit retry. Cancellation discards staging unless the final atomic
+transaction already committed; uncertain native responses read back the receipt.
+
+Read-only XMP supports title, caption, copyright, integer rating, standard color
+labels and hierarchical/flat keywords. Standard TIFF/JPEG/PNG packets and adjacent
+sidecars are bounded; sidecar properties override embedded properties and absent
+properties do not clear catalog fields. Unsupported custom labels and Adobe
+Develop settings are shown as notes. XML document types/entities and malformed or
+unrepresentable supported values are rejected. No pixel workers or hashes are
+required for synchronization.
+
+Final Python regression: **276 passed, no skips**, with the pinned real NEF and
+required Metal execution. All **14 native suites passed 248 assertions against
+the final packaged engine**, including 17 folder-sync checks. Coverage includes
+file selection, complete camera-clock/fraction presentation, independent copy
+metadata, default retention versus explicit family removal, resume/cancel and
+stale-response rejection. The Mac 14-target build and local ad-hoc signature
+verification passed; the embedded source manifest matches generation 8 / schema
+10 / 72 tools. Public source and extracted source-only archive checks passed for
+232 files. These state/IPC checks do not verify rendered desktop interaction.
+
+A packaged-engine probe used the same pinned Nikon D3S NEF from the relocation
+increment, copied into a private generated directory. Synchronization discovered
+the RAW and read a generated XMP sidecar; Adobe Develop settings were reported and
+left unapplied. A second sync changed the master's title while preserving copy
+metadata and frozen export jobs. Full-size 4284×2844 TIFF16/JPEG exports had ICC
+profiles and positive Metal dispatch, and fixture/copy hashes stayed identical.
+Discovery plus application took 26.980 ms; two exports took 2.156 seconds with
+275.0 MB worker peak. Metadata reads were warm, pixels started cold and the second
+variant could reuse decoded data. Native compilation ran concurrently, so these
+are integration diagnostics, not controlled processing benchmarks. Reproduce with
+`tests/folder_sync_raw_probe.py`.
+
+Synthetic warm measurements on the same macOS 26.6.2 arm64 / 128 GB host, without
+concurrent build/test workloads. Each input catalog has 1,000 missing leaf folders,
+all originals missing except one empty placeholder, and 10% new empty PNG
+placeholders. The probe explicitly imports all new files and removes all missing
+families, while a concurrent reader requests a 60-photo page every 20 ms.
+
+| Operation | 10,000 originals + 1,000 new | 100,000 originals + 10,000 new |
+| --- | ---: | ---: |
+| Prepare plan | 35.919 ms | 608.872 ms |
+| Complete scan | 1331.938 ms | 13682.675 ms |
+| Scan request median / p95 | 5.922 / 10.444 ms | 6.106 / 10.839 ms |
+| Validate and apply | 647.841 ms | 7306.886 ms |
+| Atomic catalog transaction | 229.364 ms | 3190.742 ms |
+| Concurrent browse median / p95 | 5.028 / 7.715 ms | 5.597 / 7.229 ms |
+| Worst concurrent browse | 224.826 ms | 3200.638 ms |
+| Peak process RSS | 43.73 MB | 70.16 MB |
+| Image-worker memory | 0 | 0 |
+
+Scan request counts were 189 / 1,875; browse samples were 55 / 545. SQL profiling
+identified repeated staging-page sorting: dedicated plan/ID indexes reduced
+the 100,000-row transaction from 10.880 to 3.191 seconds and complete application
+from 24.637 to 7.307 seconds. The final transaction still blocks catalog reads for
+about 3.2 seconds at this scale. This remains a performance gap; short scan pages
+do not establish nonblocking application. Reproduce with tests/folder_sync_probe.py.
+These are metadata/stat/SQLite timings, not RAW decode speed, IPC or desktop latency.
+
+Remaining synchronization parity includes the full Import Dialog with thumbnail
+selection and duplicate policy, missing-empty-folder removal, all supported image
+containers, extended JPEG XMP, complete IPTC/ACR/Adobe Develop metadata, custom label
+sets and XMP writing. Extreme metadata payloads across broker pages still need
+acceptance. Rendered desktop, keyboard/VoiceOver and macOS 14 runtime remain
+unverified. Physical folder move/rename and the rest of the non-AI inventory stay
+in scope.

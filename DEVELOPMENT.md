@@ -48,6 +48,15 @@ when a clear function is more maintainable. Avoid unrelated formatting churn.
   one atomic remap. Deferring for image/export work retains the plan for explicit
   retry; uncertain replies are read back rather than replayed. Preserve recipes,
   metadata, whole stacks and frozen export options across the complete family.
+- Folder synchronization stages directory identities, file/sidecar fingerprints,
+  source-family revisions and explicit selections before importing or removing
+  catalog entries. Missing originals are never inferred from read/permission
+  errors. Removal defaults off and includes the complete source family; preserve
+  frozen jobs and never delete originals. XMP reads are bounded and preserve
+  absent properties, independent copy metadata and Develop recipes. Reject
+  malformed/unrepresentable supported values instead of silently truncating them.
+  Recheck files outside the catalog lock, then apply catalog changes atomically.
+  Measure final transaction contention as well as scan-page latency.
 - Keyword assignments reference stable tag IDs. Names are unique only within one
   parent; never merge equal leaf names from different branches. Preserve qualified
   paths and invalidate affected photo metadata revisions on ancestor rename/move.

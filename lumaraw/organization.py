@@ -92,6 +92,8 @@ def migrate(db):
     migrate_keywords(db)
     from .relocations import migrate as migrate_relocations
     migrate_relocations(db)
+    from .folder_sync import migrate as migrate_folder_sync
+    migrate_folder_sync(db)
 
 
 def text_predicate(text):

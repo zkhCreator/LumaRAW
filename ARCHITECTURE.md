@@ -185,7 +185,7 @@ filtered queries retain exact SQL predicates. Native folder pages load lazily an
 release collapsed branches. Source navigation flushes pending edits and rejects
 superseded requests. Photo-to-folder navigation uses explicit tree and photo-page
 offsets, clears filters and switches to a flat direct-folder view; it does not
-change saved stack visibility. Folder synchronization, physical moves/renames,
+change saved stack visibility. Physical moves/renames,
 multi-source selection and persistent workspace preferences remain future work.
 
 `keywords.py` owns schema version 8: durable keyword IDs, parent links, synonyms
@@ -231,8 +231,8 @@ index metadata and structural folder membership. Metadata/recipe edits may conti
 Application acquires the image slot without waiting and rejects affected running
 exports. One SQL transaction remaps photos/copies, folder membership, source
 revisions, folder stacks and eligible job source paths. Export recipes/options and
-destinations stay frozen. A transaction-scoped maintenance switch suppresses only
-the per-photo folder-path trigger; aggregate folder counts are adjusted by mapped
+destinations stay frozen. A transaction-scoped maintenance switch suppresses
+the per-photo folder-path/count triggers; aggregate folder counts are adjusted by mapped
 folder and ancestor instead. Rollback restores the switch and all paths/counts.
 Nonmerged folders retain source IDs; merged nodes retain destination IDs, combine
 favorites and use destination color labels unless unset. Merged-away IDs retire.
@@ -247,6 +247,40 @@ include staging. Missing-folder reconnection never moves files, synchronizes new
 imports, removes missing catalog photos or deduplicates destination collisions.
 Overlapping old/new trees are rejected. Filesystem validation and SQLite commit are
 not an OS-wide filesystem transaction; later external file changes remain possible.
+
+`folder_sync.py` owns schema version 10. One durable synchronization plan snapshots
+the recursive source families and queues directory/file observations. Directory
+iteration visits at most 256 entries per request; file inspection and review pages
+contain at most 60 originals. One iterator is retained between requests; after a
+restart, replay uses unique staging rows and cannot duplicate discoveries. Hidden
+entries and symlinks are excluded from discovery; a catalog path replaced by a
+symlink is an error. File/sidecar reads and final fingerprint checks release the
+catalog lock. Permission/parser errors cannot be treated as missing originals.
+
+Selections are durable for individual files, a subtree or a whole change kind.
+Application rechecks source/index/folder revisions, and edit/metadata revisions
+for families being removed or masters receiving metadata. Image work and affected
+running exports defer application for explicit retry. One SQL transaction imports
+references, optionally removes complete missing families, refreshes source stats
+and applies selected descriptive metadata to masters. Copies share capture clocks
+but keep independent descriptive metadata and recipes. Export snapshots/receipts
+survive removal. SQL trigger guards suppress repeated ancestor counts during the
+batch; folder membership remains maintained and aggregated deltas restore counts
+before commit. Failed transactions restore guards and all catalog changes.
+
+`xmp_read.py` limits packets to 2 MiB, header reads to 4 MiB and XML depth/node
+counts; document types/entities are rejected. Sidecar properties override standard
+TIFF/JPEG/PNG XMP. Missing properties leave catalog data unchanged. Titles, captions,
+copyright, integer ratings, standard labels and hierarchical/flat keywords are
+supported; unknown custom labels and Adobe Develop settings are reported as notes.
+Extended JPEG XMP, BigTIFF/other embedded containers, full IPTC, ACR sidecars and
+XMP writing remain incomplete. Source headers are never decoded into pixels here.
+
+Restart requires explicit continuation, preserving file deselections. Cancellation
+discards staging unless application already committed; uncertain native replies
+are read back without replay. Terminal plans retain 32 small receipts and backups
+include active staging. No automatic synchronization or physical file deletion is
+performed. Final stat checks are not an OS-wide filesystem transaction.
 
 `source_identity.py` provides stat-based cache identities without importing pixel
 libraries. The broker returns a page of completed thumbnail paths in one command;

@@ -92,7 +92,8 @@ small raster files and separate disposable catalogs, then runs the
 15-assertion state, 13-assertion library, 12-assertion culling, 20-assertion review,
 14-assertion thumbnail, 21-assertion collection-tree, 19-assertion virtual-copy,
 10-assertion service-connection, 22-assertion stack, 19-assertion auto-stack,
-24-assertion folder, 25-assertion keyword and 17-assertion folder-relocation suites.
+24-assertion folder, 25-assertion keyword, 17-assertion folder-relocation and
+17-assertion folder-synchronization suites.
 Each suite has its own
 fresh image directory, so a relink test cannot move another suite's fixture. The library suite checks
 live smart membership, text search/sort, pagination, empty-filter selection,
@@ -114,6 +115,41 @@ and stale-reply rejection. `tests/test_relocations.py` additionally checks index
 hash mismatch, path collisions, merged folders, export admission/snapshots, file
 and directory replacement, source reappearance, responsive cancellation, failed
 write rollback, genuine v8 migration, later pages and active-plan backup/restore.
+
+The synchronization suite verifies native scan/review/file selection, metadata
+values, import-in-place, default retention versus explicit family removal, source
+refresh and durable resume/cancel through the broker. `test_folder_sync.py` adds
+directory replay, subtree selection, late file/catalog changes, cancellation during
+scan/final verification, image/export contention, permission/parser failures,
+symlink exclusion, atomic rollback, interrupted selection recovery, active-plan
+backup/restore and genuine v9
+migration. `test_xmp_read.py` verifies supported RDF fields, sidecar precedence,
+standard embedded TIFF/JPEG/PNG packets, bounded XML/headers, unsupported values
+and unchanged source hashes. These fixtures do not prove Adobe pixel equivalence.
+
+```sh
+.venv/bin/python tests/folder_sync_probe.py --work work/folder-sync-10k --rows 10000
+.venv/bin/python tests/folder_sync_probe.py --work work/folder-sync-100k --rows 100000
+```
+
+This probe uses a synthetic catalog with all but one original missing, plus 10%
+new empty placeholder files. It records preparation, bounded scan requests, final
+verification/atomic application, concurrent browse contention and RSS. No pixels,
+content hashes, broker IPC or rendered UI are measured. Empty files are used only
+for metadata performance and are not evidence of supported image decoding.
+
+```sh
+.venv/bin/python tests/folder_sync_raw_probe.py \
+  --engine /absolute/LumaRAW.app/Contents/Resources/Engine/LumaRAWEngine \
+  --fixture /absolute/nikon.NEF --work work/folder-sync-raw-01
+```
+
+This packaged integration probe discovers a private RAW copy through folder sync,
+reads a generated sidecar, reports unsupported Adobe Develop settings, and creates
+a virtual copy. A later metadata sync preserves the copy's independent description
+and two already-frozen exports. It checks full-size JPEG/16-bit TIFF, ICC tags,
+positive Metal dispatch and unchanged fixture/copy hashes. Integration timing may
+include concurrent compiler activity; it is not a controlled throughput benchmark.
 
 ```sh
 .venv/bin/python tests/relocation_probe.py --work work/relocation-10k --rows 10000

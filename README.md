@@ -17,7 +17,7 @@ LumaRAW references your originals without changing them. The SwiftUI app and you
 | Library | Folder tree/search/favorites/labels, ratings, flags, catalog metadata/keywords, regular/live smart collections, nested sets, Quick/target collections, SQL filters/sorting, manual/capture-time stacks, duplicate/missing indexing, virtual copies/shared snapshots, selective sync, and backup/restore |
 | Culling | Grid/Loupe/Compare/Survey, anchored page selections, active-photo review actions, linked or independent full-resolution comparison viewports |
 | Export | JPEG and 16-bit TIFF with embedded sRGB, Display P3, Adobe RGB, or ProPhoto RGB ICC profiles; persistent queue, pause/cancel/retry, and collision-safe filenames |
-| Agents | 66 MCP tools, equivalent JSON CLI commands, and a bundled skill; app and agent edits share conflict detection |
+| Agents | 72 MCP tools, equivalent JSON CLI commands, and a bundled skill; app and agent edits share conflict detection |
 
 ## Build and run
 
@@ -97,7 +97,7 @@ with directly contained photos cannot be hidden. These actions change catalog
 presentation only. An unavailable directory keeps its catalog counts and is marked
 in the sidebar. **Go to Folder in Library**, available from a photo's menu or
 inspector, clears filters and shows individual photos in import order, locating the
-target even beyond the first page. Folder rename/move, synchronization, multi-folder
+target even beyond the first page. Folder rename/move, multi-folder
 selection and empty-directory import remain unfinished.
 Use **Folder Options → Refresh Folders** after a volume goes offline or returns;
 directory availability is checked when folder pages are read.
@@ -113,6 +113,21 @@ their own color labels. **Folder Options → Resume Folder Relocation…** reope
 saved plan; cancellation discards staging without moving any originals. Active
 image work defers application until an explicit retry. Overlapping old/new folder
 trees and colliding catalog photo paths are not supported.
+
+Choose **Synchronize Folder…** from an available folder's menu to scan its full
+subtree. Review new files, missing originals and changed metadata in bounded
+pages; select individual files, all items of one kind, or a folder subtree.
+**Synchronize** imports selected new files in place. **Remove missing photos from
+catalog** is off by default: enabling it also removes their virtual copies, edits,
+snapshots and memberships, while preserving export receipts and files on disk.
+Scan/read metadata options are independent. Supported XMP fields include title,
+caption, copyright, integer rating, standard color labels and keyword paths;
+capture-time headers are refreshed without decoding pixels. Sidecar properties
+override standard embedded TIFF/JPEG/PNG XMP; virtual copies retain independent
+descriptive metadata and Develop recipes are preserved. Review unsupported-field
+notes and errors before applying. **Folder Options → Resume Folder Synchronization…**
+restores a saved scan or review. This is not yet the complete Lightroom Import
+Dialog, duplicate policy, full IPTC/XMP/ACR support or missing-empty-folder removal.
 
 The **Keyword List** supports nested keywords, synonyms, search and 60-item pages.
 Its checkboxes add/remove tags on the Grid selection, or just the active photo in
