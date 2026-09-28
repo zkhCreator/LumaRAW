@@ -101,6 +101,13 @@ a tag with this `expected_revision`, a name, optional parent (null/omitted means
 root) and synonyms. Optional photo `targets` atomically assign a newly created tag;
 each target needs its current `expected_metadata_revision`.
 
+Large list rows carry `details_deferred:true`, null `path`/`synonyms`, and an
+abbreviated `path_preview`. These are unknown values, not empty defaults. Read
+`get_keyword(keyword_id,expected_revision)` before editing: it returns the full
+path, authoritative parent path, all synonyms and export flags. A changed or
+removed keyword fails visibly; reread the list instead of retrying a stale edit.
+Small rows retain their inline values for compatibility.
+
 `keyword_membership` adds/removes one ID for up to 60 revision-checked targets and
 preserves other tags. `delete_keyword` removes a complete subtree and assignments,
 with the captured global revision. Both preserve original files and pixel recipes.

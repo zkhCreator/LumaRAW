@@ -78,6 +78,11 @@ when a clear function is more maintainable. Avoid unrelated formatting churn.
   the same transaction as the other metadata fields. Native keyword pickers hold
   local drafts until the parent form saves, preserving unchecked fields and stale
   revision failures. Metadata receipts must not adopt a newer recipe revision.
+  Vocabulary rows also have a byte budget. Explicitly deferred path/synonym fields
+  are unknown values, never empty edit defaults. Read complete keyword details at
+  the captured list revision before editing or choosing a parent; discard replies
+  for superseded forms and dismissed pickers. Use the authoritative parent path
+  instead of splitting display strings that may contain legacy literal separators.
 
 ## Engine changes and handoff
 

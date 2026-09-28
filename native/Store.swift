@@ -58,6 +58,8 @@ import UniformTypeIdentifiers
     @Published var expandedKeywords: Set<Int>=[]
     @Published var keywordBusy=false
     @Published var showKeywordEditor=false
+    @Published var keywordEditorLoading=false
+    var keywordEditorGeneration=0
     @Published var editingKeyword: LibraryKeyword?
     @Published var newKeywordParent: LibraryKeyword?
     var keywordEditorTargets: [Photo]=[]

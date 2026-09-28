@@ -94,7 +94,7 @@ small raster files and separate disposable catalogs, then runs the
 10-assertion service-connection, 22-assertion stack, 19-assertion auto-stack,
 24-assertion folder, 25-assertion keyword, 17-assertion folder-relocation and
 24-assertion folder-synchronization, 16-assertion export-metadata, and
-21-assertion photo-keyword-detail suites.
+21-assertion photo-keyword-detail and 24-assertion complete-vocabulary suites.
 Each suite has its own
 fresh image directory, so a relink test cannot move another suite's fixture. The library suite checks
 live smart membership, text search/sort, pagination, empty-filter selection,
@@ -108,6 +108,19 @@ The keyword suite checks lazy hierarchy/pages, Grid/active-photo scope, mixed se
 captured create-and-assign targets, stale revisions, parent filters, ancestor
 rename, synonym lookup, external updates and empty-page polling. It exercises the
 real native Store and IPC without automating the rendered desktop.
+
+The vocabulary suite exercises maximal Unicode paths and synonyms through real
+IPC, complete editor/parent initialization, preserved export options, sixty-row
+parent paging, and stale, wrong, superseded or dismissed detail responses.
+test_keyword_vocabulary.py covers full reads for 67 maximal child rows, synonym
+search, selected counts, safe rename/delete, legacy parent names and unchanged
+originals. The standalone probe isolates warm service/SQL work with a large
+synthetic dictionary; it does not measure IPC, pixels or rendered responsiveness:
+
+```sh
+.venv/bin/python tests/keyword_vocabulary_probe.py --work work/keyword-vocabulary-10k --tags 10000 --samples 30
+.venv/bin/python tests/keyword_vocabulary_probe.py --work work/keyword-vocabulary-100k --tags 100000 --samples 30
+```
 
 The relocation suite moves only its generated fixture directory, scans a nested
 tree with a missing file and a virtual copy, applies explicitly, and checks source

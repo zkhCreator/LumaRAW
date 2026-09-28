@@ -184,6 +184,7 @@ class Service:
             if method=='photo_summaries':return {'photos':c.summaries(p['photo_ids']),'stack_revision':Stacks(c).revision(),'folder_revision':Folders(c).revision(),'keyword_revision':Keywords(c).revision()}
             if method=='library_state':return {'stack_revision':Stacks(c).revision(),'folder_revision':Folders(c).revision(),'keyword_revision':Keywords(c).revision()}
             if method=='list_keywords':return Keywords(c).list(**p)
+            if method=='get_keyword':return Keywords(c).details(**p)
             if method=='save_keyword':return Keywords(c).save(**p)
             if method=='delete_keyword':return Keywords(c).delete(**p)
             if method=='keyword_membership':return Keywords(c).membership(**p)

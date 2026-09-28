@@ -74,7 +74,7 @@ import Foundation
             await s.refreshVisibleSummaries()
             try check(s.keywordPages[0]?.items.first?.name == "External","empty_photo_page_detects_external_keyword_creation")
             s.libraryFilters=[:];await s.openLibraryMode("all")
-            s.selection=[1,2];s.selected=1;s.editKeyword()
+            s.selection=[1,2];s.selected=1;await s.editKeyword()
             let captured=s.keywordEditorTargets
             s.selection=[3];s.selected=3
             let created=await s.saveKeyword(name:"Captured",synonyms:[],parentID:nil,original:nil,

@@ -1,6 +1,7 @@
 // Purpose: native keyword list, assignment controls and hierarchy editing forms.
 // Inputs: bounded keyword pages and captured revisions. Outputs: explicit catalog
 // actions. Parent picking is lazy and paged; original files are never rewritten.
+// Editing and parent selection resolve complete revision-bound keyword details.
 import SwiftUI
 
 struct KeywordsSidebar: View {
@@ -11,10 +12,11 @@ struct KeywordsSidebar: View {
                 TextField("Filter Keywords",text:Binding(get:{s.keywordSearch},set:{s.keywordSearch=$0;s.scheduleKeywordSearch()}))
                     .textFieldStyle(.roundedBorder)
                 Menu {
-                    Button("Create Keyword…") { s.editKeyword() }
+                    Button("Create Keyword…") { Task { await s.editKeyword() } }
                     Button("Refresh Keywords") { Task { await s.refreshKeywords() } }
                 } label: { Image(systemName:"plus") }.help("Keyword Options")
-                    .disabled(s.keywordRevision < 0 || s.keywordBusy)
+                    .disabled(s.keywordRevision < 0 || s.keywordBusy || s.keywordEditorLoading)
+                if s.keywordEditorLoading { ProgressView().controlSize(.small).help("Reading keyword details") }
             }
             KeywordBranch(parent:nil)
             Text("Counts show directly tagged photos. Show Photos includes nested keywords.")
@@ -60,8 +62,8 @@ struct KeywordTreeRow: View {
         }
         .contextMenu {
             Button("Show Photos") { Task { await s.showKeywordPhotos(keyword) } }
-            Button("Edit Keyword…") { s.editKeyword(keyword) }
-            Button("Create Keyword Inside…") { s.editKeyword(parent:keyword) }
+            Button("Edit Keyword…") { Task { await s.editKeyword(keyword) } }
+            Button("Create Keyword Inside…") { Task { await s.editKeyword(parent:keyword) } }
             Divider()
             Button("Delete Keyword and Children…",role:.destructive) { deleting=true }
         }
@@ -76,7 +78,7 @@ struct KeywordTreeRow: View {
             }.buttonStyle(.plain)
                 .disabled(s.keywordBusy || keyword.selection.isEmpty || keyword.selection != s.actionPhotoIDs)
                 .accessibilityLabel("\(keyword.name), \(keyword.selectedCount) of \(keyword.selection.count) selected photos tagged; \(allSelected ? "remove":"add") tag")
-            Text(keyword.name).lineLimit(1).help(keyword.path)
+            Text(keyword.name).lineLimit(1).help(keyword.path + (keyword.detailsDeferred ? "\nComplete path and synonyms are available in Edit Keyword.":""))
             Spacer(minLength:2)
             Text("\(keyword.photoCount)").font(.caption).monospacedDigit()
             Button { Task { await s.showKeywordPhotos(keyword) } } label: { Image(systemName:"arrow.right.circle") }
@@ -111,7 +113,7 @@ struct KeywordEditor: View {
         _exportContaining=State(initialValue:original?.exportContaining ?? true)
         _exportSynonyms=State(initialValue:original?.exportSynonyms ?? true)
         _parentID=State(initialValue:original?.parentID ?? parent?.id)
-        let oldPath=original?.path.components(separatedBy:" | ").dropLast().joined(separator:" | ") ?? ""
+        let oldPath=original?.parentPath ?? ""
         _parentName=State(initialValue:parent?.path ?? (oldPath.isEmpty ? "None":oldPath))
     }
 
@@ -121,7 +123,13 @@ struct KeywordEditor: View {
             Form {
                 TextField("Keyword",text:$name)
                 TextField("Synonyms, separated by commas",text:$synonyms)
-                Button("Inside: \(parentName)") { choosingParent=true }
+                LabeledContent("Inside") {
+                    HStack {
+                        ScrollView { Text(parentName).frame(maxWidth:.infinity,alignment:.leading).textSelection(.enabled) }
+                            .frame(maxHeight:70)
+                        Button("Choose…") { choosingParent=true }
+                    }
+                }
                 Toggle("Include on Export",isOn:$includeExport)
                 Toggle("Export Containing Keywords",isOn:$exportContaining)
                 Toggle("Export Synonyms",isOn:$exportSynonyms).disabled(!includeExport)
@@ -144,7 +152,7 @@ struct KeywordEditor: View {
                 }.keyboardShortcut(.defaultAction).disabled(name.trimmingCharacters(in:.whitespacesAndNewlines).isEmpty)
             }
         }.padding(24).frame(width:500).disabled(saving)
-            .sheet(isPresented:$choosingParent) { KeywordParentPicker(excluding:original?.id) { id,path in parentID=id;parentName=path } }
+            .sheet(isPresented:$choosingParent) { KeywordParentPicker(excluding:original?.id,revision:revision) { id,path in parentID=id;parentName=path } }
     }
 }
 
@@ -152,46 +160,45 @@ struct KeywordParentPicker: View {
     @Environment(\.dismiss) var dismiss
     let excluding: Int?
     let choose: (Int?,String)->Void
-    @State private var parents: [LibraryKeyword]=[]
-    @State private var items: [LibraryKeyword]=[]
-    @State private var offset=0
-    @State private var total=0
-    @State private var loading=false
-    @State private var error: String?
+    @StateObject private var model: KeywordParentModel
+
+    init(excluding: Int?,revision: Int,choose: @escaping (Int?,String)->Void) {
+        self.excluding=excluding;self.choose=choose
+        _model=StateObject(wrappedValue:KeywordParentModel(revision:revision))
+    }
+
+    func select(_ keyword: LibraryKeyword?) {
+        Task {
+            if let value=await model.choose(keyword) { choose(value.id,value.path);dismiss() }
+        }
+    }
+
     var body: some View {
         VStack(alignment:.leading,spacing:14) {
             Text("Choose Parent Keyword").font(.title2)
-            Text(parents.last?.path ?? "Keyword roots").font(.caption)
+            ScrollView { Text(model.parents.last?.path ?? "Keyword roots").font(.caption).textSelection(.enabled) }.frame(maxHeight:70)
             HStack {
-                Button("Up") { parents.removeLast();offset=0;Task { await load() } }.disabled(parents.isEmpty || loading)
-                Button("Use This Parent") { choose(parents.last?.id,parents.last?.path ?? "None");dismiss() }.disabled(loading)
+                Button("Up") { Task { await model.up() } }.disabled(model.parents.isEmpty || model.loading)
+                Button("Use This Parent") { select(model.parents.last) }.disabled(model.loading || model.error != nil)
+                if model.loading { ProgressView().controlSize(.small) }
             }
-            List(items) { keyword in
+            List(model.items) { keyword in
                 HStack {
-                    Button(keyword.name) { choose(keyword.id,keyword.path);dismiss() }
+                    Button(keyword.name) { select(keyword) }.help(keyword.path)
                     Spacer()
                     if keyword.hasChildren {
-                        Button { parents.append(keyword);offset=0;Task { await load() } } label: { Image(systemName:"chevron.right") }
+                        Button { Task { await model.browse(keyword) } } label: { Image(systemName:"chevron.right") }
                             .accessibilityLabel("Browse \(keyword.name)")
                     }
-                }.disabled(keyword.id == excluding || loading)
+                }.disabled(keyword.id == excluding || model.loading || model.error != nil)
             }
-            if let error { Text(error).foregroundStyle(.red).font(.caption) }
+            if let error=model.error { Text(error).foregroundStyle(.red).font(.caption) }
             HStack {
-                Button("Previous") { offset=max(0,offset-60);Task { await load() } }.disabled(offset == 0 || loading)
-                Button("Next") { offset+=60;Task { await load() } }.disabled(offset+60 >= total || loading)
+                Button("Previous") { Task { await model.load(offset:max(0,model.offset-60)) } }.disabled(model.offset == 0 || model.loading)
+                Button("Next") { Task { await model.load(offset:model.offset+60) } }.disabled(model.offset+60 >= model.total || model.loading)
                 Spacer();Button("Cancel") { dismiss() }.keyboardShortcut(.cancelAction)
             }
-        }.padding(20).frame(width:480,height:420).task { await load() }
-    }
-    func load() async {
-        loading=true;defer { loading=false }
-        do {
-            var params: [String:Any]=["offset":offset]
-            if let parent=parents.last { params["parent_id"]=parent.id }
-            let result=try await Backend.call("list_keywords",params)
-            items=(result["keywords"] as? [[String:Any]] ?? []).compactMap { LibraryKeyword($0,revision:0,selection:[]) }
-            offset=result["offset"] as? Int ?? 0;total=result["total"] as? Int ?? 0;error=nil
-        } catch { self.error=error.localizedDescription }
+        }.padding(20).frame(width:480,height:420).task { await model.load() }
+            .onDisappear { model.cancel() }
     }
 }

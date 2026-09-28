@@ -188,6 +188,12 @@ offsets, clears filters and switches to a flat direct-folder view; it does not
 change saved stack visibility. Physical moves/renames,
 multi-source selection and persistent workspace preferences remain future work.
 
+Vocabulary pages retain sixty rows, with an 8 KiB inline budget per row. Larger
+path/synonym values are explicitly deferred, with bounded abbreviated labels;
+get_keyword returns the complete values and parent path at the captured global
+revision. Mac editors resolve complete details before initializing fields. Parent
+navigation holds one page and rejects changed revisions and superseded replies.
+
 `keywords.py` owns schema version 8: durable keyword IDs, parent links, synonyms
 and many-to-many direct photo assignments. The migration consolidates legacy
 normalized names into root tags with a deterministic display spelling and retains

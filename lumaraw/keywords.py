@@ -6,7 +6,10 @@ No pixels, original/sidecar writes or metadata encoding. Export policy projectio
 belongs to keyword_exports; this module stores its flags. Synonyms aid lookup; they
 are not separate assignments. Stable IDs distinguish equal names under different
 parents. The legacy photo_keywords name is a read-only direct-assignment view.
+List rows have an 8 KiB budget; deferred paths/synonyms remain available through
+revision-bound details. A missing summary field never means an empty value.
 """
+import json
 import re
 import unicodedata
 
@@ -113,6 +116,22 @@ class Keywords:
             'SELECT id,path FROM paths WHERE parent_id IS NULL ORDER BY casefold(path),id LIMIT ? OFFSET ?', (photo_id,limit,offset))
         return [{'id':row[0], 'path':row[1]} for row in rows]
 
+    def details(self, keyword_id, expected_revision):
+        self.check_revision(expected_revision)
+        item = self.get(keyword_id)
+        ancestors = self.ancestors(keyword_id)
+        item['path'] = ' | '.join(a['name'] for a in ancestors)
+        item['parent_path'] = ' | '.join(a['name'] for a in ancestors[:-1])
+        item['synonyms'] = self.synonyms(keyword_id)
+        item['details_deferred'] = False
+        item['has_children'] = self.db.execute(
+            'SELECT 1 FROM keywords WHERE parent_id=? LIMIT 1', (keyword_id,)).fetchone() is not None
+        return {'keyword':item, 'keyword_revision':expected_revision}
+
+    def synonyms(self, keyword_id):
+        return [r[0] for r in self.db.execute(
+            'SELECT name FROM keyword_synonyms WHERE keyword_id=? ORDER BY normalized', (keyword_id,))]
+
     def list(self, parent_id=None, offset=0, search='', photo_ids=()):
         if parent_id is not None:
             self.get(parent_id)
@@ -133,12 +152,29 @@ class Keywords:
             'FROM keywords k WHERE ' + where + ' ORDER BY k.normalized,k.id LIMIT 60 OFFSET ?',
             [*ids, *params, offset])
         items = []
+        ancestors_by_id = {}
+        def path_names(keyword_id, seen=()):
+            if keyword_id in seen or len(seen) >= 32:
+                raise ValueError('Keyword hierarchy is too deep or cyclic')
+            if keyword_id not in ancestors_by_id:
+                tag = self.get(keyword_id)
+                parents = path_names(tag['parent_id'], (*seen, keyword_id)) if tag['parent_id'] is not None else []
+                if len(parents) >= 32:
+                    raise ValueError('Keyword hierarchy is too deep or cyclic')
+                ancestors_by_id[keyword_id] = [*parents, tag['name']]
+            return ancestors_by_id[keyword_id]
         for row in rows:
             item = dict(row)
             item['has_children'] = bool(item['has_children'])
-            item['synonyms'] = [r[0] for r in self.db.execute(
-                'SELECT name FROM keyword_synonyms WHERE keyword_id=? ORDER BY normalized', (row['id'],))]
-            item['path'] = ' | '.join(a['name'] for a in self.ancestors(row['id']))
+            item['synonyms'] = self.synonyms(row['id'])
+            names = path_names(row['id'])
+            item['path'] = ' | '.join(names)
+            item['details_deferred'] = False
+            if len(json.dumps(item, ensure_ascii=False).encode()) > 8192:
+                item['path'] = None
+                item['synonyms'] = None
+                item['details_deferred'] = True
+                item['path_preview'] = ' | '.join([names[0], '…', names[-1]]) if len(names) > 2 else ' | '.join(names)
             items.append(item)
         return {'keywords':items, 'total':total, 'offset':offset, 'page_size':60,
                 'keyword_revision':self.revision(), 'selected_total':len(ids)}

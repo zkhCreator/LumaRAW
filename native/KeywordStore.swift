@@ -2,6 +2,7 @@
 // Inputs: portable tag pages, explicit forms and photo metadata revisions.
 // Outputs: lazy tree state, mixed assignment indicators and catalog mutations.
 // No SQL, original metadata writes or recipe adoption. Stale replies are ignored.
+// Deferred list labels are presentation only; editors require complete details.
 import Foundation
 
 struct LibraryKeyword: Identifiable {
@@ -10,6 +11,8 @@ struct LibraryKeyword: Identifiable {
     let path: String
     let parentID: Int?
     let synonyms: [String]
+    let detailsDeferred: Bool
+    let parentPath: String
     let hasChildren: Bool
     let photoCount: Int
     let selectedCount: Int
@@ -21,13 +24,31 @@ struct LibraryKeyword: Identifiable {
     init?(_ row: [String:Any], revision: Int, selection: [Int]) {
         guard let id=row["id"] as? Int,let name=row["name"] as? String else { return nil }
         self.id=id;self.name=name;self.revision=revision;self.selection=selection
-        path=row["path"] as? String ?? name;parentID=row["parent_id"] as? Int
+        path=row["path"] as? String ?? row["path_preview"] as? String ?? name
+        parentID=row["parent_id"] as? Int
+        parentPath=row["parent_path"] as? String ?? ""
+        detailsDeferred=row["details_deferred"] as? Bool ?? false
         synonyms=row["synonyms"] as? [String] ?? []
         includeExport=(row["include_export"] as? Int ?? 1) != 0
         exportContaining=(row["export_containing"] as? Int ?? 1) != 0
         exportSynonyms=(row["export_synonyms"] as? Int ?? 1) != 0
         hasChildren=row["has_children"] as? Bool ?? false
         photoCount=row["photo_count"] as? Int ?? 0;selectedCount=row["selected_count"] as? Int ?? 0
+    }
+
+    func resolved(_ result: [String:Any]) throws -> LibraryKeyword {
+        guard result["keyword_revision"] as? Int == revision,
+              let row=result["keyword"] as? [String:Any],row["id"] as? Int == id,
+              row["details_deferred"] as? Bool == false,row["path"] is String,
+              row["parent_path"] is String,row["synonyms"] is [String],
+              let full=LibraryKeyword(row,revision:revision,selection:selection) else {
+            throw EngineFailure(message:"Keyword details changed; refresh before editing")
+        }
+        return full
+    }
+
+    func complete() async throws -> LibraryKeyword {
+        try resolved(await Backend.call("get_keyword",["keyword_id":id,"expected_revision":revision]))
     }
 }
 
@@ -99,16 +120,36 @@ extension Store {
         await loadKeywordPage(parent:parent,offset:offset)
     }
 
-    func editKeyword(_ original: LibraryKeyword?=nil, parent: LibraryKeyword?=nil) {
-        editingKeyword=original;newKeywordParent=parent
+    func editKeyword(_ original: LibraryKeyword?=nil, parent: LibraryKeyword?=nil) async {
+        keywordEditorGeneration+=1
+        let token=keywordEditorGeneration
+        keywordEditorLoading=true
+        showKeywordEditor=false
+        editingKeyword=nil;newKeywordParent=nil
         let ids=actionPhotoIDs
-        keywordEditorTargets=photos.filter { ids.contains($0.id) }
-        keywordEditorRevision=original?.revision ?? parent?.revision ?? keywordRevision
-        showKeywordEditor=true
+        let targets=photos.filter { ids.contains($0.id) }
+        let revision=original?.revision ?? parent?.revision ?? keywordRevision
+        defer { if token == keywordEditorGeneration { keywordEditorLoading=false } }
+        do {
+            let full=try await (original ?? parent)?.complete()
+            guard token == keywordEditorGeneration else { return }
+            editingKeyword=original == nil ? nil:full
+            newKeywordParent=original == nil ? full:nil
+            keywordEditorTargets=targets
+            keywordEditorRevision=revision
+            showKeywordEditor=true
+        } catch {
+            guard token == keywordEditorGeneration else { return }
+            self.error=error.localizedDescription
+        }
     }
 
     func saveKeyword(name: String, synonyms: [String], parentID: Int?, original: LibraryKeyword?, revision: Int, targets: [Photo]=[], includeExport: Bool?=nil, exportContaining: Bool?=nil, exportSynonyms: Bool?=nil) async -> Bool {
         guard !keywordBusy else { return false }
+        guard original?.detailsDeferred != true else {
+            error="Read complete keyword details before editing"
+            return false
+        }
         keywordBusy=true;defer { keywordBusy=false }
         var params: [String:Any]=["name":name,"synonyms":synonyms,
             "parent_id":parentID as Any? ?? NSNull(),"expected_revision":revision]

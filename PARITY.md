@@ -26,6 +26,7 @@ Official references checked September 2026:
 - [Metadata storage and supported workflows](https://helpx.adobe.com/lightroom-classic/desktop/organize-photos-in-lightroom-classic/metadata-basics-actions.html)
 - [XMP basic properties](https://developer.adobe.com/xmp/docs/xmp-namespaces/xmp/) and [Dublin Core properties](https://developer.adobe.com/xmp/docs/xmp-namespaces/dc/)
 - [Hierarchical keywords, synonyms and export options](https://helpx.adobe.com/lightroom-classic/desktop/organize-photos-in-lightroom-classic/keywords.html)
+- [Preset storage locations and catalog storage option](https://helpx.adobe.com/lightroom-classic/desktop/kb/preference-file-and-other-file-locations.html)
 - [Export metadata and hierarchy settings](https://helpx.adobe.com/lightroom-classic/desktop/export-photos/export-files-disk-or-cd.html)
 - [XMP specifications, including Part 3 storage and Extended JPEG](https://developer.adobe.com/xmp/docs/xmp-specifications/)
 
@@ -59,9 +60,8 @@ gaps. Nothing below is full Lightroom parity merely because historical tests pas
 
 ## Active increment
 
-Bounded full-photo keyword details and complete identity-based metadata editing.
-Next bound complete vocabulary-browser metadata, then continue keyword sets and
-vocabulary exchange. The remaining inventory stays in scope.
+Bounded complete vocabulary browsing, editing and parent selection. Next continue
+keyword sets and vocabulary exchange. The remaining inventory stays in scope.
 
 ## Evidence log
 
@@ -988,3 +988,64 @@ on-demand metadata before that separate case can be accepted.
 Keyword sets, vocabulary exchange, suggestions, metadata undo and Painter remain
 pending, along with rendered desktop/VoiceOver, macOS 14 runtime and the remaining
 non-AI inventory.
+
+### Complete bounded vocabulary increment
+
+Sixty-row keyword pages retain direct counts, selection state, stable identities
+and export flags. Rows above 8 KiB explicitly defer path/synonym values as null,
+with abbreviated presentation labels. No stored values are shortened. get_keyword
+returns complete paths, authoritative parent paths, all synonyms and options at
+the captured vocabulary revision. Request-local ancestor caching avoids repeated
+lookups for shared branches without caching across mutations.
+
+Mac editing resolves full values before opening the form; a deferred summary
+cannot be used to save empty synonym defaults. Parent navigation keeps one page
+and fetches full labels before selection. Wrong identities/revisions, superseded
+edit requests and dismissed picker reads are rejected. Full parent names are
+selectable in a bounded scroll area, including legacy names containing display
+separators. Editing drafts and parent browsing do not mutate catalog data.
+
+The exact sixty-child/30-synonym fixture now returns **130,295 bytes**, compared
+with **1,844,675 bytes** before this fix. Complete details for one child use
+**45,579 bytes**, retaining all 32 path components and 30 synonyms. The new real
+broker regression covers 67 maximal children across two pages, full detail
+readback, synonym search, selected counts, rename/delete and original safety.
+Source-engine native vocabulary and keyword suites passed **49 assertions**.
+
+Warm synthetic dictionary measurements on macOS 26.6.2 arm64, 128 GB RAM; thirty
+samples each. Both dictionaries add 31 shared ancestors and 61 maximal-depth
+Unicode children with thirty synonyms per child to the ordinary tag count.
+
+| Operation | 10,000 ordinary tags median / p95 | 100,000 ordinary tags median / p95 |
+| --- | ---: | ---: |
+| Sixty-root page | 2.427 / 2.810 ms | 4.030 / 4.640 ms |
+| Sixty deep children | 5.795 / 5.897 ms | 5.837 / 6.185 ms |
+| Final child page | 1.949 / 2.074 ms | 1.960 / 2.067 ms |
+| Synonym substring search | 7.377 / 7.631 ms | 21.104 / 21.801 ms |
+| Complete keyword detail | 1.394 / 1.604 ms | 1.391 / 1.477 ms |
+| Peak process RSS | 43.03 MB | 42.72 MB |
+
+Deep list responses remained below 131 KiB and single details below 46 KiB in
+these separately named fixtures. No workers ran. These are in-process service/SQL
+measurements, excluding photographs, IPC and desktop rendering. Reproduce with
+tests/keyword_vocabulary_probe.py. Required-Metal Python regression passed **305
+tests, no skips**, with the pinned Nikon D3S NEF.
+
+The final macOS 14-target app built and passed local ad-hoc signature verification
+on macOS 26.6.2, with a matching generation 12 / schema 11 / 77-tool engine manifest.
+Five affected native suites passed **96 assertions against the packaged engine**:
+complete vocabulary, keyword organization, export metadata, photo keyword details
+and connection/handoff. The previous sixteen-suite/292-assertion result is retained
+as historical evidence; this increment did not rerun every unaffected native suite.
+No compiler warnings or errors were reported. Public source checks passed for 250
+files, including the extracted source archive. A refreshed remote/branch inspection
+found no branches outside the development branch's merged history.
+
+Keyword sets and vocabulary exchange remain next, along with suggestions, Painter
+and metadata undo. Adobe documents nine-slot keyword sets and preset storage
+outside the catalog by default, with an explicit catalog-storage option. Preserve
+that distinction when introducing a portable preset repository; do not equate
+catalog-only tag groups with complete keyword-set parity. Preset selection,
+recent keywords, built-in sets, rename/delete, keyboard behavior and cross-catalog
+storage all need separate acceptance. Rendered desktop/VoiceOver, macOS 14 runtime
+and the remaining non-AI inventory are still unverified or incomplete.
