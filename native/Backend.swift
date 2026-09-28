@@ -56,6 +56,7 @@ struct Photo: Identifiable {
     var name: String
     var path: String
     var revision: Int
+    var orientation: Int
     var rating: Int
     var flag: Int
     var title: String
@@ -79,6 +80,7 @@ struct Photo: Identifiable {
         guard let id = row["id"] as? Int else { return nil }
         self.id=id; name=row["name"] as? String ?? "Photo"; path=row["path"] as? String ?? ""
         revision=row["revision"] as? Int ?? 0; rating=row["rating"] as? Int ?? 0; flag=row["flag"] as? Int ?? 0
+        orientation=row["orientation"] as? Int ?? 0
         title=row["title"] as? String ?? ""; caption=row["caption"] as? String ?? ""
         copyright=row["copyright"] as? String ?? ""; colorLabel=row["color_label"] as? String ?? "none"
         keywords=row["keywords"] as? [String] ?? []; metadataRevision=row["metadata_revision"] as? Int ?? 0

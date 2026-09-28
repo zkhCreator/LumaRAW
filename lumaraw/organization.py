@@ -102,6 +102,8 @@ def migrate(db):
     migrate_keyword_sets(db)
     from .library_painter import migrate as migrate_painter
     migrate_painter(db)
+    from .orientation import migrate as migrate_orientation
+    migrate_orientation(db)
 
 
 def text_predicate(text):

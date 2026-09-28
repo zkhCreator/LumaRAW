@@ -18,6 +18,7 @@ struct PainterToolbar: View {
                             Text("Keywords").tag("keywords");Text("Rating").tag("rating")
                             Text("Flag").tag("flag");Text("Color Label").tag("label")
                             Text("Target Collection").tag("target_collection")
+                            Text("Rotation").tag("orientation")
                         }.frame(width:205).onChange(of:s.painterKind) { _,value in
                             s.cancelPainterStroke()
                             if value == "target_collection" { Task { await s.refreshCollectionState() } }
@@ -36,6 +37,10 @@ struct PainterToolbar: View {
                             Picker("Rating",selection:$s.painterRating) { Text("None").tag(0);ForEach(1...5,id:\.self) { Text("\($0) stars").tag($0) } }.frame(width:135)
                         } else if s.painterKind == "flag" {
                             Picker("Flag",selection:$s.painterFlag) { Text("Pick").tag(1);Text("Unflagged").tag(0);Text("Rejected").tag(-1) }.frame(width:135)
+                        } else if s.painterKind == "orientation" {
+                            Picker("Rotation",selection:$s.painterOrientationAction) {
+                                ForEach(PhotoOrientation.actions,id:\.1) { title,action in Text(title).tag(action) }
+                            }.frame(width:230)
                         } else if s.painterKind == "target_collection" {
                             Text("Target: \(s.painterTargetName)").lineLimit(1)
                             Text("Option removes from this collection").font(.caption).foregroundStyle(.secondary)
@@ -47,7 +52,7 @@ struct PainterToolbar: View {
                     }
                     Text("Click or drag thumbnails · Esc to finish").font(.caption).foregroundStyle(.secondary)
                 }
-            }.controlSize(.small).padding(.horizontal,20).padding(.vertical,6).disabled(s.painterBusy)
+            }.controlSize(.small).padding(.horizontal,20).padding(.vertical,6).disabled(s.painterBusy || s.orientationBusy)
         }
     }
 }

@@ -9,6 +9,8 @@ Review callers can omit the before image and request a smaller fitted preview;
 full-resolution detail coordinates and export pixels retain the same pipeline.
 Export metadata is a frozen catalog snapshot encoded separately from pixels;
 internal recipes, source names and asset paths are never embedded as descriptions.
+Independent catalog orientation maps output strips back to canonical Develop
+coordinates, then losslessly rotates/flips each tile. Masks/crops stay attached.
 """
 from dataclasses import replace
 import hashlib
@@ -30,6 +32,7 @@ from .accelerators import grade_output
 from .color import to_output, output_matrix, encode, decode, icc_profile, mix_hues, apply_lut, soft_proof
 from .imaging import load_source, fingerprint, cache_key, write_thumbnail, LUMA
 from .source_identity import thumbnail_path, cached_thumbnail
+from .orientation import validate as validate_orientation, inverse_rect, apply_array
 
 ROWS=128
 HALO=32
@@ -120,6 +123,22 @@ class RenderPlan:
         if self.source.dtype==np.uint16: a/=65535
         if r.vignette: a*=np.exp2(r.vignette/100*np.minimum(radius2,4))[:,:,None]
         return a
+
+
+class OrientedPlan:
+    """Output-coordinate adapter; no full-frame allocation or resampling."""
+    def __init__(self, base, orientation):
+        self.base=base
+        self.orientation=validate_orientation(orientation)
+        self.width,self.height=(base.height,base.width) if orientation % 2 else (base.width,base.height)
+
+    @property
+    def pixel_scale(self):
+        return self.base.pixel_scale
+
+    @pixel_scale.setter
+    def pixel_scale(self, value):
+        self.base.pixel_scale=value
 
 
 def detail_filter(a,r,pixel_scale=1,output_sharpen=0):
@@ -230,6 +249,10 @@ def validate_camera(recipe,meta):
 
 
 def render_strip(plan,x,y,w,h,space='srgb',output_sharpen=0):
+    if isinstance(plan,OrientedPlan):
+        rect=inverse_rect(x,y,w,h,plan.base.width,plan.base.height,plan.orientation)
+        pixels,gamut=render_strip(plan.base,*rect,space,output_sharpen)
+        return apply_array(pixels,plan.orientation),apply_array(gamut,plan.orientation)
     start=max(0,y-HALO);end=min(plan.height,y+h+HALO)
     left=max(0,x-HALO);right=min(plan.width,x+w+HALO)
     with stage("geometry"):
@@ -258,18 +281,18 @@ def render_u8(plan,rect=None,display=None):
     return pixels,hist.tolist(),out_count/(w*h)*100
 
 
-def make_thumbnail(path, recipe, cache, budget_mb):
+def make_thumbnail(path, recipe, cache, budget_mb, orientation=0):
     """Render a 320-pixel edited thumbnail using the same geometry/color pipeline."""
-    existing=cached_thumbnail(path,cache,recipe)
+    existing=cached_thumbnail(path,cache,recipe,orientation)
     if existing:
         return {'thumbnail':existing,'kind':'developed','cache_hit':True}
-    target=thumbnail_path(path,cache,recipe)
+    target=thumbnail_path(path,cache,recipe,orientation)
     source,meta,base=base_image(path,recipe,cache,budget_mb)
     validate_camera(recipe,meta)
-    plan=RenderPlan(source,recipe,320)
+    plan=OrientedPlan(RenderPlan(source,recipe,320),orientation)
     plan.pixel_scale *= max(source.shape[:2])/max(meta['width'],meta['height'])
     pixels,_,_=render_u8(plan)
-    if thumbnail_path(path,cache,recipe) != target:
+    if thumbnail_path(path,cache,recipe,orientation) != target:
         raise ValueError('Source or LUT changed during thumbnail processing; retry with the current file')
     write_thumbnail(Image.fromarray(pixels),target,icc_profile('srgb'),quality=88)
     return {'thumbnail':str(target),'kind':'developed','metadata':meta,
@@ -277,7 +300,7 @@ def make_thumbnail(path, recipe, cache, budget_mb):
             'cache_keep':[base,str(Path(base).with_suffix('.json')),str(target)]}
 
 
-def make_preview(path,recipe,cache,budget_mb,detail=None,display=None,include_before=True,max_edge=None):
+def make_preview(path,recipe,cache,budget_mb,detail=None,display=None,include_before=True,max_edge=None,orientation=0):
     if detail and max_edge is not None:
         raise ValueError('A detail viewport cannot also request a fitted preview size')
     if max_edge is not None and (isinstance(max_edge,bool) or not isinstance(max_edge,int) or not 128 <= max_edge <= 1680):
@@ -285,7 +308,7 @@ def make_preview(path,recipe,cache,budget_mb,detail=None,display=None,include_be
     cache=Path(cache);full=bool(detail)
     source,meta,base=base_image(path,recipe,cache,budget_mb,full=full)
     validate_camera(recipe,meta)
-    plan=RenderPlan(source,recipe,max_edge or 0)
+    plan=OrientedPlan(RenderPlan(source,recipe,max_edge or 0),orientation)
     if not full:
         plan.pixel_scale *= max(source.shape[:2])/max(meta['width'],meta['height'])
     rect=None
@@ -297,12 +320,15 @@ def make_preview(path,recipe,cache,budget_mb,detail=None,display=None,include_be
         x=max(0,min(plan.width-w,round(cx*plan.width-w/2)));y=max(0,min(plan.height-h,round(cy*plan.height-h/2)))
         rect=(x,y,w,h)
     pixels,hist,gamut=render_u8(plan,rect,display)
-    key=hashlib.sha256((cache_key(path,recipe,'render-v4')+json.dumps([detail,display,include_before,max_edge],sort_keys=True)).encode()).hexdigest()
+    key=hashlib.sha256((cache_key(path,recipe,'render-v5')+json.dumps([detail,display,include_before,max_edge,orientation],sort_keys=True)).encode()).hexdigest()
     target=cache/(key+'.png');Image.fromarray(pixels).save(target,icc_profile=icc_profile('srgb'))
     h,w=pixels.shape[:2]
     result={'preview':str(target),'metadata':meta,'histogram':hist,
             'clipped_percent':round(gamut,2),'width':w,'height':h,'full_width':plan.width,'full_height':plan.height,
             'detail':full,'roi':rect,'cache_keep':[base,str(Path(base).with_suffix('.json')),str(target)]}
+    canonical=plan.base
+    result['geometry']={'orientation':orientation,'crop_box':[canonical.x0/canonical.sw,canonical.y0/canonical.sh,
+        (canonical.x0+canonical.crop_w)/canonical.sw,(canonical.y0+canonical.crop_h)/canonical.sh]}
     if not include_before:
         return result
     before_path=cache/(key+'-before.png')
@@ -310,7 +336,7 @@ def make_preview(path,recipe,cache,budget_mb,detail=None,display=None,include_be
     keep=('rotation','crop','crop_box','straighten','perspective_h','perspective_v','geometry_scale','distortion','ca_red','ca_blue')
     baseline=Recipe(**{k:getattr(recipe,k) for k in keep})
     base_source,_,base_before=base_image(path,baseline,cache,budget_mb,full=full)
-    before_plan=RenderPlan(base_source,baseline,max_edge or 0)
+    before_plan=OrientedPlan(RenderPlan(base_source,baseline,max_edge or 0),orientation)
     if not full:
         before_plan.pixel_scale *= max(base_source.shape[:2])/max(meta['width'],meta['height'])
     before,_,_=render_u8(before_plan,rect,display)
@@ -327,7 +353,7 @@ def estimate_export_bytes(width,height,options,fmt):
     return int(width*height*(6 if fmt=='tiff16' else 9)+4*1024**2)
 
 
-def export_image(path,recipe,destination,fmt,budget_mb,job_id,options=None,cache=None,metadata_snapshot=None):
+def export_image(path,recipe,destination,fmt,budget_mb,job_id,options=None,cache=None,metadata_snapshot=None,orientation=0):
     options=ExportOptions.parse(options) if not isinstance(options,ExportOptions) else options
     if fmt not in ('tiff16','jpeg'): raise ValueError('Unknown export format')
     from .export_metadata import xmp_packet, jpeg_segments
@@ -342,7 +368,7 @@ def export_image(path,recipe,destination,fmt,budget_mb,job_id,options=None,cache
     try:
         source,meta,_=base_image(source_path,recipe,cache,budget_mb,full=True)
         validate_camera(recipe,meta)
-        plan=RenderPlan(source,recipe,options.max_edge);h,w=plan.height,plan.width
+        plan=OrientedPlan(RenderPlan(source,recipe,options.max_edge),orientation);h,w=plan.height,plan.width
         required=estimate_export_bytes(w,h,options,fmt)
         if shutil.disk_usage(dest).free<required+64*1024**2:
             raise OSError(f'Insufficient output disk space; estimated minimum is {required/1024**2:.0f} MB plus 64 MB headroom')

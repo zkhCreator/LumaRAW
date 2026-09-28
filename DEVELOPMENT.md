@@ -42,6 +42,12 @@ when a clear function is more maintainable. Avoid unrelated formatting churn.
   catalog state; export jobs keep their original recipe and destination snapshots.
   Construct legacy fixtures with the actual earlier migration chain; changing only
   `user_version` on a newer schema does not prove upgrade compatibility.
+- Keep catalog orientation independent of Develop recipes/history. Rotate/flip
+  composes in displayed coordinates after Develop rendering, preserving attached
+  crops/masks and exact tile/ROI behavior. Freeze orientation with each export job;
+  never retrofit current orientation into old jobs. Map native crop/mask controls
+  through explicit preview geometry, and reject stale drawing/mutation state.
+  Batch orientation undo validates all targets and preserves later Develop edits.
 - Freeze descriptive metadata and resolved keyword export policies in the same
   transaction as recipes/options and idempotency receipts. Old jobs must not
   acquire present-day metadata during migration or retry. Queue pages return small

@@ -1,7 +1,7 @@
 // Purpose: persistent keyword shortcuts and bounded native Painter stroke state.
-// Inputs: captured shortcut/metadata or target-collection revisions and thumbnail IDs.
+// Inputs: captured metadata, orientation or target revisions and thumbnail IDs.
 // Outputs: one atomic service command per mouse-up or selected-photo shortcut.
-// No pointer geometry, SQL or pixel edits. Hits never select thumbnails; removing
+// No pointer geometry, SQL or pixel processing. Hits never select thumbnails; removing
 // members can prune selection when their source refreshes. Never retry stale writes
 // or follow a changed source/page. Pending strokes can be cancelled.
 import Foundation
@@ -60,7 +60,7 @@ extension Store {
         painterStroke?.configuration.targetCollection?.target.name ?? collectionState?.target.name ?? "Unavailable"
     }
     var painterCanReceive: Bool {
-        painterEnabled && painterInGrid && !painterBusy && !keywordBusy &&
+        painterEnabled && painterInGrid && !painterBusy && !orientationBusy && !keywordBusy &&
             painterKeywordPicker == nil && shortcutEditor == nil
     }
     var painterSource: String {
@@ -133,6 +133,7 @@ extension Store {
         case "rating": value=painterRating
         case "flag": value=painterFlag
         case "label": value=painterLabel
+        case "orientation": value=painterOrientationAction
         default: value=nil
         }
         if painterKind == "keywords",keywordShortcut?.ids.isEmpty != false {
@@ -140,6 +141,9 @@ extension Store {
         }
         if painterKind == "target_collection",collectionState == nil {
             error="Refresh the target collection before painting";return false
+        }
+        if painterKind == "orientation",hasPendingEdits {
+            error="Finish saving adjustments before rotating photos";return false
         }
         let configuration=PainterConfiguration(kind:painterKind,value:value,erase:painterSupportsErasing && erase,
             shortcutRevision:painterKind == "keywords" ? keywordShortcut?.revision:nil,
@@ -175,6 +179,9 @@ extension Store {
     }
 
     private func submitPaint(targets: [Photo],configuration: PainterConfiguration) -> Task<Void,Never>? {
+        if configuration.kind == "orientation",let action=configuration.value as? String {
+            return submitOrientation(targets:targets,action:action)
+        }
         guard !painterBusy,!keywordBusy,!targets.isEmpty else { return nil }
         painterBusy=true;keywordBusy=true;shortcutReadGeneration+=1
         var params=configuration.parameters

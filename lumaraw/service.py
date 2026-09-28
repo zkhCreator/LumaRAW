@@ -153,7 +153,7 @@ class Service:
             entries=[]
             for row in rows:
                 recipe=Recipe.parse(json.loads(row['recipe'])) if developed else None
-                if path:=cached_thumbnail(row['path'],self.cache,recipe):
+                if path:=cached_thumbnail(row['path'],self.cache,recipe,row['orientation']):
                     entry={'photo_id':row['id'],'thumbnail':path}
                     if developed:entry.update(revision=row['revision'],kind='developed',source=row['path'])
                     entries.append(entry)
@@ -173,12 +173,12 @@ class Service:
             with self.catalog() as c:row=self.require(c,p['photo_id'])
             if method=='thumbnail':
                 recipe=Recipe.parse(json.loads(row['recipe'])) if p.get('kind') == 'developed' else None
-                path=cached_thumbnail(row['path'],self.cache,recipe)
+                path=cached_thumbnail(row['path'],self.cache,recipe,row['orientation'])
                 if path:
                     return {'thumbnail':path,'photo_id':row['id'],'revision':row['revision'],'kind':p.get('kind','source'),'source':row['path'],
                             'cache_hit':True,'worker_spawned':False}
             request={'operation':{'preview_photo':'preview','thumbnail':'thumbnail','calibrate_camera':'calibrate'}[method],
-                     'path':row['path'],'recipe':json.loads(row['recipe'])}
+                     'path':row['path'],'recipe':json.loads(row['recipe']),'orientation':row['orientation']}
             request.update({k:v for k,v in p.items() if k!='photo_id'})
             result=self.run_worker(request)
             if 'metadata' in result:
@@ -186,6 +186,10 @@ class Service:
             return {**result,'photo_id':row['id'],'revision':row['revision'],'source':row['path']}
         if method=='queue_control':return self.control(p)
         with self.catalog() as c:
+            if method in ('orientation_state','orient_photos','undo_orientation'):
+                from .orientation import Orientations
+                orientations=Orientations(c)
+                return {'orientation_state':orientations.state,'orient_photos':orientations.apply,'undo_orientation':orientations.undo}[method](**p)
             if method=='prepare_folder_relocation':return Relocations(c).prepare(**p)
             if method in ('get_keyword_shortcut','set_keyword_shortcut','paint_library'):
                 from .library_painter import LibraryPainter
@@ -448,7 +452,7 @@ class Service:
             try:
                 result=self.run_worker({'operation':'export','path':job['source'],'recipe':json.loads(job['recipe']),
                     'destination':job['destination'],'format':job['format'],'job_id':job['id'],'options':json.loads(job['options']),
-                    'metadata_snapshot':json.loads(job['metadata_snapshot'])})
+                    'metadata_snapshot':json.loads(job['metadata_snapshot']),'orientation':job['orientation']})
                 with self.catalog() as c:
                     c.finish_job(job['id'],'done',peak_mb=result['peak_mb'],output=result['output'])
                     with c.db:c.db.execute('UPDATE jobs SET processing=? WHERE id=?',(json.dumps(result.get('processing',{})),job['id']))

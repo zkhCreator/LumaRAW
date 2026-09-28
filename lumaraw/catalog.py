@@ -2,6 +2,7 @@
 
 Inputs: explicit local paths and validated recipes. Outputs: paginated rows/jobs.
 Responsibilities: store references, edits, undo history, and export snapshots.
+Library orientation is independent of Develop recipes and frozen in each job.
 Photo details keep complete keyword IDs; large display paths use explicit pages.
 Boundaries: never copy/write original photos; never eagerly load full catalogs.
 Each connection belongs to its creating thread. Bulk insertion commits in batches.
@@ -20,7 +21,7 @@ from .organization import Organization, SORTS, criteria, folded, migrate, text_p
 FAMILY_COLUMNS = ('source_id,is_virtual,copy_name,'
                   '(SELECT revision FROM photo_sources WHERE id=photos.source_id) AS source_revision,'
                   '(SELECT id FROM photos master WHERE master.source_id=photos.source_id AND master.is_virtual=0) AS master_id')
-SUMMARY_COLUMNS = ('id,path,name,bytes,mtime,rating,flag,revision,color_label,title,metadata_revision,taken,camera,missing,error,'
+SUMMARY_COLUMNS = ('id,path,name,bytes,mtime,rating,flag,revision,orientation,color_label,title,metadata_revision,taken,camera,missing,error,'
                    + FAMILY_COLUMNS)
 
 class Catalog:
@@ -192,9 +193,9 @@ class Catalog:
         snapshot = KeywordExports(self).snapshot(row['id'], options)
         return self.db.execute(
             'INSERT INTO jobs(photo_id,source,recipe,destination,format,created,options,priority,source_id,'
-            'metadata_snapshot,export_metadata) VALUES(?,?,?,?,?,?,?,?,?,?,?)',
+            'metadata_snapshot,export_metadata,orientation) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)',
             (row['id'],row['path'],row['recipe'],str(destination),fmt,time.time(),json.dumps(options.dict()),
-             options.priority,row['source_id'],encode(snapshot),json.dumps(receipt(snapshot)))).lastrowid
+             options.priority,row['source_id'],encode(snapshot),json.dumps(receipt(snapshot)),row['orientation'])).lastrowid
 
     def all_ids(self, stars=False):
         for row in self.db.execute('SELECT id FROM photos' + (' WHERE rating>=3' if stars else '') + ' ORDER BY id'):

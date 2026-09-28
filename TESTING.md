@@ -515,6 +515,34 @@ IPC, pixels and desktop presentation. Compare the same fixture before/after edit
 do not turn machine timing into an assertion. Rendered Option-pointer dispatch and
 macOS 14 runtime remain separate acceptance requirements.
 
+## Independent photo orientation
+
+`test_orientation.py` verifies all eight orthogonal states, action composition,
+CPU/required-Metal strip and ROI equivalence with masks/crops/lens geometry, portrait
+and landscape ratios, Reset/Develop undo independence, original bytes, virtual
+copies, bounded batch undo, stale targets, injected SQL rollback, genuine schema-14
+migration failure/retry, backup/restore, cache keys and queued export snapshots.
+Asymmetric generated pixels establish orientation behavior, not Adobe processing.
+
+`NativeOrientationRegression` checks real IPC, Grid versus active-photo scope,
+busy/pending-edit guards, captured Painter actions, cancellation, stale batch/undo
+failure, preview geometry and all eight coordinate mappings. These are native
+state checks, not desktop pointer/shortcut/accessibility acceptance.
+
+```sh
+LUMARAW_REQUIRE_METAL=1 .venv/bin/python -m pytest -q tests/test_orientation.py
+.venv/bin/python tests/run_native.py --work work/new-orientation-native --suite NativeOrientationRegression
+.venv/bin/python tests/orientation_probe.py --engine /path/to/LumaRAWEngine --fixture /path/to/chart.NEF --work work/new-orientation-probe
+```
+
+The packaged-worker probe alternates identity/clockwise orientation sequentially
+after a priming export. It compares full-size 16-bit TIFFs for neutral and masked
+recipes, records real Metal dispatch, includes startup/encoding in elapsed time
+and samples worker RSS every 20 ms. Priming timings are excluded from warm medians;
+an application-cache warmup does not establish cold OS/disk/GPU behavior. Use an
+explicit read-only RAW and new output directory. Do not run benchmarks alongside
+other tests/builds. macOS 14 runtime and Lightroom Mac reference remain separate.
+
 ## Public source check
 
 ```sh

@@ -1,6 +1,7 @@
 // Purpose: export, history, batch, calibration and agent connection workflows.
 // Inputs: explicit native panels and user-entered settings. Outputs: domain calls.
 // Exports retain snapshots; app never overwrites an original or existing output.
+// Calibration rectangles address full decoded sources before catalog/Develop edits.
 import SwiftUI
 import AppKit
 
@@ -104,6 +105,7 @@ struct CalibrationSheet:View {
     @State private var profile:[String:Any]=[:]
     var body:some View {
         VStack(alignment:.leading,spacing:16){Text("Fit Camera Profile").font(.title2.weight(.semibold));Text("The current RAW and reference image must contain a 6 × 4 chart in the same orientation. Use normalized 0–1 bounds. The fit is specific to this camera and lighting.").foregroundStyle(.secondary)
+            Text("Chart bounds use the full source after EXIF orientation, before catalog rotation, flips or Develop adjustments.").font(.caption).foregroundStyle(.secondary)
             Form{TextField("Profile Name",text:$name);TextField("Lighting",text:$lighting);HStack{Text(reference.isEmpty ? "Choose a reference image":URL(fileURLWithPath:reference).lastPathComponent);Spacer();Button("Choose…"){let p=NSOpenPanel();if p.runModal() == .OK{reference=p.url?.path ?? ""}}};TextField("RAW Chart: Left, Top, Right, Bottom",text:$sourceRect);TextField("Reference Chart: Left, Top, Right, Bottom",text:$referenceRect)}
             if !report.isEmpty{ScrollView{Text(report).font(.system(.caption,design:.monospaced)).textSelection(.enabled)}.frame(height:150)}
             Text("Fit error describes this data only. It does not establish Nikon NX Studio equivalence or accuracy under other lighting.").font(.caption).foregroundStyle(.secondary)

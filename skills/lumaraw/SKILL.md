@@ -219,6 +219,32 @@ a drag; never reread and redirect the same pending stroke to a changed target.
 Membership changes do not alter photo metadata/recipe revisions. The native Option
 stroke removes only touched target members and refreshes the displayed source.
 
+## Photo orientation
+
+`orient_photos` accepts one `action` (`rotate_left`, `rotate_right`,
+`flip_horizontal`, `flip_vertical`) and up to sixty distinct `targets` containing
+`photo_id` and captured visual `expected_revision`. It increments visual revisions
+without changing metadata, Develop recipes/history or originals. Never use the
+legacy recipe `rotation` field for this Library action. Grid targets all selected
+photos; Loupe/Compare/Survey/Develop target the active photo. Painter captures the
+action and photo revisions at mouse-down and commits once at mouse-up.
+
+`orientation_state` returns a global `revision` and optional `latest.id` / `action`.
+Pass the captured values to `undo_orientation(action_id, expected_revision)` to
+restore the latest batch, preserving later Develop edits. Missing/changed targets
+or a changed history head reject the entire undo. Keep stale operations visible;
+never refresh and replay them silently. History retains fifty batches; Redo and
+unified application Undo are not implemented.
+
+Photo/job `orientation` is a 0–7 internal value: horizontal mirror when >=4, then
+`value % 4` clockwise quarter turns. It applies after canonical Develop rendering;
+it is not an EXIF orientation number. Export queues freeze it at submission.
+Reset/recipe imports leave it intact; virtual copies inherit then edit independently.
+Previews return `geometry.orientation` and effective canonical `geometry.crop_box`.
+Native drawing maps displayed coordinates through this geometry only for a matched
+fitted preview. Recipe JSON stays canonical. Calibration chart bounds continue to
+use full EXIF-oriented sources, before catalog orientation and Develop adjustments.
+
 ## Folder sources
 
 `list_folders` pages visible roots or a `parent_id` at 60 items. Optional `search`,

@@ -46,14 +46,14 @@ gaps. Nothing below is full Lightroom parity merely because historical tests pas
 | --- | --- | --- |
 | Import and catalogs | Partial: referenced originals, backup/restore | Import preview/selection, copy workflows, metadata/develop presets, tethered capture, catalog switching/merge |
 | Library navigation | Partial: bounded grid/filmstrip, folder tree/search/favorites/labels, durable missing-folder relocation and folder synchronization, direct/recursive sources, filters/sorting, regular/smart/Quick collections and nested sets | Multi-source selection, complete sync Import Dialog/duplicate policy, folder move/rename, relocation overlap/collision handling, collection drag/drop/color labels, full smart criteria/import-export, source-selection memory, desktop acceptance |
-| Organization | Partial: duplicate/missing detection, hierarchical keywords/synonyms/export flags/Will Export preview, text/CSV vocabulary exchange and manual person tags, custom nine-slot keyword sets/recent entries/shared or catalog storage, multi-keyword shortcuts and keyword/rating/flag/label/target-collection Painter strokes, title/caption/copyright, labels, batch metadata, virtual copies, manual/split/capture-time scoped stacks | Keyword policy/file and preset reference acceptance, built-in sets/suggestions/undo, remaining Painter modes and desktop acceptance, complete IPTC, stack interaction acceptance, rename and sidecars |
+| Organization | Partial: duplicate/missing detection, hierarchical keywords/synonyms/export flags/Will Export preview, text/CSV vocabulary exchange and manual person tags, custom nine-slot keyword sets/recent entries/shared or catalog storage, multi-keyword shortcuts and keyword/rating/flag/label/target-collection/rotation Painter strokes, independent catalog rotation/flips, title/caption/copyright, labels, batch metadata, virtual copies, manual/split/capture-time scoped stacks | Keyword policy/file and preset reference acceptance, built-in sets/suggestions/undo, remaining Painter modes and desktop acceptance, complete IPTC, stack interaction acceptance, rename and sidecars |
 | Culling | Partial: Loupe/Compare/Survey, linked detail, anchored page selection | Desktop acceptance, cross-page selection, Develop reference view, auto advance, persistent workspace state |
 | Basic development | Partial: light/WB/color | Calibrated absolute WB, eyedropper, texture/clarity/dehaze, complete HSL/B&W and color grading |
 | Curves and profiles | Partial: custom composite curve, LUT/ICC | Interactive RGB curves, camera/profile browser, compatible preset import/export |
 | Detail and optics | Partial: noise/sharpen, manual lens | Complete manual detail controls, automatic lens profiles, bounded full-resolution acceptance |
-| Geometry | Partial: crop/rotate/straighten/perspective | Interactive retained handles/ratios/flip, guided transforms, crop state parity |
+| Geometry | Partial: crop/straighten/perspective, independent rotation/flips with attached masks and displayed crop ratios | Interactive retained handles, guided transforms, full crop state and rendered/reference parity |
 | Local editing | Partial: radial/gradient/brush/luma | Mask list/edit/reorder/intersection, range masks, clone/heal, red-eye (non-AI) |
-| History and presets | Partial: 50-step undo, shared named snapshots | Redo, navigable history, preset management and import-time/batch application |
+| History and presets | Partial: 50-step Develop undo, separate 50-batch orientation undo, shared named snapshots | Unified Undo/Redo, navigable history, preset management and import-time/batch application |
 | Preview/performance | Partial: Metal, proxies, 1:1 viewport, developed thumbnail fast path | Real-RAW catalog/slider latency, offline previews, cache controls and desktop acceptance |
 | Export | Partial: JPEG/16-bit TIFF, ICC, durable jobs with frozen catalog XMP and keyword hierarchy options | Presets, complete EXIF/IPTC/contact/location metadata policies, watermark, additional formats, publish workflows |
 | External editing and video | Missing | External-editor setup and derivative round trips; supported video import/playback, frame capture, trimming and export |
@@ -67,9 +67,9 @@ gaps. Nothing below is full Lightroom parity merely because historical tests pas
 
 ## Active increment
 
-Target Collection Painter and bounded membership transactions. Library rotation
-and flips require separate orientation, geometry/history and export acceptance;
-remaining Painter modes, reference presets/exchange, suggestions and the full
+Independent Library rotation/flips, orientation Painter, attached crop/mask
+coordinates and frozen exports. Rendered Mac/reference acceptance, unified Undo/
+Redo, remaining Painter modes, reference presets/exchange, suggestions and the full
 inventory stay in scope. This does not complete product parity.
 
 ## Evidence log
@@ -1412,3 +1412,77 @@ matches source, and the bundled guide matches the current document. Final compil
 logs contain no warnings/errors. Public checks cover **274 files** without findings,
 including the clean extracted archive. Remote refresh found no unmerged branches.
 No rendered desktop, macOS 14 runtime or complete Lightroom parity is claimed.
+
+### Independent Library orientation and Rotation Painter
+
+Photo menus now rotate left/right and flip horizontally/vertically; Grid applies
+to the selection and Loupe/Compare/Survey/Develop to the active photo. Rotation
+Painter captures one action plus visual revisions, deduplicates visible targets
+and commits one atomic batch at mouse-up. Cancel writes nothing; any stale target
+rejects the whole gesture without retry. Painting preserves the existing selection.
+
+Schema 15 stores orientation separately from Develop recipes and metadata. It
+survives Reset and recipe import, stays out of Develop history, and is inherited
+then independently editable by virtual copies. Export jobs freeze orientation
+when queued; old jobs migrate to identity without changing their stored recipes.
+The separate Undo Last Rotation or Flip action restores the latest batch while
+preserving subsequent Develop edits. It keeps fifty batches, checks the global
+history revision, and rejects missing targets atomically. Unified Command-Z/Redo
+and Mac Lightroom reference acceptance remain open.
+
+The renderer maps each oriented strip/viewport into canonical Develop coordinates,
+then losslessly rotates/flips the returned tile and gamut mask. Existing crop,
+geometry and local masks follow the photograph without a full-frame transformed
+allocation or additional resampling. Source/developed thumbnail and preview cache
+identities include orientation; linear decode caches stay shared. Before/detail
+previews and TIFF/JPEG export use the same adapter. Preview geometry reports the
+effective crop separately from source-family EXIF. Native crop bounds/ratios and
+mask coordinates follow display orientation; drawing requires a matched fitted
+preview. Full recipe JSON remains canonical, and chart calibration still addresses
+full EXIF-oriented source pixels before Library/Develop transforms.
+
+Tests cover every orthogonal orientation and composition, asymmetric pixels,
+CPU/Metal strip versus viewport agreement with geometry and three mask kinds,
+portrait/landscape crop ratios, source-byte safety, independent reset/undo, variants,
+stale batches/history, SQL rollback, genuine schema-14 migration rollback/retry,
+backup/restore, cache invalidation and frozen queued exports. Native state/IPC
+checks cover selection scope, pending-edit guards, captured/cancelled/conflicting
+Painter gestures, undo conflicts, current preview geometry and eight coordinate
+mappings. Rendered drawing, menu/keyboard/pointer dispatch, accessibility and the
+macOS 14 runtime remain unverified. These checks do not establish Adobe color or
+pixel equivalence.
+
+Final Python validation: **404 passed, no skips**, including the pinned Nikon D3S
+NEF and required Metal dispatch. The source-native orientation suite passes 48
+assertions; the final packaged suite adds thumbnail and Compare/Survey dimension
+checks for **51**. Seven packaged suites pass **165 assertions**: orientation 51,
+state races 15, review 20, thumbnails 14, virtual copies 19, Painter 36 and engine
+connection/handoff 10. The app builds for macOS 14.0 and passes local ad-hoc signature
+verification on macOS 26.6.2. Engine generation **18**, schema **15**, **90 tools**;
+manifest `f08f02ede6cf8b78dd9a534c84b3a28eaac2c7a9f5ba187db695082eecb25769`
+matches final engine source, and the bundled guide matches the current document.
+Final build/native logs contain no compiler warnings/errors. Fresh remote and
+local/remote ancestry checks found no unmerged branches.
+
+Packaged-worker performance used the pinned **4284×2844 Nikon D3S NEF** on this
+macOS 26.6.2 arm64 / 128 GB host. Workers ran sequentially after all builds/tests
+finished. A priming export warmed the shared linear cache; three timed samples per
+recipe/orientation alternated order and include startup plus full-size ProPhoto
+16-bit TIFF encoding. RSS is sampled every 20 ms and is not an allocation bound.
+
+| Recipe | Identity median | Clockwise median | Identity / clockwise peak sampled worker RSS |
+| --- | ---: | ---: | ---: |
+| Neutral, Metal grading/output | 0.653 s | 0.772 s | 211.59 / 189.83 MB |
+| Crop, straighten, radial/linear masks, noise reduction, sharpening; CPU + Metal output | 3.844 s | 3.901 s | 247.95 / 201.56 MB |
+
+All six TIFF pairs were **bit-identical after an orthogonal rotation** (maximum
+16-bit code difference zero); the source SHA-256 stayed unchanged. Neutral output
+dimensions swap from 4284×2844 to 2844×4284; cropped output swaps 3684×2417 to
+2417×3684. Actual Metal dispatch was recorded in every worker. Rotation adds about
+0.12 s for this neutral fixture and 0.06 s for this masked fixture; these small-sample
+warm measurements are not a general throughput, cold-disk or Adobe-equivalence
+claim. Reproduce with `tests/orientation_probe.py`.
+
+The public source audit covers **279 files** with no findings. Generated images,
+catalogs, outputs, performance receipts and signed app bundles remain local and
+outside the source publication allowlist.

@@ -196,7 +196,7 @@ def test_v6_migration_preserves_existing_photos_and_backup(tmp_path, monkeypatch
         with catalog.db:
             catalog.db.execute('INSERT INTO photos(path,name,bytes,mtime,recipe,created) VALUES(?,?,0,0,?,0)',
                 (str(tmp_path / 'source' / 'p.png'), 'p.png', json.dumps(Recipe().dict())))
-        before = tuple(catalog.db.execute('SELECT * FROM photos').fetchone())
+        before = dict(catalog.db.execute('SELECT * FROM photos').fetchone())
         from lumaraw.folders import migrate
         catalog.db.set_authorizer(lambda action,a,b,d,t: sqlite3.SQLITE_DENY
             if action==sqlite3.SQLITE_INSERT and a=='folder_photos' else sqlite3.SQLITE_OK)
@@ -205,10 +205,12 @@ def test_v6_migration_preserves_existing_photos_and_backup(tmp_path, monkeypatch
         catalog.db.set_authorizer(None)
         assert catalog.db.execute('PRAGMA user_version').fetchone()[0] == 6
         assert catalog.db.execute("SELECT count(*) FROM sqlite_master WHERE name='catalog_folders'").fetchone()[0] == 0
-        assert tuple(catalog.db.execute('SELECT * FROM photos').fetchone()) == before
+        assert dict(catalog.db.execute('SELECT * FROM photos').fetchone()) == before
         catalog.close()
     catalog = Catalog(root)
-    assert tuple(catalog.db.execute('SELECT * FROM photos').fetchone()) == before
+    after = dict(catalog.db.execute('SELECT * FROM photos').fetchone())
+    assert {key:after[key] for key in before} == before
+    assert after['orientation'] == 0
     folders = Folders(catalog)
     row = folders.list()['folders'][0]
     folders.edit(row['id'],0,{'favorite':True})

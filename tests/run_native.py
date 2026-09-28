@@ -24,6 +24,7 @@ def main():
     suites=('NativeStateRegression','NativeLibraryRegression','NativeSelectionRegression','NativeReviewRegression','NativeThumbnailRegression','NativeCollectionRegression','NativeVirtualCopyRegression','NativeConnectionRegression','NativeStackRegression','NativeAutoStackRegression','NativeFolderRegression','NativeKeywordRegression','NativeFolderRelocationRegression','NativeFolderSyncRegression','NativeExportMetadataRegression','NativeKeywordDetailsRegression','NativeKeywordVocabularyRegression','NativeKeywordExchangeRegression','NativeKeywordSetRegression','NativePainterRegression')
     suites+=('NativePainterKeywordPickerRegression',)
     suites+=('NativeTargetPainterRegression',)
+    suites+=('NativeOrientationRegression',)
     parser.add_argument('--suite',choices=suites,action='append',help='Run selected suites; default: all')
     args=parser.parse_args()
     work=args.work.resolve()
@@ -54,7 +55,7 @@ def main():
         subprocess.run(['xcrun','swiftc','-swift-version','5','-parse-as-library',
             '-target','arm64-apple-macosx14.0','-module-cache-path',str(work/'module-cache'),
             *map(str,sources),str(root/'tests'/f'{suite}.swift'),'-o',str(executable)],check=True)
-        suite_paths=paths if suite in ('NativeSelectionRegression','NativeReviewRegression','NativeThumbnailRegression','NativeCollectionRegression','NativeVirtualCopyRegression','NativeStackRegression','NativeAutoStackRegression','NativeFolderRegression','NativeKeywordRegression','NativeFolderRelocationRegression','NativeFolderSyncRegression','NativePainterRegression','NativeTargetPainterRegression') else paths[:2]
+        suite_paths=paths if suite in ('NativeSelectionRegression','NativeReviewRegression','NativeThumbnailRegression','NativeCollectionRegression','NativeVirtualCopyRegression','NativeStackRegression','NativeAutoStackRegression','NativeFolderRegression','NativeKeywordRegression','NativeFolderRelocationRegression','NativeFolderSyncRegression','NativePainterRegression','NativeTargetPainterRegression','NativeOrientationRegression') else paths[:2]
         env={**os.environ,'LUMARAW_ENGINE':str(args.engine.resolve()),
             'LUMARAW_CATALOG':str(work/'catalogs'/suite),'LUMARAW_TEST_FIXTURES':'|'.join(suite_paths),
             'LUMARAW_PRESETS_ROOT':str(work/'presets'/suite)}

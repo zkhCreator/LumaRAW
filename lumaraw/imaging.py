@@ -221,13 +221,13 @@ def make_preview(path, recipe, cache, budget_mb, **kwargs):
     return render(path,recipe,cache,budget_mb,**kwargs)
 
 
-def make_thumbnail(path, cache, budget_mb, recipe=None):
+def make_thumbnail(path, cache, budget_mb, recipe=None, orientation=0):
     """Source thumbnails may use camera JPEG; developed ones use the shared renderer."""
     if recipe is not None:
         from .render import make_thumbnail as developed_thumbnail
-        return developed_thumbnail(path, recipe, cache, budget_mb)
-    target = thumbnail_path(path, cache)
-    existing = cached_thumbnail(path, cache)
+        return developed_thumbnail(path, recipe, cache, budget_mb, orientation)
+    target = thumbnail_path(path, cache, orientation=orientation)
+    existing = cached_thumbnail(path, cache, orientation=orientation)
     if existing:
         return {'thumbnail': existing}
     target.parent.mkdir(parents=True, exist_ok=True)
@@ -254,6 +254,9 @@ def make_thumbnail(path, cache, budget_mb, recipe=None):
                 img = ImageCms.profileToProfile(img, ImageCms.ImageCmsProfile(io.BytesIO(icc)), ImageCms.createProfile('sRGB'), outputMode='RGB')
             else:
                 img = img.convert('RGB')
+    if orientation:
+        from .orientation import apply_array
+        img=Image.fromarray(apply_array(np.asarray(img),orientation))
     write_thumbnail(img, target, SRGB_ICC)
     return {'thumbnail': str(target)}
 

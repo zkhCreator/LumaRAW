@@ -38,17 +38,17 @@ def main():
         recipe = Recipe.parse(request.get('recipe', {}))
         operation = request['operation']
         if operation in ('preview','detail','reference'):
-            result = make_preview(request['path'], recipe, request['cache'], request['budget_mb'],detail=request.get('detail'),display=request.get('display'),include_before=request.get('include_before',True),max_edge=request.get('max_edge'))
+            result = make_preview(request['path'], recipe, request['cache'], request['budget_mb'],detail=request.get('detail'),display=request.get('display'),include_before=request.get('include_before',True),max_edge=request.get('max_edge'),orientation=request.get('orientation',0))
         elif operation == 'calibrate':
             from .calibration import calibrate
             result = calibrate(request['path'],request['reference'],request['source_rect'],request['reference_rect'],request['cache'],request['budget_mb'],request['name'],request['lighting'])
         elif operation == 'thumbnail':
             result = make_thumbnail(request['path'], request['cache'], request['budget_mb'],
-                                    recipe=recipe if request.get('kind') == 'developed' else None)
+                                    recipe=recipe if request.get('kind') == 'developed' else None,orientation=request.get('orientation',0))
         elif operation == 'export':
             result = export_image(request['path'], recipe, request['destination'], request['format'],
                                   request['budget_mb'], request['job_id'],options=request.get('options'),cache=request['cache'],
-                                  metadata_snapshot=request.get('metadata_snapshot'))
+                                  metadata_snapshot=request.get('metadata_snapshot'),orientation=request.get('orientation',0))
         else:
             raise ValueError('Unknown worker operation')
         if 'cache' in request:

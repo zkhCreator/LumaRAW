@@ -23,6 +23,8 @@ import AppKit
                 Button("Undo Last Adjustment"){store.undo()}.keyboardShortcut("z").disabled(store.photo==nil || store.editing)
             }
             CommandMenu("Photo") {
+                PhotoOrientationActions().environmentObject(store)
+                Divider()
                 StackActions().environmentObject(store)
                 Divider()
                 Button("Create Virtual Copies") { Task { await store.createVirtualCopies() } }.keyboardShortcut("\"").disabled(store.actionPhotoIDs.isEmpty || store.copyBusy)

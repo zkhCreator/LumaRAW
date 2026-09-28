@@ -17,7 +17,7 @@ LumaRAW references your originals without changing them. The SwiftUI app and you
 | Library | Folder tree/search/favorites/labels, ratings, flags, catalog metadata/keywords, regular/live smart collections, nested sets, Quick/target collections, SQL filters/sorting, manual/capture-time stacks, duplicate/missing indexing, virtual copies/shared snapshots, selective sync, and backup/restore |
 | Culling | Grid/Loupe/Compare/Survey, anchored page selections, active-photo review actions, linked or independent full-resolution comparison viewports |
 | Export | JPEG and 16-bit TIFF with embedded sRGB, Display P3, Adobe RGB, or ProPhoto RGB ICC profiles; frozen catalog XMP/keyword policies, persistent queue, pause/cancel/retry, and collision-safe filenames |
-| Agents | 87 MCP tools, equivalent JSON CLI commands, and a bundled skill; app and agent edits share conflict detection |
+| Agents | 90 MCP tools, equivalent JSON CLI commands, and a bundled skill; app and agent edits share conflict detection |
 
 ## Build and run
 
@@ -235,7 +235,7 @@ focused photo view use the current selection/active-photo scope, even with Paint
 put away. Setting the shortcut does not tag photographs.
 
 In Grid view, enable **Painter** (Command-Option-K), choose Keywords, Rating, Flag,
-Color Label or Target Collection, then click/drag across thumbnails. Touched thumbnails highlight;
+Color Label, Target Collection or Rotation, then click/drag across thumbnails. Touched thumbnails highlight;
 mouse-up applies one transaction without selecting the touched photos. Hold Option
 before a keyword stroke to remove only the shortcut's keywords. Choose None or
 Unflagged to clear the other attributes. Esc puts the tool away and discards an
@@ -247,7 +247,7 @@ switch sets to add more, and review/remove choices before **Load Painter**. This
 replaces the loaded shortcut; Cancel leaves it unchanged. Browsing does not change
 the sidebar's active preset. Recent choices retain IDs, including legacy literal
 names; custom choices retain the text shown when selected. The draft is bounded
-to one hundred choices. Metadata/Develop presets, rotation,
+to one hundred choices. Metadata/Develop presets,
 scrolling between pages, and rendered pointer/keyboard acceptance remain
 pending. Originals and Develop recipes remain unchanged.
 
@@ -258,6 +258,25 @@ Repeated painting adds membership and never toggles existing members off. A targ
 switch, rename, deletion or membership change during a stroke rejects that stroke;
 it is never redirected to a new destination. Removing visible members refreshes
 the source, including its empty state. No photo metadata or recipe revisions change.
+
+**Photo → Rotate Left / Rotate Right** (Command-[ / Command-]) and **Flip Horizontal /
+Flip Vertical** change catalog orientation. Grid actions use all selected photos;
+Loupe, Compare, Survey and Develop use the active photo. Painter **Rotation** applies
+its captured rotate/flip action once to each touched thumbnail. A stale visual
+revision rejects the entire stroke. Orientation survives Reset All Adjustments
+and recipe imports; **Undo Last Rotation or Flip** restores the latest orientation
+batch while preserving later Develop edits. This separate, fifty-batch history has
+no Redo or unified Command-Z integration yet. A missing target blocks that batch's
+undo. New virtual copies inherit orientation and can then change independently.
+
+Previews, before/detail views, both thumbnail types and exports include orientation.
+Export jobs freeze it when queued. Existing masks and crops rotate with the image;
+drawing and inspector crop/mask coordinates follow the displayed direction.
+Drawing is available on a matching fitted preview, not a 1:1 viewport. Advanced
+recipe JSON retains canonical coordinates and the legacy Develop `rotation` field.
+Calibration rectangles refer to full EXIF-oriented sources before catalog/Develop
+edits. Rendered desktop interaction and Lightroom Mac reference acceptance remain
+unverified.
 
 Virtual copies share the original file while keeping independent adjustments,
 ratings and catalog metadata. Use **Photo → Create Virtual Copies**, rename with

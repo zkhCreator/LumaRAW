@@ -2,6 +2,7 @@
 // Inputs: the active photo and bounded recipe values. Outputs: partial recipe
 // patches and explicit metadata/edit/export-preview workflows through Store.
 // Temperature is relative to camera white balance; lens controls are manual.
+// Crop bounds and mask coordinates follow the independent displayed orientation.
 import SwiftUI
 
 struct InspectorView:View {
@@ -70,8 +71,8 @@ struct InspectorView:View {
                     if s.detail {Slider(value:$s.cx,in:0...1,onEditingChanged:{if !$0{s.render()}}){Text("Horizontal Viewport Position")};Slider(value:$s.cy,in:0...1,onEditingChanged:{if !$0{s.render()}}){Text("Vertical Viewport Position")}}
                 }
                 section("Composition"){
-                    HStack{Button{let r=(s.recipe["rotation"] as? Int ?? 0);s.set("rotation",(r+270)%360)}label:{Label("Rotate Left",systemImage:"rotate.left")};Button{let r=(s.recipe["rotation"] as? Int ?? 0);s.set("rotation",(r+90)%360)}label:{Label("Rotate Right",systemImage:"rotate.right")}}
-                    Picker("Ratio",selection:Binding(get:{s.recipe["crop"] as? String ?? "original"},set:{s.set("crop",$0)})){Text("Original Ratio").tag("original");ForEach(["1:1","3:2","4:5","16:9"],id:\.self){Text($0).tag($0)}}
+                    HStack{Button{s.orientSelection("rotate_left")}label:{Label("Rotate Left",systemImage:"rotate.left")};Button{s.orientSelection("rotate_right")}label:{Label("Rotate Right",systemImage:"rotate.right")}}.disabled(!s.canOrientPhotos)
+                    Picker("Ratio",selection:Binding(get:{PhotoOrientation.ratio(s.recipe["crop"] as? String ?? "original",orientation:s.photo?.orientation ?? 0)},set:{s.set("crop",PhotoOrientation.ratio($0,orientation:s.photo?.orientation ?? 0))})){Text("Original Ratio").tag("original");ForEach(["1:1","3:2","2:3","4:5","5:4","16:9","9:16"],id:\.self){Text($0).tag($0)}}
                     CropControls()
                     edit("Straighten","straighten",-20...20,0.1,"°")
                     edit("Vertical Perspective","perspective_v",-50...50)
@@ -103,7 +104,7 @@ struct InspectorView:View {
                     ForEach(s.metadata.keys.sorted(),id:\.self){key in HStack(alignment:.top){Text(key).foregroundStyle(.secondary);Spacer();Text(String(describing:s.metadata[key] ?? "")).multilineTextAlignment(.trailing).textSelection(.enabled)}.font(.caption)}
                     if let p=s.photo{Text(p.path).font(.caption2).foregroundStyle(.secondary).textSelection(.enabled)}
                 }
-            }.padding(18).disabled(s.photo==nil || s.browsing || s.loading)
+            }.padding(18).disabled(s.photo==nil || s.browsing || s.loading || s.orientationBusy)
         }.background(.background)
         .sheet(isPresented:Binding(get:{exportMetadataPhoto != nil},set:{if !$0 { exportMetadataPhoto=nil }})) {
             if let exportMetadataPhoto { ExportMetadataSheet(photoID:exportMetadataPhoto) }
@@ -131,10 +132,10 @@ struct ParameterRow:View {
 }
 struct CropControls:View {
     @EnvironmentObject var s:Store
-    var box:[Double]{s.recipe["crop_box"] as? [Double] ?? [0,0,1,1]}
+    var box:[Double]{PhotoOrientation.box(s.recipe["crop_box"] as? [Double] ?? [0,0,1,1],orientation:s.photo?.orientation ?? 0)}
     var body:some View {
         VStack(alignment:.leading,spacing:8){Text("Freeform Crop · Normalized Bounds").font(.caption).foregroundStyle(.secondary)
-            ForEach(0..<4){i in ParameterRow(label:["Left","Top","Right","Bottom"][i],value:Binding(get:{box[i]},set:{v in var b=box;b[i]=v;if b[2]-b[0]>=0.01 && b[3]-b[1]>=0.01{s.set("crop_box",b)}}),range:0...1,step:0.01)}
+            ForEach(0..<4){i in ParameterRow(label:["Left","Top","Right","Bottom"][i],value:Binding(get:{box[i]},set:{v in var b=box;b[i]=v;if b[2]-b[0]>=0.01 && b[3]-b[1]>=0.01{s.set("crop_box",PhotoOrientation.box(b,orientation:s.photo?.orientation ?? 0,inverse:true))}}),range:0...1,step:0.01)}
             Button("Restore Full Frame"){s.set("crop_box",[0.0,0.0,1.0,1.0]);s.set("crop","original")}
         }
     }
@@ -144,9 +145,17 @@ struct MaskControls:View {
     @State private var selected=0
     var masks:[[String:Any]]{s.recipe["masks"] as? [[String:Any]] ?? []}
     func update(_ key:String,_ value:Any){var m=masks;guard m.indices.contains(selected)else{return};m[selected][key]=value;s.set("masks",m)}
+    func add(_ name: String,kind: String) {
+        var rows=masks
+        guard rows.count<12 else { return }
+        let end=PhotoOrientation.inverse(CGPoint(x:0.5,y:1),orientation:s.photo?.orientation ?? 0)
+        rows.append(["name":name,"kind":kind,"exposure":0.5,"x":0.5,"y":0.5,
+                     "x2":end.x,"y2":end.y,"radius":0.25,"points":[[0.5,0.5]]])
+        s.set("masks",rows);selected=rows.count-1
+    }
     var body:some View {
         VStack(alignment:.leading,spacing:12){
-            HStack{Menu("Add Mask"){ForEach([("Radial","radial"),("Gradient","linear"),("Luminance Range","luminance"),("Brush Point","brush")],id:\.1){name,kind in Button(name){var m=masks;guard m.count<12 else{return};m.append(["name":name,"kind":kind,"exposure":0.5,"x":0.5,"y":0.5,"x2":0.5,"y2":1.0,"radius":0.25,"points":[[0.5,0.5]]]);s.set("masks",m);selected=m.count-1}}};Spacer();Text("\(masks.count)/12").font(.caption).foregroundStyle(.secondary)}
+            HStack{Menu("Add Mask"){ForEach([("Radial","radial"),("Gradient","linear"),("Luminance Range","luminance"),("Brush Point","brush")],id:\.1){name,kind in Button(name){add(name,kind:kind)}}};Spacer();Text("\(masks.count)/12").font(.caption).foregroundStyle(.secondary)}
             if !masks.isEmpty {
                 Picker("Mask",selection:$selected){ForEach(masks.indices,id:\.self){i in Text(masks[i]["name"] as? String ?? "Mask \(i+1)").tag(i)}}
                 if masks.indices.contains(selected){
@@ -155,8 +164,8 @@ struct MaskControls:View {
                     maskRow("Exposure","exposure",-4...4,0.05,0)
                     maskRow("Saturation","saturation",-100...100,1,0)
                     if masks[selected]["kind"] as? String == "luminance" {maskRow("Lower Limit","low",0...1,0.01,0);maskRow("Upper Limit","high",0...1,0.01,1)}
-                    else{maskRow("Center X","x",0...1,0.01,0.5);maskRow("Center Y","y",0...1,0.01,0.5);maskRow("Radius","radius",0.01...1,0.01,0.25)}
-                    if masks[selected]["kind"] as? String == "linear" {maskRow("End X","x2",0...1,0.01,0.5);maskRow("End Y","y2",0...1,0.01,1)}
+                    else{coordinateRow("Center X",axis:0);coordinateRow("Center Y",axis:1);maskRow("Radius","radius",0.01...1,0.01,0.25)}
+                    if masks[selected]["kind"] as? String == "linear" {coordinateRow("End X",axis:0,end:true);coordinateRow("End Y",axis:1,end:true)}
                     maskRow("Feather","feather",0.01...1,0.01,0.5)
                     if masks[selected]["kind"] as? String == "brush" {Text("Use the full recipe editor to set brush path points.").font(.caption);Button("Edit Brush Path…"){s.showRecipe=true}}
                     Button("Delete This Mask",role:.destructive){var m=masks;m.remove(at:selected);selected=max(0,selected-1);s.set("masks",m)}
@@ -166,5 +175,23 @@ struct MaskControls:View {
     }
     func maskRow(_ label:String,_ key:String,_ range:ClosedRange<Double>,_ step:Double,_ initial:Double)->some View{
         ParameterRow(label:label,value:Binding(get:{(masks[selected][key] as? NSNumber)?.doubleValue ?? initial},set:{update(key,$0)}),range:range,step:step)
+    }
+    func coordinateRow(_ label: String,axis: Int,end: Bool=false) -> some View {
+        let xKey=end ? "x2":"x",yKey=end ? "y2":"y"
+        func displayed() -> CGPoint {
+            let row=masks[selected]
+            return PhotoOrientation.forward(CGPoint(x:(row[xKey] as? NSNumber)?.doubleValue ?? 0.5,
+                y:(row[yKey] as? NSNumber)?.doubleValue ?? (end ? 1:0.5)),orientation:s.photo?.orientation ?? 0)
+        }
+        return ParameterRow(label:label,value:Binding(get:{
+            let point=displayed();return Double(axis == 0 ? point.x:point.y)
+        },set:{ value in
+            var point=displayed()
+            if axis == 0 { point.x=value } else { point.y=value }
+            let canonical=PhotoOrientation.inverse(point,orientation:s.photo?.orientation ?? 0)
+            var rows=masks
+            rows[selected][xKey]=canonical.x;rows[selected][yKey]=canonical.y
+            s.set("masks",rows)
+        }),range:0...1,step:0.01)
     }
 }

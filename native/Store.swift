@@ -24,6 +24,10 @@ import UniformTypeIdentifiers
         self?.thumbnails=images;self?.thumbnailErrors=errors
     })
     @Published var preview: NSImage?
+    @Published var previewGeometry: PhotoPreviewGeometry?
+    @Published var orientationState: PhotoOrientationState?
+    @Published var orientationBusy=false
+    var orientationReadGeneration=0
     @Published var before: NSImage?
     @Published var histogram: [[Double]] = []
     @Published var metadata: [String: Any] = [:]
@@ -71,6 +75,7 @@ import UniformTypeIdentifiers
     @Published var painterRating=5
     @Published var painterFlag=1
     @Published var painterLabel="red"
+    @Published var painterOrientationAction="rotate_right"
     @Published var painterBusy=false
     @Published var painterTouched: Set<Int>=[]
     var painterStroke: PainterStroke?
@@ -159,6 +164,7 @@ import UniformTypeIdentifiers
     private var started=false
     private var selectionAnchor: Int?
     var canChangePhoto: Bool { !browsing && !editing && pendingPatch.isEmpty }
+    var hasPendingEdits: Bool { editing || !pendingPatch.isEmpty }
 
     func start() async {
         guard !started else{return};started=true
@@ -237,13 +243,14 @@ import UniformTypeIdentifiers
             reviewSelectionChanged()
             updateThumbnails(force:true)
             await refreshCollectionState()
+            await refreshOrientationState()
             if folderRevision != photoFolderRevision { await refreshFolders() }
             if keywordRevision != photoKeywordRevision { await refreshKeywords();await refreshKeywordPhoto() }
         } catch {self.error=error.localizedDescription}
     }
     func clearPhoto() {
         generation += 1;previewTask?.cancel();photo=nil;recipe=[:]
-        preview=nil;before=nil;metadata=[:];histogram=[];rendering=false;loading=false
+        preview=nil;previewGeometry=nil;before=nil;metadata=[:];histogram=[];rendering=false;loading=false
     }
     func choose(_ id:Int, extend:Bool=false, range:Bool=false) {
         guard !browsing,!editing,pendingPatch.isEmpty else{message="Wait for the current edit to finish saving";return}
@@ -321,17 +328,19 @@ import UniformTypeIdentifiers
             do {
                 let r=try await Backend.call("preview_photo",params)
                 guard token==generation,selected==p.id else{return}
+                guard r["revision"] as? Int == p.revision else { rendering=false;return }
                 if let path=r["preview"] as? String{preview=NSImage(contentsOfFile:path)}
                 if let path=r["before"] as? String{before=NSImage(contentsOfFile:path)}
                 histogram=r["histogram"] as? [[Double]] ?? []
                 metadata=r["metadata"] as? [String:Any] ?? [:]
+                previewGeometry=PhotoPreviewGeometry(r)
                 message=detail ? "Full-resolution viewport · 1 image pixel = 1 screen pixel" : "Preview · Originals are read-only · Edits save automatically"
                 rendering=false
             } catch {if token==generation {rendering=false;self.error=error.localizedDescription}}
         }
     }
     func set(_ key:String,_ value:Any) {
-        guard !loading,!browsing,let p=photo,p.id==selected else{return}
+        guard !loading,!browsing,!orientationBusy,let p=photo,p.id==selected else{return}
         saveFailed=false;recipe[key]=value;pendingPatch[key]=value
         if !editing {scheduleCommit()}
     }
@@ -372,7 +381,7 @@ import UniformTypeIdentifiers
         apply(values.filter{keys.contains($0.key)})
     }
     func undo() {
-        guard let p=photo,p.id==selected,!loading,!browsing,!editing,pendingPatch.isEmpty else{return}
+        guard let p=photo,p.id==selected,!loading,!browsing,!editing,!orientationBusy,pendingPatch.isEmpty else{return}
         editing=true
         Task{await recipeMutation("undo_photo",["photo_id":p.id,"expected_revision":p.revision],photoID:p.id)}
     }

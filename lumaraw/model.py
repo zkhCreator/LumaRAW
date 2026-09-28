@@ -84,7 +84,7 @@ class Recipe:
                 raise ValueError(f'Parameter out of range: {name}')
         if type(self.rotation) is not int or self.rotation not in (0, 90, 180, 270):
             raise ValueError('Rotation must be 0 / 90 / 180 / 270')
-        if self.crop not in ('original', '1:1', '3:2', '4:5', '16:9'):
+        if self.crop not in ('original', '1:1', '3:2', '2:3', '4:5', '5:4', '16:9', '9:16'):
             raise ValueError('Unsupported crop ratio')
         validate_extras(self)
         if type(self.monochrome) is not bool or type(self.highlight_recovery) is not bool:

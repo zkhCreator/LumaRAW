@@ -195,13 +195,15 @@ def test_v3_migration_retains_photos_without_inventing_stacks(tmp_path,monkeypat
         with c.db:
             c.db.executemany('INSERT INTO photos(path,name,bytes,mtime,recipe,created) VALUES(?,?,0,0,?,0)',
                 [(str(tmp_path/f'{i}.png'),f'{i}.png',json.dumps(Recipe().dict())) for i in range(6)])
-        original=c.summaries([1,2])
+        original=[dict(row) for row in c.db.execute('SELECT * FROM photos WHERE id IN (1,2) ORDER BY id')]
         assert c.db.execute('PRAGMA user_version').fetchone()[0]==3
         c.close()
     c=Catalog(root)
     try:
         assert c.db.execute('PRAGMA user_version').fetchone()[0]==CATALOG_VERSION
-        assert c.summaries([1,2])==original
+        upgraded=[dict(row) for row in c.db.execute('SELECT * FROM photos WHERE id IN (1,2) ORDER BY id')]
+        assert [{key:row[key] for key in original[0]} for row in upgraded]==original
+        assert all(row['orientation']==0 for row in upgraded)
         assert Stacks(c).revision()==0 and c.filtered_count()==6
     finally:c.close()
 

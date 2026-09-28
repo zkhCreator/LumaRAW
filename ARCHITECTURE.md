@@ -286,6 +286,31 @@ and stack cleanup stay in the existing transaction; photo revisions, recipes,
 originals and queued jobs are untouched. The shell refreshes membership and the
 current source after commit, including removal from a displayed target collection.
 
+`orientation.py` owns schema 15's independent photo orientation, frozen job value
+and bounded fifty-batch undo history. The portable D4 representation is a horizontal
+mirror followed by zero to three clockwise quarter turns; it is not an EXIF tag.
+Rotate/flip composes in displayed coordinates. Up to sixty captured photo visual
+revisions validate before one transaction; metadata and Develop history remain
+unchanged. Undo validates the global history revision, latest action and every
+target's current orientation. It preserves subsequent Develop edits and rejects a
+missing target atomically. Existing catalogs/jobs start at identity orientation,
+preserving legacy recipe rotation. Virtual copies inherit then own their value.
+
+`OrientedPlan` maps an output strip/ROI to canonical Develop coordinates and applies
+an exact array-view transform to the returned pixels and gamut mask. Existing
+geometry, neighborhood halos, local-mask coordinates and CPU/Metal processing stay
+in their original coordinate system. No extra full-resolution rotated buffer or
+resampling pass is introduced. Preview/thumbnail cache identities include catalog
+orientation; decoded linear caches remain shared. Preview geometry includes the
+effective crop bounds separately from source-family decoder metadata.
+
+The native adapter maps crop bounds, ratios and local-mask coordinates between
+display and canonical space. Drawing requires a fitted preview with matching
+photo ID, visual revision and orientation. Rotation Painter uses `orient_photos`
+with captured visual revisions; it never writes `Recipe.rotation`. Photo menus
+follow Grid selection versus active-photo scope. Separate orientation undo avoids
+overwriting later Develop edits; unified application Undo/Redo remains future work.
+
 `keyword_exchange.py` owns schema 12's manual person-keyword flag and dictionary
 file exchange. Bounded UTF-8 input is copied and fingerprinted outside the catalog
 lock, then validated in a temporary SQLite database with a 4 MiB page cache. The

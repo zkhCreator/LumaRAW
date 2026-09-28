@@ -46,6 +46,7 @@ extension Store {
             updateThumbnails()
             updateReviewRequests()
             await refreshCollectionState()
+            await refreshOrientationState()
         } catch { message=error.localizedDescription }
     }
 }
