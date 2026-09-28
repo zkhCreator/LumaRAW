@@ -494,6 +494,27 @@ rendered dialog, native accessibility and macOS 14 runtime need desktop acceptan
 The picker extension in `tests/keyword_sets_probe.py` measures previewing other
 sets without changing the active preset; setup, IPC, images and UI are excluded.
 
+## Target Collection Painter
+
+`test_target_painter.py` verifies repeated add without toggle, removal, captured
+target/collection conflicts, all-or-nothing SQL failure, ancestor revisions, stack
+cleanup, virtual copies and preserved metadata/recipes/jobs/originals. Its existence
+check regression forbids full photo-detail reads. `NativeTargetPainterRegression`
+uses real IPC to verify mouse-down/mouse-up state boundaries, touched-ID dedup,
+cancellation, target changes during a stroke and empty displayed-target refresh.
+
+```sh
+.venv/bin/python tests/run_native.py --work work/new-target-painter-check --suite NativeTargetPainterRegression
+.venv/bin/python tests/target_painter_probe.py --work work/new-target-painter-probe --rows 100000
+```
+
+The performance fixture gives sixty generated 8×8 targets one hundred Unicode
+keyword paths each at depth 32. The rest of the catalog is synthetic. Timings
+include captured target-state reads and transaction commits, excluding setup,
+IPC, pixels and desktop presentation. Compare the same fixture before/after edits;
+do not turn machine timing into an assertion. Rendered Option-pointer dispatch and
+macOS 14 runtime remain separate acceptance requirements.
+
 ## Public source check
 
 ```sh

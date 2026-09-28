@@ -6,6 +6,7 @@ Sets contain collections, never photos directly. Originals and photo recipes are
 untouched. Ancestor revisions cover descendant edits so stale subtree deletion
 cannot erase changes the caller has not seen. No pixels or platform UI.
 Collection identities are never reused after deletion, including after restart.
+Membership validation reads only bounded IDs, never full photo/keyword details.
 """
 import json
 import re
@@ -166,7 +167,11 @@ class Collections:
         if row['kind']=='smart': raise ValueError('Smart collection membership is determined by its rules')
         if row['kind']=='set': raise ValueError('Collection sets contain collections, not photos')
         ids=list(dict.fromkeys(ids))
-        if any(not self.catalog.photo(id_) for id_ in ids): raise ValueError('Photo does not exist')
+        if not ids or len(ids)>60:
+            raise ValueError('Choose between 1 and 60 photos')
+        slots=','.join('?' for _ in ids)
+        if self.db.execute(f'SELECT COUNT(*) FROM photos WHERE id IN ({slots})',ids).fetchone()[0] != len(ids):
+            raise ValueError('Photo does not exist')
         if action not in ('add','remove'): raise ValueError('Unsupported membership action')
         with self.db:
             if action=='add':

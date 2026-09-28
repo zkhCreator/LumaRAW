@@ -17,7 +17,11 @@ struct PainterToolbar: View {
                         Picker("Paint",selection:$s.painterKind) {
                             Text("Keywords").tag("keywords");Text("Rating").tag("rating")
                             Text("Flag").tag("flag");Text("Color Label").tag("label")
-                        }.frame(width:160).onChange(of:s.painterKind) { _,_ in s.cancelPainterStroke() }
+                            Text("Target Collection").tag("target_collection")
+                        }.frame(width:205).onChange(of:s.painterKind) { _,value in
+                            s.cancelPainterStroke()
+                            if value == "target_collection" { Task { await s.refreshCollectionState() } }
+                        }
                     }
                     Spacer(minLength:0)
                     if s.painterBusy { ProgressView().controlSize(.small) }
@@ -32,6 +36,10 @@ struct PainterToolbar: View {
                             Picker("Rating",selection:$s.painterRating) { Text("None").tag(0);ForEach(1...5,id:\.self) { Text("\($0) stars").tag($0) } }.frame(width:135)
                         } else if s.painterKind == "flag" {
                             Picker("Flag",selection:$s.painterFlag) { Text("Pick").tag(1);Text("Unflagged").tag(0);Text("Rejected").tag(-1) }.frame(width:135)
+                        } else if s.painterKind == "target_collection" {
+                            Text("Target: \(s.painterTargetName)").lineLimit(1)
+                            Text("Option removes from this collection").font(.caption).foregroundStyle(.secondary)
+                            Button("Refresh Target") { Task { await s.refreshCollectionState() } }
                         } else {
                             Picker("Label",selection:$s.painterLabel) { ForEach(LibraryLabels.names,id:\.self) { Text($0.capitalized).tag($0) } }.frame(width:135)
                         }

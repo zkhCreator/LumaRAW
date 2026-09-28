@@ -275,6 +275,17 @@ segments; pending state cancels on changed layout/source/page. Deferred teardown
 captures a stroke identity to avoid mutating SwiftUI during updates or cancelling
 a new stroke. Culling readback updates rating/flag without adopting recipe revisions.
 
+Target Collection Painter reuses `target_membership` instead of the descriptive
+metadata command. Mouse-down captures the collection ID, collection revision and
+target-state revision. The whole gesture adds/removes only its deduplicated visible
+IDs. Existing-member add is not a toggle. Target changes fail at commit rather
+than redirecting a stroke; unrelated photo metadata edits do not cause conflicts.
+Membership validates at most sixty photo IDs in one indexed query without opening
+full photo details or expanding deep keyword paths. Collection/ancestor revisions
+and stack cleanup stay in the existing transaction; photo revisions, recipes,
+originals and queued jobs are untouched. The shell refreshes membership and the
+current source after commit, including removal from a displayed target collection.
+
 `keyword_exchange.py` owns schema 12's manual person-keyword flag and dictionary
 file exchange. Bounded UTF-8 input is copied and fingerprinted outside the catalog
 lock, then validated in a temporary SQLite database with a 4 MiB page cache. The

@@ -28,6 +28,9 @@ Official references checked September 2026:
 - [Hierarchical keywords, synonyms and export options](https://helpx.adobe.com/lightroom-classic/desktop/organize-photos-in-lightroom-classic/keywords.html)
 - [Keyword shortcuts, Painter and keyboard behavior, Adobe's Julieanne Kost](https://jkost.com/blog/2024/07/working-with-keywords-in-lightroom-classic-2.html)
 - [Rating, flag and label Painter workflows](https://helpx.adobe.com/lightroom-classic/desktop/organize-photos-in-lightroom-classic/flag-label-rate-photos.html)
+- [Target Collection Painter, Adobe's Julieanne Kost](https://jkost.com/blog/2024/06/organizing-photos-using-collections-in-lightroom-classic.html)
+- [Painter shortcuts and Option removal](https://jkost.com/blog/2019/10/using-the-painter-tool-in-lightroom-classic.html)
+- [Library rotation, flipping and Painter options](https://helpx.adobe.com/lightroom-classic/desktop/manage-catalogs-and-files/photos.html)
 - [Preset storage locations and catalog storage option](https://helpx.adobe.com/lightroom-classic/desktop/kb/preference-file-and-other-file-locations.html)
 - [Firsthand dictionary import behavior and preserved existing attributes](https://community.adobe.com/questions-675/importing-keywords-into-lightroom-classic-as-non-exported-keywords-1638903)
 - [Firsthand CSV field layout and tab indentation](https://community.adobe.com/questions-675/lightroom-classique-15-3-unable-to-import-keywords-from-csv-file-1560047)
@@ -43,7 +46,7 @@ gaps. Nothing below is full Lightroom parity merely because historical tests pas
 | --- | --- | --- |
 | Import and catalogs | Partial: referenced originals, backup/restore | Import preview/selection, copy workflows, metadata/develop presets, tethered capture, catalog switching/merge |
 | Library navigation | Partial: bounded grid/filmstrip, folder tree/search/favorites/labels, durable missing-folder relocation and folder synchronization, direct/recursive sources, filters/sorting, regular/smart/Quick collections and nested sets | Multi-source selection, complete sync Import Dialog/duplicate policy, folder move/rename, relocation overlap/collision handling, collection drag/drop/color labels, full smart criteria/import-export, source-selection memory, desktop acceptance |
-| Organization | Partial: duplicate/missing detection, hierarchical keywords/synonyms/export flags/Will Export preview, text/CSV vocabulary exchange and manual person tags, custom nine-slot keyword sets/recent entries/shared or catalog storage, multi-keyword shortcuts and keyword/rating/flag/label Painter strokes, title/caption/copyright, labels, batch metadata, virtual copies, manual/split/capture-time scoped stacks | Keyword policy/file and preset reference acceptance, built-in sets/suggestions/undo, remaining Painter modes and desktop acceptance, complete IPTC, stack interaction acceptance, rename and sidecars |
+| Organization | Partial: duplicate/missing detection, hierarchical keywords/synonyms/export flags/Will Export preview, text/CSV vocabulary exchange and manual person tags, custom nine-slot keyword sets/recent entries/shared or catalog storage, multi-keyword shortcuts and keyword/rating/flag/label/target-collection Painter strokes, title/caption/copyright, labels, batch metadata, virtual copies, manual/split/capture-time scoped stacks | Keyword policy/file and preset reference acceptance, built-in sets/suggestions/undo, remaining Painter modes and desktop acceptance, complete IPTC, stack interaction acceptance, rename and sidecars |
 | Culling | Partial: Loupe/Compare/Survey, linked detail, anchored page selection | Desktop acceptance, cross-page selection, Develop reference view, auto advance, persistent workspace state |
 | Basic development | Partial: light/WB/color | Calibrated absolute WB, eyedropper, texture/clarity/dehaze, complete HSL/B&W and color grading |
 | Curves and profiles | Partial: custom composite curve, LUT/ICC | Interactive RGB curves, camera/profile browser, compatible preset import/export |
@@ -64,10 +67,10 @@ gaps. Nothing below is full Lightroom parity merely because historical tests pas
 
 ## Active increment
 
-Painter's multi-set keyword chooser, including independent preset previews,
-cross-set drafts and identity-safe confirmation. Remaining Painter modes,
-reference presets/exchange, suggestions and the full inventory stay in scope;
-this does not complete product parity.
+Target Collection Painter and bounded membership transactions. Library rotation
+and flips require separate orientation, geometry/history and export acceptance;
+remaining Painter modes, reference presets/exchange, suggestions and the full
+inventory stay in scope. This does not complete product parity.
 
 ## Evidence log
 
@@ -1333,3 +1336,79 @@ All six final packaged native suites pass **132 assertions**: chooser 19, Painte
 Final build/native logs contain no compiler warnings or errors. Public checks cover
 **271 source files** without findings, including the clean extracted archive.
 Remote refresh and local/remote ancestry checks found no unmerged branches.
+
+### Target Collection Painter and membership performance
+
+Painter now adds to the current regular or Quick Collection and uses Option to
+remove only touched members. Each stroke captures the target ID, target-state
+revision and collection revision at mouse-down, retains that destination label,
+deduplicates up to sixty visible hits and submits once at mouse-up. Existing-member
+add never toggles a photo off. Cancellation writes nothing. Target switches,
+renames, deletion or concurrent membership edits reject the entire old stroke;
+no stale gesture is redirected or automatically replayed. Photo metadata changes
+are independent and do not cause an unrelated membership conflict.
+
+The native shell reuses `target_membership`; there is no duplicate SQL or new
+Painter-specific collection protocol. Membership and ancestor revisions update
+in one transaction, including existing stack-cleanup triggers on removal. Virtual
+copies remain independent targets. Recipes, photo metadata/revisions, originals
+and frozen exports stay unchanged. Painting does not select the touched photos;
+removing photos from the displayed target naturally prunes that source/selection,
+including its empty state. Membership badges and sidebar state refresh afterward.
+
+The previous membership existence check expanded complete photo details, including
+deep assigned keyword paths. It now validates at most sixty IDs in one indexed
+query. A regression forbids full photo-detail access for this operation; SQL fault
+injection proves rollback of partial membership insertion and ancestor revisions.
+
+Warm service/SQLite measurements on macOS 26.6.2 arm64, 128 GB RAM. Sixty generated
+8×8 originals each have one hundred Unicode paths at depth 32 and long descriptive
+metadata; remaining photos are synthetic rows. No image worker runs. Samples
+include target-state reads and commits, excluding setup, IPC, pixels and UI.
+Final optimized measurements ran serially after the earlier tests had finished.
+
+| Operation (median / p95, 30 samples except first add) | Previous, 10,000 photos | Optimized, 10,000 photos | Optimized, 100,000 photos |
+| --- | ---: | ---: | ---: |
+| First add sixty members, one sample | 193.715 ms | 6.254 ms | 9.852 ms |
+| Add sixty existing members | 176.204 / 183.239 ms | 4.574 / 5.147 ms | 4.624 / 5.244 ms |
+| Remove + add sixty members, two transactions | 355.462 / 368.688 ms | 10.405 / 12.612 ms | 10.313 / 20.143 ms |
+| Peak process RSS | 44.09 MB | 41.97 MB | 54.27 MB |
+
+The repeat-add improvement is about **38.5×** on this specific heavy-metadata
+fixture. It is not a general image-processing speed claim. State responses remain
+576–578 bytes for these labels. Reproduce with tests/target_painter_probe.py.
+
+Nine domain regressions cover preserved state/jobs/originals, no detail expansion,
+four captured-state conflicts, injected failure, stack cleanup and variant scope.
+The initial native target-Painter suite passes 17 assertions; a follow-up assertion
+also covers the captured destination label after another client changes target.
+Rendered pointer/Option behavior and macOS 14 runtime remain unverified.
+
+Rotation follow-through remains open: Adobe documents both rotation and horizontal/
+vertical flips in Painter. The current `Recipe.rotation` is a Develop parameter,
+applied before crop/coordinate-based masks and cleared by Reset All Adjustments;
+simply reusing it would not prove Library orientation parity. The next orientation
+work must explicitly address catalog state, virtual copies, history/reset behavior,
+frozen exports, thumbnail/viewport dimensions and mask/crop coordinate mapping,
+with an asymmetric image fixture and bounded strip/Metal checks. No new rotation
+or flip mode is claimed by this target-collection increment.
+
+A [firsthand reference discussion](https://community.adobe.com/questions-675/lightroom-classic-reset-does-not-remove-rotations-965529)
+reports that Photo Rotate/Flip survives Develop Reset and is absent from Develop
+History. That observation was made on Windows; Mac behavior still needs reference
+acceptance. The implementation must not silently equate Library orientation with
+the existing resettable Develop rotation field. Source and developed thumbnails,
+before/detail previews, export snapshots and drawing coordinates all need explicit
+orientation handling; current render/cache paths were traced but are unchanged here.
+
+Final validation: **368 Python tests passed with no skips**, including the pinned
+Nikon D3S NEF and required Metal dispatch. The packaged engine passes six native
+suites / **126 assertions**: target Painter 18, existing Painter 36, collections 21,
+stacks 22, multi-set chooser 19 and connection/handoff 10. The Mac app builds for
+14.0 and passes local ad-hoc signature verification on macOS 26.6.2. Generation
+**17**, schema **14**, **87 tools**; manifest
+`59562988f2119d6421fa9239830f7b37f93d7b01115777f34355788ee0ce26c8`
+matches source, and the bundled guide matches the current document. Final compiler
+logs contain no warnings/errors. Public checks cover **274 files** without findings,
+including the clean extracted archive. Remote refresh found no unmerged branches.
+No rendered desktop, macOS 14 runtime or complete Lightroom parity is claimed.

@@ -1,8 +1,9 @@
 // Purpose: persistent keyword shortcuts and bounded native Painter stroke state.
-// Inputs: captured shortcut/metadata revisions, explicit settings and thumbnail IDs.
+// Inputs: captured shortcut/metadata or target-collection revisions and thumbnail IDs.
 // Outputs: one atomic service command per mouse-up or selected-photo shortcut.
-// No pointer geometry, SQL or pixel edits. A stroke never selects photos, retries
-// stale writes, or follows a changed source/page. Pending strokes can be cancelled.
+// No pointer geometry, SQL or pixel edits. Hits never select thumbnails; removing
+// members can prune selection when their source refreshes. Never retry stale writes
+// or follow a changed source/page. Pending strokes can be cancelled.
 import Foundation
 
 struct KeywordShortcut {
@@ -28,7 +29,15 @@ struct PainterConfiguration {
     let value: Any?
     let erase: Bool
     let shortcutRevision: String?
+    var targetCollection: CollectionState? = nil
+    var method: String { kind == "target_collection" ? "target_membership":"paint_library" }
     var parameters: [String:Any] {
+        if let targetCollection {
+            return ["collection_id":targetCollection.target.id,
+                    "expected_state_revision":targetCollection.revision,
+                    "expected_revision":targetCollection.target.revision,
+                    "action":erase ? "remove":"add"]
+        }
         var result: [String:Any]=["kind":kind,"erase":erase]
         if let value { result["value"]=value }
         if let shortcutRevision { result["expected_shortcut_revision"]=shortcutRevision }
@@ -46,6 +55,10 @@ struct PainterStroke {
 
 extension Store {
     var painterInGrid: Bool { workspace == "library" && !develop && libraryView == .grid }
+    var painterSupportsErasing: Bool { ["keywords","target_collection"].contains(painterKind) }
+    var painterTargetName: String {
+        painterStroke?.configuration.targetCollection?.target.name ?? collectionState?.target.name ?? "Unavailable"
+    }
     var painterCanReceive: Bool {
         painterEnabled && painterInGrid && !painterBusy && !keywordBusy &&
             painterKeywordPicker == nil && shortcutEditor == nil
@@ -125,8 +138,12 @@ extension Store {
         if painterKind == "keywords",keywordShortcut?.ids.isEmpty != false {
             error="Set a keyword shortcut before painting";return false
         }
-        let configuration=PainterConfiguration(kind:painterKind,value:value,erase:painterKind == "keywords" && erase,
-            shortcutRevision:painterKind == "keywords" ? keywordShortcut?.revision:nil)
+        if painterKind == "target_collection",collectionState == nil {
+            error="Refresh the target collection before painting";return false
+        }
+        let configuration=PainterConfiguration(kind:painterKind,value:value,erase:painterSupportsErasing && erase,
+            shortcutRevision:painterKind == "keywords" ? keywordShortcut?.revision:nil,
+            targetCollection:painterKind == "target_collection" ? collectionState:nil)
         painterStroke=PainterStroke(source:painterSource,configuration:configuration,
             photos:Dictionary(uniqueKeysWithValues:photos.map { ($0.id,$0) }))
         painterTouched.removeAll()
@@ -161,11 +178,21 @@ extension Store {
         guard !painterBusy,!keywordBusy,!targets.isEmpty else { return nil }
         painterBusy=true;keywordBusy=true;shortcutReadGeneration+=1
         var params=configuration.parameters
-        params["targets"]=targets.map { ["photo_id":$0.id,"expected_metadata_revision":$0.metadataRevision] }
+        if configuration.targetCollection != nil {
+            params["photo_ids"]=targets.map(\.id)
+        } else {
+            params["targets"]=targets.map { ["photo_id":$0.id,"expected_metadata_revision":$0.metadataRevision] }
+        }
         return Task {
             defer { painterBusy=false;keywordBusy=false }
             do {
-                let result=try await Backend.call("paint_library",params)
+                let result=try await Backend.call(configuration.method,params)
+                if let target=configuration.targetCollection {
+                    await refreshCollections()
+                    await refresh()
+                    message="\(configuration.erase ? "Removed from":"Added to") \(target.target.name): \(targets.count) photos"
+                    return
+                }
                 if let reply=result["shortcut"] as? [String:Any],let shortcut=KeywordShortcut(reply) { keywordShortcut=shortcut }
                 await refresh();await refreshKeywords();await refreshKeywordPhoto(includeCulling:true)
                 message="\(configuration.erase ? "Removed":"Applied") \(configuration.kind) on \(targets.count) photos"

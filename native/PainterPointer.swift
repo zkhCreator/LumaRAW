@@ -63,8 +63,8 @@ final class PainterPointerView: NSView {
         if enabled { addCursorRect(bounds,cursor:cursor) }
     }
     private var cursor: NSCursor {
-        let erasing=store?.painterKind == "keywords" && NSEvent.modifierFlags.contains(.option)
-        if let image=NSImage(systemSymbolName:erasing ? "eraser":"paintbrush.pointed",accessibilityDescription:erasing ? "Remove shortcut keywords":"Painter") {
+        let erasing=store?.painterSupportsErasing == true && NSEvent.modifierFlags.contains(.option)
+        if let image=NSImage(systemSymbolName:erasing ? "eraser":"paintbrush.pointed",accessibilityDescription:erasing ? "Remove Painter attribute":"Painter") {
             image.size=NSSize(width:22,height:22)
             return NSCursor(image:image,hotSpot:NSPoint(x:2,y:20))
         }

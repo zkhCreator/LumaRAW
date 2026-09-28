@@ -234,9 +234,9 @@ row; a plus marks shortcut members. **Add Keyword Shortcut** and Shift-K in a
 focused photo view use the current selection/active-photo scope, even with Painter
 put away. Setting the shortcut does not tag photographs.
 
-In Grid view, enable **Painter** (Command-Option-K), choose Keywords, Rating, Flag
-or Color Label, then click/drag across thumbnails. Touched thumbnails highlight;
-mouse-up applies one transaction without changing the photo selection. Hold Option
+In Grid view, enable **Painter** (Command-Option-K), choose Keywords, Rating, Flag,
+Color Label or Target Collection, then click/drag across thumbnails. Touched thumbnails highlight;
+mouse-up applies one transaction without selecting the touched photos. Hold Option
 before a keyword stroke to remove only the shortcut's keywords. Choose None or
 Unflagged to clear the other attributes. Esc puts the tool away and discards an
 unsubmitted stroke. Changing the page/source cancels that stroke; a stale target
@@ -247,9 +247,17 @@ switch sets to add more, and review/remove choices before **Load Painter**. This
 replaces the loaded shortcut; Cancel leaves it unchanged. Browsing does not change
 the sidebar's active preset. Recent choices retain IDs, including legacy literal
 names; custom choices retain the text shown when selected. The draft is bounded
-to one hundred choices. Metadata/Develop presets, rotation, target-collection
-painting, scrolling between pages, and rendered pointer/keyboard acceptance remain
+to one hundred choices. Metadata/Develop presets, rotation,
+scrolling between pages, and rendered pointer/keyboard acceptance remain
 pending. Originals and Develop recipes remain unchanged.
+
+**Target Collection** paints into the current regular collection or Quick
+Collection. Use **Set as Target Collection** on a collection to choose it. The
+Painter shows the captured destination; Option removes touched photos from it.
+Repeated painting adds membership and never toggles existing members off. A target
+switch, rename, deletion or membership change during a stroke rejects that stroke;
+it is never redirected to a new destination. Removing visible members refreshes
+the source, including its empty state. No photo metadata or recipe revisions change.
 
 Virtual copies share the original file while keeping independent adjustments,
 ratings and catalog metadata. Use **Photo → Create Virtual Copies**, rename with

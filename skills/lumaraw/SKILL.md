@@ -210,6 +210,15 @@ Recipes, originals and frozen jobs are preserved. Native gestures submit on
 mouse-up without selecting painted photos; agents use explicit target lists.
 An uncertain or stale stroke must never be automatically replayed.
 
+Native Target Collection Painter uses `target_membership`, not `paint_library`.
+Read `collection_state`, then capture `target.id`, `target.revision` and the state
+`revision`. Submit those as `collection_id`, `expected_revision` and
+`expected_state_revision`, with up to sixty `photo_ids` and `action:add|remove`.
+Adding an existing member never toggles it off. Preserve captured revisions across
+a drag; never reread and redirect the same pending stroke to a changed target.
+Membership changes do not alter photo metadata/recipe revisions. The native Option
+stroke removes only touched target members and refreshes the displayed source.
+
 ## Folder sources
 
 `list_folders` pages visible roots or a `parent_id` at 60 items. Optional `search`,

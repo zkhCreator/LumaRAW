@@ -107,7 +107,12 @@ when a clear function is more maintainable. Avoid unrelated formatting churn.
   intermediate thumbnails crossed by coalesced pointer events, and commit once
   at mouse-up. Publish highlight changes only when a new photo is touched, not on
   every pointer event. Validate every target and assignment capacity before any write.
-  Painter never changes selection or Develop recipes. Cancel pending strokes on
+  Painter never selects touched thumbnails or changes Develop recipes. Membership
+  removal may naturally remove selected photos from the displayed source. Capture
+  both target-state and collection revisions for Target Collection strokes; never
+  redirect a pending stroke after a target switch. Membership existence checks
+  read bounded IDs, not full photo metadata or resolved keyword hierarchies.
+  Cancel pending strokes on
   Escape, source/page changes and pointer-layout invalidation. Do not publish
   SwiftUI state during representable updates; defer cancellation with a captured
   stroke identity so an old callback cannot clear a new gesture. Shortcut IDs
