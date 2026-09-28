@@ -84,6 +84,7 @@ class Keywords:
     def __init__(self, catalog):
         self.catalog = catalog
         self.db = catalog.db
+        self.last_additions = []
 
     def revision(self):
         return self.db.execute('SELECT revision FROM keyword_state WHERE id=1').fetchone()[0]
@@ -227,6 +228,9 @@ class Keywords:
             self.db.execute('UPDATE keywords SET include_export=?,export_containing=?,export_synonyms=?,is_person=? WHERE id=?',
                             (*policies.values(),keyword_id))
             self.assign(keyword_id, photo_ids, 'add')
+            if photo_ids:
+                from .keyword_sets import remember
+                remember(self.db,[keyword_id])
             self.db.execute('UPDATE keyword_state SET revision=revision+1')
         return {'keyword_id':keyword_id, 'keyword_revision':self.revision()}
 
@@ -263,6 +267,9 @@ class Keywords:
             self.get(keyword_id)
             ids = self.check_targets(targets)
             self.assign(keyword_id, ids, action)
+            if action == 'add':
+                from .keyword_sets import remember
+                remember(self.db,[keyword_id])
         return {'keyword_revision':self.revision(), 'updated':ids}
 
     def assign(self, keyword_id, ids, action):
@@ -327,7 +334,7 @@ class Keywords:
 
     def replace(self, photo_ids, values):
         """Inside the caller's metadata transaction; failure rolls back all tags."""
-        ids = set(self.resolve(value) for value in values)
+        ids = list(dict.fromkeys(self.resolve(value) for value in values))
         self.replace_ids(photo_ids, ids)
 
     def replace_ids(self, photo_ids, keyword_ids, additions=()):
@@ -335,9 +342,16 @@ class Keywords:
         ids = set(keyword_ids)
         for keyword_id in ids:
             self.get(keyword_id)
-        ids.update(self.resolve(value) for value in additions)
+        ordered = list(dict.fromkeys(keyword_ids))
+        for value in additions:
+            keyword_id = self.resolve(value)
+            if keyword_id not in ordered:
+                ordered.append(keyword_id)
+        ids.update(ordered)
         if len(ids) > 100:
             raise ValueError('A photo cannot have more than 100 directly assigned keywords')
         for photo_id in photo_ids:
+            previous = {r[0] for r in self.db.execute('SELECT keyword_id FROM keyword_photos WHERE photo_id=?', (photo_id,))}
+            self.last_additions.extend(id_ for id_ in ordered if id_ not in previous)
             self.db.execute('DELETE FROM keyword_photos WHERE photo_id=?', (photo_id,))
             self.db.executemany('INSERT INTO keyword_photos VALUES(?,?)', [(photo_id, id_) for id_ in ids])

@@ -221,8 +221,31 @@ the entire dictionary into native or Python arrays. Large edits still hold the
 catalog lock; durable background metadata jobs remain pending.
 
 The keyword layer stores export flags but does not encode image metadata.
-Keyword sets/suggestions, Painter and metadata undo remain separate workflows;
+Keyword suggestions, Painter and metadata undo remain separate workflows;
 hierarchical catalog storage does not establish those.
+
+`keyword_sets.py` owns schema 13's local presets, selected-set state and bounded
+recent-keyword IDs. Shared presets use a separately versioned SQLite repository;
+`preset_paths.py` chooses Mac App Support, Windows LOCALAPPDATA or XDG defaults.
+The service accepts an injected root, and native regression runs always override
+it. The shared repository opens lazily, so ordinary catalog commands do not touch
+user preferences. Shared storage is the default; its catalog-storage preference
+switches repositories without copying or deleting presets. Catalog backup includes
+local sets and recent entries, but not the separate shared database.
+
+All preset commands acquire the shared transaction before the catalog transaction.
+Mutations change either preset repository or the catalog, never both (apart from
+first-use shared-store initialization). A captured opaque token binds the catalog,
+storage mode, both preset revisions, selected identity and keyword revision.
+Conflicting writers, deleted sets and stale scope/keyword state fail visibly.
+Names page at thirty without slot payloads; only the selected set's nine complete
+slots cross IPC. Slots contain text paths for cross-catalog use; recent entries
+hold stable IDs and resolve their current complete labels. Explicit additions
+record recency in the same metadata transaction; removals, file imports and folder
+synchronization do not fabricate recent user actions. Applying a preset preserves
+unrelated assignments and recipes, with all targets and the 100-tag bound checked
+before commit. Native drafts are separate, retain their revision through external
+refresh, and require explicit update/save or discard. No Lua preset is executed.
 
 `keyword_exchange.py` owns schema 12's manual person-keyword flag and dictionary
 file exchange. Bounded UTF-8 input is copied and fingerprinted outside the catalog

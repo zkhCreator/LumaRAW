@@ -98,6 +98,8 @@ def migrate(db):
     migrate_keyword_exports(db)
     from .keyword_exchange import migrate as migrate_keyword_exchange
     migrate_keyword_exchange(db)
+    from .keyword_sets import migrate as migrate_keyword_sets
+    migrate_keyword_sets(db)
 
 
 def text_predicate(text):
@@ -206,6 +208,9 @@ class Organization:
                 store.replace(ids, patch['keywords'])
             if 'keyword_ids' in patch:
                 store.replace_ids(ids, patch['keyword_ids'], patch.get('keyword_additions',()))
+            if 'keywords' in patch or 'keyword_ids' in patch:
+                from .keyword_sets import remember
+                remember(self.db, store.last_additions)
             for photo_id in ids:
                 if fields:
                     self.db.execute('UPDATE photos SET ' + ','.join(f'{key}=?' for key in fields)

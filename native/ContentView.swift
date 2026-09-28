@@ -25,6 +25,7 @@ struct ContentView: View {
                 FoldersSidebar()
                 CollectionsSidebar()
                 KeywordsSidebar()
+                KeywordSetsSidebar()
                 Section {
                     Button {s.libraryAction("index_library")} label:{Label("Update Library Index",systemImage:"arrow.triangle.2.circlepath")}.disabled(s.busy)
                     Button {s.backup()} label:{Label("Back Up Library…",systemImage:"externaldrive")}

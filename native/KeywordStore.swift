@@ -101,6 +101,7 @@ extension Store {
                 await loadKeywordPage(parent:id,offset:keywordPages[id]?.offset ?? 0)
             }
         }
+        await refreshKeywordSets()
     }
 
     func scheduleKeywordSearch() {

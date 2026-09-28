@@ -95,13 +95,16 @@ small raster files and separate disposable catalogs, then runs the
 24-assertion folder, 25-assertion keyword, 17-assertion folder-relocation and
 24-assertion folder-synchronization, 16-assertion export-metadata, and
 21-assertion photo-keyword-detail, 24-assertion complete-vocabulary and 23-assertion
-dictionary-exchange suites.
+dictionary-exchange suites, plus the keyword-set suite described below.
 Each suite has its own
 fresh image directory, so a relink test cannot move another suite's fixture. The library suite checks
 live smart membership, text search/sort, pagination, empty-filter selection,
 partial metadata writes and independent recipe/metadata conflict handling. JSON
 receipts stay in the ignored work directory. Without `--engine`, it uses the
 current Python environment's `lumaraw` executable.
+Every suite sets an isolated `LUMARAW_PRESETS_ROOT` as well as its catalog path.
+When using the standalone harness outside this runner, set this override too;
+the keyword sidebar initializes shared preset storage on first use.
 The folder suite adds 64 copies of its own generated fixture to test locating a
 photo beyond the first page; it never copies a personal photograph.
 
@@ -109,6 +112,27 @@ The keyword suite checks lazy hierarchy/pages, Grid/active-photo scope, mixed se
 captured create-and-assign targets, stale revisions, parent filters, ancestor
 rename, synonym lookup, external updates and empty-page polling. It exercises the
 real native Store and IPC without automating the rendered desktop.
+
+`test_keyword_sets.py` covers shared/cross-catalog and local storage, persistence,
+rename/delete, transient application, nine-slot recency with legacy IDs, all-target
+and capacity rollback, concurrent writers, bounded large-preset pages, genuine
+v12 migration rollback, catalog backup and newer shared-schema refusal. Path
+adapter checks mock Windows/XDG locations; they do not verify either OS runtime.
+`NativeKeywordSetRegression` exercises native state over real IPC, including
+Grid/active-photo application, saved versus draft slots, scope switching, stale
+draft/editor protection, recent-to-preset creation and paged selection. Rendered
+forms, Option-number dispatch, typing interference and VoiceOver remain unverified.
+
+```sh
+.venv/bin/python tests/run_native.py --work work/native-keyword-sets-01 --suite NativeKeywordSetRegression
+.venv/bin/python tests/keyword_sets_probe.py --work work/keyword-sets-10k --tags 10000 --sets 1000 --samples 30
+.venv/bin/python tests/keyword_sets_probe.py --work work/keyword-sets-100k --tags 100000 --sets 10000 --samples 30
+```
+
+The set probe uses sixty generated 8×8 photos and isolated preset storage. It
+measures warm service/SQL reads and repeat application of an already assigned tag,
+including state and photo-revision reads. Setup, IPC, pixels and desktop latency
+are excluded; peak process RSS and zero worker usage are recorded separately.
 
 The vocabulary suite exercises maximal Unicode paths and synonyms through real
 IPC, complete editor/parent initialization, preserved export options, sixty-row

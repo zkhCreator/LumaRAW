@@ -158,6 +158,30 @@ fail without publishing a partial file. Receipts remain compact; the dictionarie
 travel as explicit files, not oversized broker responses. Do not automatically
 retry a mutation after an uncertain response.
 
+## Keyword sets
+
+`list_keyword_sets` returns thirty names, the selected nine text slots, storage
+mode and an opaque `revision`. `offset` pages names; it does not select a preset.
+`save_keyword_set(name,slots,expected_revision)` creates a set; include `set_id`
+to update or rename that identity. Supply exactly nine strings, using empty strings
+for unused slots. Saving does not create or assign catalog keywords.
+
+`keyword_set_action` accepts `select` or `delete` with `set_id`, or `storage` with
+`store_with_catalog`. Every mutation needs the captured token. The reserved
+`recent` set cannot be edited/deleted, but its slots can seed a new preset.
+Shared storage is the default. Switching to catalog storage preserves shared sets
+in place; it does not copy them. Catalog backups contain local presets and recent
+IDs; shared presets use a separate user repository. Set `LUMARAW_PRESETS_ROOT`
+before launching an isolated broker to override platform storage defaults.
+
+`apply_keyword_set(slot,targets,expected_revision)` adds slot 1–9 to up to sixty
+revision-checked photos, preserving unrelated tags and recipes. Optional
+`draft_slots` applies a transient nine-slot edit to a custom set without saving it.
+Recent slots resolve by stable catalog identity. Empty slots, ambiguous text,
+stale state, missing targets or capacity errors commit nothing. Never retry an
+uncertain mutation response or silently replace the captured token. Adobe built-in
+preset contents, `.lrtemplate` exchange and Painter are not implemented.
+
 ## Folder sources
 
 `list_folders` pages visible roots or a `parent_id` at 60 items. Optional `search`,

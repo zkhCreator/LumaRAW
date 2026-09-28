@@ -17,7 +17,7 @@ LumaRAW references your originals without changing them. The SwiftUI app and you
 | Library | Folder tree/search/favorites/labels, ratings, flags, catalog metadata/keywords, regular/live smart collections, nested sets, Quick/target collections, SQL filters/sorting, manual/capture-time stacks, duplicate/missing indexing, virtual copies/shared snapshots, selective sync, and backup/restore |
 | Culling | Grid/Loupe/Compare/Survey, anchored page selections, active-photo review actions, linked or independent full-resolution comparison viewports |
 | Export | JPEG and 16-bit TIFF with embedded sRGB, Display P3, Adobe RGB, or ProPhoto RGB ICC profiles; frozen catalog XMP/keyword policies, persistent queue, pause/cancel/retry, and collision-safe filenames |
-| Agents | 79 MCP tools, equivalent JSON CLI commands, and a bundled skill; app and agent edits share conflict detection |
+| Agents | 83 MCP tools, equivalent JSON CLI commands, and a bundled skill; app and agent edits share conflict detection |
 
 ## Build and run
 
@@ -199,7 +199,7 @@ preserving catalog photos and originals.
 
 **Organize → Edit Metadata** edits title, caption, copyright, keywords and labels.
 For a batch, check only the fields to apply; keywords replace the selected photos'
-current keyword sets. These changes are catalog-only, with separate metadata
+current keyword assignments. These changes are catalog-only, with separate metadata
 revision checks; they do not write EXIF/XMP into originals. Warm grid pages reuse
 completed thumbnail paths in one service call without starting image workers.
 Mac grid and filmstrip thumbnails show the saved edits, including crop, rotation,
@@ -208,6 +208,24 @@ affected image; metadata edits reuse its thumbnail. External edits to any visibl
 photo are detected by bounded summary polling. Refresh Library rechecks source
 files and retries missing or failed thumbnails. Legacy CLI thumbnail requests
 default to source previews; pass `kind: "developed"` for the edited result.
+
+The **Keyword Set** sidebar provides nine slots and **Recent Keywords**. Click a
+slot or use its Option-number menu shortcut to add that keyword: Grid applies to
+the selection; Loupe, Compare, Survey and Develop apply to the active photo.
+Create a blank set or save the current slots as a preset. **Edit Set → Change**
+keeps a temporary draft; **Update Preset** saves edits and a changed name. Choosing
+another set discards the draft. **Discard Draft** returns to the saved version.
+Deletion removes the preset and preserves assigned photo keywords. Recent entries
+retain catalog identities, including renamed or legacy literal keywords.
+
+Sets are shared across catalogs by default. **Settings → Keyword Sets → Store
+Keyword Sets with This Catalog** switches storage without moving existing sets;
+switch back to access them. Catalog backups include local sets and recent entries,
+but shared presets remain in the separate user preset store. Platform directory
+selection is isolated behind an adapter; `LUMARAW_PRESETS_ROOT` explicitly overrides
+it for isolated tests or deployments. Built-in Adobe presets, `.lrtemplate` exchange,
+suggestions and Painter remain pending. Native shortcut dispatch and rendered
+interaction still require desktop acceptance.
 
 Virtual copies share the original file while keeping independent adjustments,
 ratings and catalog metadata. Use **Photo → Create Virtual Copies**, rename with

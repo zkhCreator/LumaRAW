@@ -51,7 +51,7 @@ def unpack(row):
     return row
 
 class Service:
-    def __init__(self,root,identity=None):
+    def __init__(self,root,identity=None,presets_root=None):
         self.root=Path(root).resolve();self.root.mkdir(parents=True,exist_ok=True)
         self.cache=self.root/'cache';self.cache.mkdir(exist_ok=True)
         self.lock=threading.RLock();self.image_lock=threading.Lock();self.state_lock=threading.RLock()
@@ -61,6 +61,8 @@ class Service:
         self.relocation_lock=threading.Lock()
         self.relocation_cancel={}
         self.folder_sync=FolderSyncRunner(self)
+        from .keyword_sets import KeywordSets
+        self.keyword_sets=KeywordSets(self,presets_root)
         self.last_activity=time.monotonic()
         with self.catalog() as c:
             Relocations(c).recover()
@@ -113,6 +115,8 @@ class Service:
         self.last_activity=time.monotonic();p={} if p is None else p
         if method not in TOOLS: raise ValueError('Unknown operation: '+method)
         jsonschema.validate(p,TOOLS[method]['inputSchema'])
+        if method in ('list_keyword_sets','save_keyword_set','keyword_set_action','apply_keyword_set'):
+            return self.keyword_sets.dispatch(method,p)
         if method in ('prepare_folder_sync','get_folder_sync','get_folder_sync_metadata','scan_folder_sync','select_folder_sync_items','apply_folder_sync','cancel_folder_sync'):
             return self.folder_sync.dispatch(method,p)
         if method=='status':

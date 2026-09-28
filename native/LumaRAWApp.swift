@@ -69,6 +69,12 @@ import AppKit
             }
             CommandMenu("Metadata") {
                 KeywordExchangeActions().environmentObject(store)
+                Divider()
+                ForEach(1...9,id:\.self) { slot in
+                    Button("Apply Keyword Set Slot \(slot)") { Task { await store.applyKeywordSlot(slot) } }
+                        .keyboardShortcut(KeyEquivalent(Character(String(slot))),modifiers:.option)
+                        .disabled(!store.canApplyKeywordSlot(slot))
+                }
             }
             CommandGroup(after:.toolbar) {
                 Button("Show Adjustment Inspector"){store.showInspector.toggle()}.keyboardShortcut("i",modifiers:[.command,.option])

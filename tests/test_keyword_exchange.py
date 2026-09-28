@@ -191,7 +191,8 @@ def test_genuine_v11_person_flag_migration_and_backup(tmp_path,monkeypatch):
     with c.db:c.db.execute('UPDATE keywords SET is_person=1 WHERE id=?',(id_,))
     backup_catalog(c,tmp_path/'backup');c.close()
     restored=Catalog(restore_catalog(tmp_path/'backup',tmp_path/'restored'))
-    assert restored.db.execute('PRAGMA user_version').fetchone()[0]==12
+    from lumaraw.runtime import CATALOG_VERSION
+    assert restored.db.execute('PRAGMA user_version').fetchone()[0]==CATALOG_VERSION
     assert restored.db.execute('SELECT is_person FROM keywords WHERE id=?',(id_,)).fetchone()[0]==1
     restored.close()
 

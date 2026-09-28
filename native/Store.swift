@@ -57,6 +57,11 @@ import UniformTypeIdentifiers
     @Published var keywordPages: [Int:KeywordPage]=[:]
     @Published var expandedKeywords: Set<Int>=[]
     @Published var keywordBusy=false
+    @Published var keywordSets: KeywordSetState?
+    @Published var keywordSetBusy=false
+    @Published var keywordSetDraft: [String]?
+    var keywordSetDraftRevision: String?
+    var keywordSetGeneration=0
     @Published var showKeywordEditor=false
     @Published var keywordEditorLoading=false
     var keywordEditorGeneration=0

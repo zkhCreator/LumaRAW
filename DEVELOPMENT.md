@@ -90,6 +90,14 @@ when a clear function is more maintainable. Avoid unrelated formatting churn.
   a snapshot, preserve UTF-8, report options omitted by text, and never publish a
   partial file or overwrite an existing destination. Reject unrepresentable names
   instead of silently changing them. Person classification is manual metadata.
+- Keyword presets store nine text slots; recent entries store stable catalog IDs.
+  Saving a preset never creates vocabulary. Applying a slot validates preset scope,
+  captured revision, all photo revisions and capacity in one catalog transaction.
+  Global preset storage must be injectable; tests must not write user preferences.
+  Acquire shared preset storage before the catalog lock consistently. Switching
+  global/catalog storage never moves existing sets. Keep temporary native edits
+  separate from persisted presets and preserve their captured revision after an
+  external refresh; never silently rebase stale drafts onto newer settings.
 
 ## Engine changes and handoff
 
@@ -140,6 +148,7 @@ runtime until a concrete workflow demonstrates a net benefit.
 | Decode | LibRaw/rawpy | Same LibRaw ABI or independently validated decoder | Camera fixtures, white balance, orientation and precision |
 | Color | Portable matrices + ICC assets | OS display adapter with same tagged output | Profile correctness and calibrated display tests |
 | Files/publication | pathlib + atomic non-overwriting publication | Platform filesystem adapter | Unicode/long paths, offline volumes, no overwritten originals/exports |
+| Shared presets | Portable SQLite + App Support path adapter | Same repository with LOCALAPPDATA/XDG path adapter | Cross-catalog revisions, scope isolation, catalog backup, injected test roots |
 
 If profiling justifies moving a hot algorithm to C++ or Rust, extract only that
 algorithm behind a narrow buffer/recipe contract, retain the CPU reference and

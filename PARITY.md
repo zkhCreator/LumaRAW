@@ -41,7 +41,7 @@ gaps. Nothing below is full Lightroom parity merely because historical tests pas
 | --- | --- | --- |
 | Import and catalogs | Partial: referenced originals, backup/restore | Import preview/selection, copy workflows, metadata/develop presets, tethered capture, catalog switching/merge |
 | Library navigation | Partial: bounded grid/filmstrip, folder tree/search/favorites/labels, durable missing-folder relocation and folder synchronization, direct/recursive sources, filters/sorting, regular/smart/Quick collections and nested sets | Multi-source selection, complete sync Import Dialog/duplicate policy, folder move/rename, relocation overlap/collision handling, collection drag/drop/color labels, full smart criteria/import-export, source-selection memory, desktop acceptance |
-| Organization | Partial: duplicate/missing detection, hierarchical keywords/synonyms/export flags/Will Export preview, text/CSV vocabulary exchange and manual person tags, title/caption/copyright, labels, batch metadata, virtual copies, manual/split/capture-time scoped stacks | Keyword policy/file reference acceptance, sets/undo/Painter, complete IPTC, stack interaction acceptance, rename and sidecars |
+| Organization | Partial: duplicate/missing detection, hierarchical keywords/synonyms/export flags/Will Export preview, text/CSV vocabulary exchange and manual person tags, custom nine-slot keyword sets/recent entries/shared or catalog storage, title/caption/copyright, labels, batch metadata, virtual copies, manual/split/capture-time scoped stacks | Keyword policy/file and preset reference acceptance, built-in sets/suggestions/undo/Painter, complete IPTC, stack interaction acceptance, rename and sidecars |
 | Culling | Partial: Loupe/Compare/Survey, linked detail, anchored page selection | Desktop acceptance, cross-page selection, Develop reference view, auto advance, persistent workspace state |
 | Basic development | Partial: light/WB/color | Calibrated absolute WB, eyedropper, texture/clarity/dehaze, complete HSL/B&W and color grading |
 | Curves and profiles | Partial: custom composite curve, LUT/ICC | Interactive RGB curves, camera/profile browser, compatible preset import/export |
@@ -62,8 +62,9 @@ gaps. Nothing below is full Lightroom parity merely because historical tests pas
 
 ## Active increment
 
-Keyword vocabulary file exchange and manual person classification. Keyword sets,
-reference-file interoperability and the remaining inventory stay in scope.
+Custom keyword sets, recent entries and replaceable shared/catalog preset storage.
+Reference preset contents/exchange, suggestions, Painter and the remaining full
+inventory stay in scope; this increment does not complete keyword or product parity.
 
 ## Evidence log
 
@@ -1124,3 +1125,68 @@ The initial transaction still holds the catalog lock for its measured duration;
 this is not a claim of zero interactive contention. Reproduce with
 tests/keyword_exchange_probe.py. Keyword sets, suggestions, Painter, metadata
 undo and the remaining non-AI feature inventory are still pending.
+
+### Custom keyword sets and preset storage
+
+Implemented custom nine-slot presets, recent keywords, creation from current
+slots, editing/rename, explicit update/save-as-new, deletion, transient Change
+drafts and additive slot application. The sidebar and Metadata menu expose
+Option-number shortcuts with keypad ordering. Grid targets the captured selection;
+other viewing modes use the active photo. Recent entries store nine catalog IDs,
+preserving renamed and legacy literal keywords rather than reparsing their labels.
+Preset deletion preserves photo assignments. Applying validates preset and photo
+revisions, ambiguity and capacity before one transaction commits.
+
+Shared presets use a portable, separately versioned SQLite repository. The
+platform path adapter chooses Mac App Support or replaceable Windows/XDG paths;
+tests inject isolated roots. The catalog-storage preference changes the repository
+without moving existing presets. Catalog-local sets and recent entries survive
+backup/restore. Shared and catalog revisions, scope, selected identity and keyword
+state bind each mutation token; concurrent writers produce a visible conflict.
+Native drafts retain their original token through external refresh, and selection
+changes discard them. Thirty preset names and only nine selected slots cross IPC.
+
+This increment follows Adobe's documented custom sets and storage behavior; it
+does **not** establish full keyword-set parity. Built-in Outdoor/Portrait/Wedding
+contents, `.lrtemplate` import/export, suggestions, Painter, cycling shortcuts,
+precise recency ordering and reference-application draft semantics remain open.
+Real Option-number dispatch, text-field interference, rendered controls, VoiceOver
+and macOS 14 runtime were not verified. No desktop automation was attempted.
+
+Validation: **336 Python tests passed, no skips**, with the pinned Nikon D3S NEF
+and required Metal dispatch. Twelve set-specific tests cover concurrent catalogs,
+scope persistence, stale tokens, legacy recency identities, malformed/ambiguous
+application, capacity and injected SQL rollback, maximum slot payloads, genuine
+v12 migration rollback, backup/restore and future shared-schema refusal. A test-only
+variable reuse and an outdated restored-schema assertion were corrected before the
+passing full suite; the initial non-escalated IPC run could not create its socket.
+
+The Mac app builds for macOS 14 and passes local ad-hoc signature verification
+on macOS 26.6.2. Generation **14**, schema **13**, **83 tools**; packaged manifest
+`6f590d5d8982d816771672c1389fe8770b6064b91613a23fdf5b203a7b9d5d71`
+matches source. The source-native set suite passes **29 assertions**. Five packaged
+suites pass **108 assertions**: sets, keyword organization, complete photo-keyword
+details, dictionary exchange and connection/handoff. No compiler warnings/errors
+appear in the final build/native logs. The bundled usage guide was refreshed, the
+app re-signed and its signature reverified. The keyword-set suite then passed its
+29 assertions again against the final artifact. The engine manifest matches source.
+Public checks covered 262 source files without findings, including the extracted
+archive. Remote refresh found no unmerged branches.
+
+Warm service/SQLite measurements, 30 samples, macOS 26.6.2 arm64 with 128 GB RAM.
+Sixty generated 8×8 photos serve as metadata targets; no image worker is started.
+
+| Operation (median / p95) | 10,000 tags / 1,000 presets | 100,000 tags / 10,000 presets |
+| --- | ---: | ---: |
+| First preset page | 1.165 / 1.361 ms | 1.227 / 1.420 ms |
+| Last preset page | 1.181 / 1.340 ms | 1.363 / 1.567 ms |
+| Reapply one tag to sixty photos | 5.386 / 5.487 ms | 5.478 / 5.691 ms |
+| Recent keyword page | 1.187 / 1.530 ms | 1.390 / 1.623 ms |
+| Peak process RSS | 35.58 MB | 37.98 MB |
+
+Repeat application includes captured preset and photo-revision reads; the tag is
+already assigned. Setup, first-time creation, IPC, pixels and rendered latency are
+excluded. First-page responses are 1,338 / 1,339 bytes for these short labels;
+the regression with nine 4,096-character Unicode slots remains below 160 KB.
+Reproduce with tests/keyword_sets_probe.py. This is bounded metadata performance,
+not a RAW processing or end-to-end UI speed claim.

@@ -145,6 +145,12 @@ struct SettingsView:View {
             Section("Processing"){Slider(value:$s.budget,in:256...16384,step:256){Text("Image Worker Budget")}onEditingChanged:{if !$0{Task{do{_=try await Backend.call("settings",["budget_mb":Int(s.budget)]);await s.refreshMemory()}catch{s.error=error.localizedDescription}}}};Text("Configured limit: \(Int(s.budget)) MB · Effective budget: \(s.effectiveBudget) MB").font(.caption).foregroundStyle(.secondary)
                 Text("Available memory: about \(Int(s.availableMemory)) MB. Each job uses the lower of the configured limit and 70% of available memory. RSS is sampled, not a system hard limit.").font(.caption).foregroundStyle(.secondary)
                 Button("Refresh Memory Status"){Task{await s.refreshMemory()}}}
+            Section("Keyword Sets") {
+                Toggle("Store Keyword Sets with This Catalog",isOn:Binding(get:{s.keywordSets?.storeWithCatalog ?? false},set:{value in
+                    Task { _=await s.keywordSetAction("storage",storeWithCatalog:value) }
+                })).disabled(s.keywordSets == nil || s.keywordSetBusy)
+                Text("New sets use the selected location. Existing sets are kept in their original location. Shared sets are available to other catalogs.").font(.caption).foregroundStyle(.secondary)
+            }
             Section("Library"){Text(Backend.catalog).font(.caption).textSelection(.enabled);Button("Show in Finder"){NSWorkspace.shared.open(URL(fileURLWithPath:Backend.catalog))}}
             Section("Background Service") {
                 Button(s.connectingService ? "Connecting…":"Connect with This Version") { Task { await s.activateCurrentService() } }.disabled(s.connectingService)
@@ -152,6 +158,6 @@ struct SettingsView:View {
                 if !s.serviceConnectionMessage.isEmpty { Text(s.serviceConnectionMessage).font(.caption) }
             }
             Section("Color"){Text("Non-destructive editing leaves originals unchanged. NEF decoding uses LibRaw; HE / HE* support and camera-specific color require testing.").font(.callout).foregroundStyle(.secondary)}
-        }.formStyle(.grouped).padding(12).task{await s.refreshMemory()}
+        }.formStyle(.grouped).padding(12).task{await s.refreshMemory();await s.refreshKeywordSets()}
     }
 }
