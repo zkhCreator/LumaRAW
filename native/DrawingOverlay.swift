@@ -12,7 +12,7 @@ struct DrawingOverlay:View {
     @State private var points:[CGPoint]=[]
     var canDraw: Bool {
         guard let photo=s.photo,let geometry=s.previewGeometry else { return false }
-        return !s.rendering && !s.loading && !s.hasPendingEdits && !s.orientationBusy &&
+        return !s.rendering && !s.loading && !s.hasPendingEdits && !s.orientationBusy && !s.developPresetBusy &&
             !geometry.detail && geometry.photoID == photo.id && geometry.revision == photo.revision && geometry.orientation == photo.orientation
     }
     var rect:CGRect {

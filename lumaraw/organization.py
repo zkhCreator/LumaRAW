@@ -104,6 +104,8 @@ def migrate(db):
     migrate_painter(db)
     from .orientation import migrate as migrate_orientation
     migrate_orientation(db)
+    from .develop_presets import migrate as migrate_develop_presets
+    migrate_develop_presets(db)
 
 
 def text_predicate(text):

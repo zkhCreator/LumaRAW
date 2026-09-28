@@ -1,5 +1,5 @@
 // Purpose: persistent keyword shortcuts and bounded native Painter stroke state.
-// Inputs: captured metadata, orientation or target revisions and thumbnail IDs.
+// Inputs: captured metadata, orientation, preset or target revisions and thumbnail IDs.
 // Outputs: one atomic service command per mouse-up or selected-photo shortcut.
 // No pointer geometry, SQL or pixel processing. Hits never select thumbnails; removing
 // members can prune selection when their source refreshes. Never retry stale writes
@@ -60,8 +60,8 @@ extension Store {
         painterStroke?.configuration.targetCollection?.target.name ?? collectionState?.target.name ?? "Unavailable"
     }
     var painterCanReceive: Bool {
-        painterEnabled && painterInGrid && !painterBusy && !orientationBusy && !keywordBusy &&
-            painterKeywordPicker == nil && shortcutEditor == nil
+        painterEnabled && painterInGrid && !painterBusy && !orientationBusy && !developPresetBusy && !keywordBusy &&
+            painterKeywordPicker == nil && shortcutEditor == nil && !showDevelopPresets
     }
     var painterSource: String {
         let filters=(try? JSONSerialization.data(withJSONObject:libraryFilters,options:.sortedKeys)).flatMap { String(data:$0,encoding:.utf8) } ?? ""
@@ -134,6 +134,7 @@ extension Store {
         case "flag": value=painterFlag
         case "label": value=painterLabel
         case "orientation": value=painterOrientationAction
+        case "develop_preset": value=painterDevelopPreset
         default: value=nil
         }
         if painterKind == "keywords",keywordShortcut?.ids.isEmpty != false {
@@ -142,8 +143,11 @@ extension Store {
         if painterKind == "target_collection",collectionState == nil {
             error="Refresh the target collection before painting";return false
         }
-        if painterKind == "orientation",hasPendingEdits {
-            error="Finish saving adjustments before rotating photos";return false
+        if painterKind == "develop_preset",painterDevelopPreset == nil {
+            error="Choose a Develop preset before painting";return false
+        }
+        if ["orientation","develop_preset"].contains(painterKind),hasPendingEdits {
+            error="Finish saving adjustments before painting edits";return false
         }
         let configuration=PainterConfiguration(kind:painterKind,value:value,erase:painterSupportsErasing && erase,
             shortcutRevision:painterKind == "keywords" ? keywordShortcut?.revision:nil,
@@ -179,6 +183,9 @@ extension Store {
     }
 
     private func submitPaint(targets: [Photo],configuration: PainterConfiguration) -> Task<Void,Never>? {
+        if configuration.kind == "develop_preset",let preset=configuration.value as? DevelopPresetSelection {
+            return submitDevelopPreset(targets:targets,selection:preset)
+        }
         if configuration.kind == "orientation",let action=configuration.value as? String {
             return submitOrientation(targets:targets,action:action)
         }

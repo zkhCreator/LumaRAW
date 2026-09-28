@@ -17,7 +17,7 @@ LumaRAW references your originals without changing them. The SwiftUI app and you
 | Library | Folder tree/search/favorites/labels, ratings, flags, catalog metadata/keywords, regular/live smart collections, nested sets, Quick/target collections, SQL filters/sorting, manual/capture-time stacks, duplicate/missing indexing, virtual copies/shared snapshots, selective sync, and backup/restore |
 | Culling | Grid/Loupe/Compare/Survey, anchored page selections, active-photo review actions, linked or independent full-resolution comparison viewports |
 | Export | JPEG and 16-bit TIFF with embedded sRGB, Display P3, Adobe RGB, or ProPhoto RGB ICC profiles; frozen catalog XMP/keyword policies, persistent queue, pause/cancel/retry, and collision-safe filenames |
-| Agents | 90 MCP tools, equivalent JSON CLI commands, and a bundled skill; app and agent edits share conflict detection |
+| Agents | 95 MCP tools, equivalent JSON CLI commands, and a bundled skill; app and agent edits share conflict detection |
 
 ## Build and run
 
@@ -235,7 +235,7 @@ focused photo view use the current selection/active-photo scope, even with Paint
 put away. Setting the shortcut does not tag photographs.
 
 In Grid view, enable **Painter** (Command-Option-K), choose Keywords, Rating, Flag,
-Color Label, Target Collection or Rotation, then click/drag across thumbnails. Touched thumbnails highlight;
+Color Label, Target Collection, Rotation or Develop Preset, then click/drag across thumbnails. Touched thumbnails highlight;
 mouse-up applies one transaction without selecting the touched photos. Hold Option
 before a keyword stroke to remove only the shortcut's keywords. Choose None or
 Unflagged to clear the other attributes. Esc puts the tool away and discards an
@@ -247,9 +247,9 @@ switch sets to add more, and review/remove choices before **Load Painter**. This
 replaces the loaded shortcut; Cancel leaves it unchanged. Browsing does not change
 the sidebar's active preset. Recent choices retain IDs, including legacy literal
 names; custom choices retain the text shown when selected. The draft is bounded
-to one hundred choices. Metadata/Develop presets,
-scrolling between pages, and rendered pointer/keyboard acceptance remain
-pending. Originals and Develop recipes remain unchanged.
+to one hundred choices. Metadata presets, scrolling between pages, and rendered
+pointer/keyboard acceptance remain pending. Keyword, rating, flag, label and
+collection strokes preserve Develop recipes; originals remain unchanged in every mode.
 
 **Target Collection** paints into the current regular collection or Quick
 Collection. Use **Set as Target Collection** on a collection to choose it. The
@@ -277,6 +277,28 @@ recipe JSON retains canonical coordinates and the legacy Develop `rotation` fiel
 Calibration rectangles refer to full EXIF-oriented sources before catalog/Develop
 edits. Rendered desktop interaction and Lightroom Mac reference acceptance remain
 unverified.
+
+**Photo → Develop Presets…** (also in the Develop inspector) opens the preset
+library. Create a preset from the current photo, enter a name/group and select
+individual settings; Check All/None controls that selection. Applying preserves
+unchecked settings. Browse/search thirty presets at a time, filter favorites or
+groups, show/hide groups, and duplicate, rename, move, update or delete custom
+presets. The five LumaRAW built-ins can be favorited and duplicated. Existing-name
+conflicts require an explicit Keep Both or Replace Existing choice.
+
+**Apply to Photos** uses all selected photos in Grid and the active photo in other
+views. Each changed photo receives ordinary Develop undo history; applying equal
+settings adds no history. Catalog rotation, descriptive metadata, originals and
+queued exports are preserved. In Grid, **Load Painter** captures the chosen preset;
+mouse-up applies it once per touched photo. Later preset or photo changes reject
+the whole stroke, and refreshing the browser does not silently update that capture.
+
+Develop presets are shared across catalogs by default. **Store Develop Presets
+with This Catalog**, in the library or Settings, switches to catalog-local presets
+without moving existing ones. LUT assets are retained with their preset and copied
+into a target catalog on application; local presets and assets are backed up with
+the catalog. Hover previews, Amount, ISO-adaptive presets, Adobe XMP/`.lrtemplate`
+exchange and import-time application remain pending.
 
 Virtual copies share the original file while keeping independent adjustments,
 ratings and catalog metadata. Use **Photo → Create Virtual Copies**, rename with

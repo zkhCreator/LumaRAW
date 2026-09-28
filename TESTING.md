@@ -543,6 +543,35 @@ an application-cache warmup does not establish cold OS/disk/GPU behavior. Use an
 explicit read-only RAW and new output directory. Do not run benchmarks alongside
 other tests/builds. macOS 14 runtime and Lightroom Mac reference remain separate.
 
+## Develop presets
+
+`test_develop_presets.py` covers partial fields/no-op/history, group/favorite/name
+policies, shared/catalog-local scope, genuine schema-15 rollback/retry, captured
+revisions, all-target and injected SQL rollback, bounded pages without full photo
+materialization, camera compatibility and LUT backup/restore. Asset tests change
+source/target/storage between validation passes, prove catalog reads remain
+available while staging, and reject corrupt source/destination or symlink assets
+without overwriting files or editing any target.
+
+`NativeDevelopPresetRegression` checks real IPC and immutable editor/Painter
+captures, Grid/active scope, busy and pending-edit guards, no-op reapply, mouse-up
+state submission, cancellation, stale batch rejection, filters and storage. Its
+state-driven gestures do not establish actual pointer/keyboard dispatch or rendered
+desktop, VoiceOver, Lightroom reference or macOS 14 runtime acceptance.
+
+```sh
+.venv/bin/python -m pytest -q tests/test_develop_presets.py
+.venv/bin/python tests/run_native.py --work work/new-develop-preset-native --suite NativeDevelopPresetRegression
+.venv/bin/python tests/develop_preset_probe.py --work work/new-develop-preset-probe --photos 100000 --presets 10000 --samples 30
+```
+
+The probe uses sixty generated 8×8 originals, one hundred depth-32 Unicode keyword
+assignments per target and synthetic catalog/preset rows. It measures bounded
+first/last/search pages, one changed application, equal reapplication and two
+alternating changed applications; capture reads are included. It verifies bounded
+history, unchanged metadata/originals and zero image workers. Setup, IPC, LUT I/O,
+preview rendering and UI latency are excluded. Run after builds/tests finish.
+
 ## Public source check
 
 ```sh

@@ -27,6 +27,14 @@ import UniformTypeIdentifiers
     @Published var previewGeometry: PhotoPreviewGeometry?
     @Published var orientationState: PhotoOrientationState?
     @Published var orientationBusy=false
+    @Published var developPresetPage: DevelopPresetPage?
+    @Published var developPresetQuery: [String:Any]=[:]
+    @Published var developPresetBusy=false
+    @Published var showDevelopPresets=false
+    @Published var developPresetEditor: DevelopPresetEditorSource?
+    @Published var painterDevelopPreset: DevelopPresetSelection?
+    var developPresetReadGeneration=0
+    var developPresetEditorGeneration=0
     var orientationReadGeneration=0
     @Published var before: NSImage?
     @Published var histogram: [[Double]] = []
@@ -340,7 +348,7 @@ import UniformTypeIdentifiers
         }
     }
     func set(_ key:String,_ value:Any) {
-        guard !loading,!browsing,!orientationBusy,let p=photo,p.id==selected else{return}
+        guard !loading,!browsing,!orientationBusy,!developPresetBusy,let p=photo,p.id==selected else{return}
         saveFailed=false;recipe[key]=value;pendingPatch[key]=value
         if !editing {scheduleCommit()}
     }
@@ -381,7 +389,7 @@ import UniformTypeIdentifiers
         apply(values.filter{keys.contains($0.key)})
     }
     func undo() {
-        guard let p=photo,p.id==selected,!loading,!browsing,!editing,!orientationBusy,pendingPatch.isEmpty else{return}
+        guard let p=photo,p.id==selected,!loading,!browsing,!editing,!orientationBusy,!developPresetBusy,pendingPatch.isEmpty else{return}
         editing=true
         Task{await recipeMutation("undo_photo",["photo_id":p.id,"expected_revision":p.revision],photoID:p.id)}
     }

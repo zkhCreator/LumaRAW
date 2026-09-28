@@ -24,6 +24,7 @@ Official references checked September 2026:
 - [Folder hierarchy, subfolder inclusion and synchronization](https://helpx.adobe.com/lightroom-classic/desktop/manage-catalogs-and-files/create-folders.html)
 - [Missing-photo and missing-folder relinking](https://helpx.adobe.com/lightroom-classic/desktop/manage-catalogs-and-files/locate-missing-photos.html)
 - [Metadata storage and supported workflows](https://helpx.adobe.com/lightroom-classic/desktop/organize-photos-in-lightroom-classic/metadata-basics-actions.html)
+- [Metadata presets, selective fields and Painter application](https://helpx.adobe.com/lightroom-classic/desktop/organize-photos-in-lightroom-classic/advanced-metadata-actions.html)
 - [XMP basic properties](https://developer.adobe.com/xmp/docs/xmp-namespaces/xmp/) and [Dublin Core properties](https://developer.adobe.com/xmp/docs/xmp-namespaces/dc/)
 - [Hierarchical keywords, synonyms and export options](https://helpx.adobe.com/lightroom-classic/desktop/organize-photos-in-lightroom-classic/keywords.html)
 - [Keyword shortcuts, Painter and keyboard behavior, Adobe's Julieanne Kost](https://jkost.com/blog/2024/07/working-with-keywords-in-lightroom-classic-2.html)
@@ -32,6 +33,7 @@ Official references checked September 2026:
 - [Painter shortcuts and Option removal](https://jkost.com/blog/2019/10/using-the-painter-tool-in-lightroom-classic.html)
 - [Library rotation, flipping and Painter options](https://helpx.adobe.com/lightroom-classic/desktop/manage-catalogs-and-files/photos.html)
 - [Preset storage locations and catalog storage option](https://helpx.adobe.com/lightroom-classic/desktop/kb/preference-file-and-other-file-locations.html)
+- [Develop preset creation, groups, favorites, selected settings and application](https://helpx.adobe.com/lightroom-classic/desktop/process-and-develop-photos/apply-presets.html)
 - [Firsthand dictionary import behavior and preserved existing attributes](https://community.adobe.com/questions-675/importing-keywords-into-lightroom-classic-as-non-exported-keywords-1638903)
 - [Firsthand CSV field layout and tab indentation](https://community.adobe.com/questions-675/lightroom-classique-15-3-unable-to-import-keywords-from-csv-file-1560047)
 - [Export metadata and hierarchy settings](https://helpx.adobe.com/lightroom-classic/desktop/export-photos/export-files-disk-or-cd.html)
@@ -46,14 +48,14 @@ gaps. Nothing below is full Lightroom parity merely because historical tests pas
 | --- | --- | --- |
 | Import and catalogs | Partial: referenced originals, backup/restore | Import preview/selection, copy workflows, metadata/develop presets, tethered capture, catalog switching/merge |
 | Library navigation | Partial: bounded grid/filmstrip, folder tree/search/favorites/labels, durable missing-folder relocation and folder synchronization, direct/recursive sources, filters/sorting, regular/smart/Quick collections and nested sets | Multi-source selection, complete sync Import Dialog/duplicate policy, folder move/rename, relocation overlap/collision handling, collection drag/drop/color labels, full smart criteria/import-export, source-selection memory, desktop acceptance |
-| Organization | Partial: duplicate/missing detection, hierarchical keywords/synonyms/export flags/Will Export preview, text/CSV vocabulary exchange and manual person tags, custom nine-slot keyword sets/recent entries/shared or catalog storage, multi-keyword shortcuts and keyword/rating/flag/label/target-collection/rotation Painter strokes, independent catalog rotation/flips, title/caption/copyright, labels, batch metadata, virtual copies, manual/split/capture-time scoped stacks | Keyword policy/file and preset reference acceptance, built-in sets/suggestions/undo, remaining Painter modes and desktop acceptance, complete IPTC, stack interaction acceptance, rename and sidecars |
+| Organization | Partial: duplicate/missing detection, hierarchical keywords/synonyms/export flags/Will Export preview, text/CSV vocabulary exchange and manual person tags, custom nine-slot keyword sets/recent entries/shared or catalog storage, multi-keyword shortcuts and keyword/rating/flag/label/target-collection/rotation/Develop-preset Painter strokes, independent catalog rotation/flips, title/caption/copyright, labels, batch metadata, virtual copies, manual/split/capture-time scoped stacks | Keyword policy/file and preset reference acceptance, built-in sets/suggestions/undo, remaining Painter modes and desktop acceptance, complete IPTC, stack interaction acceptance, rename and sidecars |
 | Culling | Partial: Loupe/Compare/Survey, linked detail, anchored page selection | Desktop acceptance, cross-page selection, Develop reference view, auto advance, persistent workspace state |
 | Basic development | Partial: light/WB/color | Calibrated absolute WB, eyedropper, texture/clarity/dehaze, complete HSL/B&W and color grading |
 | Curves and profiles | Partial: custom composite curve, LUT/ICC | Interactive RGB curves, camera/profile browser, compatible preset import/export |
 | Detail and optics | Partial: noise/sharpen, manual lens | Complete manual detail controls, automatic lens profiles, bounded full-resolution acceptance |
 | Geometry | Partial: crop/straighten/perspective, independent rotation/flips with attached masks and displayed crop ratios | Interactive retained handles, guided transforms, full crop state and rendered/reference parity |
 | Local editing | Partial: radial/gradient/brush/luma | Mask list/edit/reorder/intersection, range masks, clone/heal, red-eye (non-AI) |
-| History and presets | Partial: 50-step Develop undo, separate 50-batch orientation undo, shared named snapshots | Unified Undo/Redo, navigable history, preset management and import-time/batch application |
+| History and presets | Partial: 50-step Develop undo, separate 50-batch orientation undo, shared named snapshots, partial Develop presets/groups/favorites/shared or local storage, batch/Painter application | Unified Undo/Redo, navigable history, preset hover preview/Amount/ISO adaptation/Adobe exchange, import-time application and reference acceptance |
 | Preview/performance | Partial: Metal, proxies, 1:1 viewport, developed thumbnail fast path | Real-RAW catalog/slider latency, offline previews, cache controls and desktop acceptance |
 | Export | Partial: JPEG/16-bit TIFF, ICC, durable jobs with frozen catalog XMP and keyword hierarchy options | Presets, complete EXIF/IPTC/contact/location metadata policies, watermark, additional formats, publish workflows |
 | External editing and video | Missing | External-editor setup and derivative round trips; supported video import/playback, frame capture, trimming and export |
@@ -67,10 +69,10 @@ gaps. Nothing below is full Lightroom parity merely because historical tests pas
 
 ## Active increment
 
-Independent Library rotation/flips, orientation Painter, attached crop/mask
-coordinates and frozen exports. Rendered Mac/reference acceptance, unified Undo/
-Redo, remaining Painter modes, reference presets/exchange, suggestions and the full
-inventory stay in scope. This does not complete product parity.
+Develop preset management, selected-field application, shared/catalog-local
+storage and preset Painter strokes. Rendered Mac/reference acceptance, hover
+preview, Amount, ISO adaptation, Adobe exchange, import-time application, unified
+Undo/Redo and the full inventory stay in scope. This does not complete product parity.
 
 ## Evidence log
 
@@ -1486,3 +1488,80 @@ claim. Reproduce with `tests/orientation_probe.py`.
 The public source audit covers **279 files** with no findings. Generated images,
 catalogs, outputs, performance receipts and signed app bundles remain local and
 outside the source publication allowlist.
+
+### Partial Develop presets and captured Painter application
+
+Adobe's preset documentation describes creating presets from selected settings,
+updating from the current photograph, groups, favorites, storage choice and
+additional preview/Amount/ISO/file-exchange workflows. This increment implements
+the first group of workflows using LumaRAW's existing recipe contract; it does not
+establish Adobe parameter or rendering equivalence.
+
+Schema 16 adds catalog-local presets, groups and revisions. Default shared storage
+uses a separate SQLite repository behind the existing platform path adapter and
+injectable test root. Switching scope preserves both libraries. Bounded pages
+return thirty preset summaries and thirty groups, without recipe patches. Native
+menus/inspector expose create/update with individual field selection, Check All/
+None, search, favorites, group filtering/visibility/rename, duplicate/rename/move/
+delete, explicit duplicate-name policy, and shared/catalog storage. The five
+existing LumaRAW looks are immutable built-ins that can be duplicated or favorited.
+
+Application merges saved fields into each captured target recipe in one atomic
+transaction. It preserves unchecked settings, metadata, independent orientation,
+original bytes and frozen jobs, records ordinary Develop history for changed
+photos and skips equal recipes. Grid uses selected photos; other views use the
+active photo. Painter captures the preset-library token and touched photo visual
+revisions, deduplicates hits and submits once at mouse-up without changing the
+selection. Refresh does not rebase loaded presets or open editors. Concurrent
+preset/scope/photo edits reject the entire action with no automatic replay.
+
+Immutable, checksum-addressed LUTs are retained with saved presets and copied into
+the target catalog when applying. Asset I/O runs outside SQL locks; source/preset/
+target revisions are rechecked afterward. Corrupt/replaced assets fail without
+overwriting an existing file. Catalog backup/restore includes local presets and
+rebinds LUT paths. Camera-bound profile presets require compatible target identity.
+
+Hover preview, Amount scaling, ISO-adaptive presets, Adobe XMP/legacy preset import
+and export, group deletion/export, import-time application and complete reference
+preset content remain open. No desktop automation was performed: actual rendered
+dialogs, pointer/shortcut dispatch, VoiceOver, macOS 14 runtime and Lightroom
+Classic Mac reference acceptance remain unverified. This is not full preset parity.
+
+Final verification: **416 Python tests passed, no skips**, including the fixed
+Nikon D3S NEF and required Metal checks. Twelve preset tests cover the domain,
+assets and schema migration. The source-native preset suite passes **28 assertions**.
+Seven suites against the self-contained packaged engine pass **187 assertions**:
+presets 28, state races 15, Painter 36, orientation 51, keyword sets 29, target
+Painter 18 and connection/handoff 10. The macOS 14.0-target app builds and passes
+local ad-hoc signature verification on macOS 26.6.2; build/native logs contain no
+compiler warnings or errors. Generation **19**, schema **16**, **95 tools**; digest
+`95a2cdc60e719870f04408a874c78863cf9d37f729919c6bd9b27f9b3f791561`
+matches final engine source, and the packaged usage guide matches its source.
+
+Performance was measured sequentially after builds/tests on the same arm64,
+128 GB host with warm SQLite, sixty generated 8×8 originals, and one hundred
+depth-32 Unicode keyword assignments per target. Synthetic catalog rows and
+1,000/10,000 custom presets are setup, excluded from timing. Each repeated measure
+uses thirty samples. Application includes captured preset-token and visual-revision
+reads, two validation passes and atomic recipe/history writes; it does not read
+full photo metadata. These are in-process service/SQL timings, excluding IPC,
+image rendering, LUT copying and desktop latency.
+
+| Operation (median / p95) | 10,000 photos / 1,000 custom presets | 100,000 photos / 10,000 custom presets |
+| --- | ---: | ---: |
+| First preset page | 2.812 / 4.820 ms | 3.081 / 3.454 ms |
+| Last preset page | 2.952 / 4.353 ms | 3.252 / 3.933 ms |
+| Name search | 2.621 / 3.005 ms | 4.497 / 5.057 ms |
+| Equal reapplication to 60 photos | 14.167 / 16.028 ms | 15.344 / 16.631 ms |
+| Two different applications to 60 photos | 34.779 / 37.188 ms | 37.460 / 42.220 ms |
+
+The first changed application took **16.640 / 19.241 ms** respectively (one sample
+per catalog, not a distribution). Peak process RSS was **47.53 / 58.62 MB** and
+image-worker memory was zero. First-page responses were **6,400 / 6,401 bytes**;
+history remained bounded and metadata, orientation and original hashes were
+unchanged. Reproduce with `tests/develop_preset_probe.py`; these measurements do
+not establish cold-storage or real-RAW preview throughput.
+
+Current public source audit covers **285 files**, with no findings. Local/remote
+ancestry checks after fetching found no unmerged branches. Generated fixtures,
+catalogs, receipts and app bundles remain excluded from publication.

@@ -127,13 +127,13 @@ def restore_catalog(path,destination):
     catalog=Catalog(dest)
     try:
         # Rebind assets by their immutable content address, including named versions.
-        for table,key in [('photos','id'),('history','id'),('versions','id'),('jobs','id')]:
-            for id_,payload in catalog.db.execute(f'SELECT {key},recipe FROM {table}'):
+        for table,key,column in [('photos','id','recipe'),('history','id','recipe'),('versions','id','recipe'),('jobs','id','recipe'),('develop_presets','id','patch')]:
+            for id_,payload in catalog.db.execute(f'SELECT {key},{column} FROM {table}'):
                 recipe=json.loads(payload)
                 if recipe.get('lut'):
                     candidate=dest/'assets'/(recipe['lut']['sha256']+'.cube')
                     if candidate.exists(): recipe['lut']['path']=str(candidate)
-                    catalog.db.execute(f'UPDATE {table} SET recipe=? WHERE {key}=?',(json.dumps(recipe),id_))
+                    catalog.db.execute(f'UPDATE {table} SET {column}=? WHERE {key}=?',(json.dumps(recipe),id_))
         # Never start restored exports automatically against old destinations.
         catalog.db.execute("UPDATE jobs SET state='interrupted',error='Restored from backup; check the destination before retrying' WHERE state IN ('running','pending')")
         catalog.db.commit()

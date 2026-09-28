@@ -153,6 +153,12 @@ struct SettingsView:View {
                 })).disabled(s.keywordSets == nil || s.keywordSetBusy)
                 Text("New sets use the selected location. Existing sets are kept in their original location. Shared sets are available to other catalogs.").font(.caption).foregroundStyle(.secondary)
             }
+            Section("Develop Presets") {
+                Toggle("Store Develop Presets with This Catalog",isOn:Binding(get:{s.developPresetPage?.local ?? false},set:{value in
+                    if let page=s.developPresetPage { Task { await s.developPresetAction("storage",revision:page.revision,values:["store_with_catalog":value]) } }
+                })).disabled(s.developPresetPage == nil || s.developPresetBusy)
+                Text("Shared presets are available to other catalogs. Switching storage keeps existing presets in their original location.").font(.caption).foregroundStyle(.secondary)
+            }
             Section("Library"){Text(Backend.catalog).font(.caption).textSelection(.enabled);Button("Show in Finder"){NSWorkspace.shared.open(URL(fileURLWithPath:Backend.catalog))}}
             Section("Background Service") {
                 Button(s.connectingService ? "Connecting…":"Connect with This Version") { Task { await s.activateCurrentService() } }.disabled(s.connectingService)
@@ -160,6 +166,6 @@ struct SettingsView:View {
                 if !s.serviceConnectionMessage.isEmpty { Text(s.serviceConnectionMessage).font(.caption) }
             }
             Section("Color"){Text("Non-destructive editing leaves originals unchanged. NEF decoding uses LibRaw; HE / HE* support and camera-specific color require testing.").font(.callout).foregroundStyle(.secondary)}
-        }.formStyle(.grouped).padding(12).task{await s.refreshMemory();await s.refreshKeywordSets()}
+        }.formStyle(.grouped).padding(12).task{await s.refreshMemory();await s.refreshKeywordSets();await s.refreshDevelopPresets()}
     }
 }

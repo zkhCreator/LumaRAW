@@ -17,10 +17,11 @@ from lumaraw.keyword_exports import migrate as keyword_exports
 from lumaraw.keyword_exchange import migrate as keyword_exchange
 from lumaraw.keyword_sets import migrate as keyword_sets
 from lumaraw.library_painter import migrate as painter
+from lumaraw.orientation import migrate as orientation
 
 
 def migrate_to(db, version):
-    migrations = (migrate_metadata, collections, copies, stacks, migrate_identities, capture, folders, keywords, relocations, folder_sync, keyword_exports, keyword_exchange, keyword_sets, painter)
+    migrations = (migrate_metadata, collections, copies, stacks, migrate_identities, capture, folders, keywords, relocations, folder_sync, keyword_exports, keyword_exchange, keyword_sets, painter, orientation)
     if not 0 <= version <= len(migrations):
         raise ValueError('Unsupported legacy fixture version')
     for migration in migrations[:version]:

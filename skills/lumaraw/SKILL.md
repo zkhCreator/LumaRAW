@@ -219,6 +219,40 @@ a drag; never reread and redirect the same pending stroke to a changed target.
 Membership changes do not alter photo metadata/recipe revisions. The native Option
 stroke removes only touched target members and refreshes the displayed source.
 
+## Develop presets
+
+`list_develop_presets` returns thirty compact names per page, separately paged
+groups, `field_groups`, supported `fields`, storage mode and an opaque `revision`.
+Use `search`, `group_id`, `favorites`, `include_hidden`, `offset` and `group_offset`
+to browse. `get_develop_preset(preset_id, expected_revision)` reads the partial
+`patch` at that exact library state. Browsing never applies settings.
+
+`save_develop_preset` takes the captured `photo_id` / `expected_photo_revision`,
+selected `fields`, `name`, `group_name` and preset-library `expected_revision`.
+Pass `preset_id` to update a custom preset. The default `duplicate_policy: error`
+rejects equal names in the same group; `duplicate` explicitly keeps both and
+`replace` replaces a single matching custom preset when creating. Do not infer
+replacement authorization from an accidental name collision.
+
+`develop_preset_action` requires the captured `expected_revision` and exactly the
+fields for its action: `favorite` (preset_id/favorite), `rename` (preset_id/name),
+`move` (preset_id/group_name), `duplicate` (preset_id/name/group_name), `delete`
+(preset_id), `group_visibility` (group_id/visible), `group_rename` (group_id/name),
+or `storage` (store_with_catalog). Built-ins allow favorite/duplicate; their group
+can be hidden. Switching storage preserves both libraries without moving entries.
+Shared Develop storage uses the injectable `LUMARAW_PRESETS_ROOT` path adapter
+independently of keyword-set storage. Catalog backups contain local presets/assets.
+
+`apply_develop_preset` takes `preset_id`, preset-library `expected_revision` and
+1–60 distinct `targets` with `photo_id` / photo `expected_revision`. Capture those
+revisions before applying. Any stale target, changed preset/scope or incompatible
+camera profile rejects the whole batch. Only saved fields change; every changed
+photo receives Develop history, and equal recipes do not increment revisions.
+Metadata, independent orientation, originals and queued jobs survive. LUTs are
+checksum-verified and retained in the target catalog. Neither failed nor uncertain
+applications may be retried automatically with fresh revisions. Adobe preset
+file exchange, Amount, ISO adaptation and import-time application are not supported.
+
 ## Photo orientation
 
 `orient_photos` accepts one `action` (`rotate_left`, `rotate_right`,

@@ -311,6 +311,22 @@ with captured visual revisions; it never writes `Recipe.rotation`. Photo menus
 follow Grid selection versus active-photo scope. Separate orientation undo avoids
 overwriting later Develop edits; unified application Undo/Redo remains future work.
 
+`develop_presets.py` owns schema 16's catalog-local partial recipes, groups and
+library revision. An independently versioned shared SQLite repository stores the
+default preset library and catalog-storage preference. It uses `preset_paths.py`
+and injectable roots; no native or OS path logic enters the domain. Shared-before-
+catalog lock ordering matches keyword sets, but their storage preferences and
+libraries remain independent. Thirty-row pages omit recipe patches; a captured
+revision guards detail reads, management and application across both repositories.
+Preset, scope and photo revisions are validated before and after LUT staging.
+Content-addressed LUT copies happen outside SQL locks, reject changed bytes and
+never overwrite destinations. Catalog restore rebinds local preset asset paths.
+Application merges only selected fields, validates all target recipes/camera
+profiles and writes one transaction with normal bounded Develop history. Equal
+recipes are no-ops. Frozen export jobs, metadata and catalog orientation survive.
+The Mac shell owns immutable editor and Painter captures, selection scope and
+preview refresh; it does not translate Adobe parameters or process image pixels.
+
 `keyword_exchange.py` owns schema 12's manual person-keyword flag and dictionary
 file exchange. Bounded UTF-8 input is copied and fingerprinted outside the catalog
 lock, then validated in a temporary SQLite database with a 4 MiB page cache. The

@@ -33,7 +33,7 @@ struct InspectorView:View {
                     HStack(spacing:7){ForEach(1..<6){value in Button{s.rate(p.rating==value ? 0:value)}label:{Image(systemName:p.rating>=value ? "star.fill":"star").foregroundStyle(p.rating>=value ? Color.yellow:Color.secondary)}.accessibilityLabel("Rate \(value) \(value == 1 ? "star" : "stars")")};Spacer();Button{s.flag(p.flag==1 ? 0:1)}label:{Image(systemName:p.flag==1 ? "flag.fill":"flag")}}
                         .buttonStyle(.plain).help("1–5 to rate, P to flag as a pick")
                 }
-                Menu{ForEach(s.presets.keys.sorted(),id:\.self){name in Button(name){s.preset(name)}}}label:{Label("Choose Preset",systemImage:"camera.filters")}.frame(maxWidth:.infinity)
+                Button { s.showDevelopPresets=true } label: { Label("Develop Presets…",systemImage:"camera.filters") }.frame(maxWidth:.infinity)
                 Divider()
                 DisclosureGroup("Light",isExpanded:$light){VStack(spacing:12){
                     edit("Exposure","exposure",-5...5,0.05,"EV")
@@ -104,7 +104,7 @@ struct InspectorView:View {
                     ForEach(s.metadata.keys.sorted(),id:\.self){key in HStack(alignment:.top){Text(key).foregroundStyle(.secondary);Spacer();Text(String(describing:s.metadata[key] ?? "")).multilineTextAlignment(.trailing).textSelection(.enabled)}.font(.caption)}
                     if let p=s.photo{Text(p.path).font(.caption2).foregroundStyle(.secondary).textSelection(.enabled)}
                 }
-            }.padding(18).disabled(s.photo==nil || s.browsing || s.loading || s.orientationBusy)
+            }.padding(18).disabled(s.photo==nil || s.browsing || s.loading || s.orientationBusy || s.developPresetBusy)
         }.background(.background)
         .sheet(isPresented:Binding(get:{exportMetadataPhoto != nil},set:{if !$0 { exportMetadataPhoto=nil }})) {
             if let exportMetadataPhoto { ExportMetadataSheet(photoID:exportMetadataPhoto) }

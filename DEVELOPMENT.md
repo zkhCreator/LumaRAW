@@ -113,7 +113,9 @@ when a clear function is more maintainable. Avoid unrelated formatting churn.
   intermediate thumbnails crossed by coalesced pointer events, and commit once
   at mouse-up. Publish highlight changes only when a new photo is touched, not on
   every pointer event. Validate every target and assignment capacity before any write.
-  Painter never selects touched thumbnails or changes Develop recipes. Membership
+  Painter never selects touched thumbnails. Metadata/collection modes preserve
+  Develop recipes; Develop preset strokes capture preset and visual revisions,
+  apply only selected settings atomically and retain per-photo history. Membership
   removal may naturally remove selected photos from the displayed source. Capture
   both target-state and collection revisions for Target Collection strokes; never
   redirect a pending stroke after a target switch. Membership existence checks
@@ -123,6 +125,16 @@ when a clear function is more maintainable. Avoid unrelated formatting churn.
   SwiftUI state during representable updates; defer cancellation with a captured
   stroke identity so an old callback cannot clear a new gesture. Shortcut IDs
   remain complete while labels page at twenty; never split old literal labels.
+- Develop presets persist only explicitly selected recipe fields. Saving or
+  browsing never edits a photo. Capture both library scope/revision and source or
+  target visual revisions; revalidate after asset I/O before any mutation. Shared
+  storage always locks before the catalog. Stage checksum-verified, immutable LUT
+  assets outside SQL locks; retain them across source-catalog removal and rebind
+  catalog-local assets on restore. Never equate application-level recipe fields
+  with Adobe preset parameters. Batch application preserves unchecked fields,
+  metadata, orientation and frozen jobs, with per-photo history and no-op reapply.
+  Native editors and loaded Painter presets retain their original revisions after
+  refresh; name conflicts require an explicit duplicate/replacement policy.
 
 ## Engine changes and handoff
 

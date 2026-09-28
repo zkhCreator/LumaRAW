@@ -73,7 +73,7 @@ struct PhotoOrientationState {
 
 extension Store {
     var canOrientPhotos: Bool {
-        !orientationBusy && !painterBusy && !hasPendingEdits && !browsing && !loading && !actionPhotoIDs.isEmpty
+        !orientationBusy && !developPresetBusy && !painterBusy && !hasPendingEdits && !browsing && !loading && !actionPhotoIDs.isEmpty
     }
 
     func refreshOrientationState() async {
@@ -96,13 +96,13 @@ extension Store {
     }
 
     @discardableResult func submitOrientation(targets: [Photo],action: String) -> Task<Void,Never>? {
-        guard !orientationBusy,!painterBusy,!hasPendingEdits,!targets.isEmpty else { return nil }
+        guard !orientationBusy,!developPresetBusy,!painterBusy,!hasPendingEdits,!targets.isEmpty else { return nil }
         let params: [String:Any]=["action":action,"targets":targets.map { ["photo_id":$0.id,"expected_revision":$0.revision] }]
         return orientationCommand("orient_photos",params:params)
     }
 
     @discardableResult func undoOrientation() -> Task<Void,Never>? {
-        guard !orientationBusy,!painterBusy,!hasPendingEdits,
+        guard !orientationBusy,!developPresetBusy,!painterBusy,!hasPendingEdits,
               let state=orientationState,let id=state.actionID else { return nil }
         return orientationCommand("undo_orientation",params:["action_id":id,"expected_revision":state.revision])
     }

@@ -63,6 +63,8 @@ class Service:
         self.folder_sync=FolderSyncRunner(self)
         from .keyword_sets import KeywordSets
         self.keyword_sets=KeywordSets(self,presets_root)
+        from .develop_presets import DevelopPresets
+        self.develop_presets=DevelopPresets(self,presets_root)
         self.last_activity=time.monotonic()
         with self.catalog() as c:
             Relocations(c).recover()
@@ -115,6 +117,8 @@ class Service:
         self.last_activity=time.monotonic();p={} if p is None else p
         if method not in TOOLS: raise ValueError('Unknown operation: '+method)
         jsonschema.validate(p,TOOLS[method]['inputSchema'])
+        if method in ('list_develop_presets','get_develop_preset','save_develop_preset','develop_preset_action','apply_develop_preset'):
+            return self.develop_presets.dispatch(method,p)
         if method in ('list_keyword_sets','get_keyword_set','save_keyword_set','keyword_set_action','apply_keyword_set'):
             return self.keyword_sets.dispatch(method,p)
         if method in ('prepare_folder_sync','get_folder_sync','get_folder_sync_metadata','scan_folder_sync','select_folder_sync_items','apply_folder_sync','cancel_folder_sync'):
