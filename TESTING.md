@@ -57,7 +57,7 @@ The harness exercises the real native Store and JSON transport: import, RAW prev
 
 The runner compiles all native files except the app entry point, generates five
 small raster files and separate disposable catalogs, then runs the
-15-assertion state, 13-assertion library and 12-assertion culling suites. The library suite checks
+15-assertion state, 13-assertion library, 12-assertion culling and 20-assertion review suites. The library suite checks
 live smart membership, text search/sort, pagination, empty-filter selection,
 partial metadata writes and independent recipe/metadata conflict handling. JSON
 receipts stay in the ignored work directory. Without `--engine`, it uses the
@@ -68,6 +68,18 @@ Command toggling, visible-page selection, all-target batch flags/ratings, recipe
 revision preservation and Develop active-photo scope. Single-key shortcuts are
 scoped to photo views so metadata/search text fields retain text input; rendered
 keyboard routing still needs desktop acceptance.
+
+The review suite checks fixed Select/candidate roles, swap/promotion, linked and
+independent viewports, retained frames, stale asynchronous replies, active-photo
+actions and non-destructive Survey deselection. `--suite NativeReviewRegression`
+runs only that suite. `tests/test_review.py` checks optional baseline omission,
+identical edited pixels, bounded fitted output, exact viewport crops, lightweight
+summaries and cancellation isolation using real worker processes.
+
+The synthetic preview benchmark is `tests/review_probe.py --work work/review-probe-01
+--backend cpu`. It records cold decode separately and uses five uncached recipe
+outputs per warm-decode scenario, including worker startup/encoding, dimensions,
+actual backend dispatch and sampled memory. It excludes UI and IPC latency.
 
 ## Library organization and performance
 

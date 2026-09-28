@@ -51,6 +51,13 @@ misses still use bounded image workers. Workers publish JPEG cache entries atomi
 Warm cache lookup does not claim image processing ran. Source thumbnails currently
 do not reflect developed recipes; recipe-aware thumbnails remain tracked in parity.
 
+Library Compare retains at most two revision-keyed frames and Survey at most 60
+512-pixel fitted frames. Compare detail requests use physical display scale and
+the existing 2048 × 1536 viewport bound. Review previews omit unused before-image
+work; the default Develop contract still returns it. Review has a separate client
+generation, drops stale replies and cancels its own workers on exit. Lightweight
+summary polling detects external edit revisions without loading all recipes.
+
 Each image worker exits after one operation, releasing native allocations. The parent samples RSS every 50 ms and stops work above the effective budget or after five minutes. The effective budget is the lower of the configured limit and 70% of available memory; this is not a system hard limit. When available memory falls below 384 MB, the queue pauses job acquisition. Independent catalogs can start separate brokers, so budgets are not a global quota.
 
 Superseded UI previews are skipped or cancelled by client generation. Cancelling a UI preview does not cancel an unrelated agent preview or export. Large imports and indexing still hold the catalog service lock and may delay other commands; persistent metadata jobs remain future work.

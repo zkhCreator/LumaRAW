@@ -40,7 +40,7 @@ import Foundation
             let persisted=try await Backend.call("get_photo",["photo_id":id])
             try check(persisted["title"] as? String == "Evening","metadata_conflict_preserves_title")
             try check(await s.saveCollection(name:"Red photos",kind:"smart",rules:["color_label":"red"],match:"all",original:nil),"create_smart_collection")
-            await s.refresh()
+            // Saving returns only after its collection page is authoritative.
             try check(s.total == 1 && s.photos.first?.id == id,"smart_membership_in_native_page")
             s.collectionID=nil;s.librarySort="name";s.sortDescending=false;s.offset=0
             await s.refresh()

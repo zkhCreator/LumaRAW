@@ -15,6 +15,8 @@ import time
 from .model import Recipe, ExportOptions, SYNC_GROUPS, IMAGE_EXTENSIONS
 from .organization import Organization, SORTS, criteria, folded, migrate, text_predicate
 
+SUMMARY_COLUMNS = 'id,path,name,bytes,mtime,rating,flag,revision,color_label,title,metadata_revision,taken,camera,missing,error'
+
 class Catalog:
     def __init__(self, root):
         self.root = Path(root).resolve()
@@ -219,10 +221,16 @@ class Catalog:
             raise ValueError('Unsupported library sort')
         order = 'DESC' if descending else 'ASC'
         # Keep large recipe/decoder metadata JSON out of the grid query entirely.
-        columns = 'id,path,name,bytes,mtime,rating,flag,revision,color_label,title,metadata_revision,taken,camera,missing,error'
         return [dict(r) for r in self.db.execute(
-            f'SELECT {columns} FROM photos{where} ORDER BY {SORTS[sort]} {order},id {order} LIMIT 60 OFFSET ?',
+            f'SELECT {SUMMARY_COLUMNS} FROM photos{where} ORDER BY {SORTS[sort]} {order},id {order} LIMIT 60 OFFSET ?',
             params+[max(0,offset)])]
+
+    def summaries(self, ids):
+        if not 1 <= len(ids) <= 60:
+            raise ValueError('Summary reads require 1 to 60 photo IDs')
+        placeholders=','.join('?' for _ in ids)
+        return [dict(row) for row in self.db.execute(
+            f'SELECT {SUMMARY_COLUMNS} FROM photos WHERE id IN ({placeholders}) ORDER BY id',ids)]
 
     def filtered_count(self,mode='all',search='',filters=None,collection_id=None):
         where,params=self.filter_sql(mode,search,filters,collection_id)

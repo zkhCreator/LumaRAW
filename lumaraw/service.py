@@ -93,6 +93,20 @@ class Service:
             with self.catalog() as c:
                 return {'version':'0.4.1','api_version':1,'catalog':str(self.root),'photos':c.count(),'counts':c.job_counts(),'paused':self.paused,'active':self.active,**self.memory_status(),'peak_mb':round(self.peak,1)}
         if method=='recipe_schema':return {'defaults':Recipe().dict(),'limits':LIMITS,'presets':{k:v.dict() for k,v in PRESETS.items()},'groups':SYNC_GROUPS}
+        if method=='cancel_preview':
+            with self.state_lock:
+                client=p['client_id'];generation=p['generation']
+                if generation < self.preview_versions.get(client,-1):
+                    return {'cancelled':False,'superseded':True}
+                self.preview_versions[client]=generation
+                if len(self.preview_versions)>128:self.preview_versions.pop(next(iter(self.preview_versions)))
+                cancelled=False
+                if (self.active and self.active.get('client_id')==client
+                        and self.active.get('generation',-1)<generation
+                        and self.active.get('operation') in ('preview','detail')):
+                    self.cancelled=True
+                    if self.process.poll() is None:self.process.kill();cancelled=True
+                return {'cancelled':cancelled,'generation':generation}
         if method=='cached_thumbnails':
             with self.catalog() as c:
                 rows=[self.require(c,photo_id) for photo_id in dict.fromkeys(p['photo_ids'])]
@@ -125,6 +139,7 @@ class Service:
             return {**result,'photo_id':row['id'],'revision':row['revision']}
         if method=='queue_control':return self.control(p)
         with self.catalog() as c:
+            if method=='photo_summaries':return {'photos':c.summaries(p['photo_ids'])}
             if method=='import_photos':
                 def paths():
                     for path in p['paths']:

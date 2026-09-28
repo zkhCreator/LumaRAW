@@ -5,6 +5,8 @@ source and a versioned recipe. Geometry samples strips; neighborhood filters use
 halos so strip boundaries do not change pixels. Only the requested 1:1 viewport is
 encoded for the GUI. LibRaw itself still decodes a full frame in one child process.
 Manual lens coefficients are user corrections, not an auto-selected lens database.
+Review callers can omit the before image and request a smaller fitted preview;
+full-resolution detail coordinates and export pixels retain the same pipeline.
 """
 from dataclasses import replace
 import hashlib
@@ -253,11 +255,15 @@ def render_u8(plan,rect=None,display=None):
     return pixels,hist.tolist(),out_count/(w*h)*100
 
 
-def make_preview(path,recipe,cache,budget_mb,detail=None,display=None):
+def make_preview(path,recipe,cache,budget_mb,detail=None,display=None,include_before=True,max_edge=None):
+    if detail and max_edge is not None:
+        raise ValueError('A detail viewport cannot also request a fitted preview size')
+    if max_edge is not None and (isinstance(max_edge,bool) or not isinstance(max_edge,int) or not 128 <= max_edge <= 1680):
+        raise ValueError('Preview edge must be between 128 and 1680 pixels')
     cache=Path(cache);full=bool(detail)
     source,meta,base=base_image(path,recipe,cache,budget_mb,full=full)
     validate_camera(recipe,meta)
-    plan=RenderPlan(source,recipe)
+    plan=RenderPlan(source,recipe,max_edge or 0)
     if not full:
         plan.pixel_scale *= max(source.shape[:2])/max(meta['width'],meta['height'])
     rect=None
@@ -269,22 +275,27 @@ def make_preview(path,recipe,cache,budget_mb,detail=None,display=None):
         x=max(0,min(plan.width-w,round(cx*plan.width-w/2)));y=max(0,min(plan.height-h,round(cy*plan.height-h/2)))
         rect=(x,y,w,h)
     pixels,hist,gamut=render_u8(plan,rect,display)
-    key=hashlib.sha256((cache_key(path,recipe,'render-v3')+json.dumps([detail,display],sort_keys=True)).encode()).hexdigest()
+    key=hashlib.sha256((cache_key(path,recipe,'render-v4')+json.dumps([detail,display,include_before,max_edge],sort_keys=True)).encode()).hexdigest()
     target=cache/(key+'.png');Image.fromarray(pixels).save(target,icc_profile=icc_profile('srgb'))
+    h,w=pixels.shape[:2]
+    result={'preview':str(target),'metadata':meta,'histogram':hist,
+            'clipped_percent':round(gamut,2),'width':w,'height':h,'full_width':plan.width,'full_height':plan.height,
+            'detail':full,'roi':rect,'cache_keep':[base,str(Path(base).with_suffix('.json')),str(target)]}
+    if not include_before:
+        return result
     before_path=cache/(key+'-before.png')
     # A baseline keeps the same geometric corrections so split comparison aligns.
     keep=('rotation','crop','crop_box','straighten','perspective_h','perspective_v','geometry_scale','distortion','ca_red','ca_blue')
     baseline=Recipe(**{k:getattr(recipe,k) for k in keep})
     base_source,_,base_before=base_image(path,baseline,cache,budget_mb,full=full)
-    before_plan=RenderPlan(base_source,baseline)
+    before_plan=RenderPlan(base_source,baseline,max_edge or 0)
     if not full:
         before_plan.pixel_scale *= max(base_source.shape[:2])/max(meta['width'],meta['height'])
     before,_,_=render_u8(before_plan,rect,display)
     Image.fromarray(before).save(before_path,icc_profile=icc_profile('srgb'))
-    h,w=pixels.shape[:2]
-    return {'preview':str(target),'before':str(before_path),'metadata':meta,'histogram':hist,
-            'clipped_percent':round(gamut,2),'width':w,'height':h,'full_width':plan.width,'full_height':plan.height,
-            'detail':full,'roi':rect,'cache_keep':[base,base_before,str(Path(base).with_suffix('.json')),str(Path(base_before).with_suffix('.json')),str(target),str(before_path)]}
+    result['before']=str(before_path)
+    result['cache_keep'].extend([base_before,str(Path(base_before).with_suffix('.json')),str(before_path)])
+    return result
 
 
 def estimate_export_bytes(width,height,options,fmt):

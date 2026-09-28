@@ -43,6 +43,10 @@ import AppKit
                 Button("Locate Missing Original…"){store.relink()}
             }
             CommandMenu("Library") {
+                ForEach(LibraryViewMode.allCases,id:\.self) { view in
+                    Button("\(view.title) View") { Task { await store.switchLibraryView(view) } }
+                }
+                Divider()
                 Button("New Collection…") { store.editCollection() }.keyboardShortcut("n",modifiers:[.command,.shift])
                 Button("Filter Photos…") { store.showLibraryFilters=true }
                 Button("Refresh Library") { Task { await store.refreshCollections(); await store.refresh() } }

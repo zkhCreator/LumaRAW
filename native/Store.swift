@@ -35,6 +35,12 @@ import UniformTypeIdentifiers
     @Published var metadataTargets: [Photo] = []
     @Published var workspace="library"
     @Published var develop=false
+    @Published var libraryView: LibraryViewMode = .grid
+    @Published var review=ReviewSession()
+    let reviewRenderer=ReviewRenderer()
+    var reviewPaneWidth=1200
+    var reviewPaneHeight=900
+    var reviewSwitchGeneration=0
     @Published var showInspector=true
     @Published var compare=false
     @Published var splitCompare=false
@@ -78,6 +84,7 @@ import UniformTypeIdentifiers
     private var polling: Task<Void,Never>?
     private var started=false
     private var selectionAnchor: Int?
+    var canChangePhoto: Bool { !browsing && !editing && pendingPatch.isEmpty }
 
     func start() async {
         guard !started else{return};started=true
@@ -95,6 +102,7 @@ import UniformTypeIdentifiers
                     try? await Task.sleep(nanoseconds:2_000_000_000)
                     guard let self else { return }
                     await self.refreshJobs()
+                    await self.refreshReviewSummaries()
                     if let current=self.photo, !self.editing, self.pendingPatch.isEmpty {
                         if let row=try? await Backend.call("get_photo",["photo_id":current.id]),let updated=Photo(row) {
                             guard !self.editing,self.pendingPatch.isEmpty,self.selected==current.id,self.photo?.revision==current.revision else{continue}
@@ -127,6 +135,7 @@ import UniformTypeIdentifiers
                 if let first=photos.first{selected=first.id;selection=[first.id];await load(first.id)}
                 else{selected=nil;selection=[];clearPhoto()}
             }
+            reviewSelectionChanged()
             Task { [weak self] in
                 guard let self else{return}
                 let missing=self.photos.filter { self.thumbnails[$0.id] == nil }.map(\.id)
@@ -152,6 +161,13 @@ import UniformTypeIdentifiers
     func choose(_ id:Int, extend:Bool=false, range:Bool=false) {
         guard !browsing,!editing,pendingPatch.isEmpty else{message="Wait for the current edit to finish saving";return}
         guard photos.contains(where:{$0.id==id}) else{return}
+        defer { reviewSelectionChanged() }
+        if isMultiReview,libraryView == .compare,!extend,!range {
+            review.chooseCandidate(id)
+            selection.insert(id)
+            activateReviewPhoto(id)
+            return
+        }
         if range,let end=photos.firstIndex(where: { $0.id == id }),
            let start=photos.firstIndex(where: { $0.id == (selectionAnchor ?? selected ?? id) }) {
             selectionAnchor=selectionAnchor ?? selected ?? id
@@ -172,10 +188,21 @@ import UniformTypeIdentifiers
             }
             return
         }
-        if extend {selection.insert(id)}else{selection=[id]}
+        if extend {selection.insert(id)}else if !selection.contains(id){selection=[id]}
         guard selected != id || photo==nil else{return}
         selected=id;saveFailed=false;clearPhoto()
         Task{await load(id)}
+    }
+    func activateReviewPhoto(_ id: Int) {
+        guard !editing,pendingPatch.isEmpty,photos.contains(where: { $0.id == id }) else { return }
+        guard selected != id || photo == nil else { return }
+        selected=id;saveFailed=false;clearPhoto()
+        Task { await load(id) }
+    }
+    func cancelMainPreview() {
+        generation+=1;let token=generation
+        previewTask?.cancel();rendering=false
+        Task { _=try? await Backend.call("cancel_preview",["client_id":previewClient,"generation":token]) }
     }
     func load(_ id:Int) async {
         guard selected==id else{return}
@@ -188,6 +215,7 @@ import UniformTypeIdentifiers
         } catch {if selected==id,token==generation{self.error=error.localizedDescription}}
     }
     func render() {
+        if isMultiReview { updateReviewRequests();return }
         guard let p=photo,p.id==selected,!loading else{return}
         generation += 1;let token=generation
         previewTask?.cancel()
@@ -279,11 +307,11 @@ import UniformTypeIdentifiers
         selectionAnchor=selected
     }
     func rate(_ value:Int) {
-        let ids=develop ? selected.map { [$0] } ?? [] : selection.sorted()
+        let ids=actionPhotoIDs
         Task { await ratePhotos(ids,patch:["rating":value]) }
     }
     func flag(_ value:Int) {
-        let ids=develop ? selected.map { [$0] } ?? [] : selection.sorted()
+        let ids=actionPhotoIDs
         Task { await ratePhotos(ids,patch:["flag":value]) }
     }
     func ratePhotos(_ ids: [Int], patch: [String: Any]) async {

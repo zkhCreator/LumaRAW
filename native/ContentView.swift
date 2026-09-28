@@ -39,10 +39,10 @@ struct ContentView: View {
             }
             .toolbar {
                 ToolbarItem(placement:.primaryAction){Button{ s.importPanel() }label:{Label("Import",systemImage:"plus")}.help("Import photos or folders ⌘I")}
-                ToolbarItem(placement:.principal){if s.workspace=="library"{Picker("View",selection:$s.develop){Image(systemName:"square.grid.2x2").tag(false);Image(systemName:"slider.horizontal.3").tag(true)}.pickerStyle(.segmented).frame(width:100)}}
+                ToolbarItem(placement:.principal){if s.workspace=="library"{Picker("Module",selection:Binding(get:{s.develop},set:{value in Task {if value {await s.startDevelop()} else {await s.switchLibraryView(s.libraryView)}}})){Image(systemName:"square.grid.2x2").tag(false);Image(systemName:"slider.horizontal.3").tag(true)}.pickerStyle(.segmented).frame(width:100)}}
                 ToolbarItemGroup(placement:.primaryAction){
                     if s.workspace=="library" {
-                        Button{s.compare.toggle()}label:{Label("Before and After",systemImage:"rectangle.lefthalf.inset.filled")}.disabled(s.photo==nil).help("Before / After \\")
+                        if s.develop {Button{s.compare.toggle()}label:{Label("Before and After",systemImage:"rectangle.lefthalf.inset.filled")}.disabled(s.photo==nil).help("Before / After \\")}
                         Button{s.showInspector.toggle()}label:{Label("Inspector",systemImage:"sidebar.right")}
                         Button{s.showExport=true}label:{Label("Export",systemImage:"square.and.arrow.up")}.disabled(s.selected==nil)
                     }
@@ -63,6 +63,8 @@ struct ContentView: View {
         .sheet(isPresented:$s.showCollectionEditor){CollectionEditor(original:s.editingCollection)}
         .sheet(isPresented:$s.showLibraryFilters){LibraryFilterSheet(draft:LibraryFilterDraft(s.libraryFilters))}
         .sheet(isPresented:$s.showMetadataEditor){MetadataEditor(targets:s.metadataTargets)}
+        .onChange(of:s.workspace) { _,_ in if !s.isMultiReview {s.reviewRenderer.stop()} else {s.updateReviewRequests()} }
+        .onChange(of:s.develop) { _,value in if value {s.reviewRenderer.stop()} }
         .onDrop(of:[UTType.fileURL],isTargeted:nil){providers in
             for provider in providers {provider.loadItem(forTypeIdentifier:UTType.fileURL.identifier,options:nil){item,_ in
                 if let data=item as? Data,let url=URL(dataRepresentation:data,relativeTo:nil){Task{@MainActor in await s.importPaths([url.path])}}
@@ -90,17 +92,25 @@ struct ContentView: View {
                     } label:{Label(s.canvasTool=="view" ? "Tools":"Drawing",systemImage:s.canvasTool=="crop" ? "crop":"paintbrush.pointed")}
                     Picker("Zoom",selection:$s.detail){Text("Fit").tag(false);Text("1:1 Detail").tag(true)}.frame(width:155).onChange(of:s.detail){_,_ in s.render()}
                 } else {
+                    if s.libraryView == .loupe {
+                        Picker("Zoom",selection:$s.detail){Text("Fit").tag(false);Text("1:1 Detail").tag(true)}.frame(width:155).onChange(of:s.detail){_,_ in s.render()}
+                    }
                     TextField("Search photos and metadata",text:$s.search).textFieldStyle(.roundedBorder).frame(width:220).onSubmit{s.offset=0;Task{await s.refresh()}}
-                    Button{Task{await s.refreshCollections();await s.refresh()}}label:{Image(systemName:"arrow.clockwise")}.help("Refresh Library")
+                    Button{Task{await s.refreshCollections();await s.refresh();s.updateReviewRequests(force:true)}}label:{Image(systemName:"arrow.clockwise")}.help("Refresh Library")
                 }
             }.padding(.horizontal,20).padding(.vertical,12)
             Divider()
             if !s.develop {
                 LibraryToolbar()
+                Picker("Library View",selection:Binding(get:{s.libraryView},set:{view in Task {await s.switchLibraryView(view)}})) {
+                    ForEach(LibraryViewMode.allCases,id:\.self) { view in Label(view.title,systemImage:view.symbol).tag(view) }
+                }.pickerStyle(.segmented).padding(.horizontal,20).padding(.bottom,8)
                 Divider()
             }
             if s.total==0 {empty}
             else if s.develop {PhotoCanvas();filmstrip}
+            else if s.isMultiReview {ReviewWorkspace(renderer:s.reviewRenderer);filmstrip}
+            else if s.libraryView == .loupe {PhotoCanvas();filmstrip}
             else {gallery}
             Divider()
             HStack {
@@ -140,11 +150,11 @@ struct ContentView: View {
                         }
                         HStack(spacing:2){ForEach(0..<5){i in Image(systemName:i<p.rating ? "star.fill":"star").font(.system(size:9)).foregroundStyle(i<p.rating ? Color.yellow:Color.secondary.opacity(0.4))};Spacer();Text(URL(fileURLWithPath:p.path).pathExtension.uppercased()).font(.caption2).foregroundStyle(.secondary)}
                     }.contentShape(Rectangle())
-                    .onTapGesture(count:2){s.choose(p.id);s.develop=true}
+                    .onTapGesture(count:2){s.choose(p.id);Task {await s.switchLibraryView(.loupe)}}
                     .onTapGesture {s.choose(p.id,extend:NSEvent.modifierFlags.contains(.command),range:NSEvent.modifierFlags.contains(.shift))}
                     .accessibilityElement(children:.combine).accessibilityLabel("\(p.name), \(p.rating) \(p.rating == 1 ? "star" : "stars")")
-                    .accessibilityAddTraits(.isButton).accessibilityAction{s.choose(p.id);s.develop=true}
-                    .contextMenu {Button("Develop"){s.choose(p.id);s.develop=true};Button("Show in Finder"){NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath:p.path)])}}
+                    .accessibilityAddTraits(.isButton).accessibilityAction{s.choose(p.id);Task {await s.switchLibraryView(.loupe)}}
+                    .contextMenu {Button("Develop"){s.choose(p.id);Task {await s.startDevelop()}};Button("Show in Finder"){NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath:p.path)])}}
                 }
             }.padding(24)
         }.background(Color(nsColor:.underPageBackgroundColor))
@@ -152,7 +162,7 @@ struct ContentView: View {
         .modifier(PhotoKeyboardShortcuts())
         .onKeyPress(.rightArrow){moveSelection(1);return .handled}
         .onKeyPress(.leftArrow){moveSelection(-1);return .handled}
-        .onKeyPress(.return){s.develop=true;return .handled}
+        .onKeyPress(.return){Task {await s.switchLibraryView(.loupe)};return .handled}
         .onKeyPress(characters:CharacterSet(charactersIn:"a")){press in
             if press.modifiers.contains(.command) {s.selectAllVisible();return .handled}
             return .ignored
@@ -172,28 +182,29 @@ struct ContentView: View {
 
 struct PhotoCanvas:View {
     @EnvironmentObject var s:Store
+    @Environment(\.displayScale) private var displayScale
     @FocusState private var keyboardFocus: Bool
     var body:some View {
         GeometryReader {geo in
             ZStack {
                 Color(white:0.075)
-                if let image=s.compare ? s.before:s.preview {
+                if let image=s.develop && s.compare ? s.before:s.preview {
                     if s.detail {
                         ScrollView([.horizontal,.vertical]) {
-                            let scale=NSScreen.main?.backingScaleFactor ?? 2
+                            let scale=displayScale
                             let pixels=image.representations.first
                             Image(nsImage:image).resizable().frame(width:CGFloat(pixels?.pixelsWide ?? 1600)/scale,height:CGFloat(pixels?.pixelsHigh ?? 1100)/scale)
                                 .frame(minWidth:geo.size.width,minHeight:geo.size.height)
                         }
                     } else {
                         Image(nsImage:image).resizable().aspectRatio(contentMode:.fit).padding(26)
-                        if s.splitCompare,!s.compare,let baseline=s.before {
+                        if s.develop,s.splitCompare,!s.compare,let baseline=s.before {
                             Image(nsImage:baseline).resizable().aspectRatio(contentMode:.fit).padding(26)
                                 .mask(alignment:.leading){Rectangle().frame(width:geo.size.width*s.splitPosition)}
                             Rectangle().fill(.white.opacity(0.85)).frame(width:2).position(x:geo.size.width*s.splitPosition,y:geo.size.height/2)
                             VStack{Spacer();HStack{Text("Before");Slider(value:$s.splitPosition,in:0...1).accessibilityLabel("Before and after divider");Text("After")}.font(.caption).padding(9).background(.ultraThinMaterial,in:Capsule()).frame(width:280).padding(.bottom,14)}
                         }
-                        if s.canvasTool != "view",!s.compare {DrawingOverlay(image:image,available:geo.size)}
+                        if s.develop,s.canvasTool != "view",!s.compare {DrawingOverlay(image:image,available:geo.size)}
                     }
                 } else if s.rendering {ProgressView("Developing…").tint(.white).foregroundStyle(.white)}
                 else {Text("Select a photo to start editing").foregroundStyle(.gray)}
@@ -205,6 +216,8 @@ struct PhotoCanvas:View {
         .focusable().focused($keyboardFocus)
         .onTapGesture { keyboardFocus=true }
         .modifier(PhotoKeyboardShortcuts())
+        .onKeyPress(.leftArrow) { s.navigateLoupe(-1);return .handled }
+        .onKeyPress(.rightArrow) { s.navigateLoupe(1);return .handled }
     }
 }
 

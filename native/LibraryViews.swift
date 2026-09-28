@@ -50,7 +50,7 @@ struct CollectionsSidebar: View {
         Section("Collections") {
             Button { s.editCollection() } label: { Label("New Collection…", systemImage:"plus") }
             ForEach(s.collections) { collection in
-                Button { s.openCollection(collection) } label: {
+                Button { Task { await s.openCollection(collection) } } label: {
                     HStack {
                         Label(collection.name, systemImage:collection.kind == "smart" ? "gearshape.2":"square.stack")
                             .lineLimit(1)

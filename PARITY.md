@@ -17,6 +17,7 @@ Official references checked September 2026:
 - [Collections, smart collections and collection sets](https://helpx.adobe.com/lightroom-classic/desktop/organize-photos-in-lightroom-classic/photo-collections.html)
 - [Smart collection criteria](https://helpx.adobe.com/lightroom-classic/desktop/organize-photos-in-lightroom-classic/smart-collections-criteria-in-lightroom-classic.html)
 - [Develop tools](https://helpx.adobe.com/lightroom-classic/desktop/process-and-develop-photos/develop-module-tools.html)
+- [Loupe, Compare and Survey](https://helpx.adobe.com/lightroom-classic/desktop/viewing-photos/browse-compare-photos.html)
 - [Keyboard shortcuts](https://helpx.adobe.com/lightroom-classic/desktop/introduction-to-lightroom-classic/keyboard-shortcuts.html)
 
 ## Feature inventory
@@ -29,7 +30,7 @@ gaps. Nothing below is full Lightroom parity merely because historical tests pas
 | Import and catalogs | Partial: referenced originals, backup/restore | Import preview/selection, copy workflows, metadata/develop presets, catalog switching/merge |
 | Library navigation | Partial: bounded grid/filmstrip, flags/stars | Folders, collections/sets, smart/quick collections, stable sorting, metadata/keyword filters |
 | Organization | Partial: duplicate/missing detection | Keywords/hierarchy, IPTC, labels, stacks, virtual copies, rename, multi-photo metadata, sidecars |
-| Culling | Partial: single-photo view, before/after | Compare/survey, reference view, range selection, auto advance, persistent workspace state |
+| Culling | Partial: Loupe/Compare/Survey, linked detail, anchored page selection | Desktop acceptance, cross-page selection, Develop reference view, auto advance, persistent workspace state |
 | Basic development | Partial: light/WB/color | Calibrated absolute WB, eyedropper, texture/clarity/dehaze, complete HSL/B&W and color grading |
 | Curves and profiles | Partial: custom composite curve, LUT/ICC | Interactive RGB curves, camera/profile browser, compatible preset import/export |
 | Detail and optics | Partial: noise/sharpen, manual lens | Complete manual detail controls, automatic lens profiles, bounded full-resolution acceptance |
@@ -48,10 +49,10 @@ gaps. Nothing below is full Lightroom parity merely because historical tests pas
 
 ## Active increment
 
-Library organization: durable regular/smart collections, catalog-only title/caption/
-copyright/keywords/color labels, revision-safe batch changes, SQL filtering/sorting,
-native controls, migration and query evidence. Collection sets, keyword hierarchy,
-virtual copies and the other rows remain tracked separately.
+Library review: Loupe, Compare and Survey with bounded previews, candidate roles,
+linked full-resolution viewports, active-photo actions and cancellation isolation.
+Collection sets, quick collection, virtual copies, edited thumbnails and the other
+rows remain tracked separately.
 
 ## Evidence log
 
@@ -99,8 +100,8 @@ whole-desktop latency, or performance guarantees on other hardware. Reproduce vi
 
 ### Next work
 
-Continue culling and organization: compare/survey, collection sets and quick collection, virtual copies, keyword
-hierarchy, source-versus-developed thumbnail behavior. Then close Develop and
+Continue first with developed thumbnails and cache invalidation, then collection
+sets and quick collection, virtual copies and keyword hierarchy. Then close Develop and
 export gaps in the inventory. Preserve pending desktop/older-OS acceptance rather
 than removing it from the completion criteria.
 
@@ -125,3 +126,39 @@ batch deduplication and preserved recipe/metadata revisions. Smart “any” pre
 also accept disjoint ranges (for example, rating >= 5 OR rating <= 1).
 Rendered keyboard event routing remains pending desktop access; state tests do
 not establish that evidence.
+
+### Loupe, Compare and Survey increment
+
+Implemented distinct Library views and G/E/C/N/D shortcuts, fixed Select and
+Candidate roles, candidate navigation, swap/promotion, linked/independent zoom and
+pan, synchronization, Survey tiles and non-destructive deselection. Metadata,
+ratings and labels affect only the active photo outside Grid. Entering Library
+clears Develop drawing/baseline modes. Collection saves now await their page
+refresh, fixing a race exposed by the combined native regression run. Comparison keeps unchanged revision-keyed
+frames; Survey fits up to the current 60-photo page using 512-pixel previews.
+
+The shared preview contract can omit the unused baseline and bound fitted output.
+Client-scoped cancellation and generation checks prevent stale preview repainting
+without cancelling exports. Lightweight summary polling refreshes external edits.
+Python regressions passed **117 tests, 2 real-NEF tests skipped**, with Metal
+required. All four native suites passed against the packaged engine: **60 assertions**,
+including 20 review checks for role/viewport transitions, stale replies, frame
+retention, action scope and safe Survey removal. The final Mac app compiled,
+packaged and passed ad-hoc signature verification. The 167-file source archive
+also passed the extracted strict source scan. Desktop events, physical
+display-scale rendering and macOS 14 runtime remain unverified.
+
+Synthetic CPU preview probe, 1600 × 1067 generated raster, warm linear-source cache
+and five distinct recipe outputs per case (128 GB arm64 Mac, macOS 26.6.2):
+
+| Complete service/worker request | Median | p95 | Output dimensions |
+| --- | ---: | ---: | --- |
+| Preview with baseline | 869.59 ms | 891.36 ms | 1600 × 1067, two images |
+| Compare preview without baseline | 577.54 ms | 586.88 ms | 1600 × 1067, one image |
+| Fitted Survey preview | 303.20 ms | 350.82 ms | 512 × 341, one image |
+
+A separate cold-decode default request took 997.85 ms (one sample). Broker RSS
+was 54.62 MB; sampled worker peak across cases was 146.14 MB. The comparison
+request reduced measured median time by about 34%; this includes startup and
+encoding but excludes IPC and desktop presentation, and is not a RAW performance
+claim. Reproduce with `tests/review_probe.py`; private receipts remain ignored.

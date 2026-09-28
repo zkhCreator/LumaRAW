@@ -15,6 +15,12 @@ If MCP is unavailable, call the packaged engine at `<LumaRAW.app>/Contents/Resou
 2. `lumaraw_import_photos` takes explicit local file or directory paths. Imports reference originals; moving originals makes them offline. `lumaraw_list_photos` paginates in 60-photo pages and returns summaries. `lumaraw_get_photo` returns a full recipe and revision.
 3. Read `lumaraw_recipe_schema` for defaults, numeric limits and presets. Send a **partial** `patch` to `lumaraw_edit_photo` with `photo_id` and `expected_revision`. Preserve crop, masks, LUT and calibration unless the task asks to change them. On `ConflictError`, re-read and reconcile; do not blindly overwrite the newer edit.
 4. Inspect `lumaraw_preview_photo`'s local `preview` and `before` image paths. Add `detail: {cx: 0.5, cy: 0.5, width: 1024, height: 768}` for a true full-resolution viewport. The normal preview is reduced resolution. Do not claim Nikon color accuracy from appearance alone.
+   Use `include_before: false` when no baseline is needed. `max_edge` (128–1680)
+   requests a fitted preview; do not combine it with `detail`. `photo_summaries`
+   reads at most 60 existing IDs without recipe/EXIF payloads. A preview client may
+   pass its own `client_id` and monotonically increasing `generation`;
+   `cancel_preview` with a newer generation invalidates only that client's older
+   preview work, leaving other clients and exports intact.
 5. Save named versions before exploratory changes if useful. Undo affects the last recipe edit; ratings and flags are separate.
 
 Example edit arguments:

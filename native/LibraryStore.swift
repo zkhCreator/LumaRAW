@@ -19,9 +19,9 @@ extension Store {
         } catch { self.error=error.localizedDescription }
     }
 
-    func openCollection(_ collection: LibraryCollection) {
+    func openCollection(_ collection: LibraryCollection) async {
         collectionID=collection.id; mode="all"; workspace="library"; offset=0
-        Task { await refresh() }
+        await refresh()
     }
 
     func editCollection(_ collection: LibraryCollection? = nil) {
@@ -39,7 +39,7 @@ extension Store {
         do {
             let result=try await Backend.call("save_collection", params)
             await refreshCollections()
-            if let saved=LibraryCollection(result) { openCollection(saved) }
+            if let saved=LibraryCollection(result) { await openCollection(saved) }
             return true
         } catch { self.error=error.localizedDescription; return false }
     }
@@ -68,15 +68,15 @@ extension Store {
     }
 
     func prepareMetadataEditor() async {
-        guard !selection.isEmpty, await flushEdits() else { return }
-        let ids=selection.sorted()
+        guard !actionPhotoIDs.isEmpty, await flushEdits() else { return }
+        let ids=actionPhotoIDs
         do {
             var targets: [Photo] = []
             for id in ids {
                 let result=try await Backend.call("get_photo", ["photo_id":id])
                 if let target=Photo(result) { targets.append(target) }
             }
-            guard selection.sorted() == ids else { return }
+            guard actionPhotoIDs == ids else { return }
             metadataTargets=targets
             showMetadataEditor=true
         } catch { self.error=error.localizedDescription }
@@ -105,7 +105,8 @@ extension Store {
     }
 
     func labelSelection(_ label: String) {
-        let targets=photos.filter { selection.contains($0.id) }
+        let ids=Set(actionPhotoIDs)
+        let targets=photos.filter { ids.contains($0.id) }
         Task { _=await saveMetadata(targets:targets, patch:["color_label":label]) }
     }
 }

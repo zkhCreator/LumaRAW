@@ -15,8 +15,9 @@ LumaRAW references your originals without changing them. The SwiftUI app and you
 | Detail and composition | Full-resolution 1:1 viewports, noise reduction, sharpening, defringing, rotation, crop, straighten, and perspective |
 | Local adjustments | Radial, gradient, luminance-range, and brush masks; manual lens distortion, vignette, and chromatic-aberration correction |
 | Library | Ratings, flags, color labels, catalog metadata/keywords, regular and live smart collections, SQL filters/sorting, duplicate/missing indexing, edit versions, selective sync, and backup/restore |
+| Culling | Grid/Loupe/Compare/Survey, anchored page selections, active-photo review actions, linked or independent full-resolution comparison viewports |
 | Export | JPEG and 16-bit TIFF with embedded sRGB, Display P3, Adobe RGB, or ProPhoto RGB ICC profiles; persistent queue, pause/cancel/retry, and collision-safe filenames |
-| Agents | 34 MCP tools, equivalent JSON CLI commands, and a bundled skill; app and agent edits share conflict detection |
+| Agents | 36 MCP tools, equivalent JSON CLI commands, and a bundled skill; app and agent edits share conflict detection |
 
 ## Build and run
 
@@ -39,12 +40,20 @@ The default catalog is `~/Library/Application Support/LumaRAW Native`. Use `--ca
 ## Editing workflow
 
 1. Press **⌘I** to import photos or folders. Drag-and-drop and Finder file-open events are also supported.
-2. Double-click a photo to develop it. Use the inspector for light, color, detail, composition, lens, and local adjustments.
-3. Use **Tools** to draw a crop or mask, or enable the split before/after view. Press **\\** to toggle the original preview.
+2. Double-click a photo to open Library Loupe. Press **D** or choose **Develop** to edit light, color, detail, composition, lens, and local adjustments.
+3. Use **Tools** to draw a crop or mask, or enable the split before/after view. In Develop, press **\\** to toggle the original preview; in Library it opens filters.
 4. Choose **1:1 Detail** to inspect a full-resolution viewport. Inspector sliders move the viewport horizontally and vertically.
-5. Press **1–5** to rate, **0** to clear the rating, **P** to pick, **X** to reject, or **U** to clear the flag. With the gallery focused, arrow keys select photos and Return opens Develop.
-6. Command-click to toggle selection; Shift-click selects a contiguous range on the current page. **⌘A** in the focused grid selects the visible page. Grid rating/flag actions apply to the selection; Develop actions apply to the active photo. **Photo → Sync Selected Photos** copies selected adjustment groups; composition, masks, and camera profiles are excluded by default.
+5. Press **1–5** to rate, **0** to clear the rating, **P** to pick, **X** to reject, or **U** to clear the flag. With the gallery focused, arrow keys select photos and Return opens Loupe.
+6. Command-click to toggle selection; Shift-click selects a contiguous range on the current page. **⌘A** in the focused grid selects the visible page. Grid rating/flag/metadata actions apply to the selection; Loupe, Compare, Survey and Develop actions apply to the active photo. **Photo → Sync Selected Photos** copies selected adjustment groups; composition, masks, and camera profiles are excluded by default.
 7. Press **⇧⌘E** to export. Choose a format, color space, long-edge size, and filename template. Existing files are preserved.
+
+Press **G / E / C / N** with a photo view focused to open Grid / Loupe / Compare / Survey.
+Compare keeps a Select photo beside a changing Candidate: use arrows to navigate,
+Swap to exchange roles, or Make Select to promote the candidate. Linked zoom/pan
+can be unlocked and synchronized. Survey fits the selected page photos together;
+its remove button only deselects a photo. Click a selected photo to make it active
+without losing the group. Full-resolution comparison and fitted Survey use separate
+preview requests; unchanged comparison frames are retained.
 
 Adjustments save automatically. Each photo supports up to 50 undo steps, named edit versions, and portable recipe bundles. The full recipe editor supports precise curve points and brush paths. Submitted exports retain their original recipe snapshot even if you continue editing.
 
