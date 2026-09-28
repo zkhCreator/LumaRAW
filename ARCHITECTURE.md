@@ -109,6 +109,28 @@ share source-keyed caches; different variants still carry distinct photo/revisio
 identities in asynchronous native requests. This schema upgrade is not a supported
 downgrade path to older application builds.
 
+`stacks.py` owns schema version 4. Stack membership is unique per photo and source:
+one folder stack, plus an independent stack in each regular/Quick collection.
+Folder groups validate exact parent directories. Smart/set sources are flat.
+Summaries project stack count/cover/visibility with SQL joins, anchor group sorting
+to the cover and keep internal order independent of ascending/descending sorting.
+Filtering applies to visible members; `stacked: false` returns a flat query. Pages
+remain capped at 60 even when a stack spans pages. Queries sort narrow IDs/keys
+before reading the page's summaries and family fields. Unfiltered All Photos
+counts use maintained stack sizes; empty stack sources retain the indexed flat
+query path. No pixel worker or recipe JSON participates.
+
+A catalog-wide stack revision is intentionally conservative: every stack mutation
+requires the captured revision and rejects concurrent changes atomically. Collection
+stack edits also advance collection/ancestor revisions. Cleanup triggers remove
+membership on photo/collection removal, promote the first remaining member and
+dissolve singleton stacks. Cross-folder relinking detaches folder membership;
+collection organization remains intact. Collection duplication and Quick saving
+copy scoped stacks inside their enclosing transaction. New virtual copies join
+the origin's expanded folder stack; migration leaves existing variants unchanged.
+Native stack metadata is separate from recipe revisions, and lightweight polling
+refreshes structural changes, including previously empty pages.
+
 `source_identity.py` provides stat-based cache identities without importing pixel
 libraries. The broker returns a page of completed thumbnail paths in one command;
 misses still use bounded image workers. Workers publish JPEG cache entries atomically.

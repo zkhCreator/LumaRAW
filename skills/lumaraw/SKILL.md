@@ -92,6 +92,31 @@ edits. A thumbnail client can use its own `client_id`/`generation` and
 `cancel_preview` to discard obsolete work. Metadata edits preserve the pixel cache;
 recipe, source or LUT changes invalidate it. The Mac shell uses developed images.
 
+## Photo stacks
+
+`list_photos` defaults to source-scoped stacks and includes `stack_revision` plus
+stack ID/count/cover/visibility on each visible row. Folder stacks are separate
+from regular/Quick collection stacks; smart/set views are flat. Collapsed members
+are hidden from filtering and selection. Use `stacked: false` to inspect all
+matching photos without changing saved visibility. Never assume selecting a cover
+authorizes editing or exporting its hidden members.
+
+`stack_photos` takes `photo_ids` (1–60 distinct IDs), `expected_revision` captured
+from the page, an optional `collection_id`, and an action: group, unstack, remove,
+expand, collapse, toggle, top, up or down. For a new group, order IDs as displayed
+and provide its selected `active_id` to choose the cover. Grouping requires at
+least two photos; folder groups require the same exact folder. Grouping two
+collapsed covers moves only the selected photo from the other stack. Remove and
+unstack leave photos, originals and recipes intact. A stale revision is a conflict,
+not permission to refresh and retry the mutation automatically.
+
+`set_stack_visibility` expands/collapses every stack in a captured source, without
+depending on photo selection or metadata filters. Pass `collapsed`, the current
+stack revision and either `collection_id` or `folder` (including descendants).
+Omitting the source affects all folder stacks. `stack_state` reads the revision
+without photo payloads. New virtual copies automatically join an expanded folder
+stack, even when created in a collection; no collection stack is invented.
+
 ## Virtual copies and snapshots
 
 `create_virtual_copies` takes up to 60 `{photo_id, expected_revision,

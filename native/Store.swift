@@ -8,6 +8,10 @@ import UniformTypeIdentifiers
 
 @MainActor final class Store: ObservableObject {
     @Published var photos: [Photo] = []
+    @Published var photoStacks: [Int:PhotoStack] = [:]
+    @Published var stackRevision=0
+    @Published var stackBusy=false
+    @Published var showStacks=true
     @Published var selected: Int?
     @Published var selection: Set<Int> = []
     @Published var photo: Photo?
@@ -161,11 +165,12 @@ import UniformTypeIdentifiers
         guard await flushEdits(),token==pageGeneration else{return}
         do {
             var params: [String: Any] = ["offset":offset,"mode":mode,"search":search,
-                                       "filters":libraryFilters,"sort":librarySort,"descending":sortDescending]
+                                       "filters":libraryFilters,"sort":librarySort,"descending":sortDescending,"stacked":showStacks]
             if let collectionID { params["collection_id"]=collectionID }
             let result=try await Backend.call("list_photos",params)
             guard token==pageGeneration else{return}
             photos=(result["photos"] as? [[String:Any]] ?? []).compactMap(Photo.init)
+            adoptStacks(result)
             total=result["total"] as? Int ?? 0
             offset=result["offset"] as? Int ?? offset
             thumbnails=thumbnails.filter { id,_ in photos.contains{$0.id==id} }

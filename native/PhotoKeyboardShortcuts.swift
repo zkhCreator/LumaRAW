@@ -17,6 +17,22 @@ struct PhotoKeyboardShortcuts: ViewModifier {
                 Task { await s.prepareCopyRemoval() }
             } else { return .ignored }
             return .handled
+        }.onKeyPress(characters:CharacterSet(charactersIn:"sS[]{}")) { press in
+            guard let id=s.selected,s.canStack,s.photoStacks[id] != nil else { return .ignored }
+            if press.modifiers.isEmpty,press.characters == "s" {
+                Task { await s.changeStack("toggle",ids:[id]) };return .handled
+            }
+            if press.modifiers == .shift {
+                let action: String
+                switch press.characters.lowercased() {
+                case "s": action="top"
+                case "[","{": action="up"
+                case "]","}": action="down"
+                default: return .ignored
+                }
+                Task { await s.changeStack(action,ids:[id]) };return .handled
+            }
+            return .ignored
         }.onKeyPress(characters:CharacterSet(charactersIn:"012345pxu\\gecnd/b")) { press in
             guard press.modifiers.isEmpty, s.selected != nil else { return .ignored }
             if let rating=Int(press.characters), (0...5).contains(rating) {

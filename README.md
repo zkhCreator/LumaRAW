@@ -14,10 +14,10 @@ LumaRAW references your originals without changing them. The SwiftUI app and you
 | Color | Custom tone curves, color mixer, camera-bound chart calibration, `.cube` LUTs, ICC soft proofing, and gamut warnings |
 | Detail and composition | Full-resolution 1:1 viewports, noise reduction, sharpening, defringing, rotation, crop, straighten, and perspective |
 | Local adjustments | Radial, gradient, luminance-range, and brush masks; manual lens distortion, vignette, and chromatic-aberration correction |
-| Library | Ratings, flags, color labels, catalog metadata/keywords, regular/live smart collections, nested sets, Quick/target collections, SQL filters/sorting, duplicate/missing indexing, virtual copies/shared snapshots, selective sync, and backup/restore |
+| Library | Ratings, flags, color labels, catalog metadata/keywords, regular/live smart collections, nested sets, Quick/target collections, SQL filters/sorting, manual folder/collection stacks, duplicate/missing indexing, virtual copies/shared snapshots, selective sync, and backup/restore |
 | Culling | Grid/Loupe/Compare/Survey, anchored page selections, active-photo review actions, linked or independent full-resolution comparison viewports |
 | Export | JPEG and 16-bit TIFF with embedded sRGB, Display P3, Adobe RGB, or ProPhoto RGB ICC profiles; persistent queue, pause/cancel/retry, and collision-safe filenames |
-| Agents | 46 MCP tools, equivalent JSON CLI commands, and a bundled skill; app and agent edits share conflict detection |
+| Agents | 49 MCP tools, equivalent JSON CLI commands, and a bundled skill; app and agent edits share conflict detection |
 
 ## Build and run
 
@@ -63,6 +63,18 @@ without losing the group. Full-resolution comparison and fitted Survey use separ
 preview requests; unchanged comparison frames are retained.
 
 Adjustments save automatically. Each photo supports up to 50 undo steps, named snapshots shared by a source’s master and virtual copies, and portable recipe bundles. The full recipe editor supports precise curve points and brush paths. Submitted exports retain their original recipe snapshot even if you continue editing.
+
+Use **Photo → Stacking** to group, unstack, remove members, choose a cover or
+reorder photos. **⌘G / ⇧⌘G** group/unstack; with a photo surface focused, **S**
+expands/collapses, **⇧S** moves to the top, and **⇧[ / ⇧]** move up/down. The count
+badge also expands/collapses. Folder stacks require the same physical folder;
+regular and Quick collections have independent stacks. Smart collections and
+collection sets show individual photos. A collapsed stack selects only its cover,
+so ratings, edits and collection additions do not silently include hidden members.
+Expand all stacks in a source from the menu, or turn off **Library → Show Photo
+Stacks** to search every photo without changing saved stack visibility. New
+virtual copies join an expanded folder stack, including copies created inside a
+collection. Capture-time auto stacking and splitting remain pending.
 
 Use **Collections → New Collection** to create a regular collection or a smart
 collection with live rules. Add/remove selected photos from a regular collection

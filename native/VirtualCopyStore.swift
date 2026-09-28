@@ -85,6 +85,7 @@ extension Store {
     func showPhotoFamily(_ target: Photo,masterOnly: Bool=false) async {
         guard await flushEdits() else { return }
         collectionID=nil;activeCollection=nil;search="";mode="all";workspace="library"
+        showStacks=false
         libraryFilters=["source_id":target.sourceID]
         if masterOnly { libraryFilters["is_virtual"]=false }
         librarySort="imported";sortDescending=false;offset=0

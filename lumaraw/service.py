@@ -26,6 +26,7 @@ from .model import Recipe, ExportOptions, LIMITS, PRESETS, SYNC_GROUPS
 from .organization import Organization
 from .collections import Collections
 from .virtual_copies import VirtualCopies
+from .stacks import Stacks
 from .source_identity import cached_thumbnail
 from .runtime import engine_identity, EngineChangedError
 
@@ -157,7 +158,7 @@ class Service:
             return {**result,'photo_id':row['id'],'revision':row['revision'],'source':row['path']}
         if method=='queue_control':return self.control(p)
         with self.catalog() as c:
-            if method=='photo_summaries':return {'photos':c.summaries(p['photo_ids'])}
+            if method=='photo_summaries':return {'photos':c.summaries(p['photo_ids']),'stack_revision':Stacks(c).revision()}
             if method=='import_photos':
                 def paths():
                     for path in p['paths']:
@@ -168,9 +169,13 @@ class Service:
             if method=='list_photos':
                 mode=p.get('mode','all');search=p.get('search','');offset=p.get('offset',0)
                 filters=p.get('filters');collection=p.get('collection_id')
-                total=c.filtered_count(mode,search,filters,collection)
+                stacked=p.get('stacked',True)
+                total=c.filtered_count(mode,search,filters,collection,stacked)
                 offset=min(offset,max(0,((total-1)//60)*60))
-                return {'photos':c.filtered_page(offset,mode,search,filters,collection,p.get('sort','imported'),p.get('descending',True)),'total':total,'offset':offset,'page_size':60}
+                return {'photos':c.filtered_page(offset,mode,search,filters,collection,p.get('sort','imported'),p.get('descending',True),stacked),'total':total,'offset':offset,'page_size':60,'stack_revision':Stacks(c).revision()}
+            if method=='stack_state':return {'revision':Stacks(c).revision()}
+            if method=='stack_photos':return Stacks(c).change(**p)
+            if method=='set_stack_visibility':return Stacks(c).visibility(**p)
             if method=='list_collections':return Collections(c).list(**p)
             if method=='get_collection':
                 store=Collections(c);row=store.get(p['collection_id'])

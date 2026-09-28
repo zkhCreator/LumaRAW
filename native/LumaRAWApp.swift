@@ -23,6 +23,8 @@ import AppKit
                 Button("Undo Last Adjustment"){store.undo()}.keyboardShortcut("z").disabled(store.photo==nil || store.editing)
             }
             CommandMenu("Photo") {
+                StackActions().environmentObject(store)
+                Divider()
                 Button("Create Virtual Copies") { Task { await store.createVirtualCopies() } }.keyboardShortcut("\"").disabled(store.actionPhotoIDs.isEmpty || store.copyBusy)
                 Button("Set Copy as Master") { Task { await store.setCopyAsMaster() } }.disabled(store.photo?.isVirtual != true || store.copyBusy)
                 Button("Show Master and Copies") { if let photo=store.photo { Task { await store.showPhotoFamily(photo) } } }.disabled(store.photo == nil)
@@ -58,6 +60,7 @@ import AppKit
                 Button("New Collection Set…") { store.editCollection(kind:"set") }
                 Button("Show Quick Collection") { if let quick=store.collectionState?.quick { Task { await store.openCollection(quick) } } }
                 Button("Filter Photos…") { store.showLibraryFilters=true }
+                Toggle("Show Photo Stacks",isOn:Binding(get:{store.showStacks},set:{value in store.showStacks=value;Task { await store.refresh() }}))
                 Button("Refresh Library") { Task { await store.refreshCollections(); await store.refresh() } }
             }
             CommandGroup(after:.toolbar) {

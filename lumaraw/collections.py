@@ -199,6 +199,8 @@ class Collections:
                 id_=self.db.execute("INSERT INTO collections(name,kind,parent_id,created) VALUES(?,'regular',?,?)",
                                    (name.strip(),parent_id,time.time())).lastrowid
                 self.db.execute('INSERT INTO collection_photos SELECT ?,photo_id FROM collection_photos WHERE collection_id=?',(id_,row['id']))
+                from .stacks import Stacks
+                Stacks(self.catalog).duplicate_collection(row['id'],id_)
                 self.touch_ancestors(parent_id);saved=self.get(id_)
             if action=='clear' or clear_after:
                 self.db.execute('DELETE FROM collection_photos WHERE collection_id=?',(row['id'],))
@@ -220,6 +222,8 @@ class Collections:
                     (name.strip() if id_==collection_id else row['name'],row['kind'],json.dumps(row['rules']),row['match'],None,time.time())).lastrowid
                 mapping[id_]=new_id
                 self.db.execute('INSERT INTO collection_photos SELECT ?,photo_id FROM collection_photos WHERE collection_id=?',(new_id,id_))
+                from .stacks import Stacks
+                Stacks(self.catalog).duplicate_collection(id_,new_id)
             for old_id,new_id in mapping.items():
                 parent=original['parent_id'] if old_id==collection_id else mapping[self.get(old_id)['parent_id']]
                 self.db.execute('UPDATE collections SET parent_id=? WHERE id=?',(parent,new_id))

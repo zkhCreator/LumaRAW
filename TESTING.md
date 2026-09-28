@@ -80,7 +80,10 @@ The harness exercises the real native Store and JSON transport: import, RAW prev
 
 The runner compiles all native files except the app entry point, generates five
 small raster files and separate disposable catalogs, then runs the
-15-assertion state, 13-assertion library, 12-assertion culling, 20-assertion review and 14-assertion thumbnail, 17-assertion collection-tree and 19-assertion virtual-copy and 10-assertion service-connection suites. The library suite checks
+15-assertion state, 13-assertion library, 12-assertion culling, 20-assertion review,
+14-assertion thumbnail, 17-assertion collection-tree, 19-assertion virtual-copy,
+10-assertion service-connection and 20-assertion stack suites. Each suite has its own
+fresh image directory, so a relink test cannot move another suite's fixture. The library suite checks
 live smart membership, text search/sort, pagination, empty-filter selection,
 partial metadata writes and independent recipe/metadata conflict handling. JSON
 receipts stay in the ignored work directory. Without `--engine`, it uses the
@@ -121,6 +124,26 @@ starts no image workers.
 
 These probes do not establish rendered disclosure, drag/drop or B-key mixed
 selection equivalence to Lightroom Classic.
+
+## Photo stacks
+
+`tests/test_stacks.py` exercises source isolation, active covers, contiguous sort,
+collapsed selection/filtering, optimistic conflicts, collection ancestor conflicts,
+singleton cleanup, virtual copies, cross-folder relinking, duplication/Quick save,
+bulk source visibility and v3 migration. A 130-member stack crosses three pages
+without returning more than 60 summaries or loading recipes.
+
+`NativeStackRegression` checks the actual Store, scoped badges, visible selection,
+cover changes, external polling, empty-page refresh, collection revisions and flat
+views against a real engine. It does not validate rendered controls or key routing.
+
+```sh
+.venv/bin/python tests/stack_probe.py --work work/stack-probe-01 --rows 10000 --samples 30
+```
+
+The probe creates ten-photo stacks with SQL fixtures, records collapsed/expanded
+pages, filters, a flat baseline and deep offsets. It measures warm in-process
+service latency and peak RSS, with no image workers, photograph processing or UI.
 
 ## Virtual copies
 

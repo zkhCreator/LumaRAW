@@ -79,6 +79,8 @@ def migrate(db):
     migrate_collections(db)
     from .virtual_copies import migrate as migrate_virtual_copies
     migrate_virtual_copies(db)
+    from .stacks import migrate as migrate_stacks
+    migrate_stacks(db)
 
 
 def text_predicate(text):

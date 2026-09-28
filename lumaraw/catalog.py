@@ -223,8 +223,11 @@ class Catalog:
             clauses.append(clause);params.extend(values)
         return (' WHERE '+' AND '.join(clauses) if clauses else ''),params
 
-    def filtered_page(self,offset=0,mode='all',search='',filters=None,collection_id=None,sort='imported',descending=True):
+    def filtered_page(self,offset=0,mode='all',search='',filters=None,collection_id=None,sort='imported',descending=True,stacked=True):
         where,params=self.filter_sql(mode,search,filters,collection_id)
+        if stacked:
+            from .stacks import Stacks
+            return Stacks(self).projection(where,params,collection_id,sort,descending,offset)
         if sort not in SORTS:
             raise ValueError('Unsupported library sort')
         order = 'DESC' if descending else 'ASC'
@@ -240,8 +243,11 @@ class Catalog:
         return [dict(row) for row in self.db.execute(
             f'SELECT {SUMMARY_COLUMNS} FROM photos WHERE id IN ({placeholders}) ORDER BY id',ids)]
 
-    def filtered_count(self,mode='all',search='',filters=None,collection_id=None):
+    def filtered_count(self,mode='all',search='',filters=None,collection_id=None,stacked=True):
         where,params=self.filter_sql(mode,search,filters,collection_id)
+        if stacked:
+            from .stacks import Stacks
+            return Stacks(self).projection(where,params,collection_id)
         return self.db.execute('SELECT count(*) FROM photos'+where,params).fetchone()[0]
 
     def filtered_ids(self,mode='all',search=''):
@@ -287,6 +293,11 @@ class Catalog:
             if hash_file(p)!=old['sha256']: raise ValueError('New file content differs from the indexed original')
         stat=p.stat()
         with self.db:
+            if p.parent != Path(old['path']).parent:
+                # A folder stack cannot span two folders. Collection stacks are
+                # unaffected by relocation of the family's shared original.
+                self.db.execute("DELETE FROM stack_members WHERE scope='folder' AND photo_id IN "
+                                '(SELECT id FROM photos WHERE source_id=?)',(old['source_id'],))
             self.db.execute('UPDATE photo_sources SET revision=revision+1 WHERE id=?',(old['source_id'],))
             self.db.execute("UPDATE photos SET path=?,name=?,bytes=?,mtime=?,missing=0,error='' WHERE source_id=?",(str(p),p.name,stat.st_size,stat.st_mtime_ns,old['source_id']))
             self.db.execute("UPDATE jobs SET source=? WHERE source_id=? AND state IN ('pending','interrupted','failed','cancelled')",(str(p),old['source_id']))

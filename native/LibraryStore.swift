@@ -18,6 +18,7 @@ extension Store {
 
     func openCollection(_ collection: LibraryCollection) async {
         activeCollection=collection
+        showStacks=true
         collectionID=collection.id; mode="all"; workspace="library"; offset=0
         await refresh()
     }

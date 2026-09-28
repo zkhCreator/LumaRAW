@@ -90,6 +90,7 @@ class VirtualCopies:
 
     def create(self, targets, collection_id=None, expected_collection_revision=None):
         from .collections import Collections
+        from .stacks import Stacks
         if len({target['photo_id'] for target in targets}) != len(targets):
             raise ValueError('Duplicate photo targets are not allowed')
         with self.db:
@@ -112,6 +113,7 @@ class VirtualCopies:
                 if collection:
                     self.db.execute('INSERT INTO collection_photos VALUES(?,?)', (collection_id, new_id))
                 ids.append(new_id)
+                Stacks(self.catalog).copy_created(row,new_id)
             self.touch(row['source_id'] for row in rows)
             if collection:
                 self.db.execute('UPDATE collections SET revision=revision+1 WHERE id=?', (collection_id,))

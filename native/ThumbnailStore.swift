@@ -12,10 +12,16 @@ extension Store {
     func refreshVisibleSummaries() async {
         let snapshot=photos
         let ids=snapshot.map(\.id)
-        guard !browsing,!ids.isEmpty else { return }
+        guard !browsing else { return }
+        if ids.isEmpty {
+            if let result=try? await Backend.call("stack_state"),let revision=result["revision"] as? Int,
+               !browsing,photos.isEmpty,revision != stackRevision { await refresh() }
+            return
+        }
         do {
             let result=try await Backend.call("photo_summaries",["photo_ids":ids])
             guard !browsing,photos.map(\.id) == ids else { return }
+            if let revision=result["stack_revision"] as? Int,revision != stackRevision { await refresh();return }
             let rows=result["photos"] as? [[String:Any]] ?? []
             if rows.count != ids.count { await refresh();return }
             for row in rows {

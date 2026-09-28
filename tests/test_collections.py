@@ -13,6 +13,7 @@ from lumaraw.catalog import Catalog
 from lumaraw.collections import Collections
 from lumaraw.library import backup_catalog,restore_catalog
 from lumaraw.service import Service
+from lumaraw.runtime import CATALOG_VERSION
 
 
 @pytest.fixture
@@ -154,7 +155,7 @@ def test_legacy_collection_migration_persistence_and_backup(tmp_path):
     backup_catalog(c,tmp_path/'backup');c.close()
     restored=restore_catalog(tmp_path/'backup',tmp_path/'restored');c=Catalog(restored)
     assert Collections(c).state()==state
-    assert c.db.execute('PRAGMA user_version').fetchone()[0]==3
+    assert c.db.execute('PRAGMA user_version').fetchone()[0]==CATALOG_VERSION
     c.close()
 
 

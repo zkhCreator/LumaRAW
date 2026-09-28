@@ -19,6 +19,8 @@ Official references checked September 2026:
 - [Develop tools](https://helpx.adobe.com/lightroom-classic/desktop/process-and-develop-photos/develop-module-tools.html)
 - [Loupe, Compare and Survey](https://helpx.adobe.com/lightroom-classic/desktop/viewing-photos/browse-compare-photos.html)
 - [Keyboard shortcuts](https://helpx.adobe.com/lightroom-classic/desktop/introduction-to-lightroom-classic/keyboard-shortcuts.html)
+- [Photo stacks and source boundaries](https://helpx.adobe.com/lightroom-classic/desktop/organize-photos-in-lightroom-classic/grouping-photos-stacks.html)
+- [Stacking shortcuts, Adobe's Julieanne Kost](https://jkost.com/blog/2024/07/stacking-similar-photos-in-lightroom-classic.html)
 
 ## Feature inventory
 
@@ -29,7 +31,7 @@ gaps. Nothing below is full Lightroom parity merely because historical tests pas
 | --- | --- | --- |
 | Import and catalogs | Partial: referenced originals, backup/restore | Import preview/selection, copy workflows, metadata/develop presets, catalog switching/merge |
 | Library navigation | Partial: bounded grid/filmstrip, filters/sorting, regular/smart/Quick collections and nested sets | Folder tree, collection drag/drop/color labels, full smart criteria/import-export, source-selection memory, desktop acceptance |
-| Organization | Partial: duplicate/missing detection, flat keywords, title/caption/copyright, labels, batch metadata and virtual copies | Keyword hierarchy, complete IPTC, stacks, rename and sidecars |
+| Organization | Partial: duplicate/missing detection, flat keywords, title/caption/copyright, labels, batch metadata, virtual copies and manual scoped stacks | Keyword hierarchy, complete IPTC, stack splitting/auto stacking, rename and sidecars |
 | Culling | Partial: Loupe/Compare/Survey, linked detail, anchored page selection | Desktop acceptance, cross-page selection, Develop reference view, auto advance, persistent workspace state |
 | Basic development | Partial: light/WB/color | Calibrated absolute WB, eyedropper, texture/clarity/dehaze, complete HSL/B&W and color grading |
 | Curves and profiles | Partial: custom composite curve, LUT/ICC | Interactive RGB curves, camera/profile browser, compatible preset import/export |
@@ -49,9 +51,10 @@ gaps. Nothing below is full Lightroom parity merely because historical tests pas
 
 ## Active increment
 
-Broker compatibility: identity negotiation, single-owner admission, idle handoff
-with durable queue preservation, worker-build checks and native reconnection.
-Photo stacks and the remaining feature inventory follow this integration work.
+Photo stacks: manual grouping, independent folder/collection scope, visibility,
+cover/order, virtual-copy integration, lifecycle cleanup and bounded SQL pages.
+Capture-time auto stacking and splitting follow this increment; the remaining
+feature inventory stays in scope.
 
 ## Evidence log
 
@@ -99,7 +102,8 @@ whole-desktop latency, or performance guarantees on other hardware. Reproduce vi
 
 ### Next work
 
-Continue with virtual copies and keyword hierarchy. Offline preview caches,
+Continue with stable collection identities, capture-time auto stacking, stack
+splitting, folder navigation and keyword hierarchy. Offline preview caches,
 cache-size controls and native polling/process-startup costs remain pending. Then close Develop and
 export gaps in the inventory. Preserve pending desktop/older-OS acceptance rather
 than removing it from the completion criteria.
@@ -343,3 +347,71 @@ The app built without Swift warnings and passed ad-hoc signature verification af
 the bundled service-compatibility instructions were updated. The 189-file source
 archive passed the extracted strict source check. Desktop alerts/Settings and
 macOS 14 runtime still require separate verification.
+
+### Manual photo stacks increment
+
+Folder and regular/Quick collection stacks now have separate persistent membership.
+New groups use the active photo as cover, then display order; expanded members stay
+contiguous under every sort. Grouping collapsed covers moves only the selected
+cover from another stack. Group/unstack, expand/collapse, remove, cover selection,
+up/down and source-wide visibility are available through shared APIs and Mac menus.
+Count badges and scoped S/Shift-S/bracket actions are wired to these commands.
+
+New virtual copies join an expanded folder stack, including creation inside a
+collection. Collection removal, copy removal and cross-folder relinking clean up
+membership; singleton stacks dissolve without deleting photos. Collection duplicate
+and Quick save preserve independent stack organization. Stack changes use a
+catalog-wide revision; collection/ancestor revisions protect subtree operations.
+Deleting even an unstacked collection invalidates captured stack requests, including
+when the legacy collection schema reuses its ID for a new collection. Stable IDs
+for other collection commands remain a follow-up.
+Schema v4 preserves old photos and leaves existing variants ungrouped on migration.
+
+Collapsed children are excluded from filtered pages and selection. The explicit
+flat-view option exposes them without changing saved stack visibility; family
+navigation uses this view. External stack changes refresh native pages, including
+an empty page. This filter policy, Quick-stack behavior and collection stack copy
+behavior still need direct Lightroom desktop comparison.
+
+Queries select at most 60 narrow IDs/sort keys before fetching summaries. All Photos
+uses maintained stack sizes for counting; empty stack sources use the existing
+indexed path. Warm synthetic measurements on macOS 26.6.2 arm64, 128 GB, 30 samples,
+ten photos per stack, with no image work or concurrent build/test workload:
+
+| Operation | 10,000 photos median / p95 | 100,000 photos median / p95 |
+| --- | ---: | ---: |
+| Collapsed page | 7.561 / 7.789 ms | 50.151 / 51.153 ms |
+| Collapsed filename sort | 7.450 / 8.092 ms | 49.491 / 50.257 ms |
+| Collapsed rating filter | 7.814 / 8.448 ms | 55.775 / 57.947 ms |
+| Expanded page | 9.565 / 9.949 ms | 71.218 / 72.133 ms |
+| Expanded final page | 11.500 / 11.922 ms | 102.479 / 107.480 ms |
+| Flat baseline | 3.357 / 3.467 ms | 3.603 / 3.689 ms |
+
+Process peak RSS was 44.44 MB / 73.06 MB respectively; worker peak was zero.
+The initial 100k implementation measured 187.405 ms median for an expanded page
+and 274.431 ms for its final page on the same host/fixture configuration. The
+narrow page and count changes reduced these observed costs. These are in-process
+service/SQLite measurements, excluding IPC, RAW processing and desktop latency.
+
+Remaining stack work: capture-time auto stacking, splitting, ordinal member badges,
+cross-page cover focus and direct Lightroom interaction acceptance. Rendered Mac
+controls, shortcuts, VoiceOver and macOS 14 runtime remain unverified.
+
+Required-Metal Python verification: **168 passed, 2 real-NEF tests skipped**.
+Thirteen stack tests cover migration, ordering, source isolation, stale commands,
+cleanup, duplication, bulk visibility and legacy collection-ID reuse. The native
+runner now generates a fresh image directory for every suite: the thumbnail
+relink test previously moved a shared fixture, which caused a later suite to
+import four photos instead of five. The stack suite explicitly checks all five
+imports before testing its workflows. No personal catalog or source was touched.
+
+A fresh remote audit still found only `origin/main` at the baseline; no additional
+branches or worktrees needed integration. Development changes remain on the
+`codex/lightroom-classic-mac` branch.
+
+All nine native suites passed against the final self-contained engine: **140
+assertions**, including 20 stack assertions. The Mac app built without Swift
+warnings and passed ad-hoc signature verification. The bundled engine manifest
+matches the final engine source. Native state checks are not rendered desktop,
+keyboard routing, VoiceOver or macOS 14 runtime evidence.
+The 195-file source-only archive also passed its extracted strict public check.

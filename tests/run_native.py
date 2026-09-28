@@ -21,7 +21,7 @@ def main():
     parser=argparse.ArgumentParser()
     parser.add_argument('--work',type=Path,required=True)
     parser.add_argument('--engine',type=Path,default=Path(sys.executable).with_name('lumaraw'))
-    suites=('NativeStateRegression','NativeLibraryRegression','NativeSelectionRegression','NativeReviewRegression','NativeThumbnailRegression','NativeCollectionRegression','NativeVirtualCopyRegression','NativeConnectionRegression')
+    suites=('NativeStateRegression','NativeLibraryRegression','NativeSelectionRegression','NativeReviewRegression','NativeThumbnailRegression','NativeCollectionRegression','NativeVirtualCopyRegression','NativeConnectionRegression','NativeStackRegression')
     parser.add_argument('--suite',choices=suites,action='append',help='Run selected suites; default: all')
     args=parser.parse_args()
     work=args.work.resolve()
@@ -30,17 +30,21 @@ def main():
     work.mkdir(parents=True)
     root=Path(__file__).resolve().parents[1]
     sources=sorted(path for path in (root/'native').glob('*.swift') if path.name != 'LumaRAWApp.swift')
-    paths=[]
-    for index,color in enumerate(('navy','orange','green','purple','teal')):
-        path=work/f'photo-{index}.png'
-        Image.new('RGB',(160,100),color).save(path)
-        paths.append(str(path))
     for suite in args.suite or suites:
+        # Relink/eviction suites deliberately move their own originals. Every
+        # suite needs fresh files as well as its own catalog, independent of order.
+        fixtures=work/'fixtures'/suite
+        fixtures.mkdir(parents=True)
+        paths=[]
+        for index,color in enumerate(('navy','orange','green','purple','teal')):
+            path=fixtures/f'photo-{index}.png'
+            Image.new('RGB',(160,100),color).save(path)
+            paths.append(str(path))
         executable=work/suite
         subprocess.run(['xcrun','swiftc','-swift-version','5','-parse-as-library',
             '-target','arm64-apple-macosx14.0','-module-cache-path',str(work/'module-cache'),
             *map(str,sources),str(root/'tests'/f'{suite}.swift'),'-o',str(executable)],check=True)
-        suite_paths=paths if suite in ('NativeSelectionRegression','NativeReviewRegression','NativeThumbnailRegression','NativeCollectionRegression','NativeVirtualCopyRegression') else paths[:2]
+        suite_paths=paths if suite in ('NativeSelectionRegression','NativeReviewRegression','NativeThumbnailRegression','NativeCollectionRegression','NativeVirtualCopyRegression','NativeStackRegression') else paths[:2]
         env={**os.environ,'LUMARAW_ENGINE':str(args.engine.resolve()),
             'LUMARAW_CATALOG':str(work/'catalogs'/suite),'LUMARAW_TEST_FIXTURES':'|'.join(suite_paths)}
         fixture=None
