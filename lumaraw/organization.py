@@ -190,7 +190,11 @@ class Organization:
     def edit_metadata(self, targets, patch):
         from .keywords import Keywords
         store = Keywords(self.catalog)
-        fields = {k: v for k, v in patch.items() if k != 'keywords'}
+        fields = {k: v for k, v in patch.items() if k not in ('keywords','keyword_ids','keyword_additions')}
+        if 'keywords' in patch and ('keyword_ids' in patch or 'keyword_additions' in patch):
+            raise ValueError('Choose keyword text replacement or identity replacement, not both')
+        if 'keyword_additions' in patch and 'keyword_ids' not in patch:
+            raise ValueError('Keyword additions require the complete replacement keyword IDs')
         if set(fields) - {'title', 'caption', 'copyright', 'color_label', 'copy_name'}:
             raise ValueError('Unsupported descriptive metadata field')
         with self.db:
@@ -198,6 +202,8 @@ class Organization:
             ids = store.check_targets(targets)
             if 'keywords' in patch:
                 store.replace(ids, patch['keywords'])
+            if 'keyword_ids' in patch:
+                store.replace_ids(ids, patch['keyword_ids'], patch.get('keyword_additions',()))
             for photo_id in ids:
                 if fields:
                     self.db.execute('UPDATE photos SET ' + ','.join(f'{key}=?' for key in fields)

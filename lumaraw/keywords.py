@@ -104,13 +104,13 @@ class Keywords:
             keyword_id = row['parent_id']
         return list(reversed(result))
 
-    def photo(self, photo_id):
+    def photo(self, photo_id, limit=100, offset=0):
         rows = self.db.execute('WITH RECURSIVE paths(id,parent_id,path,depth) AS ('
             'SELECT k.id,k.parent_id,k.name,1 FROM keywords k JOIN keyword_photos p '
             'ON p.keyword_id=k.id WHERE p.photo_id=? UNION ALL '
             "SELECT p.id,k.parent_id,k.name || ' | ' || p.path,p.depth+1 "
             'FROM paths p JOIN keywords k ON k.id=p.parent_id WHERE p.depth<32) '
-            'SELECT id,path FROM paths WHERE parent_id IS NULL ORDER BY casefold(path),id', (photo_id,))
+            'SELECT id,path FROM paths WHERE parent_id IS NULL ORDER BY casefold(path),id LIMIT ? OFFSET ?', (photo_id,limit,offset))
         return [{'id':row[0], 'path':row[1]} for row in rows]
 
     def list(self, parent_id=None, offset=0, search='', photo_ids=()):
@@ -291,6 +291,16 @@ class Keywords:
     def replace(self, photo_ids, values):
         """Inside the caller's metadata transaction; failure rolls back all tags."""
         ids = set(self.resolve(value) for value in values)
+        self.replace_ids(photo_ids, ids)
+
+    def replace_ids(self, photo_ids, keyword_ids, additions=()):
+        """Replace complete assignments by stable identity in the caller's transaction."""
+        ids = set(keyword_ids)
+        for keyword_id in ids:
+            self.get(keyword_id)
+        ids.update(self.resolve(value) for value in additions)
+        if len(ids) > 100:
+            raise ValueError('A photo cannot have more than 100 directly assigned keywords')
         for photo_id in photo_ids:
             self.db.execute('DELETE FROM keyword_photos WHERE photo_id=?', (photo_id,))
             self.db.executemany('INSERT INTO keyword_photos VALUES(?,?)', [(photo_id, id_) for id_ in ids])

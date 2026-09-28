@@ -10,6 +10,7 @@ struct InspectorView:View {
     @State private var color=true
     @State private var reset=false
     @State private var exportMetadataPhoto: Int?
+    @State private var keywordPhoto: Photo?
     var body:some View {
         ScrollView {
             VStack(alignment:.leading,spacing:18){
@@ -21,6 +22,9 @@ struct InspectorView:View {
                         Menu("Photo Variants") { VirtualCopyActions(photo:p) }
                         if !p.title.isEmpty { Text(p.title).font(.headline) }
                         if !p.keywords.isEmpty { Text(p.keywords.joined(separator:", ")).font(.caption).foregroundStyle(.secondary) }
+                        if p.keywordsDeferred {
+                            Button("Review \(p.keywordCount) Keywords…") { keywordPhoto=p }
+                        }
                         Button("Edit Metadata…") { Task { await s.prepareMetadataEditor() } }
                         Button("Will Export…") { exportMetadataPhoto=p.id }
                         Button("Go to Folder in Library") { Task { await s.showPhotoFolder(p) } }
@@ -104,6 +108,7 @@ struct InspectorView:View {
         .sheet(isPresented:Binding(get:{exportMetadataPhoto != nil},set:{if !$0 { exportMetadataPhoto=nil }})) {
             if let exportMetadataPhoto { ExportMetadataSheet(photoID:exportMetadataPhoto) }
         }
+        .sheet(item:$keywordPhoto) { PhotoKeywordsSheet(photo:$0) }
         .confirmationDialog("Reset all adjustments for this photo?",isPresented:$reset,titleVisibility:.visible){Button("Reset Adjustments",role:.destructive){s.apply(s.defaults)};Button("Cancel",role:.cancel){}}message:{Text("The original is unchanged. You can undo this action.")}
     }
     func bool(_ key:String)->Binding<Bool>{Binding(get:{s.recipe[key] as? Bool ?? false},set:{s.set(key,$0)})}

@@ -218,6 +218,18 @@ The keyword layer stores export flags but does not encode image metadata.
 Vocabulary file exchange, keyword sets/suggestions, Painter and metadata undo
 remain separate workflows; hierarchical catalog storage does not establish those.
 
+`keyword_details.py` bounds photo keyword descriptions without changing assignments.
+Photo reads retain every assigned ID and count. A recursive byte-length query
+measures escaped names without concatenating all paths; paths above the 32 KiB
+inline budget are explicitly deferred. Twenty-path detail pages bind to the photo's
+metadata revision, which ancestor edits already invalidate. Assignment pickers
+query twenty full paths by IDs or name/synonym search; they do not load the whole
+vocabulary. Metadata replacement accepts complete existing IDs plus optional new
+text paths in one transaction, validating targets, identities, ambiguity and the
+combined 100-assignment bound before commit. Receipts return compact IDs/defer
+state. Native pickers keep drafts local and preserve unmodified assignments and
+independent recipe revisions.
+
 `keyword_exports.py` owns schema version 11, adding three keyword export flags
 and immutable per-job metadata snapshots/receipts. Projection walks explicitly
 assigned tags and their ancestors until a containing-keyword flag stops traversal.

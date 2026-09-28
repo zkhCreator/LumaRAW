@@ -17,7 +17,7 @@ LumaRAW references your originals without changing them. The SwiftUI app and you
 | Library | Folder tree/search/favorites/labels, ratings, flags, catalog metadata/keywords, regular/live smart collections, nested sets, Quick/target collections, SQL filters/sorting, manual/capture-time stacks, duplicate/missing indexing, virtual copies/shared snapshots, selective sync, and backup/restore |
 | Culling | Grid/Loupe/Compare/Survey, anchored page selections, active-photo review actions, linked or independent full-resolution comparison viewports |
 | Export | JPEG and 16-bit TIFF with embedded sRGB, Display P3, Adobe RGB, or ProPhoto RGB ICC profiles; frozen catalog XMP/keyword policies, persistent queue, pause/cancel/retry, and collision-safe filenames |
-| Agents | 74 MCP tools, equivalent JSON CLI commands, and a bundled skill; app and agent edits share conflict detection |
+| Agents | 76 MCP tools, equivalent JSON CLI commands, and a bundled skill; app and agent edits share conflict detection |
 
 ## Build and run
 
@@ -142,6 +142,12 @@ also includes nested keywords and clears other source/filter restrictions.
 The metadata editor accepts qualified paths such as `Places | Coast` (also `>` or
 reversed `<`). Equal leaf names under different parents retain separate IDs;
 ambiguous unqualified names require a path. Keyword changes remain in the catalog.
+Long assignment lists open **Review Keywords…** in the inspector. Full paths are
+paged without shortening names. **Choose Existing Keywords…** in the metadata
+form builds a replacement selection; additional typed paths can create new tags.
+Picker changes stay local until the metadata form is saved. Unchanged single-photo
+assignments are preserved while editing other fields, and batch replacement uses
+complete tag identities rather than resending large display paths.
 Keyword forms include **Include on Export**, **Export Containing Keywords** and
 **Export Synonyms**. Each parent can stop traversal to higher ancestors; excluded
 names and their synonyms are omitted from flat keywords and hierarchy paths.

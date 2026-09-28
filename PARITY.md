@@ -59,9 +59,9 @@ gaps. Nothing below is full Lightroom parity merely because historical tests pas
 
 ## Active increment
 
-Bounded folder-sync metadata summaries and complete revision-bound detail views.
-Next close the reproduced full-photo keyword payload gap, then continue keyword
-sets and vocabulary exchange. The remaining inventory stays in scope.
+Bounded full-photo keyword details and complete identity-based metadata editing.
+Next bound complete vocabulary-browser metadata, then continue keyword sets and
+vocabulary exchange. The remaining inventory stays in scope.
 
 ## Evidence log
 
@@ -109,7 +109,7 @@ whole-desktop latency, or performance guarantees on other hardware. Reproduce vi
 
 ### Next work
 
-Continue with bounded full-photo keyword details, keyword sets and vocabulary exchange, complete synchronization import options, relocation edge cases, stack ordinal badges and
+Continue with bounded vocabulary-browser metadata, keyword sets and vocabulary exchange, complete synchronization import options, relocation edge cases, stack ordinal badges and
 cross-page cover focus. Offline preview caches,
 cache-size controls and native polling/process-startup costs remain pending. Then close Develop and
 export gaps in the inventory. Preserve pending desktop/older-OS acceptance rather
@@ -926,3 +926,65 @@ the same broker limit. list_photos and photo_summaries remain compact at 664 and
 paged contract before claiming the complete extreme-keyword workflow. Full Import Dialog,
 reference-app metadata semantics, rendered desktop/VoiceOver, macOS 14 runtime
 and the rest of the non-AI inventory remain pending.
+
+### Complete keyword details and identity editing increment
+
+Photo details always retain all keyword IDs and the assignment count. Small path
+arrays remain inline; a 32 KiB description budget explicitly defers large path
+arrays. A numeric recursive SQL query measures escaped ancestor-name lengths
+without materializing every repeated long path for routine recipe/detail reads.
+Revision-bound twenty-path pages return complete names. The Mac inspector opens
+the paged review, while the metadata form provides a paged keyword picker with a
+local replacement draft. Additional typed paths are still supported. Only saving
+the parent form changes photo assignments; unchanged single-photo assignments and
+unchecked batch fields remain intact.
+
+Identity replacement validates all photo revisions, all existing IDs, new path
+ambiguity and the combined 100-assignment limit inside one transaction. Failure
+rolls back new tags as well as metadata. Receipts carry compact identities and
+defer state, preserving independent recipe revisions. Legacy literal names are
+retained by identity instead of reparsing display separators.
+
+The exact previously failing fixture now returns **1,968 bytes** for get_photo,
+including all 100 IDs, versus **3,054,478 bytes** previously. A complete twenty-path
+page is 305,619 bytes. Real-broker tests cover all five pages, recipe/rating replies,
+batch replacements and new typed paths, independent virtual copies and actual
+JPEG output. Required-Metal Python regression passed **303 tests, no skips**, with
+the pinned Nikon D3S NEF. The source-engine native keyword-detail suite passed
+**21 assertions**, including draft-only selection, complete readback, stale/wrong
+reply rejection and metadata saves that preserve the local recipe revision.
+
+The final macOS 14-target app built and passed local ad-hoc signature verification
+on macOS 26.6.2. Its engine manifest matches generation 11 / schema 11 / 76 tools.
+All sixteen native suites passed **292 assertions against the packaged engine**.
+Build and regression logs contain no compiler warnings or errors. Public source
+checks covered 246 files without findings, including the extracted source archive.
+These checks do not establish rendered desktop behavior or macOS 14 runtime support.
+
+Warm synthetic measurements on macOS 26.6.2 arm64, 128 GB RAM. Each catalog has
+1,141 tags; ordinary rows have two assignments and one row has 100 maximal
+32-level Unicode paths. Reads use 30 samples, sixty-photo replacements five.
+
+| Operation | 10,000 photos median / p95 | 100,000 photos median / p95 |
+| --- | ---: | ---: |
+| Ordinary photo detail | 1.168 / 1.276 ms | 1.182 / 3.622 ms |
+| Deep-keyword photo detail | 3.875 / 4.132 ms | 3.943 / 4.015 ms |
+| First twenty-path page | 10.351 / 11.257 ms | 10.730 / 11.560 ms |
+| Last twenty-path page | 14.441 / 17.431 ms | 15.120 / 18.336 ms |
+| Twenty selected keyword choices | 4.118 / 4.459 ms | 4.115 / 4.353 ms |
+| Name-search choices | 1.582 / 1.698 ms | 1.664 / 1.853 ms |
+| Replace sixty photos, including revision read | 79.699 / 83.738 ms | 81.716 / 84.127 ms |
+| Peak process RSS | 53.78 MB | 63.59 MB |
+
+Deep photo responses were 2,110 / 2,111 bytes in those separately named fixtures;
+path and picker pages stayed below 316 KiB. No image workers ran. Timings include
+in-process service/SQLite work and exclude photographs, IPC and desktop rendering.
+Reproduce with tests/keyword_details_probe.py. A separate valid vocabulary fixture
+with sixty maximal-depth children and thirty maximal Unicode synonyms per child
+produces **1,844,675 bytes** from list_keywords, above the broker limit. The new
+twenty-row identity picker stays at **315,320 bytes** for those same choices.
+The existing vocabulary browser/editor needs compact summaries plus complete
+on-demand metadata before that separate case can be accepted.
+Keyword sets, vocabulary exchange, suggestions, metadata undo and Painter remain
+pending, along with rendered desktop/VoiceOver, macOS 14 runtime and the remaining
+non-AI inventory.

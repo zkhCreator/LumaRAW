@@ -36,6 +36,7 @@ from .runtime import engine_identity, EngineChangedError
 from .folder_sync import FolderSync
 from .folder_sync_runner import FolderSyncRunner
 from .keyword_exports import KeywordExports
+from .keyword_details import KeywordDetails
 
 class ConflictError(ValueError): pass
 
@@ -232,8 +233,11 @@ class Service:
             if method=='edit_metadata':
                 ids=Organization(c).edit_metadata(p['targets'],p['patch'])
                 first=c.photo(ids[0])
-                return {'updated':[{'photo_id':photo_id,'metadata_revision':c.photo(photo_id)['metadata_revision']} for photo_id in ids],
-                        'patch':{key:first[key] for key in p['patch']}}
+                accepted={key:first[key] for key in p['patch'] if key not in ('keywords','keyword_ids','keyword_additions')}
+                if any(key in p['patch'] for key in ('keywords','keyword_ids')):
+                    accepted.update({key:first[key] for key in ('keywords','keyword_tags','keyword_ids','keyword_count','keywords_deferred')})
+                return {'updated':[{'photo_id':photo_id,'metadata_revision':c.db.execute(
+                    'SELECT metadata_revision FROM photos WHERE id=?',(photo_id,)).fetchone()[0]} for photo_id in ids], 'patch':accepted}
             if method=='create_virtual_copies':
                 if ('collection_id' in p) != ('expected_collection_revision' in p):
                     raise ValueError('Collection ID and revision must be provided together')
@@ -241,6 +245,8 @@ class Service:
             if method=='remove_virtual_copies':return VirtualCopies(c).remove(p['targets'])
             if method=='set_copy_as_master':return unpack(VirtualCopies(c).promote(p))
             if method=='get_photo':return unpack(self.require(c,p['photo_id']))
+            if method=='get_photo_keywords':return KeywordDetails(c).photo(**p)
+            if method=='keyword_choices':return KeywordDetails(c).choices(**p)
             if method in ('edit_photo','undo_photo','restore_version','load_recipe'):
                 row=self.check_revision(c,p['photo_id'],p['expected_revision'])
                 if method=='edit_photo':

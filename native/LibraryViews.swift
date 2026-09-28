@@ -177,6 +177,8 @@ struct MetadataEditor: View {
     @State private var caption: String
     @State private var copyright: String
     @State private var keywords: String
+    @State private var keywordIDs: [Int]?
+    @State private var choosingKeywords=false
     @State private var label: String
     @State private var fields: Set<String>
     @State private var saving=false
@@ -189,6 +191,7 @@ struct MetadataEditor: View {
         _caption=State(initialValue:first?.caption ?? "")
         _copyright=State(initialValue:first?.copyright ?? "")
         _keywords=State(initialValue:first?.keywords.joined(separator:", ") ?? "")
+        _keywordIDs=State(initialValue:first?.keywordsDeferred == true ? first?.keywordIDs:nil)
         _label=State(initialValue:first?.colorLabel ?? "none")
         _fields=State(initialValue:targets.count == 1 ? ["copy_name","title","caption","copyright","keywords","color_label"]:[])
     }
@@ -207,7 +210,11 @@ struct MetadataEditor: View {
                 Toggle("Apply title",isOn:enabled("title")); TextField("Title",text:$title).disabled(!fields.contains("title"))
                 Toggle("Apply caption",isOn:enabled("caption")); TextField("Caption",text:$caption,axis:.vertical).lineLimit(3...5).disabled(!fields.contains("caption"))
                 Toggle("Apply copyright",isOn:enabled("copyright")); TextField("Copyright",text:$copyright).disabled(!fields.contains("copyright"))
-                Toggle("Apply keywords",isOn:enabled("keywords")); TextField("Keywords, separated by commas",text:$keywords).disabled(!fields.contains("keywords"))
+                Toggle("Apply keywords",isOn:enabled("keywords"))
+                if let keywordIDs { Text("\(keywordIDs.count) existing keywords selected").font(.caption) }
+                Button("Choose Existing Keywords…") { choosingKeywords=true }.disabled(!fields.contains("keywords"))
+                TextField(keywordIDs == nil ? "Keywords, separated by commas":"Additional keyword paths, separated by commas",text:$keywords)
+                    .disabled(!fields.contains("keywords"))
                 Toggle("Apply color label",isOn:enabled("color_label"))
                 Picker("Color label",selection:$label) {
                     ForEach(LibraryLabels.names,id:\.self) { Text($0.capitalized).tag($0) }
@@ -219,8 +226,12 @@ struct MetadataEditor: View {
                 Button("Save Metadata") {
                     var patch: [String: Any] = [:]
                     for (key,value) in [("copy_name",copyName),("title",title),("caption",caption),("copyright",copyright),("color_label",label)] where fields.contains(key) { patch[key]=value }
-                    if fields.contains("keywords"),let values=metadataKeywordReplacement(keywords,original:targets.first?.keywords ?? [],targetCount:targets.count) {
-                        patch["keywords"]=values
+                    if fields.contains("keywords") {
+                        if let keywordIDs {
+                            patch.merge(metadataKeywordIdentityReplacement(keywordIDs,additions:keywords,original:targets.first?.keywordIDs ?? [],targetCount:targets.count)) { _,new in new }
+                        } else if let values=metadataKeywordReplacement(keywords,original:targets.first?.keywords ?? [],targetCount:targets.count) {
+                            patch["keywords"]=values
+                        }
                     }
                     if patch.isEmpty { dismiss();return }
                     saving=true
@@ -228,5 +239,11 @@ struct MetadataEditor: View {
                 }.keyboardShortcut(.defaultAction).disabled(fields.isEmpty || saving)
             }
         }.padding(24).frame(width:560,height:720)
+            .sheet(isPresented:$choosingKeywords) {
+                KeywordSelectionSheet(ids:keywordIDs ?? targets.first?.keywordIDs ?? []) { ids in
+                    if keywordIDs == nil,keywords == targets.first?.keywords.joined(separator:", ") { keywords="" }
+                    keywordIDs=ids
+                }
+            }
     }
 }

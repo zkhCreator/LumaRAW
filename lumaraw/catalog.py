@@ -2,6 +2,7 @@
 
 Inputs: explicit local paths and validated recipes. Outputs: paginated rows/jobs.
 Responsibilities: store references, edits, undo history, and export snapshots.
+Photo details keep complete keyword IDs; large display paths use explicit pages.
 Boundaries: never copy/write original photos; never eagerly load full catalogs.
 Each connection belongs to its creating thread. Bulk insertion commits in batches.
 """
@@ -130,9 +131,8 @@ class Catalog:
         if not row:
             return None
         result = dict(row)
-        from .keywords import Keywords
-        result['keyword_tags'] = Keywords(self).photo(photo_id)
-        result['keywords'] = [tag['path'] for tag in result['keyword_tags']]
+        from .keyword_details import KeywordDetails
+        result.update(KeywordDetails(self).summary(photo_id))
         return result
 
     def recipe(self, photo_id):

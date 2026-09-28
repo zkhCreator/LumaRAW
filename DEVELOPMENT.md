@@ -72,6 +72,12 @@ when a clear function is more maintainable. Avoid unrelated formatting churn.
   paths and invalidate affected photo metadata revisions on ancestor rename/move.
   Batch tag addition/removal preserves unrelated assignments; replacing a string
   list must reject ambiguous leaf names instead of picking an arbitrary branch.
+  Full-photo reads always retain complete assignment IDs. A deferred path array is
+  not an empty assignment set; use revision-bound pages for full labels and ID
+  replacement for editing. Validate newly typed paths and all existing IDs within
+  the same transaction as the other metadata fields. Native keyword pickers hold
+  local drafts until the parent form saves, preserving unchecked fields and stale
+  revision failures. Metadata receipts must not adopt a newer recipe revision.
 
 ## Engine changes and handoff
 

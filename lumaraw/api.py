@@ -81,7 +81,13 @@ tool('create_virtual_copies','Atomically create up to 60 independent catalog var
 tool('remove_virtual_copies','Remove only virtual copies and their private history/memberships; preserve originals, shared snapshots and queued export snapshots.',{'targets':array(obj(COPY_REMOVE,COPY_REMOVE),60)},['targets'])
 TOOLS['remove_virtual_copies']['annotations']['destructiveHint']=True
 tool('set_copy_as_master','Promote a virtual copy and demote the old master without changing IDs, recipes, collections or originals.',COPY_REMOVE,COPY_REMOVE)
-tool('get_photo','Read recipe, metadata and current revision before editing.',{'photo_id':ID},['photo_id'],True)
+tool('get_photo','Read recipe, metadata and revisions. keyword_ids is complete; keywords_deferred=true means display paths are omitted, not unassigned. Read those paths with get_photo_keywords.',{'photo_id':ID},['photo_id'],True)
+tool('get_photo_keywords','Read twenty complete assigned keyword paths at a captured photo metadata revision. Photo details always contain complete keyword_ids; large display paths are marked keywords_deferred.',{'photo_id':ID,'expected_metadata_revision':REV,'offset':integer()},['photo_id','expected_metadata_revision'],True)
+tool('keyword_choices','Read twenty complete keyword paths for an assignment picker. Search names/synonyms or supply up to 100 explicit IDs; empty IDs select nothing.',{'search':{'type':'string','maxLength':200},'keyword_ids':{'type':'array','items':ID,'maxItems':100,'uniqueItems':True},'offset':integer()},read=True)
+TOOLS['edit_metadata']['inputSchema']['properties']['patch']['properties'].update(
+    keyword_ids={'type':'array','items':ID,'maxItems':100,'uniqueItems':True},
+    keyword_additions={'type':'array','items':string(4096),'maxItems':100})
+TOOLS['edit_metadata']['description']='Atomically update catalog metadata at captured revisions. Replace keywords with text keywords OR complete keyword_ids plus optional new keyword_additions paths. Never mix both replacement forms. Omitted fields stay unchanged; originals and recipe revisions are preserved.'
 tool('edit_photo','Merge a partial recipe using expected_revision; stale revisions fail without changes.',{'photo_id':ID,'expected_revision':REV,'patch':PATCH},['photo_id','expected_revision','patch'])
 tool('undo_photo','Undo the last edit only if the revision is current.',{'photo_id':ID,'expected_revision':REV},['photo_id','expected_revision'])
 tool('rate_photo','Set rating 0–5 and/or pick flag (-1 reject, 0 neutral, 1 pick).',{'photo_id':ID,'rating':integer(0,5),'flag':{'enum':[-1,0,1]}},['photo_id'])

@@ -107,8 +107,22 @@ with the captured global revision. Both preserve original files and pixel recipe
 Read before editing, and never resubmit a stale mutation automatically. A failed
 batch leaves every target unchanged.
 
-`get_photo` includes `keyword_tags` IDs/qualified paths and compatible `keywords`
-strings. A replacement string list accepts `parent | child`, `parent > child` or
+`get_photo` always includes complete `keyword_ids` and `keyword_count`. Small
+assignments also include `keyword_tags` IDs/qualified paths and compatible
+`keywords` strings. With `keywords_deferred:true`, those display arrays are omitted
+as empty arrays; this does **not** mean the photo is untagged. Use
+`get_photo_keywords(photo_id,expected_metadata_revision,offset)` for twenty full
+paths per page. A stale revision requires rereading the photo.
+
+`keyword_choices` searches names/synonyms or filters up to 100 supplied
+`keyword_ids`, returning twenty complete paths. An explicit empty ID list returns
+no rows. For large assignment edits, `edit_metadata.patch.keyword_ids` replaces
+the entire set by identity; optional `keyword_additions` resolves new typed paths
+in that same transaction. Empty IDs explicitly clear assignments. Never combine
+these fields with the alternative `keywords` text-replacement field. Omit all
+keyword fields when only changing a title or caption.
+
+A replacement string list accepts `parent | child`, `parent > child` or
 `child < parent`; ambiguous bare leaf names fail. `filters.keyword_id` selects a
 stable tag plus descendants; name and synonym filters can match multiple branches.
 Tag IDs are never reused after deletion. Synonyms are searchable catalog terms.

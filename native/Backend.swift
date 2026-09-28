@@ -63,6 +63,9 @@ struct Photo: Identifiable {
     var copyright: String
     var colorLabel: String
     var keywords: [String]
+    var keywordIDs: [Int]
+    var keywordCount: Int
+    var keywordsDeferred: Bool
     var sourceID: Int
     var sourceRevision: Int
     var masterID: Int
@@ -79,6 +82,9 @@ struct Photo: Identifiable {
         title=row["title"] as? String ?? ""; caption=row["caption"] as? String ?? ""
         copyright=row["copyright"] as? String ?? ""; colorLabel=row["color_label"] as? String ?? "none"
         keywords=row["keywords"] as? [String] ?? []; metadataRevision=row["metadata_revision"] as? Int ?? 0
+        keywordIDs=row["keyword_ids"] as? [Int] ?? []
+        keywordCount=row["keyword_count"] as? Int ?? keywords.count
+        keywordsDeferred=row["keywords_deferred"] as? Bool ?? false
         sourceID=row["source_id"] as? Int ?? id; sourceRevision=row["source_revision"] as? Int ?? 0
         masterID=row["master_id"] as? Int ?? id;isVirtual=(row["is_virtual"] as? Int ?? 0) == 1
         copyName=row["copy_name"] as? String ?? ""
@@ -92,6 +98,9 @@ struct Photo: Identifiable {
         if let value=patch["copyright"] as? String { copyright=value }
         if let value=patch["color_label"] as? String { colorLabel=value }
         if let value=patch["keywords"] as? [String] { keywords=value }
+        if let value=patch["keyword_ids"] as? [Int] { keywordIDs=value }
+        if let value=patch["keyword_count"] as? Int { keywordCount=value }
+        if let value=patch["keywords_deferred"] as? Bool { keywordsDeferred=value }
         metadataRevision=revision
     }
 }

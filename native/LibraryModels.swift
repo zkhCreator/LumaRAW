@@ -13,6 +13,12 @@ func metadataKeywordReplacement(_ text: String, original: [String], targetCount:
         .map { $0.trimmingCharacters(in:.whitespacesAndNewlines) }.filter { !$0.isEmpty }
 }
 
+func metadataKeywordIdentityReplacement(_ ids: [Int], additions: String, original: [Int], targetCount: Int) -> [String:Any] {
+    let extra=metadataKeywordReplacement(additions,original:[],targetCount:1) ?? []
+    if Set(ids) == Set(original) && targetCount == 1 && extra.isEmpty { return [:] }
+    return ["keyword_ids":ids.sorted(),"keyword_additions":extra]
+}
+
 struct LibraryCollection: Identifiable {
     let id: Int
     let name: String

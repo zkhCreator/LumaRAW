@@ -93,7 +93,8 @@ small raster files and separate disposable catalogs, then runs the
 14-assertion thumbnail, 21-assertion collection-tree, 19-assertion virtual-copy,
 10-assertion service-connection, 22-assertion stack, 19-assertion auto-stack,
 24-assertion folder, 25-assertion keyword, 17-assertion folder-relocation and
-24-assertion folder-synchronization, and 16-assertion export-metadata suites.
+24-assertion folder-synchronization, 16-assertion export-metadata, and
+21-assertion photo-keyword-detail suites.
 Each suite has its own
 fresh image directory, so a relink test cannot move another suite's fixture. The library suite checks
 live smart membership, text search/sort, pagination, empty-filter selection,
@@ -214,6 +215,25 @@ search, subtree moves/deletion, bounded pages/depth, assignment limits, independ
 virtual copies, source/smart filters and atomic create/assign conflicts. The older
 collection migration fixture uses v4 SQL state rather than calling current photo
 commands against tables that intentionally do not exist until upgrade.
+
+`test_keyword_details.py` sends maximal Unicode hierarchy data through a real
+broker, then checks paged reads, compact recipe/rating/metadata replies, ID-based
+replacement, new typed paths, independent copies and actual JPEG export. Invalid
+identities, ambiguous additions, overlarge combined sets and stale revisions roll
+back without leaking new tags. The native keyword-detail suite covers all five
+pages, captured revisions, local selection drafts, batch forms, ID receipts and
+preserved recipe revisions; it does not inspect rendered controls.
+
+```sh
+.venv/bin/python tests/keyword_details_probe.py --work work/keyword-details-10k --rows 10000 --samples 30
+.venv/bin/python tests/keyword_details_probe.py --work work/keyword-details-100k --rows 100000 --samples 30
+```
+
+The synthetic catalog has 1,141 tags. Ordinary photos start with two assignments;
+one photo has 100 maximal 32-level Unicode paths. Warm reads use 30 samples and
+60-photo identity replacements use five samples, including their revision read.
+The probe records response bytes and RSS, without photographs, image workers,
+IPC or rendered UI. Absolute path lengths can slightly change response byte counts.
 
 ```sh
 .venv/bin/python tests/keyword_probe.py --work work/keyword-probe-01 --rows 100000 --samples 30
