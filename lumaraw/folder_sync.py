@@ -131,13 +131,13 @@ class FolderSync:
         for key in ('patch','clock','notes'):
             item[key] = json.loads(item[key])
         paths = item['patch'].get('keyword_paths',[])
-        # Twenty full paths leave ample room for four-byte Unicode, long
-        # descriptions and JSON escaping within the broker's 1 MiB frame.
-        offset = min(offset,max(0,(len(paths)-1)//20*20))
+        # Reserve room for bounded IPTC JSON alongside worst-case escaped paths.
+        page_size=12 if 'iptc' in item['patch'] else 20
+        offset = min(offset,max(0,(len(paths)-1)//page_size*page_size))
         if 'keyword_paths' in item['patch']:
-            item['patch']['keyword_paths'] = paths[offset:offset+20]
+            item['patch']['keyword_paths'] = paths[offset:offset+page_size]
         return {'plan_id':plan_id,'revision':plan['revision'],'item':item,
-                'offset':offset,'total':len(paths),'page_size':20}
+                'offset':offset,'total':len(paths),'page_size':page_size}
 
     def prepare(self,folder_id,expected_revision,scan_metadata,fingerprint):
         with self.db:
@@ -205,7 +205,7 @@ class FolderSync:
                 else:
                     # Most scans only need availability/stat fields. Never load
                     # recipes or decoder JSON, especially for missing originals.
-                    current = self.db.execute('SELECT id,bytes,mtime,missing,title,caption,copyright,color_label,rating,flag,'
+                    current = self.db.execute('SELECT id,bytes,mtime,missing,title,caption,copyright,color_label,rating,flag,iptc,'
                         'taken,taken_us,taken_submicro,capture_clock,camera FROM photos WHERE source_id=? AND is_virtual=0',
                         (row['source_id'],)).fetchone()
                     if current is None:
@@ -217,7 +217,14 @@ class FolderSync:
                         new = {tuple(folded(part) for part in path) for path in patch['keyword_paths']}
                         if old == new:
                             patch = {key:value for key,value in patch.items() if key!='keyword_paths'}
-                    patch = {key:value for key,value in patch.items() if key == 'keyword_paths' or current[key] != value}
+                    if 'iptc' in patch:
+                        stored=json.loads(current['iptc'])
+                        values={key:value for key,value in patch['iptc'].items() if stored.get(key)!=value}
+                        if values:
+                            patch['iptc']=values
+                        else:
+                            patch.pop('iptc')
+                    patch = {key:value for key,value in patch.items() if key in ('keyword_paths','iptc') or current[key] != value}
                     # Preserve the complete clock/provenance when anything
                     # changes so review never formats camera time as local UTC.
                     if all(current[key] == value for key,value in clock.items()):
@@ -381,7 +388,10 @@ class FolderSync:
             after = rows[-1]['id']
 
     def apply_metadata(self,photo_id,patch):
-        fields = {key:value for key,value in patch.items() if key!='keyword_paths'}
+        fields = {key:value for key,value in patch.items() if key not in ('keyword_paths','iptc')}
+        if 'iptc' in patch:
+            from .iptc import merge
+            merge(self.db,photo_id,patch['iptc'])
         if fields:
             self.db.execute('UPDATE photos SET '+','.join(key+'=?' for key in fields)+' WHERE id=?',[*fields.values(),photo_id])
         if 'keyword_paths' in patch:

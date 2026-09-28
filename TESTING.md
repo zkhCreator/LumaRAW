@@ -572,6 +572,40 @@ alternating changed applications; capture reads are included. It verifies bounde
 history, unchanged metadata/originals and zero image workers. Setup, IPC, LUT I/O,
 preview rendering and UI latency are excluded. Run after builds/tests finish.
 
+## Metadata presets and IPTC
+
+`test_metadata_presets.py` checks selective clearing/omission, additive keywords,
+metadata and independent rating conflicts, no-op writes, Unicode names, paging,
+shared/catalog scope, backup/restore and genuine schema-17 migration rollback.
+`test_iptc.py` uses independent namespace/contact fixtures, empty values, ISO date
+precision, extended JPEG packets, sidecar precedence, copy independence and frozen
+export policies. Merged-size and injected SQL failures must roll back every target
+and new keyword. Schema-16 upgrades preserve existing recipes and orientation.
+`test_folder_sync_metadata.py` covers worst-case escaped IPTC plus one hundred
+depth-32 keyword paths, respecting the broker frame while preserving every value.
+
+`NativeMetadataPresetRegression` drives real IPC through forms, captured selections,
+Grid/Loupe scope, no-op application, Painter cancellation and consecutive strokes.
+It verifies acknowledged vocabulary changes can advance only the same loaded
+preset, stale drafts/strokes fail, metadata refresh preserves pending Develop
+edits, and ordinary IPTC partial receipts preserve unrelated values. It does not
+verify rendered controls, actual pointer/shortcut dispatch or accessibility.
+
+```sh
+.venv/bin/python -m pytest -q tests/test_metadata_presets.py tests/test_iptc.py tests/test_folder_sync_metadata.py
+.venv/bin/python tests/run_native.py --work work/new-metadata-preset-native --suite NativeMetadataPresetRegression
+.venv/bin/python tests/metadata_preset_probe.py --work work/new-metadata-preset-probe --photos 100000 --presets 10000 --samples 30
+```
+
+Run the probe after builds/tests finish. Sixty generated 8×8 originals carry
+60,090 bytes of descriptive IPTC and ninety-nine depth-32 Unicode tags before
+application adds one tag. It measures bounded preset pages, first/equal application
+and alternating changes to sixty photos. Capture reads are included; setup, IPC,
+pixels and desktop latency are excluded. Repeated identical IPTC is validated once
+per batch through a bounded exact-value cache; distinct per-photo values still
+receive individual validation. Originals, recipes, history and orientation are
+asserted unchanged. Timings are observations, not hardware-specific test gates.
+
 ## Public source check
 
 ```sh

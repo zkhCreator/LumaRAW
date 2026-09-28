@@ -209,7 +209,7 @@ extension Store {
               selected == id,var current=photo,current.id == id,current.metadataRevision <= fresh.metadataRevision else { return }
         current.adoptLibraryPatch(["keywords":fresh.keywords,"title":fresh.title,"caption":fresh.caption,
             "keyword_ids":fresh.keywordIDs,"keyword_count":fresh.keywordCount,"keywords_deferred":fresh.keywordsDeferred,
-            "copyright":fresh.copyright,"color_label":fresh.colorLabel,"copy_name":fresh.copyName],revision:fresh.metadataRevision)
+            "copyright":fresh.copyright,"color_label":fresh.colorLabel,"copy_name":fresh.copyName,"iptc":fresh.iptc],revision:fresh.metadataRevision)
         if includeCulling { current.rating=fresh.rating;current.flag=fresh.flag }
         photo=current
     }

@@ -219,6 +219,35 @@ a drag; never reread and redirect the same pending stroke to a changed target.
 Membership changes do not alter photo metadata/recipe revisions. The native Option
 stroke removes only touched target members and refreshes the displayed source.
 
+## Metadata presets and descriptive IPTC
+
+`metadata_schema` returns thirty supported `iptc_fields` and their JSON schema.
+`edit_metadata.patch.iptc` merges only submitted fields; omitted fields survive.
+Array values use actual string arrays, not comma-separated names. Empty checked
+values clear; Date Created never changes source capture time. Merged IPTC is bounded
+to 64 KiB of UTF-8 JSON. `get_photo` contains complete IPTC; list summaries omit it.
+Supported IPTC participates in export previews/frozen jobs and folder-sync reads.
+Catalog export includes all supported values; Copyright includes only rights IPTC.
+
+`list_metadata_presets(offset, search)` returns thirty name/count summaries,
+`fields`, storage mode and an opaque `revision`; details require
+`get_metadata_preset(preset_id, expected_revision)`. Save a checked-field `patch`
+with `save_metadata_preset(name, patch, expected_revision, preset_id?)`. Keywords
+are path strings appended on application, never created while saving. New preset
+names must be distinct under Unicode normalization/case folding; no implicit replace.
+`metadata_preset_action` supports rename/duplicate (preset_id/name), delete
+(preset_id), and storage (store_with_catalog), each at the captured revision.
+Shared and catalog libraries remain separate; local presets are included in backups.
+
+`apply_metadata_preset` takes a preset ID, captured preset `expected_revision` and
+1–60 distinct targets with `photo_id` / `expected_metadata_revision`. When rating
+is selected in the preset, every target must also include its `expected_rating`.
+Any stale token, metadata/rating conflict, capacity or merged-IPTC error rolls back
+the entire batch and any newly resolved vocabulary. Equal reapplication is a no-op.
+Returned `revision` acknowledges this application's vocabulary changes; refresh
+never authorizes rebasing an unrelated stale draft. Original files, recipes,
+orientation and submitted jobs are preserved. Adobe preset exchange is unsupported.
+
 ## Develop presets
 
 `list_develop_presets` returns thirty compact names per page, separately paged

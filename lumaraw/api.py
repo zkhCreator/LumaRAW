@@ -6,6 +6,8 @@ Tool annotations describe effects; they never substitute for user authorization.
 """
 from .model import LIMITS, Recipe, SYNC_GROUPS
 from .organization import COLORS, SORTS, FILTER_SCHEMA
+from .iptc import SCHEMA as IPTC_SCHEMA
+from .metadata_presets import PATCH_SCHEMA as METADATA_PRESET_PATCH
 
 def obj(properties=None, required=()):
     return {'type':'object','properties':properties or {},'required':list(required),'additionalProperties':False}
@@ -22,6 +24,7 @@ def tool(name,description,properties=None,required=(),read=False):
 tool('service_connection','Inspect engine compatibility or explicitly activate this build when the broker is idle. Preserves pending jobs on a clean handoff; never interrupts active work.',{'action':{'enum':['status','activate']}},['action'])
 tool('status','Service version, catalog location, queue and processing state.',read=True)
 tool('recipe_schema','Supported recipe ranges, defaults, presets and sync groups.',read=True)
+tool('metadata_schema','Read supported IPTC fields, groups and value formats. These descriptive fields do not replace source EXIF capture time.',read=True)
 from .develop_presets import FIELDS as DEVELOP_FIELDS
 PRESET_ID=string(80)
 PRESET_TOKEN=string(64)
@@ -40,6 +43,12 @@ tool('orientation_state','Read the catalog orientation revision and latest indep
 tool('orient_photos','Rotate or flip up to sixty photos atomically at captured visual revisions. Orientation acts after Develop processing, survives Develop reset, and never changes recipes or originals.',{'targets':array(obj({'photo_id':ID,'expected_revision':REV},['photo_id','expected_revision']),60),'action':{'enum':['rotate_left','rotate_right','flip_horizontal','flip_vertical']}},['targets','action'])
 tool('undo_orientation','Undo the latest catalog rotate/flip batch at the captured orientation-state revision and action ID. Preserves later Develop edits; any missing target rejects the whole undo.',{'action_id':ID,'expected_revision':REV},['action_id','expected_revision'])
 KEYWORD_TARGET = obj({'photo_id':ID,'expected_metadata_revision':REV},['photo_id','expected_metadata_revision'])
+METADATA_PRESET_TARGET=obj({'photo_id':ID,'expected_metadata_revision':REV,'expected_rating':integer(0,5)},['photo_id','expected_metadata_revision'])
+tool('list_metadata_presets','Read thirty metadata preset summaries, editable field descriptors and shared/catalog storage state. Does not apply metadata.',{'offset':integer(),'search':{'type':'string','maxLength':200}},read=True)
+tool('get_metadata_preset','Read explicitly saved metadata fields at a captured library/vocabulary token.',{'preset_id':PRESET_ID,'expected_revision':PRESET_TOKEN},['preset_id','expected_revision'],True)
+tool('save_metadata_preset','Create or update explicitly checked metadata fields. Empty text clears checked fields when applying; keywords append. Saving never tags photos.',{'name':string(120),'patch':METADATA_PRESET_PATCH,'preset_id':PRESET_ID,'expected_revision':PRESET_TOKEN},['name','patch','expected_revision'])
+tool('metadata_preset_action','Rename, duplicate, delete or switch metadata preset storage at a captured token. Switching storage never moves presets.',{'action':{'enum':['rename','duplicate','delete','storage']},'preset_id':PRESET_ID,'name':string(120),'store_with_catalog':BOOL,'expected_revision':PRESET_TOKEN},['action','expected_revision'])
+tool('apply_metadata_preset','Apply saved metadata to up to sixty captured photos atomically; append keywords and preserve unchecked fields, recipes and originals. Presets including rating require expected_rating for every target.',{'preset_id':PRESET_ID,'expected_revision':PRESET_TOKEN,'targets':array(METADATA_PRESET_TARGET,60)},['preset_id','expected_revision','targets'])
 tool('list_keywords','Read at most 60 keyword roots/children or search names/synonyms. Large rows set details_deferred with null path/synonyms and an abbreviated path_preview; read get_keyword before editing. Counts and selection states are direct assignments; keyword photo filters also include descendants.',{'parent_id':OPTIONAL_ID,'offset':integer(),'search':{'type':'string','maxLength':200},'photo_ids':array(ID,60)},read=True)
 tool('get_keyword','Read complete keyword path, parent path, synonyms and export options at the captured keyword list revision. Deferred list fields are not empty values.',{'keyword_id':ID,'expected_revision':REV},['keyword_id','expected_revision'],True)
 tool('import_keywords','Import a UTF-8 tab-indented text or keyword-options CSV dictionary, up to 64 MiB. Validate the entire file before one additive transaction. Existing tag identities, synonyms, policies and photo assignments are preserved.',{'path':PATH,'expected_revision':REV},['path','expected_revision'])
@@ -98,6 +107,7 @@ tool('target_membership','Add/remove photos only if the captured target and coll
 tool('quick_collection','Clear Quick or atomically save it as a regular collection, optionally clearing afterward.',{'expected_revision':REV,'action':{'enum':['clear','save']},'name':string(120),'clear_after':BOOL,'parent_id':OPTIONAL_ID},['expected_revision','action'])
 tool('edit_metadata','Atomically update catalog-only descriptive metadata. Keywords replace the current set. Recipe revisions remain unchanged.',{'targets':array(obj({'photo_id':ID,'expected_metadata_revision':REV},['photo_id','expected_metadata_revision']),60),'patch':obj({'copy_name':{'type':'string','maxLength':120},'title':{'type':'string','maxLength':500},'caption':{'type':'string','maxLength':5000},'copyright':{'type':'string','maxLength':500},'color_label':{'enum':list(COLORS)},'keywords':{'type':'array','items':string(120),'maxItems':100}})},['targets','patch'])
 TOOLS['edit_metadata']['inputSchema']['properties']['patch']['properties']['keywords']['items']=string(4096)
+TOOLS['edit_metadata']['inputSchema']['properties']['patch']['properties']['iptc']=IPTC_SCHEMA
 COPY_TARGET={'photo_id':ID,'expected_revision':REV,'expected_metadata_revision':REV}
 for policy in ('include_export','export_containing','export_synonyms'):
     TOOLS['save_keyword']['inputSchema']['properties'][policy]=BOOL

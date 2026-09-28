@@ -17,6 +17,7 @@ from lumaraw.catalog import Catalog
 from lumaraw.develop_presets import migrate
 from lumaraw.model import Recipe
 from lumaraw.service import Service
+from lumaraw.runtime import CATALOG_VERSION
 
 
 @pytest.fixture
@@ -344,7 +345,7 @@ def test_genuine_v15_migration_is_atomic_and_preserves_recipes_jobs(tmp_path,mon
     c=Catalog(root)
     try:
         migrate(c.db)
-        assert c.db.execute('PRAGMA user_version').fetchone()[0]==16
+        assert c.db.execute('PRAGMA user_version').fetchone()[0]==CATALOG_VERSION
         assert c.db.execute('SELECT COUNT(*) FROM develop_presets').fetchone()[0]==5
         assert c.db.execute('SELECT recipe,orientation FROM photos').fetchone()[:]==(recipe,5)
         assert c.db.execute('SELECT recipe,orientation FROM jobs').fetchone()[:]==(recipe,5)

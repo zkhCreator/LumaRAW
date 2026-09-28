@@ -20,13 +20,14 @@ struct PainterToolbar: View {
                             Text("Target Collection").tag("target_collection")
                             Text("Rotation").tag("orientation")
                             Text("Develop Preset").tag("develop_preset")
+                            Text("Metadata Preset").tag("metadata_preset")
                         }.frame(width:205).onChange(of:s.painterKind) { _,value in
                             s.cancelPainterStroke()
                             if value == "target_collection" { Task { await s.refreshCollectionState() } }
                         }
                     }
                     Spacer(minLength:0)
-                    if s.painterBusy || s.orientationBusy || s.developPresetBusy { ProgressView().controlSize(.small) }
+                    if s.painterBusy || s.orientationBusy || s.developPresetBusy || s.metadataPresetBusy { ProgressView().controlSize(.small) }
                 }
                 if s.painterEnabled {
                     HStack(spacing:10) {
@@ -41,6 +42,9 @@ struct PainterToolbar: View {
                         } else if s.painterKind == "develop_preset" {
                             Text(s.painterPresetName).lineLimit(1)
                             Button("Choose Preset…") { s.cancelPainterStroke();s.showDevelopPresets=true }
+                        } else if s.painterKind == "metadata_preset" {
+                            Text(s.painterMetadataPresetName).lineLimit(1)
+                            Button("Choose Preset…") { s.cancelPainterStroke();s.showMetadataPresets=true }
                         } else if s.painterKind == "orientation" {
                             Picker("Rotation",selection:$s.painterOrientationAction) {
                                 ForEach(PhotoOrientation.actions,id:\.1) { title,action in Text(title).tag(action) }
@@ -56,7 +60,7 @@ struct PainterToolbar: View {
                     }
                     Text("Click or drag thumbnails · Esc to finish").font(.caption).foregroundStyle(.secondary)
                 }
-            }.controlSize(.small).padding(.horizontal,20).padding(.vertical,6).disabled(s.painterBusy || s.orientationBusy || s.developPresetBusy)
+            }.controlSize(.small).padding(.horizontal,20).padding(.vertical,6).disabled(s.painterBusy || s.orientationBusy || s.developPresetBusy || s.metadataPresetBusy)
         }
     }
 }

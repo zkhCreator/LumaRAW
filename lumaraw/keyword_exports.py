@@ -86,15 +86,21 @@ class KeywordExports:
 
     def snapshot(self, photo_id, options):
         row = self.db.execute(
-            'SELECT id,title,caption,copyright,rating,flag,color_label,metadata_revision '
+            'SELECT id,title,caption,copyright,rating,flag,color_label,metadata_revision,iptc '
             'FROM photos WHERE id=?', (photo_id,)).fetchone()
         if row is None:
             raise ValueError('Photo does not exist')
         fields, keywords, hierarchy = {}, [], []
         if options.metadata in ('copyright', 'catalog'):
             fields['copyright'] = row['copyright']
+            rights={key:value for key,value in json.loads(row['iptc']).items()
+                    if key in ('rights_usage_terms','rights_url','copyright_status')}
+            if rights:
+                fields['iptc']=rights
         if options.metadata == 'catalog':
             fields.update({key: row[key] for key in ('title', 'caption', 'rating', 'flag', 'color_label')})
+            if descriptive:=json.loads(row['iptc']):
+                fields['iptc']=descriptive
             keywords, paths = self.project(photo_id)
             if options.keyword_hierarchy:
                 hierarchy = paths

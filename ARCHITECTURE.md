@@ -327,6 +327,31 @@ recipes are no-ops. Frozen export jobs, metadata and catalog orientation survive
 The Mac shell owns immutable editor and Painter captures, selection scope and
 preview refresh; it does not translate Adobe parameters or process image pixels.
 
+`iptc.py` owns schema 17's additive descriptive JSON field, form descriptors,
+validation and named XMP mappings. Thirty supported fields are partial patches:
+omission preserves, explicit empty values clear. Each merged photo stays within
+64 KiB of UTF-8 JSON. Source EXIF/capture time and Develop recipes remain separate.
+Creator contact structures, ordered creators, code bags, language alternatives
+(x-default), rights URLs and copyright status round-trip through bounded XMP.
+Large descriptive JPEG packets use verified Extended XMP; export policy projection
+freezes these values with the existing job snapshot. Folder-sync details reduce
+keyword pages to twelve paths when IPTC is present, retaining all values below the
+broker frame bound; ordinary summary pages omit large patches.
+
+`metadata_presets.py` owns schema 18's stable preset identities and revision.
+Its independent shared/catalog repositories use the existing path adapter and
+shared-before-catalog locking. Thirty-name pages omit patches; get/save/action/apply
+require a captured token containing both repository revisions, scope and vocabulary
+revision. Saved patches contain checked fields only, bounded to 512 KiB of escaped
+JSON. Saving keyword text does not create tags. Application resolves additive tags,
+validates every captured metadata revision and, when rating is selected, the prior
+rating independently. It validates merged IPTC and keyword capacity before atomic
+writes. Changed photos increment metadata revision once; equal applications do
+nothing. Original files, Develop history, orientation and frozen jobs survive.
+Native forms retain their captured revision. Only a successful own application
+advances the same loaded Painter token to the acknowledged vocabulary state;
+external refresh cannot rebase a pending stroke or draft.
+
 `keyword_exchange.py` owns schema 12's manual person-keyword flag and dictionary
 file exchange. Bounded UTF-8 input is copied and fingerprinted outside the catalog
 lock, then validated in a temporary SQLite database with a 4 MiB page cache. The

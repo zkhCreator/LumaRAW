@@ -159,6 +159,12 @@ struct SettingsView:View {
                 })).disabled(s.developPresetPage == nil || s.developPresetBusy)
                 Text("Shared presets are available to other catalogs. Switching storage keeps existing presets in their original location.").font(.caption).foregroundStyle(.secondary)
             }
+            Section("Metadata Presets") {
+                Toggle("Store Metadata Presets with This Catalog",isOn:Binding(get:{s.metadataPresetPage?.local ?? false},set:{value in
+                    if let page=s.metadataPresetPage { Task { await s.metadataPresetAction("storage",revision:page.revision,values:["store_with_catalog":value]) } }
+                })).disabled(s.metadataPresetPage == nil || s.metadataPresetBusy)
+                Text("Existing presets remain in their original location. Metadata preset storage is independent of Develop and keyword presets.").font(.caption).foregroundStyle(.secondary)
+            }
             Section("Library"){Text(Backend.catalog).font(.caption).textSelection(.enabled);Button("Show in Finder"){NSWorkspace.shared.open(URL(fileURLWithPath:Backend.catalog))}}
             Section("Background Service") {
                 Button(s.connectingService ? "Connecting…":"Connect with This Version") { Task { await s.activateCurrentService() } }.disabled(s.connectingService)
@@ -166,6 +172,6 @@ struct SettingsView:View {
                 if !s.serviceConnectionMessage.isEmpty { Text(s.serviceConnectionMessage).font(.caption) }
             }
             Section("Color"){Text("Non-destructive editing leaves originals unchanged. NEF decoding uses LibRaw; HE / HE* support and camera-specific color require testing.").font(.callout).foregroundStyle(.secondary)}
-        }.formStyle(.grouped).padding(12).task{await s.refreshMemory();await s.refreshKeywordSets();await s.refreshDevelopPresets()}
+        }.formStyle(.grouped).padding(12).task{await s.refreshMemory();await s.refreshKeywordSets();await s.refreshDevelopPresets();await s.refreshMetadataPresets()}
     }
 }

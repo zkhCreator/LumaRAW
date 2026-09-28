@@ -39,6 +39,15 @@ import UniformTypeIdentifiers
     @Published var before: NSImage?
     @Published var histogram: [[Double]] = []
     @Published var metadata: [String: Any] = [:]
+    @Published var iptcFields: [MetadataField]=[]
+    @Published var metadataPresetPage: MetadataPresetPage?
+    @Published var metadataPresetQuery: [String:Any]=[:]
+    @Published var metadataPresetBusy=false
+    @Published var showMetadataPresets=false
+    @Published var metadataPresetEditor: MetadataPresetEditorSource?
+    @Published var painterMetadataPreset: MetadataPresetSelection?
+    var metadataPresetReadGeneration=0
+    var metadataPresetEditorGeneration=0
     @Published var total=0
     @Published var offset=0
     @Published var mode="all"

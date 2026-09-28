@@ -62,6 +62,7 @@ struct Photo: Identifiable {
     var title: String
     var caption: String
     var copyright: String
+    var iptc: [String:Any]
     var colorLabel: String
     var keywords: [String]
     var keywordIDs: [Int]
@@ -83,6 +84,7 @@ struct Photo: Identifiable {
         orientation=row["orientation"] as? Int ?? 0
         title=row["title"] as? String ?? ""; caption=row["caption"] as? String ?? ""
         copyright=row["copyright"] as? String ?? ""; colorLabel=row["color_label"] as? String ?? "none"
+        iptc=row["iptc"] as? [String:Any] ?? [:]
         keywords=row["keywords"] as? [String] ?? []; metadataRevision=row["metadata_revision"] as? Int ?? 0
         keywordIDs=row["keyword_ids"] as? [Int] ?? []
         keywordCount=row["keyword_count"] as? Int ?? keywords.count
@@ -98,6 +100,7 @@ struct Photo: Identifiable {
         if let value=patch["title"] as? String { title=value }
         if let value=patch["caption"] as? String { caption=value }
         if let value=patch["copyright"] as? String { copyright=value }
+        if let value=patch["iptc"] as? [String:Any] { iptc.merge(value) { _,new in new } }
         if let value=patch["color_label"] as? String { colorLabel=value }
         if let value=patch["keywords"] as? [String] { keywords=value }
         if let value=patch["keyword_ids"] as? [Int] { keywordIDs=value }

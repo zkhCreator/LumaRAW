@@ -75,7 +75,9 @@ extension Store {
     }
 
     func prepareMetadataEditor() async {
-        guard !actionPhotoIDs.isEmpty, await flushEdits() else { return }
+        guard !metadataPresetBusy,!actionPhotoIDs.isEmpty, await flushEdits() else { return }
+        await refreshMetadataSchema()
+        guard !iptcFields.isEmpty else { return }
         let ids=actionPhotoIDs
         do {
             var targets: [Photo] = []

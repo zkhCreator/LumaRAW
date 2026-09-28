@@ -73,12 +73,19 @@ def test_sixty_long_descriptions_scan_review_and_apply_through_real_broker(tmp_p
             process.terminate();process.wait(timeout=10)
 
 
-def test_worst_case_keyword_detail_pages_preserve_every_path(tmp_path):
+@pytest.mark.parametrize('with_iptc',[False,True])
+def test_worst_case_keyword_detail_pages_preserve_every_path(tmp_path,with_iptc):
     folder=tmp_path/'Photos';folder.mkdir()
     source=folder/'photo.png';Image.new('RGB',(4,4)).save(source)
     branch=[str(i)+('🌊'*118) for i in range(31)]
     paths=[branch+[str(i)+('🌊'*118)] for i in range(100)]
     data=packet('<lr:hierarchicalSubject><rdf:Bag>'+''.join('<rdf:li>'+'|'.join(path)+'</rdf:li>' for path in paths)+'</rdf:Bag></lr:hierarchicalSubject>')
+    iptc={}
+    if with_iptc:
+        from lumaraw.export_metadata import xmp_packet
+        iptc={'instructions':'🌊'*5000,'alt_text':'🌊'*5000,'rights_usage_terms':'🌊'*5000}
+        data=xmp_packet({'version':1,'mode':'catalog','fields':{'iptc':iptc},'keywords':[],
+                         'hierarchy':['|'.join(path) for path in paths]})
     source.with_suffix('.xmp').write_bytes(data)
     s=Service(tmp_path/'catalog')
     try:
@@ -90,13 +97,16 @@ def test_worst_case_keyword_detail_pages_preserve_every_path(tmp_path):
         assert result['plan']['state']=='ready' and result['items'][0]['metadata_deferred']
         request={'plan_id':result['plan']['id'],'item_id':result['items'][0]['id'],'expected_revision':result['plan']['revision']}
         restored=[]
-        for offset in range(0,100,20):
+        page_size=12 if with_iptc else 20
+        for offset in range(0,100,page_size):
             detail=s.dispatch('get_folder_sync_metadata',{**request,'offset':offset})
             assert len(json.dumps({'ok':True,'result':detail},ensure_ascii=False).encode())<512*1024
-            assert detail['total']==100 and detail['offset']==offset and detail['page_size']==20
+            assert len(json.dumps({'ok':True,'result':detail}).encode())<MAX_MESSAGE
+            assert detail['total']==100 and detail['offset']==offset and detail['page_size']==page_size
+            if with_iptc:assert detail['item']['patch']['iptc']==iptc
             restored+=detail['item']['patch']['keyword_paths']
         assert restored==paths and source.with_suffix('.xmp').read_bytes()==data
-        assert s.dispatch('get_folder_sync_metadata',{**request,'offset':9999})['offset']==80
+        assert s.dispatch('get_folder_sync_metadata',{**request,'offset':9999})['offset']==99//page_size*page_size
         with pytest.raises(ValueError,match='no longer available'):
             s.dispatch('get_folder_sync_metadata',{**request,'item_id':999999})
     finally:s.close()

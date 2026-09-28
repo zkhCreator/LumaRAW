@@ -68,6 +68,7 @@ struct ContentView: View {
         .sheet(isPresented:$s.showSync){SyncSheet()}
         .sheet(isPresented:$s.showCalibration){CalibrationSheet()}
         .sheet(isPresented:$s.showDevelopPresets){DevelopPresetBrowser()}
+        .sheet(isPresented:$s.showMetadataPresets){MetadataPresetBrowser()}
         .sheet(isPresented:$s.showCollectionEditor){CollectionEditor(original:s.editingCollection,kind:s.newCollectionKind,parentID:s.newCollectionParent)}
         .sheet(isPresented:$s.showQuickSave){if let source=s.quickSaveSource {QuickCollectionSheet(source:source)}}
         .sheet(isPresented:$s.showLibraryFilters){LibraryFilterSheet(draft:LibraryFilterDraft(s.libraryFilters))}

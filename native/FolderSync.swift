@@ -36,6 +36,7 @@ struct FolderSyncItem: Identifiable {
         ["keyword_paths":"Keywords","color_label":"Color Label","flag":"Flag","taken":"Capture Time","camera":"Camera"][key] ?? key.capitalized
     }
     func value(_ key: String) -> String {
+        if key == "iptc",let values=patch[key] as? [String:Any] { return "\(values.count) IPTC fields" }
         if key == "keyword_paths",let paths=patch[key] as? [[String]] { return paths.map{$0.joined(separator:" | ")}.joined(separator:", ") }
         if key == "flag",let flag=patch[key] as? Int { return flag == -1 ? "Rejected":flag == 1 ? "Picked":"Unflagged" }
         if key == "taken",let micros=clock["taken_us"] as? Int64 {

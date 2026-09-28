@@ -8,11 +8,13 @@ Never copies raw EXIF blocks, local paths, processing recipes or unsupported fie
 import hashlib
 import struct
 import xml.etree.ElementTree as ET
+from . import iptc
 
 MAX_PACKET = 2 * 1024 * 1024
 NS = {'x': 'adobe:ns:meta/', 'rdf': 'http://www.w3.org/1999/02/22-rdf-syntax-ns#',
       'dc': 'http://purl.org/dc/elements/1.1/', 'xmp': 'http://ns.adobe.com/xap/1.0/',
       'lr': 'http://ns.adobe.com/lightroom/1.0/', 'note': 'http://ns.adobe.com/xmp/note/'}
+NS.update(iptc.NAMESPACES)
 for prefix, uri in NS.items():
     ET.register_namespace(prefix, uri)
 
@@ -37,6 +39,7 @@ def tree(snapshot, extended=None):
     if extended:
         description.set(tag('note', 'HasExtendedXMP'), extended)
     fields = snapshot.get('fields', {})
+    iptc.write_xmp(description,fields.get('iptc',{}),tag)
     for key, name in (('title', 'title'), ('caption', 'description'), ('copyright', 'rights')):
         if key in fields:
             alt = ET.SubElement(ET.SubElement(description, tag('dc', name)), tag('rdf', 'Alt'))
@@ -86,10 +89,13 @@ def jpeg_segments(snapshot):
     guid = hashlib.md5(large, usedforsecurity=False).hexdigest().upper()
     standard = wrapped(tree({'fields': snapshot['fields']}, extended=guid))
     if len(standard) > 65502:
-        raise ValueError('Descriptive export metadata exceeds the JPEG standard packet size')
+        # Escaped descriptive text can exceed APP1 even when catalog JSON is
+        # bounded. Keep the complete RDF tree in the verified extension.
+        large=tree(snapshot)
+        guid=hashlib.md5(large,usedforsecurity=False).hexdigest().upper()
+        standard=wrapped(tree({},extended=guid))
     chunks = [segment(signature + standard)]
     for offset in range(0, len(large), 65458):
         chunks.append(segment(extension + guid.encode('ascii') + struct.pack('>II', len(large), offset)
                               + large[offset:offset+65458]))
     return b''.join(chunks)
-

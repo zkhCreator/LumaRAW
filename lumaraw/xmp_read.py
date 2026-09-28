@@ -16,12 +16,14 @@ import zlib
 from .keywords import valid_name
 from .organization import COLORS, folded
 from .relocations import identity
+from . import iptc
 
 MAX_PACKET = 2 * 1024 * 1024
 MAX_READ = 4 * 1024 * 1024
 NS = {'rdf':'http://www.w3.org/1999/02/22-rdf-syntax-ns#',
       'dc':'http://purl.org/dc/elements/1.1/', 'xmp':'http://ns.adobe.com/xap/1.0/',
       'lr':'http://ns.adobe.com/lightroom/1.0/', 'crs':'http://ns.adobe.com/camera-raw-settings/1.0/'}
+NS.update(iptc.NAMESPACES)
 
 
 class PacketReader:
@@ -84,12 +86,17 @@ def parse_packet(data):
                     values.append(selected.text or '')
                 elif child.find('./rdf:Bag', NS) is not None or child.find('./rdf:Seq', NS) is not None:
                     values.append([entry.text or '' for entry in child.findall('./*/rdf:li', NS)])
+                elif '{'+NS['rdf']+'}resource' in child.attrib:
+                    values.append(child.attrib['{'+NS['rdf']+'}resource'])
                 else:
                     values.append(child.text or '')
         if values and any(value != values[0] for value in values[1:]):
             raise ValueError('Conflicting XMP properties: '+prefix+':'+name)
         return values[0] if values else None
     patch, notes = {}, []
+    descriptive=iptc.read_xmp(root,property_values,NS)
+    if descriptive:
+        patch['iptc']=descriptive
     for name, field, limit in (('title','title',500), ('description','caption',5000), ('rights','copyright',500)):
         value = property_values('dc', name)
         if value is not None:
@@ -291,6 +298,8 @@ def read_xmp(path):
     patch, notes = {}, []
     for packet in packets:
         values, warnings = parse_packet(packet)
+        if 'iptc' in values:
+            values['iptc']={**patch.get('iptc',{}),**values['iptc']}
         patch.update(values);notes.extend(warnings)
     if any(identity(name) != value for name,value in fingerprints.items()):
         raise ValueError('Metadata changed during reading; scan again')

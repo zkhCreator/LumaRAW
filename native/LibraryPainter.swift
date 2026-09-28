@@ -60,8 +60,8 @@ extension Store {
         painterStroke?.configuration.targetCollection?.target.name ?? collectionState?.target.name ?? "Unavailable"
     }
     var painterCanReceive: Bool {
-        painterEnabled && painterInGrid && !painterBusy && !orientationBusy && !developPresetBusy && !keywordBusy &&
-            painterKeywordPicker == nil && shortcutEditor == nil && !showDevelopPresets
+        painterEnabled && painterInGrid && !painterBusy && !orientationBusy && !developPresetBusy && !metadataPresetBusy && !keywordBusy &&
+            painterKeywordPicker == nil && shortcutEditor == nil && !showDevelopPresets && !showMetadataPresets
     }
     var painterSource: String {
         let filters=(try? JSONSerialization.data(withJSONObject:libraryFilters,options:.sortedKeys)).flatMap { String(data:$0,encoding:.utf8) } ?? ""
@@ -135,6 +135,7 @@ extension Store {
         case "label": value=painterLabel
         case "orientation": value=painterOrientationAction
         case "develop_preset": value=painterDevelopPreset
+        case "metadata_preset": value=painterMetadataPreset
         default: value=nil
         }
         if painterKind == "keywords",keywordShortcut?.ids.isEmpty != false {
@@ -145,6 +146,9 @@ extension Store {
         }
         if painterKind == "develop_preset",painterDevelopPreset == nil {
             error="Choose a Develop preset before painting";return false
+        }
+        if painterKind == "metadata_preset",painterMetadataPreset == nil {
+            error="Choose a metadata preset before painting";return false
         }
         if ["orientation","develop_preset"].contains(painterKind),hasPendingEdits {
             error="Finish saving adjustments before painting edits";return false
@@ -183,6 +187,9 @@ extension Store {
     }
 
     private func submitPaint(targets: [Photo],configuration: PainterConfiguration) -> Task<Void,Never>? {
+        if configuration.kind == "metadata_preset",let preset=configuration.value as? MetadataPresetSelection {
+            return submitMetadataPreset(targets:targets,selection:preset)
+        }
         if configuration.kind == "develop_preset",let preset=configuration.value as? DevelopPresetSelection {
             return submitDevelopPreset(targets:targets,selection:preset)
         }

@@ -72,6 +72,8 @@ import AppKit
                 Button("Refresh Library") { Task { await store.refreshCollections(); await store.refresh() } }
             }
             CommandMenu("Metadata") {
+                Button("Metadata Presets…") { store.showMetadataPresets=true }
+                Divider()
                 KeywordExchangeActions().environmentObject(store)
                 Divider()
                 Button("Set Keyword Shortcut…") { Task { await store.prepareKeywordShortcut() } }

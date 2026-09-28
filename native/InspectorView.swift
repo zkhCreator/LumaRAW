@@ -27,6 +27,7 @@ struct InspectorView:View {
                             Button("Review \(p.keywordCount) Keywords…") { keywordPhoto=p }
                         }
                         Button("Edit Metadata…") { Task { await s.prepareMetadataEditor() } }
+                        Button("Metadata Presets…") { s.showMetadataPresets=true }
                         Button("Will Export…") { exportMetadataPhoto=p.id }
                         Button("Go to Folder in Library") { Task { await s.showPhotoFolder(p) } }
                     }

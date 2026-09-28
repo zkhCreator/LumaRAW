@@ -82,3 +82,11 @@ are created; gate legacy overrides to preserve iOS 26 Liquid Glass. Verify pushe
 views, sheets, scrolling states, back taps and edge swipes on both OS families,
 including supported languages. Never use per-screen replacement navigation bars
 to conceal a compatibility problem.
+
+## Module checkpoints
+
+After each module passes its required checks, commit its source and evidence
+documentation and push the development branch to the authorized remote. Preserve
+history, never force-push, and verify the remote branch reaches the local commit.
+Do not describe a local-only checkpoint as remotely backed up. Keep unfinished
+modules and generated test data out of a completed module's commit.

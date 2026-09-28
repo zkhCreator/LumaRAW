@@ -8,6 +8,10 @@ modules. `PARITY.md` is the inventory, not a promise that every existing control
 matches Adobe's proprietary processing. AI generation, semantic selection,
 AI denoising, assisted culling and inferred depth are excluded.
 
+Commit each validated module and push it to the authorized development remote.
+Verify the remote commit; an unpushed checkpoint is not a remote backup. Preserve
+branch history and keep generated fixtures, catalogs, artifacts and receipts local.
+
 Before changing a feature, read its opening comments, trace the native action
 through `api.py` and `service.py` to catalog/renderer ownership, and identify the
 observable acceptance condition. New code should be normally formatted with
@@ -21,6 +25,13 @@ when a clear function is more maintainable. Avoid unrelated formatting churn.
   commands compatible; use explicit revisions for editable persisted objects.
 - Keep descriptive library metadata separate from decoder-derived EXIF and pixel
   recipes. Metadata edits must not invalidate pixel caches or adopt edit revisions.
+- Metadata presets preserve unchecked fields and append keyword assignments.
+  Explicit empty scalar/list values clear only checked fields; empty preset
+  keywords never remove existing tags. Validate merged IPTC byte limits per target
+  before writing. Legacy rating commands have independent state, so presets that
+  set ratings must capture and check previous ratings as well as metadata revisions.
+  Keep form drafts and loaded Painter revisions immutable across external refresh;
+  only an acknowledged own mutation may advance that same loaded token.
 - Virtual copies share a stable source-family ID, never a fabricated file path.
   Keep edits/metadata/history independent; share snapshots, indexing and relinking.
   Deleting a virtual copy must preserve original files and frozen export jobs.

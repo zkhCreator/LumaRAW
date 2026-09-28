@@ -17,7 +17,7 @@ LumaRAW references your originals without changing them. The SwiftUI app and you
 | Library | Folder tree/search/favorites/labels, ratings, flags, catalog metadata/keywords, regular/live smart collections, nested sets, Quick/target collections, SQL filters/sorting, manual/capture-time stacks, duplicate/missing indexing, virtual copies/shared snapshots, selective sync, and backup/restore |
 | Culling | Grid/Loupe/Compare/Survey, anchored page selections, active-photo review actions, linked or independent full-resolution comparison viewports |
 | Export | JPEG and 16-bit TIFF with embedded sRGB, Display P3, Adobe RGB, or ProPhoto RGB ICC profiles; frozen catalog XMP/keyword policies, persistent queue, pause/cancel/retry, and collision-safe filenames |
-| Agents | 95 MCP tools, equivalent JSON CLI commands, and a bundled skill; app and agent edits share conflict detection |
+| Agents | 101 MCP tools, equivalent JSON CLI commands, and a bundled skill; app and agent edits share conflict detection |
 
 ## Build and run
 
@@ -235,7 +235,7 @@ focused photo view use the current selection/active-photo scope, even with Paint
 put away. Setting the shortcut does not tag photographs.
 
 In Grid view, enable **Painter** (Command-Option-K), choose Keywords, Rating, Flag,
-Color Label, Target Collection, Rotation or Develop Preset, then click/drag across thumbnails. Touched thumbnails highlight;
+Color Label, Target Collection, Rotation, Develop Preset or Metadata Preset, then click/drag across thumbnails. Touched thumbnails highlight;
 mouse-up applies one transaction without selecting the touched photos. Hold Option
 before a keyword stroke to remove only the shortcut's keywords. Choose None or
 Unflagged to clear the other attributes. Esc puts the tool away and discards an
@@ -247,9 +247,30 @@ switch sets to add more, and review/remove choices before **Load Painter**. This
 replaces the loaded shortcut; Cancel leaves it unchanged. Browsing does not change
 the sidebar's active preset. Recent choices retain IDs, including legacy literal
 names; custom choices retain the text shown when selected. The draft is bounded
-to one hundred choices. Metadata presets, scrolling between pages, and rendered
+to one hundred choices. Scrolling between pages and rendered
 pointer/keyboard acceptance remain pending. Keyword, rating, flag, label and
 collection strokes preserve Develop recipes; originals remain unchanged in every mode.
+
+**Metadata Presets…** in the Metadata menu or inspector manages named, selective
+metadata templates. Create a blank preset or start from the current photo, then
+check individual fields or use Check All / None / Filled. A checked empty scalar
+clears that field; unchecked fields survive. Preset keywords append to existing
+assignments. Search thirty names per page, edit, duplicate, rename or delete, then
+apply to the Grid selection or active photo in other views. Load a preset into
+Painter to apply it to touched thumbnails. Stale preset, vocabulary or photo
+state rejects the entire action, including rating changes made outside this form.
+Shared storage is the default; Store Metadata Presets with This Catalog switches
+repositories without moving or deleting entries, independently of other presets.
+
+The ordinary metadata editor and presets support thirty descriptive IPTC fields,
+including creators/contact information, caption accessibility text, location,
+credit/instructions and rights. Lists use one value per line, preserving commas
+inside names. Date Created is descriptive and never changes source capture time.
+Supported fields survive virtual copies and catalog backups, participate in
+frozen export metadata, and can be read through folder synchronization. Copyright
+export policy includes rights fields without creator/contact/location information.
+Adobe `.lrtemplate` exchange, IPTC Extension structures, custom textual labels,
+metadata Undo and full reference acceptance remain open.
 
 **Target Collection** paints into the current regular collection or Quick
 Collection. Use **Set as Target Collection** on a collection to choose it. The

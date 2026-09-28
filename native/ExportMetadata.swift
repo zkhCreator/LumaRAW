@@ -77,8 +77,12 @@ struct ExportMetadataSheet: View {
             ScrollView {
                 VStack(alignment:.leading,spacing:8) {
                     ForEach(model.fields.keys.filter{$0 != "flag"}.sorted(),id:\.self) { key in
+                        if key == "iptc",let values=model.fields[key] as? [String:Any] {
+                            DisclosureGroup("IPTC") { IPTCValuesView(values:values) }
+                        } else {
                         LabeledContent(model.label(key),value:model.value(key).isEmpty ? "(empty)":model.value(key))
                             .textSelection(.enabled)
+                        }
                     }
                 }
             }.frame(maxHeight:160)
@@ -110,4 +114,3 @@ struct ExportMetadataSheet: View {
             .task { await model.load() }.onDisappear { model.invalidate() }
     }
 }
-

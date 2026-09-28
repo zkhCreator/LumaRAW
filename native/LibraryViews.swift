@@ -176,6 +176,7 @@ struct MetadataEditor: View {
     @State private var title: String
     @State private var caption: String
     @State private var copyright: String
+    @State private var iptcValues: [String:Any]
     @State private var keywords: String
     @State private var keywordIDs: [Int]?
     @State private var choosingKeywords=false
@@ -190,6 +191,7 @@ struct MetadataEditor: View {
         _title=State(initialValue:first?.title ?? "")
         _caption=State(initialValue:first?.caption ?? "")
         _copyright=State(initialValue:first?.copyright ?? "")
+        _iptcValues=State(initialValue:MetadataDraft.flatten(["iptc":first?.iptc ?? [:]]))
         _keywords=State(initialValue:first?.keywords.joined(separator:", ") ?? "")
         _keywordIDs=State(initialValue:first?.keywordsDeferred == true ? first?.keywordIDs:nil)
         _label=State(initialValue:first?.colorLabel ?? "none")
@@ -219,6 +221,7 @@ struct MetadataEditor: View {
                 Picker("Color label",selection:$label) {
                     ForEach(LibraryLabels.names,id:\.self) { Text($0.capitalized).tag($0) }
                 }.disabled(!fields.contains("color_label"))
+                MetadataFieldsEditor(fields:s.iptcFields,values:$iptcValues,selected:$fields)
             }.formStyle(.grouped)
             HStack {
                 Button("Cancel",role:.cancel) { dismiss() }.keyboardShortcut(.cancelAction)
@@ -226,6 +229,7 @@ struct MetadataEditor: View {
                 Button("Save Metadata") {
                     var patch: [String: Any] = [:]
                     for (key,value) in [("copy_name",copyName),("title",title),("caption",caption),("copyright",copyright),("color_label",label)] where fields.contains(key) { patch[key]=value }
+                    patch.merge(MetadataDraft.patch(values:iptcValues,selected:fields,fields:s.iptcFields)) { _,new in new }
                     if fields.contains("keywords") {
                         if let keywordIDs {
                             patch.merge(metadataKeywordIdentityReplacement(keywordIDs,additions:keywords,original:targets.first?.keywordIDs ?? [],targetCount:targets.count)) { _,new in new }

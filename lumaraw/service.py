@@ -46,7 +46,7 @@ def executable_args():
 def unpack(row):
     if row:
         row=dict(row)
-        for key in ('recipe','metadata','options','processing','export_metadata'):
+        for key in ('recipe','metadata','options','processing','export_metadata','iptc'):
             if key in row and isinstance(row[key],str): row[key]=json.loads(row[key])
     return row
 
@@ -65,6 +65,8 @@ class Service:
         self.keyword_sets=KeywordSets(self,presets_root)
         from .develop_presets import DevelopPresets
         self.develop_presets=DevelopPresets(self,presets_root)
+        from .metadata_presets import MetadataPresets
+        self.metadata_presets=MetadataPresets(self,presets_root)
         self.last_activity=time.monotonic()
         with self.catalog() as c:
             Relocations(c).recover()
@@ -117,6 +119,11 @@ class Service:
         self.last_activity=time.monotonic();p={} if p is None else p
         if method not in TOOLS: raise ValueError('Unknown operation: '+method)
         jsonschema.validate(p,TOOLS[method]['inputSchema'])
+        if method=='metadata_schema':
+            from .iptc import FIELDS, SCHEMA
+            return {'iptc_fields':list(FIELDS.values()),'iptc_schema':SCHEMA}
+        if method in ('list_metadata_presets','get_metadata_preset','save_metadata_preset','metadata_preset_action','apply_metadata_preset'):
+            return self.metadata_presets.dispatch(method,p)
         if method in ('list_develop_presets','get_develop_preset','save_develop_preset','develop_preset_action','apply_develop_preset'):
             return self.develop_presets.dispatch(method,p)
         if method in ('list_keyword_sets','get_keyword_set','save_keyword_set','keyword_set_action','apply_keyword_set'):
@@ -253,7 +260,9 @@ class Service:
             if method=='edit_metadata':
                 ids=Organization(c).edit_metadata(p['targets'],p['patch'])
                 first=c.photo(ids[0])
-                accepted={key:first[key] for key in p['patch'] if key not in ('keywords','keyword_ids','keyword_additions')}
+                accepted={key:first[key] for key in p['patch'] if key not in ('keywords','keyword_ids','keyword_additions','iptc')}
+                if 'iptc' in p['patch']:
+                    accepted['iptc']=p['patch']['iptc']
                 if any(key in p['patch'] for key in ('keywords','keyword_ids')):
                     accepted.update({key:first[key] for key in ('keywords','keyword_tags','keyword_ids','keyword_count','keywords_deferred')})
                 return {'updated':[{'photo_id':photo_id,'metadata_revision':c.db.execute(

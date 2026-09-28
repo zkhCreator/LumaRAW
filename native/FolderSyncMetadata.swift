@@ -1,6 +1,6 @@
 // Purpose: show complete scanned metadata without enlarging folder review pages.
 // Inputs: a captured plan/item/revision and bounded read-only detail responses.
-// Outputs: full descriptive fields and twenty complete keyword paths per page.
+// Outputs: full descriptive fields and bounded complete keyword paths per page.
 // No writes or automatic revision adoption; changed plans require a fresh review.
 import SwiftUI
 
@@ -11,6 +11,7 @@ import SwiftUI
     @Published var item: FolderSyncItem?
     @Published var offset=0
     @Published var total=0
+    @Published var pageSize=20
     @Published var loading=false
     @Published var error: String?
     private var generation=0
@@ -21,6 +22,7 @@ import SwiftUI
         guard result["plan_id"] as? Int == planID,result["revision"] as? Int == revision,
               let row=result["item"] as? [String:Any],let next=FolderSyncItem(row),next.id == itemID else { return }
         item=next;offset=result["offset"] as? Int ?? 0;total=result["total"] as? Int ?? 0
+        pageSize=result["page_size"] as? Int ?? 20
     }
     func load(offset: Int=0) async {
         generation+=1;let token=generation;loading=true;error=nil
@@ -49,9 +51,14 @@ struct FolderSyncMetadataSheet: View {
                     VStack(alignment:.leading,spacing:12) {
                         Text(item.path).font(.caption).textSelection(.enabled)
                         ForEach(item.metadataKeys.filter{$0 != "keyword_paths"},id:\.self) { key in
+                            if key == "iptc",let values=item.patch[key] as? [String:Any] {
+                                Text("IPTC").font(.headline)
+                                IPTCValuesView(values:values)
+                            } else {
                             VStack(alignment:.leading,spacing:4) {
                                 Text(item.label(key)).font(.headline)
                                 Text(item.value(key).isEmpty ? "(empty)":item.value(key)).textSelection(.enabled)
+                            }
                             }
                         }
                         if let paths=item.patch["keyword_paths"] as? [[String]] {
@@ -68,12 +75,12 @@ struct FolderSyncMetadataSheet: View {
             }
             if let error=model.error { Text(error).foregroundStyle(.red) }
             HStack {
-                if model.total>20 {
-                    Button("Previous") { Task { await model.load(offset:max(0,model.offset-20)) } }
+                if model.total>model.pageSize {
+                    Button("Previous") { Task { await model.load(offset:max(0,model.offset-model.pageSize)) } }
                         .disabled(model.loading || model.offset==0)
-                    Text("\(model.offset+1)–\(min(model.offset+20,model.total)) of \(model.total) keywords").font(.caption)
-                    Button("Next") { Task { await model.load(offset:model.offset+20) } }
-                        .disabled(model.loading || model.offset+20>=model.total)
+                    Text("\(model.offset+1)–\(min(model.offset+model.pageSize,model.total)) of \(model.total) keywords").font(.caption)
+                    Button("Next") { Task { await model.load(offset:model.offset+model.pageSize) } }
+                        .disabled(model.loading || model.offset+model.pageSize>=model.total)
                 }
                 Spacer()
                 if model.loading { ProgressView().controlSize(.small) }

@@ -106,6 +106,10 @@ def migrate(db):
     migrate_orientation(db)
     from .develop_presets import migrate as migrate_develop_presets
     migrate_develop_presets(db)
+    from .iptc import migrate as migrate_iptc
+    migrate_iptc(db)
+    from .metadata_presets import migrate as migrate_metadata_presets
+    migrate_metadata_presets(db)
 
 
 def text_predicate(text):
@@ -200,7 +204,7 @@ class Organization:
     def edit_metadata(self, targets, patch):
         from .keywords import Keywords
         store = Keywords(self.catalog)
-        fields = {k: v for k, v in patch.items() if k not in ('keywords','keyword_ids','keyword_additions')}
+        fields = {k: v for k, v in patch.items() if k not in ('keywords','keyword_ids','keyword_additions','iptc')}
         if 'keywords' in patch and ('keyword_ids' in patch or 'keyword_additions' in patch):
             raise ValueError('Choose keyword text replacement or identity replacement, not both')
         if 'keyword_additions' in patch and 'keyword_ids' not in patch:
@@ -218,6 +222,9 @@ class Organization:
                 from .keyword_sets import remember
                 remember(self.db, store.last_additions)
             for photo_id in ids:
+                if 'iptc' in patch:
+                    from .iptc import merge
+                    merge(self.db,photo_id,patch['iptc'])
                 if fields:
                     self.db.execute('UPDATE photos SET ' + ','.join(f'{key}=?' for key in fields)
                                     + ' WHERE id=?', [*fields.values(), photo_id])
