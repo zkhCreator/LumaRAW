@@ -16,10 +16,8 @@ import time
 import tempfile
 from urllib.parse import quote
 import zipfile
-from datetime import datetime
-
-from PIL import Image
 from .model import Recipe
+from .capture_time import read_capture_time
 
 
 def hash_file(path,cancelled=lambda:False):
@@ -150,21 +148,11 @@ def index_library(catalog,cancelled=lambda:False,progress=lambda n:None):
         id_,path,mtime,size,sha=photo
         p=Path(path)
         try:
-            stat=p.stat();meta={};taken=0;camera=''
-            try:
-                with Image.open(p) as im:
-                    exif=im.getexif();camera=str(exif.get(272,''))[:100]
-                    datestr=exif.get(306,'')
-                    sub=exif.get_ifd(34665)
-                    datestr=sub.get(36867,datestr)
-                    if datestr:
-                        try: taken=int(datetime.strptime(str(datestr)[:19],'%Y:%m:%d %H:%M:%S').timestamp())
-                        except ValueError: pass
-            except (OSError,ValueError): pass
+            stat=p.stat();clock=read_capture_time(p)
             if not sha or stat.st_mtime_ns!=mtime or stat.st_size!=size:
                 sha=hash_file(p,cancelled)
-            catalog.db.execute('UPDATE photos SET sha256=?,taken=?,camera=?,mtime=?,bytes=?,missing=0 WHERE source_id=?',
-                               (sha,taken,camera,stat.st_mtime_ns,stat.st_size,id_))
+            catalog.db.execute('UPDATE photos SET sha256=?,taken=?,taken_us=?,taken_submicro=?,capture_clock=?,camera=?,mtime=?,bytes=?,missing=0 WHERE source_id=?',
+                               (sha,clock['taken'],clock['taken_us'],clock['taken_submicro'],clock['capture_clock'],clock['camera'],stat.st_mtime_ns,stat.st_size,id_))
         except InterruptedError: break
         except OSError:
             catalog.db.execute('UPDATE photos SET missing=1 WHERE source_id=?',(id_,))

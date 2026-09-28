@@ -21,6 +21,7 @@ Official references checked September 2026:
 - [Keyboard shortcuts](https://helpx.adobe.com/lightroom-classic/desktop/introduction-to-lightroom-classic/keyboard-shortcuts.html)
 - [Photo stacks and source boundaries](https://helpx.adobe.com/lightroom-classic/desktop/organize-photos-in-lightroom-classic/grouping-photos-stacks.html)
 - [Stacking shortcuts, Adobe's Julieanne Kost](https://jkost.com/blog/2024/07/stacking-similar-photos-in-lightroom-classic.html)
+- [Folder hierarchy, subfolder inclusion and synchronization](https://helpx.adobe.com/lightroom-classic/desktop/manage-catalogs-and-files/create-folders.html)
 
 ## Feature inventory
 
@@ -31,7 +32,7 @@ gaps. Nothing below is full Lightroom parity merely because historical tests pas
 | --- | --- | --- |
 | Import and catalogs | Partial: referenced originals, backup/restore | Import preview/selection, copy workflows, metadata/develop presets, catalog switching/merge |
 | Library navigation | Partial: bounded grid/filmstrip, filters/sorting, regular/smart/Quick collections and nested sets | Folder tree, collection drag/drop/color labels, full smart criteria/import-export, source-selection memory, desktop acceptance |
-| Organization | Partial: duplicate/missing detection, flat keywords, title/caption/copyright, labels, batch metadata, virtual copies and manual scoped stacks | Keyword hierarchy, complete IPTC, stack splitting/auto stacking, rename and sidecars |
+| Organization | Partial: duplicate/missing detection, flat keywords, title/caption/copyright, labels, batch metadata, virtual copies, manual/split/capture-time scoped stacks | Keyword hierarchy, complete IPTC, stack interaction acceptance, rename and sidecars |
 | Culling | Partial: Loupe/Compare/Survey, linked detail, anchored page selection | Desktop acceptance, cross-page selection, Develop reference view, auto advance, persistent workspace state |
 | Basic development | Partial: light/WB/color | Calibrated absolute WB, eyedropper, texture/clarity/dehaze, complete HSL/B&W and color grading |
 | Curves and profiles | Partial: custom composite curve, LUT/ICC | Interactive RGB curves, camera/profile browser, compatible preset import/export |
@@ -51,10 +52,9 @@ gaps. Nothing below is full Lightroom parity merely because historical tests pas
 
 ## Active increment
 
-Photo stacks: manual grouping, independent folder/collection scope, visibility,
-cover/order, virtual-copy integration, lifecycle cleanup and bounded SQL pages.
-Capture-time auto stacking and splitting follow this increment; the remaining
-feature inventory stays in scope.
+Capture-time auto stacking and selected-subset splitting, precise read-only EXIF
+clocks, stable collection identities and packaged Mac workflow verification.
+Folder navigation and keyword hierarchy follow; the remaining inventory stays in scope.
 
 ## Evidence log
 
@@ -102,11 +102,18 @@ whole-desktop latency, or performance guarantees on other hardware. Reproduce vi
 
 ### Next work
 
-Continue with stable collection identities, capture-time auto stacking, stack
-splitting, folder navigation and keyword hierarchy. Offline preview caches,
+Continue with folder navigation, keyword hierarchy, stack ordinal badges and
+cross-page cover focus. Offline preview caches,
 cache-size controls and native polling/process-startup costs remain pending. Then close Develop and
 export gaps in the inventory. Preserve pending desktop/older-OS acceptance rather
 than removing it from the completion criteria.
+
+Folder navigation acceptance includes imported-directory hierarchy, alphabetical
+children, bounded counts/pages, optional inclusion of descendants, and locating a
+selected photo's folder. Source navigation must remain distinct from metadata
+filters. Favorites, labels, missing-folder relinking, synchronization and explicit
+filesystem rename/move workflows remain separate unfinished requirements; a tree
+view alone does not complete folder parity.
 
 Full completion still requires closing all non-AI gaps above. Historical receipts
 in `VERIFICATION.md` do not validate this increment.
@@ -415,3 +422,66 @@ warnings and passed ad-hoc signature verification. The bundled engine manifest
 matches the final engine source. Native state checks are not rendered desktop,
 keyboard routing, VoiceOver or macOS 14 runtime evidence.
 The 195-file source-only archive also passed its extracted strict public check.
+
+### Capture-time stacks and stable collection identities increment
+
+Schema v5 preserves live collection IDs, hierarchy, target state, memberships,
+indexes and triggers while preventing future identifier reuse. Deleting the
+highest collection and restarting or restoring a backup no longer lets stale
+native editors rename a replacement collection. Failed rebuilds roll back. IDs
+already deleted before this upgrade cannot be reconstructed from old catalogs.
+
+Schema v6 adds precise capture clocks: integer microseconds and exact finer decimal
+digits, including epoch/pre-epoch dates. Bounded read-only TIFF-family, JPEG and
+PNG EXIF readers obtain camera model, original/digitized/fallback date, fraction
+and offset without opening a pixel decoder or hashing files. Explicit offsets
+normalize to UTC; absent offsets keep marked camera wall time independent of the
+host timezone. Unsupported containers, BigTIFF and malformed metadata stay unknown.
+Old integer timestamps remain on migration; precise clocks require refresh.
+Generated TIFF headers are not evidence of actual Nikon metadata coverage.
+
+Auto-Stack by Capture Time previews the entire explicit folder (excluding child
+folders) or regular/Quick collection, ignoring selection and filters. Adjacent gaps
+strictly below 0–3600 seconds join groups; equality starts a new group and zero
+leaves photos unstacked. Preview examples are capped at 20. Application rechecks
+the preview fingerprint before atomically replacing that source's stacks. Changed
+clocks, membership, duration or stack revision reject the old plan. Unknown dates
+remain unstacked; an entirely unknown source cannot erase existing stacks. Recipe
+changes are preserved. Split moves a proper selected subset of an expanded stack
+in its existing order; singletons become unstacked.
+
+Native confirmation captures source and duration, clears stale plans and reports
+conflicts without automatic retry. Capture refresh pages at 60 physical originals,
+updates all virtual-copy clocks and exposes progress/Stop between pages. Refresh
+does not hash photos or run image workers. Dismissing the sheet discards late
+previews. Mixed camera/UTC clocks, existing-stack replacement details and exact
+Split behavior still require direct Lightroom comparison; no desktop parity is
+claimed from matching the published descriptions alone.
+
+Warm synthetic timings on macOS 26.6.2 arm64, 128 GB, with no concurrent build or
+test workload. Previews use 30 samples; replacement uses three samples and includes
+the preceding preview and apply-time revalidation:
+
+| Operation | 10,000 photos median / p95 | 100,000 photos median / p95 |
+| --- | ---: | ---: |
+| Folder preview | 29.719 / 32.887 ms | 292.696 / 296.435 ms |
+| Collection preview | 29.401 / 30.322 ms | 305.416 / 323.433 ms |
+| Folder replacement, ten-photo groups | 258.500 / 267.989 ms | 2693.146 / 2700.447 ms |
+| Collection replacement, ten-photo groups | 258.329 / 264.071 ms | 2762.498 / 2776.028 ms |
+| One source-sized stack replacement | 236.382 / 238.452 ms | 2483.035 / 2489.030 ms |
+
+Peak process RSS was 48.47 / 79.27 MB; worker peak was zero. Groups stream through
+SQL cursors and update their cached size once rather than recounting on each
+insertion. These timings exclude EXIF I/O, IPC, RAW processing and rendered UI.
+`tests/auto_stack_probe.py` reproduces the synthetic workload.
+
+Final required-Metal Python run: **194 passed, 2 real-NEF tests skipped**. Capture,
+auto-stack, split and identity tests cover exact boundaries, scope, stale plans,
+unknown dates, migration rollback, backup/restore and non-reused collection IDs.
+All ten native suites passed against the self-contained packaged engine: **165
+assertions**, including 19 auto-stack, 22 stack and 21 collection checks. The Mac
+app built without Swift warnings and passed ad-hoc signature verification. Its
+engine manifest matches the final source (generation 4, catalog schema 6, 52 tools).
+Rendered desktop interaction, VoiceOver, macOS 14 runtime and real-camera/Adobe
+reference acceptance remain unverified. Folder navigation, keyword hierarchy and
+the full non-AI feature inventory remain unfinished.

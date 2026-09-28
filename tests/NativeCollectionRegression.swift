@@ -64,6 +64,15 @@ import Foundation
             try check(!s.expandedCollections.contains(root.id) && !s.expandedCollections.contains(child.id),"deleted_tree_releases_sidebar_pages")
             let reloaded=Store();await reloaded.refreshCollections()
             try check(reloaded.collectionState?.quick.id == quick.id && reloaded.collections.contains { $0.name == "Trip Copy" },"state_survives_new_native_store")
+            let old=LibraryCollection(try await Backend.call("save_collection",["name":"Old source","kind":"regular"]))!
+            _=try await Backend.call("delete_collection",["collection_id":old.id,"expected_revision":old.revision])
+            let replacement=LibraryCollection(try await Backend.call("save_collection",["name":"New source","kind":"regular"]))!
+            try check(replacement.id > old.id,"deleted_collection_identity_is_not_reused")
+            try check(!(await s.saveCollection(name:"Stale rename",kind:"regular",rules:[:],match:"all",original:old)),"stale_native_editor_cannot_retarget_new_collection")
+            try check(s.error?.contains("does not exist") == true,"stale_collection_error_is_visible")
+            s.error=nil
+            let unchanged=LibraryCollection(try await Backend.call("get_collection",["collection_id":replacement.id]))!
+            try check(unchanged.name == "New source" && unchanged.revision == 0,"replacement_collection_remains_unchanged")
             let report:[String:Any]=["ok":true,"checks":checks,"desktop_ui":"NOT_VERIFIED"]
             print(String(data:try JSONSerialization.data(withJSONObject:report,options:[.prettyPrinted,.sortedKeys]),encoding:.utf8)!)
             exit(0)

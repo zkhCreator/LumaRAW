@@ -71,6 +71,10 @@ import Foundation
             try check(!s.canStack && s.photoStacks.isEmpty,"smart_collection_stack_actions_disabled")
             s.collectionID=nil;s.activeCollection=nil;s.showStacks=false;await s.refresh()
             try check(s.total == 5 && s.photoStacks.isEmpty && !s.canStack,"flat_view_exposes_all_photos_without_modifying_stacks")
+            s.showStacks=true;await s.refresh()
+            await s.changeStack("split",ids:[4,5])
+            try check(s.photoStacks[3] == nil && s.photoStacks[4]?.count == 2,"split_leaves_singleton_and_new_selected_stack")
+            try check(s.photoStacks[5]?.top == 4 && s.total == 5,"split_keeps_internal_order_and_all_photos")
             print(String(data:try JSONSerialization.data(withJSONObject:["ok":true,"checks":checks,
                 "desktop_ui":"NOT_VERIFIED"],options:[.prettyPrinted,.sortedKeys]),encoding:.utf8)!)
             exit(0)

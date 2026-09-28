@@ -81,6 +81,10 @@ def migrate(db):
     migrate_virtual_copies(db)
     from .stacks import migrate as migrate_stacks
     migrate_stacks(db)
+    from .collections import migrate_identities
+    migrate_identities(db)
+    from .capture_time import migrate as migrate_capture_time
+    migrate_capture_time(db)
 
 
 def text_predicate(text):

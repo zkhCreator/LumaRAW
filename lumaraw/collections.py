@@ -5,8 +5,10 @@ Outputs: bounded collection pages, predicates and atomic membership changes.
 Sets contain collections, never photos directly. Originals and photo recipes are
 untouched. Ancestor revisions cover descendant edits so stale subtree deletion
 cannot erase changes the caller has not seen. No pixels or platform UI.
+Collection identities are never reused after deletion, including after restart.
 """
 import json
+import re
 import time
 
 from .organization import criteria
@@ -31,6 +33,33 @@ def migrate(db):
                              (time.time(),)).lastrowid
             db.execute('INSERT INTO collection_state(id,quick_id,target_id) VALUES(1,?,?)',(quick,quick))
         db.execute('PRAGMA user_version=2')
+
+
+def migrate_identities(db):
+    """v5: retain every live collection/reference while preventing future ID reuse."""
+    if db.execute('PRAGMA user_version').fetchone()[0] >= 5:
+        return
+    with db:
+        db.execute('BEGIN IMMEDIATE')
+        schema=db.execute("SELECT sql FROM sqlite_master WHERE type='table' AND name='collections'").fetchone()[0]
+        if not re.search(r'\bid\s+INTEGER\s+PRIMARY\s+KEY\s+AUTOINCREMENT\b',schema,re.I):
+            schema,replaced=re.subn(r'\bid\s+INTEGER\s+PRIMARY\s+KEY\b',
+                'id INTEGER PRIMARY KEY AUTOINCREMENT',schema,flags=re.I)
+            if replaced != 1:
+                raise ValueError('Unsupported collections schema; identity migration was not applied')
+            schema,replaced=re.subn(r'CREATE TABLE\s+(?:IF NOT EXISTS\s+)?["`\[]?collections["`\]]?',
+                                   'CREATE TABLE collections_v5',schema,count=1,flags=re.I)
+            if replaced != 1:
+                raise ValueError('Unsupported collections table declaration')
+            objects=[row[0] for row in db.execute("SELECT sql FROM sqlite_master WHERE tbl_name='collections' "
+                "AND type IN ('index','trigger') AND sql IS NOT NULL")]
+            db.execute(schema)
+            db.execute('INSERT INTO collections_v5 SELECT * FROM collections')
+            db.execute('DROP TABLE collections')
+            db.execute('ALTER TABLE collections_v5 RENAME TO collections')
+            for statement in objects:
+                db.execute(statement)
+        db.execute('PRAGMA user_version=5')
 
 
 class Collections:

@@ -99,6 +99,15 @@ class Catalog:
                     (str(p), p.name, stat.st_size, stat.st_mtime_ns, json.dumps(Recipe().dict()), time.time()))
                 count += cur.rowcount
                 skipped += 1 - cur.rowcount
+                if cur.rowcount:
+                    from .capture_time import read_capture_time
+                    try:
+                        clock=read_capture_time(p)
+                    except OSError:
+                        clock=None  # The reference is imported; capture metadata remains unknown.
+                    if clock:
+                        self.db.execute('UPDATE photos SET taken=?,taken_us=?,taken_submicro=?,capture_clock=?,camera=? WHERE id=?',
+                                        (clock['taken'],clock['taken_us'],clock['taken_submicro'],clock['capture_clock'],clock['camera'],cur.lastrowid))
                 if (count + skipped) % 100 == 0:
                     self.db.commit()
             except OSError:

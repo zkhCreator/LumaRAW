@@ -81,8 +81,9 @@ The harness exercises the real native Store and JSON transport: import, RAW prev
 The runner compiles all native files except the app entry point, generates five
 small raster files and separate disposable catalogs, then runs the
 15-assertion state, 13-assertion library, 12-assertion culling, 20-assertion review,
-14-assertion thumbnail, 17-assertion collection-tree, 19-assertion virtual-copy,
-10-assertion service-connection and 20-assertion stack suites. Each suite has its own
+14-assertion thumbnail, 21-assertion collection-tree, 19-assertion virtual-copy,
+10-assertion service-connection, 22-assertion stack and 19-assertion auto-stack suites.
+Each suite has its own
 fresh image directory, so a relink test cannot move another suite's fixture. The library suite checks
 live smart membership, text search/sort, pagination, empty-filter selection,
 partial metadata writes and independent recipe/metadata conflict handling. JSON
@@ -117,6 +118,10 @@ The collection-tree suite verifies native nesting/aggregation, Quick save/clear,
 target changes, stale target rejection, subtree duplication/removal and state in
 a new Store. `tests/test_collections.py` adds database migration/backup evidence,
 ancestor conflicts, live aggregate membership, cycle/depth checks and pagination.
+`tests/test_collection_identities.py` checks the v4-to-v5 identity rebuild,
+preserved hierarchy/Quick target/membership/stacks/custom schema objects, rollback
+after a denied table drop, restart and stale mutation rejection. Native collection
+checks prove a stale editor cannot rename a replacement collection.
 `tests/collection_probe.py --work work/collection-probe-01` measures a generated
 10,000-photo catalog and 13-node set: aggregate/child/state queries, Quick save and
 subtree duplication. It records median/p95, counts and RSS, excludes IPC/UI and
@@ -130,7 +135,7 @@ selection equivalence to Lightroom Classic.
 `tests/test_stacks.py` exercises source isolation, active covers, contiguous sort,
 collapsed selection/filtering, optimistic conflicts, collection ancestor conflicts,
 singleton cleanup, virtual copies, cross-folder relinking, duplication/Quick save,
-bulk source visibility and v3 migration. A 130-member stack crosses three pages
+bulk source visibility, selected-subset splitting and v3 migration. A 130-member stack crosses three pages
 without returning more than 60 summaries or loading recipes.
 
 `NativeStackRegression` checks the actual Store, scoped badges, visible selection,
@@ -144,6 +149,26 @@ views against a real engine. It does not validate rendered controls or key routi
 The probe creates ten-photo stacks with SQL fixtures, records collapsed/expanded
 pages, filters, a flat baseline and deep offsets. It measures warm in-process
 service latency and peak RSS, with no image workers, photograph processing or UI.
+
+`tests/test_capture_time.py` uses generated JPEG/PNG and both TIFF byte orders to
+check EXIF offsets, exact fractions, host-timezone independence, malformed headers,
+epoch/pre-epoch dates and source-family refresh. These fixtures do not establish
+real-camera metadata coverage. The timezone-switching test requires POSIX `tzset`.
+`tests/test_auto_stacks.py` checks strict adjacent gaps, submicrosecond boundaries,
+source isolation, stale previews, unknown dates, rollback, 60-family refresh pages
+and bounded examples. `NativeAutoStackRegression` uses five EXIF-tagged JPEGs to
+exercise captured source, changed duration, stale confirmation, metadata progress,
+folder/collection application and revision adoption through the real broker.
+
+```sh
+.venv/bin/python tests/auto_stack_probe.py --work work/auto-stack-probe-01 --rows 100000 --samples 30
+```
+
+The probe streams generated ten-photo bursts and one source-sized stack. Preview
+uses 30 warm samples; replacement uses three samples and includes its preceding
+preview plus the apply-time revalidation. It records RSS and zero image-worker
+activity, excluding metadata I/O, IPC and rendered UI. No unit-test timing threshold
+or actual RAW processing speed is implied.
 
 ## Virtual copies
 

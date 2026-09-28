@@ -103,12 +103,14 @@ authorizes editing or exporting its hidden members.
 
 `stack_photos` takes `photo_ids` (1–60 distinct IDs), `expected_revision` captured
 from the page, an optional `collection_id`, and an action: group, unstack, remove,
-expand, collapse, toggle, top, up or down. For a new group, order IDs as displayed
+expand, collapse, toggle, split, top, up or down. For a new group, order IDs as displayed
 and provide its selected `active_id` to choose the cover. Grouping requires at
 least two photos; folder groups require the same exact folder. Grouping two
 collapsed covers moves only the selected photo from the other stack. Remove and
 unstack leave photos, originals and recipes intact. A stale revision is a conflict,
 not permission to refresh and retry the mutation automatically.
+Split requires a proper subset from one expanded stack, beyond only its cover.
+It retains selected internal order in a new expanded stack; singletons are unstacked.
 
 `set_stack_visibility` expands/collapses every stack in a captured source, without
 depending on photo selection or metadata filters. Pass `collapsed`, the current
@@ -116,6 +118,22 @@ stack revision and either `collection_id` or `folder` (including descendants).
 Omitting the source affects all folder stacks. `stack_state` reads the revision
 without photo payloads. New virtual copies automatically join an expanded folder
 stack, even when created in a collection; no collection stack is invented.
+
+`preview_auto_stack` takes `seconds` (0–3600) and exactly one `folder` or
+`collection_id`. A folder includes only its immediate catalog photos. Selection,
+filters and visibility do not narrow this operation. Adjacent gaps strictly below
+the threshold form groups. The response reports counts, unknown dates, existing
+stacks and a `token`; applying replaces stack organization in that source. Call
+`apply_auto_stack` only with the reviewed source, duration and token. A conflict
+requires a new preview and review; never automatically retry a stale replacement.
+
+`refresh_capture_times` reads up to 60 physical originals per call; pass its returned
+`after_source_id` until `done`, allowing cancellation between calls. This reads
+bounded TIFF-family/JPEG/PNG EXIF headers, without hashing or pixels, and updates
+shared source-family clocks. Unknown/unsupported dates are explicit. Offsets become
+UTC; dates without offsets retain camera clock provenance. Fractional precision is
+preserved. Migration keeps old integer timestamps but does not invent precise
+clocks, so older catalogs may need this explicit refresh. Originals are read-only.
 
 ## Virtual copies and snapshots
 

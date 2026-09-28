@@ -69,6 +69,7 @@ struct ContentView: View {
         .sheet(isPresented:$s.showLibraryFilters){LibraryFilterSheet(draft:LibraryFilterDraft(s.libraryFilters))}
         .sheet(isPresented:$s.showCopyRemoval){VirtualCopyRemovalSheet(targets:s.copyRemovalTargets)}
         .sheet(isPresented:$s.showMetadataEditor){MetadataEditor(targets:s.metadataTargets)}
+        .sheet(isPresented:$s.showAutoStack){if let source=s.autoStackSource {AutoStackSheet(source:source)}}
         .onChange(of:s.workspace) { _,_ in if !s.isMultiReview {s.reviewRenderer.stop()} else {s.updateReviewRequests()} }
         .onChange(of:s.develop) { _,value in if value {s.reviewRenderer.stop()} }
         .onDrop(of:[UTType.fileURL],isTargeted:nil){providers in

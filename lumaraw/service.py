@@ -27,6 +27,7 @@ from .organization import Organization
 from .collections import Collections
 from .virtual_copies import VirtualCopies
 from .stacks import Stacks
+from .auto_stacks import AutoStacks
 from .source_identity import cached_thumbnail
 from .runtime import engine_identity, EngineChangedError
 
@@ -176,6 +177,9 @@ class Service:
             if method=='stack_state':return {'revision':Stacks(c).revision()}
             if method=='stack_photos':return Stacks(c).change(**p)
             if method=='set_stack_visibility':return Stacks(c).visibility(**p)
+            if method=='preview_auto_stack':return AutoStacks(c).preview(**p)
+            if method=='apply_auto_stack':return AutoStacks(c).apply(**p)
+            if method=='refresh_capture_times':return AutoStacks(c).refresh_times(**p)
             if method=='list_collections':return Collections(c).list(**p)
             if method=='get_collection':
                 store=Collections(c);row=store.get(p['collection_id'])

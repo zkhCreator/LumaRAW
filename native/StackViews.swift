@@ -26,6 +26,8 @@ struct StackActions: View {
             }.disabled(stack == nil)
             Button("Remove from Stack") { Task { await s.changeStack("remove",ids:ids) } }
                 .disabled(!ids.contains { s.photoStacks[$0] != nil })
+            Button("Split Stack") { Task { await s.changeStack("split",ids:ids) } }
+                .disabled(stack == nil || stack?.collapsed == true || ids == [stack?.top ?? -1])
             Divider()
             Button("Move to Top of Stack") { if let active { Task { await s.changeStack("top",ids:[active]) } } }
                 .disabled(stack == nil || stack?.top == active)
@@ -34,6 +36,8 @@ struct StackActions: View {
             Divider()
             Button("Expand All Stacks") { Task { await s.setStackVisibility(collapsed:false) } }
             Button("Collapse All Stacks") { Task { await s.setStackVisibility(collapsed:true) } }
+            Divider()
+            Button("Auto-Stack by Capture Time…") { s.prepareAutoStack() }
         }.disabled(!s.canStack)
     }
 }

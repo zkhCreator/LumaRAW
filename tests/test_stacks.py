@@ -13,6 +13,7 @@ from lumaraw.catalog import Catalog
 from lumaraw.model import Recipe
 from lumaraw.service import Service
 from lumaraw.stacks import Stacks
+from lumaraw.runtime import CATALOG_VERSION
 
 
 @pytest.fixture
@@ -189,7 +190,7 @@ def test_v3_migration_retains_photos_without_inventing_stacks(service):
             for table in ('stack_state','stack_members','photo_stacks'):c.db.execute('DROP TABLE '+table)
             c.db.execute('PRAGMA user_version=3')
     with s.catalog() as c:
-        assert c.db.execute('PRAGMA user_version').fetchone()[0]==4
+        assert c.db.execute('PRAGMA user_version').fetchone()[0]==CATALOG_VERSION
         assert c.summaries([1,2])==original
         assert Stacks(c).revision()==0 and c.filtered_count()==6
 
@@ -237,10 +238,25 @@ def test_removed_unstacked_collection_invalidates_captured_scope(service):
     revision=s.dispatch('stack_state')['revision']
     s.dispatch('delete_collection',{'collection_id':old['id'],'expected_revision':old['revision']})
     new=s.dispatch('save_collection',{'name':'New','kind':'regular','photo_ids':[1,2]})
-    # Collection IDs can be reused by the older schema. A captured scope must
-    # still fail even when the replacement coincidentally has the same members.
-    assert new['id']==old['id']
+    # A deleted source invalidates captured stack requests; the new collection
+    # also gets a fresh identity, even if it has exactly the same members.
+    assert new['id']>old['id']
     with pytest.raises(ValueError,match='Stack conflict'):
         s.dispatch('stack_photos',{'action':'group','photo_ids':[1,2],
             'collection_id':old['id'],'expected_revision':revision})
     assert ids(s,collection_id=new['id'])==[1,2]
+
+
+def test_split_selected_subset_preserves_order_and_both_remaining_groups(service):
+    s=service
+    change(s,'group',[1,2,3,4,5])
+    with pytest.raises(ValueError,match='Expand'):change(s,'split',[2,4])
+    change(s,'expand',[1])
+    with pytest.raises(ValueError,match='beyond its cover'):change(s,'split',[1])
+    with pytest.raises(ValueError,match='at least one'):change(s,'split',[1,2,3,4,5])
+    change(s,'split',[4,2])
+    rows=page(s)['photos'];byid={row['id']:row for row in rows}
+    assert byid[1]['stack_count']==3 and byid[2]['stack_count']==2
+    assert byid[4]['stack_top']==2 and ids(s)==[1,3,5,2,4,6]
+    change(s,'split',[4])
+    assert page(s)['total']==6 and all(byid['stack_id'] is None for byid in page(s)['photos'] if byid['id'] in (2,4))

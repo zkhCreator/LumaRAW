@@ -82,8 +82,12 @@ collection revisions. Set views combine relational descendants and live smart
 predicates. Children page at 60; collapsed branches release native cached pages.
 Nesting is limited to 32 levels, aggregate views to 128 smart descendants, and
 subtree duplication to 1,000 collection nodes. These resource bounds are explicit.
-Metadata
-and collections have independent revisions. Grid filtering/counting/sorting runs in
+Schema version 5 rebuilds the collection table with AUTOINCREMENT, preserving live
+IDs, custom columns, indexes and triggers in one transaction. IDs deleted after
+this upgrade are never reused, including after restart; historical IDs deleted
+before the upgrade cannot be reconstructed. Stale editors therefore cannot retarget
+a replacement collection. Unsupported schemas fail without committing the rebuild.
+Metadata and collections have independent revisions. Grid filtering/counting/sorting runs in
 SQLite with a deterministic ID tie-breaker; summaries never select recipe or EXIF
 JSON. Collections also paginate at 60 and do not eagerly count every smart collection.
 
@@ -130,6 +134,30 @@ copy scoped stacks inside their enclosing transaction. New virtual copies join
 the origin's expanded folder stack; migration leaves existing variants unchanged.
 Native stack metadata is separate from recipe revisions, and lightweight polling
 refreshes structural changes, including previously empty pages.
+
+`capture_time.py` owns schema version 6 and bounded EXIF header reads. It stores
+integer microseconds plus an exact decimal residual, including pre-epoch dates.
+Explicit offsets normalize to UTC; absent offsets retain a marked camera wall
+clock independent of the host timezone. The previous integer `taken` field is
+preserved on migration; precise clocks remain unknown until refresh. Import and
+indexing populate the new fields. TIFF IFD0/Exif IFD, JPEG APP1 and PNG eXIf are
+supported, capped at 1 MiB of reads and 4,096 entries/segments. BigTIFF and other
+containers are not inferred from file timestamps. No image decoding is involved.
+
+`auto_stacks.py` streams an explicit folder's immediate photos or a regular/Quick
+collection in precise capture order. A strictly shorter adjacent gap joins a
+group; zero leaves every photo unstacked. Preview returns counts and at most 20
+examples. Its fingerprint includes source, duration, clocks/membership and the
+global stack revision. Apply rechecks this in a write transaction before replacing
+source stacks; failures roll back, with no automatic retry. Groups are streamed
+and their sizes updated once to avoid repeatedly recounting large stacks. Recipes
+and originals are untouched. Mixed UTC/camera clocks are identified in the preview;
+exact Adobe mixed-timezone behavior remains unverified.
+
+Capture refresh reads at most 60 physical source families per command and updates
+their shared clock fields, without hashing or image workers. Native progress can
+stop between pages. It captures source/duration, drops late previews and disables
+confirmation when the displayed plan no longer matches the current query.
 
 `source_identity.py` provides stat-based cache identities without importing pixel
 libraries. The broker returns a page of completed thumbnail paths in one command;

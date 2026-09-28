@@ -159,6 +159,18 @@ class Stacks:
                     self.db.execute('UPDATE photo_stacks SET collapsed=1 WHERE id=?', (destination,))
                 else:
                     self.create(scope, next(iter(folders)) if scope == 'folder' else '', ordered)
+            elif action == 'split':
+                if len(stacks)!=1 or any(row is None for row in members.values()):
+                    raise ValueError('Select photos from one expanded stack to split')
+                old=self.db.execute('SELECT * FROM photo_stacks WHERE id=?',(next(iter(stacks)),)).fetchone()
+                if old['collapsed'] or photo_ids==[old['top_id']]:
+                    raise ValueError('Expand the stack and select photos beyond its cover to split')
+                if len(photo_ids)>=old['size']:
+                    raise ValueError('Leave at least one photo in the original stack')
+                ordered=sorted(photo_ids,key=lambda id_:members[id_]['position'])
+                for id_ in ordered:
+                    self.db.execute('DELETE FROM stack_members WHERE scope=? AND photo_id=?',(scope,id_))
+                if len(ordered)>=2:self.create(scope,old['folder'],ordered,False)
             elif action in ('expand', 'collapse', 'toggle', 'unstack'):
                 for id_ in stacks:
                     if action == 'unstack':

@@ -14,10 +14,10 @@ LumaRAW references your originals without changing them. The SwiftUI app and you
 | Color | Custom tone curves, color mixer, camera-bound chart calibration, `.cube` LUTs, ICC soft proofing, and gamut warnings |
 | Detail and composition | Full-resolution 1:1 viewports, noise reduction, sharpening, defringing, rotation, crop, straighten, and perspective |
 | Local adjustments | Radial, gradient, luminance-range, and brush masks; manual lens distortion, vignette, and chromatic-aberration correction |
-| Library | Ratings, flags, color labels, catalog metadata/keywords, regular/live smart collections, nested sets, Quick/target collections, SQL filters/sorting, manual folder/collection stacks, duplicate/missing indexing, virtual copies/shared snapshots, selective sync, and backup/restore |
+| Library | Ratings, flags, color labels, catalog metadata/keywords, regular/live smart collections, nested sets, Quick/target collections, SQL filters/sorting, manual/capture-time folder and collection stacks, duplicate/missing indexing, virtual copies/shared snapshots, selective sync, and backup/restore |
 | Culling | Grid/Loupe/Compare/Survey, anchored page selections, active-photo review actions, linked or independent full-resolution comparison viewports |
 | Export | JPEG and 16-bit TIFF with embedded sRGB, Display P3, Adobe RGB, or ProPhoto RGB ICC profiles; persistent queue, pause/cancel/retry, and collision-safe filenames |
-| Agents | 49 MCP tools, equivalent JSON CLI commands, and a bundled skill; app and agent edits share conflict detection |
+| Agents | 52 MCP tools, equivalent JSON CLI commands, and a bundled skill; app and agent edits share conflict detection |
 
 ## Build and run
 
@@ -74,7 +74,19 @@ so ratings, edits and collection additions do not silently include hidden member
 Expand all stacks in a source from the menu, or turn off **Library → Show Photo
 Stacks** to search every photo without changing saved stack visibility. New
 virtual copies join an expanded folder stack, including copies created inside a
-collection. Capture-time auto stacking and splitting remain pending.
+collection. To split an expanded stack, select a proper subset beyond just its
+cover and choose **Split Stack**; a single selected member becomes unstacked.
+
+**Auto-Stack by Capture Time…** previews all catalog photos in one explicit folder
+(excluding subfolders) or regular/Quick collection, regardless of the current
+selection and filters. Gaps equal to or longer than the selected duration start a
+new stack. Applying replaces that source's existing stack organization and rejects
+a stale preview. **Refresh Capture Times** reads metadata in batches with progress
+and a Stop button; it does not hash or decode photos. Unknown dates stay unstacked.
+Classic TIFF-family, JPEG and PNG EXIF are supported; other containers and malformed
+metadata remain unknown. Dates without offsets use the camera clock, so mixed
+timezone sources need review. Older catalogs need a refresh to populate precise
+clocks; original files remain unchanged.
 
 Use **Collections → New Collection** to create a regular collection or a smart
 collection with live rules. Add/remove selected photos from a regular collection

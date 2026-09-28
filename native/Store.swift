@@ -12,6 +12,8 @@ import UniformTypeIdentifiers
     @Published var stackRevision=0
     @Published var stackBusy=false
     @Published var showStacks=true
+    @Published var autoStackSource: AutoStackSource?
+    @Published var showAutoStack=false
     @Published var selected: Int?
     @Published var selection: Set<Int> = []
     @Published var photo: Photo?

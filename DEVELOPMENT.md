@@ -27,6 +27,12 @@ when a clear function is more maintainable. Avoid unrelated formatting churn.
 - Store collection membership relationally. Compile supported filters to bound
   SQL parameters; whitelist sort columns. Smart collections evaluate stored rules
   at query time. Count and page queries must use identical predicates.
+- Persist identities that cannot be reused by a later object. Migration must
+  preserve live references and roll back failures; a stale native editor must
+  never modify a newly created collection with an old identifier.
+- Keep capture-time provenance and fractional precision. Unknown metadata is not
+  file modification time. Read bounded headers separately from hashing/pixels;
+  source-wide replacements require a preview bound to the data being replaced.
 - Add indexes for common query paths. Use a deterministic ID tie-breaker for
   pagination and never decode image pixels merely to search the library.
 - Test migration with existing photos, edits and jobs. Backups include all new
