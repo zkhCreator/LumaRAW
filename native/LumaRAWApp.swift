@@ -34,10 +34,10 @@ import AppKit
                 Button("Paste Adjustments"){store.pasteEdits()}.keyboardShortcut("v",modifiers:[.command,.shift])
                 Button("Sync Selected Photos…"){store.showSync=true}.disabled(store.selection.count<2)
                 Divider()
-                ForEach(0..<6){value in Button(value==0 ? "Clear Rating":"\(value) \(value == 1 ? "Star" : "Stars")"){store.rate(value)}.keyboardShortcut(KeyEquivalent(Character(String(value))),modifiers:[])}
-                Button("Flag as Pick"){store.flag(1)}.keyboardShortcut("p",modifiers:[])
-                Button("Flag as Rejected"){store.flag(-1)}.keyboardShortcut("x",modifiers:[])
-                Button("Clear Flag"){store.flag(0)}.keyboardShortcut("u",modifiers:[])
+                ForEach(0..<6){value in Button(value==0 ? "Clear Rating":"\(value) \(value == 1 ? "Star" : "Stars")"){store.rate(value)}}
+                Button("Flag as Pick"){store.flag(1)}
+                Button("Flag as Rejected"){store.flag(-1)}
+                Button("Clear Flag"){store.flag(0)}
                 Divider()
                 Button("Show in Finder"){store.reveal()}
                 Button("Locate Missing Original…"){store.relink()}
@@ -49,7 +49,7 @@ import AppKit
             }
             CommandGroup(after:.toolbar) {
                 Button("Show Adjustment Inspector"){store.showInspector.toggle()}.keyboardShortcut("i",modifiers:[.command,.option])
-                Button("Before / After"){store.compare.toggle()}.keyboardShortcut("\\",modifiers:[])
+                Button("Before / After"){store.compare.toggle()}
                 Button("Full Resolution 1:1"){store.detail.toggle();store.render()}.keyboardShortcut("1",modifiers:[.command])
             }
         }

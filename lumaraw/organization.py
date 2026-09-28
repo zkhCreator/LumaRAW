@@ -23,8 +23,8 @@ FILTER_PROPERTIES = {
     'has_keywords': {'type': 'boolean'},
     'camera': {'type': 'string', 'minLength': 1, 'maxLength': 200},
     'folder': {'type': 'string', 'minLength': 1, 'maxLength': 4096},
-    'taken_from': {'type': 'integer', 'minimum': 0},
-    'taken_to': {'type': 'integer', 'minimum': 0},
+    'taken_from': {'type': 'integer', 'minimum': 0, 'maximum': 2**53-1},
+    'taken_to': {'type': 'integer', 'minimum': 0, 'maximum': 2**53-1},
     'text': {'type': 'string', 'minLength': 1, 'maxLength': 200},
 }
 FILTER_SCHEMA = {'type': 'object', 'properties': FILTER_PROPERTIES,
@@ -82,9 +82,9 @@ def text_predicate(text):
 
 def criteria(filters, match='all'):
     clauses, values = [], []
-    if filters.get('rating_min', 0) > filters.get('rating_max', 5):
+    if match == 'all' and filters.get('rating_min', 0) > filters.get('rating_max', 5):
         raise ValueError('Minimum rating exceeds maximum rating')
-    if filters.get('taken_from', 0) > filters.get('taken_to', 2**63 - 1):
+    if match == 'all' and filters.get('taken_from', 0) > filters.get('taken_to', 2**63 - 1):
         raise ValueError('Start capture date exceeds end capture date')
     for key, value in filters.items():
         if key in ('rating_min', 'rating_max', 'taken_from', 'taken_to'):

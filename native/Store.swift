@@ -77,6 +77,7 @@ import UniformTypeIdentifiers
     private var copied: [String: Any]?
     private var polling: Task<Void,Never>?
     private var started=false
+    private var selectionAnchor: Int?
 
     func start() async {
         guard !started else{return};started=true
@@ -121,6 +122,7 @@ import UniformTypeIdentifiers
             offset=result["offset"] as? Int ?? offset
             thumbnails=thumbnails.filter { id,_ in photos.contains{$0.id==id} }
             selection.formIntersection(Set(photos.map(\.id)))
+            if !photos.contains(where: { $0.id == selectionAnchor }) { selectionAnchor=nil }
             if selected==nil || !photos.contains(where:{$0.id==selected}) {
                 if let first=photos.first{selected=first.id;selection=[first.id];await load(first.id)}
                 else{selected=nil;selection=[];clearPhoto()}
@@ -147,9 +149,20 @@ import UniformTypeIdentifiers
         generation += 1;previewTask?.cancel();photo=nil;recipe=[:]
         preview=nil;before=nil;metadata=[:];histogram=[];rendering=false;loading=false
     }
-    func choose(_ id:Int, extend:Bool=false) {
+    func choose(_ id:Int, extend:Bool=false, range:Bool=false) {
         guard !browsing,!editing,pendingPatch.isEmpty else{message="Wait for the current edit to finish saving";return}
         guard photos.contains(where:{$0.id==id}) else{return}
+        if range,let end=photos.firstIndex(where: { $0.id == id }),
+           let start=photos.firstIndex(where: { $0.id == (selectionAnchor ?? selected ?? id) }) {
+            selectionAnchor=selectionAnchor ?? selected ?? id
+            let ids=Set(photos[min(start,end)...max(start,end)].map(\.id))
+            selection=extend ? selection.union(ids):ids
+            if selected != id || photo == nil {
+                selected=id;saveFailed=false;clearPhoto();Task { await load(id) }
+            }
+            return
+        }
+        selectionAnchor=id
         if extend && selection.contains(id) {
             selection.remove(id)
             if selected==id {
@@ -259,8 +272,42 @@ import UniformTypeIdentifiers
             if selected==photoID{await load(photoID)}
         }
     }
-    func rate(_ value:Int) {guard let p=photo else{return};Task{await mutate("rate_photo",["photo_id":p.id,"rating":value])}}
-    func flag(_ value:Int) {guard let p=photo else{return};Task{await mutate("rate_photo",["photo_id":p.id,"flag":value])}}
+    func selectAllVisible() {
+        guard !browsing,!editing,pendingPatch.isEmpty,!photos.isEmpty else { return }
+        selection=Set(photos.map(\.id))
+        if selected == nil { selected=photos.first?.id; if let selected { Task { await load(selected) } } }
+        selectionAnchor=selected
+    }
+    func rate(_ value:Int) {
+        let ids=develop ? selected.map { [$0] } ?? [] : selection.sorted()
+        Task { await ratePhotos(ids,patch:["rating":value]) }
+    }
+    func flag(_ value:Int) {
+        let ids=develop ? selected.map { [$0] } ?? [] : selection.sorted()
+        Task { await ratePhotos(ids,patch:["flag":value]) }
+    }
+    func ratePhotos(_ ids: [Int], patch: [String: Any]) async {
+        guard !ids.isEmpty else { return }
+        do {
+            let result=try await Backend.call("rate_photos",patch.merging(["photo_ids":ids]) { _,new in new })
+            for row in result["updated"] as? [[String: Any]] ?? [] {
+                guard let id=row["photo_id"] as? Int else { continue }
+                if var current=photo,current.id == id {
+                    if let rating=row["rating"] as? Int { current.rating=rating }
+                    if let flag=row["flag"] as? Int { current.flag=flag }
+                    photo=current
+                }
+                if let index=photos.firstIndex(where: { $0.id == id }) {
+                    if let rating=row["rating"] as? Int { photos[index].rating=rating }
+                    if let flag=row["flag"] as? Int { photos[index].flag=flag }
+                }
+            }
+            // Keep the active recipe revision for conflict detection. A new
+            // library query is explicit so a pick does not unexpectedly hide
+            // the photo while the user is still reviewing or editing it.
+            message="Updated \(ids.count) \(ids.count == 1 ? "photo":"photos")"
+        } catch { self.error=error.localizedDescription }
+    }
     func mutate(_ method:String,_ params:[String:Any]) async {
         do {
             let row=try await Backend.call(method,params)

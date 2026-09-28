@@ -31,6 +31,7 @@ tool('get_photo','Read recipe, metadata and current revision before editing.',{'
 tool('edit_photo','Merge a partial recipe using expected_revision; stale revisions fail without changes.',{'photo_id':ID,'expected_revision':REV,'patch':PATCH},['photo_id','expected_revision','patch'])
 tool('undo_photo','Undo the last edit only if the revision is current.',{'photo_id':ID,'expected_revision':REV},['photo_id','expected_revision'])
 tool('rate_photo','Set rating 0–5 and/or pick flag (-1 reject, 0 neutral, 1 pick).',{'photo_id':ID,'rating':integer(0,5),'flag':{'enum':[-1,0,1]}},['photo_id'])
+tool('rate_photos','Atomically set ratings and/or pick flags on a bounded selection; leaves recipes and metadata revisions unchanged.',{'photo_ids':array(ID,60),'rating':integer(0,5),'flag':{'enum':[-1,0,1]}},['photo_ids'])
 tool('preview_photo','Render an sRGB preview or full-resolution viewport. Returns local paths, histogram and metadata.',{'photo_id':ID,'client_id':string(128),'generation':integer(),'detail':obj({'cx':{'type':'number','minimum':0,'maximum':1},'cy':{'type':'number','minimum':0,'maximum':1},'width':integer(1,2048),'height':integer(1,1536)}),'display':obj({'gamut':BOOL,'proof_path':PATH,'proof_sha':string(64)})},['photo_id'],True)
 tool('thumbnail','Create/read a thumbnail for a catalog photo.',{'photo_id':ID},['photo_id'],True)
 tool('cached_thumbnails','Read completed thumbnail paths for up to 60 photos without starting image workers. Missing entries are omitted.',{'photo_ids':array(ID,60)},['photo_ids'],True)

@@ -25,17 +25,18 @@ def main():
     root=Path(__file__).resolve().parents[1]
     sources=sorted(path for path in (root/'native').glob('*.swift') if path.name != 'LumaRAWApp.swift')
     paths=[]
-    for index,color in enumerate(('navy','orange')):
+    for index,color in enumerate(('navy','orange','green','purple','teal')):
         path=work/f'photo-{index}.png'
         Image.new('RGB',(160,100),color).save(path)
         paths.append(str(path))
-    for suite in ('NativeStateRegression','NativeLibraryRegression'):
+    for suite in ('NativeStateRegression','NativeLibraryRegression','NativeSelectionRegression'):
         executable=work/suite
         subprocess.run(['xcrun','swiftc','-swift-version','5','-parse-as-library',
             '-target','arm64-apple-macosx14.0','-module-cache-path',str(work/'module-cache'),
             *map(str,sources),str(root/'tests'/f'{suite}.swift'),'-o',str(executable)],check=True)
+        suite_paths=paths if suite == 'NativeSelectionRegression' else paths[:2]
         env={**os.environ,'LUMARAW_ENGINE':str(args.engine.resolve()),
-            'LUMARAW_CATALOG':str(work/'catalogs'/suite),'LUMARAW_TEST_FIXTURES':'|'.join(paths)}
+            'LUMARAW_CATALOG':str(work/'catalogs'/suite),'LUMARAW_TEST_FIXTURES':'|'.join(suite_paths)}
         result=subprocess.run([str(executable)],env=env,capture_output=True,text=True,timeout=120)
         (work/f'{suite}.json').write_text(result.stdout)
         print(result.stdout)

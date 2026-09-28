@@ -113,6 +113,15 @@ def test_literal_unicode_search_and_combined_filters(library):
     assert ids(service, sort='name', descending=False) == [1, 2, 3]
 
 
+def test_any_rules_allow_disjoint_rating_ranges(library):
+    service, _=library
+    service.dispatch('rate_photo',{'photo_id':1,'rating':5})
+    service.dispatch('rate_photo',{'photo_id':2,'rating':3})
+    extremes=service.dispatch('save_collection',{'name':'Extremes','kind':'smart','match':'any',
+        'rules':{'rating_min':5,'rating_max':1}})
+    assert ids(service,collection_id=extremes['id']) == [3,1]
+
+
 def test_pagination_deterministic_bounded_and_clamped(library):
     service, _ = library
     with service.catalog() as catalog:
@@ -145,6 +154,24 @@ def test_invalid_membership_and_metadata_do_not_partially_apply(library):
     with pytest.raises(ValueError, match='exceeds'):
         service.dispatch('list_photos', {'filters': {'rating_min': 5, 'rating_max': 1}})
     assert service.dispatch('get_photo', {'photo_id': 1})['metadata_revision'] == 0
+
+
+def test_batch_ratings_validate_all_targets_and_preserve_other_state(library):
+    service, _ = library
+    metadata(service, [1], {'color_label': 'green', 'keywords': ['Keep']})
+    service.dispatch('edit_photo', {'photo_id': 1, 'expected_revision': 0, 'patch': {'exposure': 1.5}})
+    with pytest.raises(ValueError, match='does not exist'):
+        service.dispatch('rate_photos', {'photo_ids': [1, 2, 999], 'rating': 5, 'flag': 1})
+    assert service.dispatch('get_photo', {'photo_id': 1})['rating'] == 0
+    result=service.dispatch('rate_photos', {'photo_ids': [1, 2, 2], 'rating': 4, 'flag': 1})
+    assert len(result['updated']) == 2
+    first=service.dispatch('get_photo', {'photo_id': 1})
+    assert first['rating'] == 4 and first['flag'] == 1
+    assert first['metadata_revision'] == 1 and first['revision'] == 1
+    assert first['keywords'] == ['Keep'] and first['recipe']['exposure'] == 1.5
+    assert service.dispatch('get_photo', {'photo_id': 3})['rating'] == 0
+    with pytest.raises(ValueError, match='Set a rating'):
+        service.dispatch('rate_photos', {'photo_ids': [1]})
 
 
 def test_legacy_migration_preserves_rows_and_backup_keeps_organization(tmp_path):

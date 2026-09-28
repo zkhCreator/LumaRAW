@@ -25,6 +25,10 @@ Example edit arguments:
 
 ## Library organization
 
+`rate_photos` applies an explicit rating and/or flag atomically to at most 60 IDs.
+Every target is validated before writes. It preserves recipe and descriptive
+metadata revisions. Use `rate_photo` for the existing single-photo contract.
+
 `list_photos` accepts `filters`, `collection_id`, `sort` and `descending`, and
 returns a clamped offset plus at most 60 summaries. `list_collections` paginates
 regular and smart collections. Use `save_collection` with `collection_id` and

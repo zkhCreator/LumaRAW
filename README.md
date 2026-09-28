@@ -16,7 +16,7 @@ LumaRAW references your originals without changing them. The SwiftUI app and you
 | Local adjustments | Radial, gradient, luminance-range, and brush masks; manual lens distortion, vignette, and chromatic-aberration correction |
 | Library | Ratings, flags, color labels, catalog metadata/keywords, regular and live smart collections, SQL filters/sorting, duplicate/missing indexing, edit versions, selective sync, and backup/restore |
 | Export | JPEG and 16-bit TIFF with embedded sRGB, Display P3, Adobe RGB, or ProPhoto RGB ICC profiles; persistent queue, pause/cancel/retry, and collision-safe filenames |
-| Agents | 33 MCP tools, equivalent JSON CLI commands, and a bundled skill; app and agent edits share conflict detection |
+| Agents | 34 MCP tools, equivalent JSON CLI commands, and a bundled skill; app and agent edits share conflict detection |
 
 ## Build and run
 
@@ -43,7 +43,7 @@ The default catalog is `~/Library/Application Support/LumaRAW Native`. Use `--ca
 3. Use **Tools** to draw a crop or mask, or enable the split before/after view. Press **\\** to toggle the original preview.
 4. Choose **1:1 Detail** to inspect a full-resolution viewport. Inspector sliders move the viewport horizontally and vertically.
 5. Press **1–5** to rate, **0** to clear the rating, **P** to pick, **X** to reject, or **U** to clear the flag. With the gallery focused, arrow keys select photos and Return opens Develop.
-6. Command-click or Shift-click to toggle multiple selections. **Photo → Sync Selected Photos** copies selected adjustment groups; composition, masks, and camera profiles are excluded by default.
+6. Command-click to toggle selection; Shift-click selects a contiguous range on the current page. **⌘A** in the focused grid selects the visible page. Grid rating/flag actions apply to the selection; Develop actions apply to the active photo. **Photo → Sync Selected Photos** copies selected adjustment groups; composition, masks, and camera profiles are excluded by default.
 7. Press **⇧⌘E** to export. Choose a format, color space, long-edge size, and filename template. Existing files are preserved.
 
 Adjustments save automatically. Each photo supports up to 50 undo steps, named edit versions, and portable recipe bundles. The full recipe editor supports precise curve points and brush paths. Submitted exports retain their original recipe snapshot even if you continue editing.

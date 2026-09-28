@@ -55,13 +55,19 @@ The harness exercises the real native Store and JSON transport: import, RAW prev
   --engine /absolute/LumaRAW.app/Contents/Resources/Engine/LumaRAWEngine
 ```
 
-The runner compiles all native files except the app entry point, generates two
-small raster files and separate disposable catalogs, then runs both the
-15-assertion state suite and 13-assertion library suite. The library suite checks
+The runner compiles all native files except the app entry point, generates five
+small raster files and separate disposable catalogs, then runs the
+15-assertion state, 13-assertion library and 12-assertion culling suites. The library suite checks
 live smart membership, text search/sort, pagination, empty-filter selection,
 partial metadata writes and independent recipe/metadata conflict handling. JSON
 receipts stay in the ignored work directory. Without `--engine`, it uses the
 current Python environment's `lumaraw` executable.
+
+The culling suite uses five generated images to check anchored Shift selection,
+Command toggling, visible-page selection, all-target batch flags/ratings, recipe
+revision preservation and Develop active-photo scope. Single-key shortcuts are
+scoped to photo views so metadata/search text fields retain text input; rendered
+keyboard routing still needs desktop acceptance.
 
 ## Library organization and performance
 

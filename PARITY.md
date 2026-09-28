@@ -99,11 +99,29 @@ whole-desktop latency, or performance guarantees on other hardware. Reproduce vi
 
 ### Next work
 
-Continue culling and organization: proper range selection and batch flags/ratings,
-compare/survey, collection sets and quick collection, virtual copies, keyword
+Continue culling and organization: compare/survey, collection sets and quick collection, virtual copies, keyword
 hierarchy, source-versus-developed thumbnail behavior. Then close Develop and
 export gaps in the inventory. Preserve pending desktop/older-OS acceptance rather
 than removing it from the completion criteria.
 
 Full completion still requires closing all non-AI gaps above. Historical receipts
 in `VERIFICATION.md` do not validate this increment.
+
+### Range selection and batch culling increment
+
+Implemented anchored Shift ranges within the visible page, Command toggling,
+focused-grid Select All, atomic batch ratings/flags and active-photo-only Develop
+culling. Single-key photo commands are scoped to grid/filmstrip/canvas, preserving
+normal text-field input routing. Selection remains bounded to a 60-photo page;
+cross-page selections, Compare/Survey and auto-advance are still pending.
+
+The new 12-assertion native culling suite passed alongside the existing 28 checks
+against both source and final packaged engines (**40 assertions**). The final
+required-Metal Python run passed **112 tests, with 2 real-NEF tests skipped**.
+The updated Mac app built and passed ad-hoc signature verification. The source
+scanner passed all **160 files**, and the extracted source archive passed its
+strict check. Service regressions verify missing-target rollback,
+batch deduplication and preserved recipe/metadata revisions. Smart “any” predicates
+also accept disjoint ranges (for example, rating >= 5 OR rating <= 1).
+Rendered keyboard event routing remains pending desktop access; state tests do
+not establish that evidence.

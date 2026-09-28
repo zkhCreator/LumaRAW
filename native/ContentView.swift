@@ -141,7 +141,7 @@ struct ContentView: View {
                         HStack(spacing:2){ForEach(0..<5){i in Image(systemName:i<p.rating ? "star.fill":"star").font(.system(size:9)).foregroundStyle(i<p.rating ? Color.yellow:Color.secondary.opacity(0.4))};Spacer();Text(URL(fileURLWithPath:p.path).pathExtension.uppercased()).font(.caption2).foregroundStyle(.secondary)}
                     }.contentShape(Rectangle())
                     .onTapGesture(count:2){s.choose(p.id);s.develop=true}
-                    .onTapGesture {s.choose(p.id,extend:NSEvent.modifierFlags.contains(.command) || NSEvent.modifierFlags.contains(.shift))}
+                    .onTapGesture {s.choose(p.id,extend:NSEvent.modifierFlags.contains(.command),range:NSEvent.modifierFlags.contains(.shift))}
                     .accessibilityElement(children:.combine).accessibilityLabel("\(p.name), \(p.rating) \(p.rating == 1 ? "star" : "stars")")
                     .accessibilityAddTraits(.isButton).accessibilityAction{s.choose(p.id);s.develop=true}
                     .contextMenu {Button("Develop"){s.choose(p.id);s.develop=true};Button("Show in Finder"){NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath:p.path)])}}
@@ -149,24 +149,30 @@ struct ContentView: View {
             }.padding(24)
         }.background(Color(nsColor:.underPageBackgroundColor))
         .focusable()
+        .modifier(PhotoKeyboardShortcuts())
         .onKeyPress(.rightArrow){moveSelection(1);return .handled}
         .onKeyPress(.leftArrow){moveSelection(-1);return .handled}
         .onKeyPress(.return){s.develop=true;return .handled}
+        .onKeyPress(characters:CharacterSet(charactersIn:"a")){press in
+            if press.modifiers.contains(.command) {s.selectAllVisible();return .handled}
+            return .ignored
+        }
     }
     func moveSelection(_ delta:Int){
         guard !s.photos.isEmpty else{return}
         let index=s.photos.firstIndex(where:{$0.id==s.selected}) ?? 0
-        s.choose(s.photos[min(s.photos.count-1,max(0,index+delta))].id)
+        s.choose(s.photos[min(s.photos.count-1,max(0,index+delta))].id,range:NSEvent.modifierFlags.contains(.shift))
     }
     var filmstrip:some View {
-        ScrollView(.horizontal){HStack(spacing:10){ForEach(s.photos){p in Button{s.choose(p.id,extend:NSEvent.modifierFlags.contains(.command))}label:{
+        ScrollView(.horizontal){HStack(spacing:10){ForEach(s.photos){p in Button{s.choose(p.id,extend:NSEvent.modifierFlags.contains(.command),range:NSEvent.modifierFlags.contains(.shift))}label:{
             VStack(spacing:4){Group{if let im=s.thumbnails[p.id]{Image(nsImage:im).resizable().aspectRatio(contentMode:.fit)}else{Image(systemName:"photo")}}.frame(width:88,height:62).background(.black.opacity(0.8)).clipShape(RoundedRectangle(cornerRadius:4)).overlay(RoundedRectangle(cornerRadius:4).stroke(s.selection.contains(p.id) ? Color.accentColor:.clear,lineWidth:2));Text(p.name).font(.system(size:9)).lineLimit(1).frame(width:88)}
-        }.buttonStyle(.plain).accessibilityLabel(p.name)}}.padding(12)}.frame(height:109).background(.bar)
+        }.buttonStyle(.plain).accessibilityLabel(p.name)}}.padding(12)}.frame(height:109).background(.bar).modifier(PhotoKeyboardShortcuts())
     }
 }
 
 struct PhotoCanvas:View {
     @EnvironmentObject var s:Store
+    @FocusState private var keyboardFocus: Bool
     var body:some View {
         GeometryReader {geo in
             ZStack {
@@ -196,6 +202,9 @@ struct PhotoCanvas:View {
             .accessibilityLabel(s.compare ? "Photo before editing":"Photo after editing")
             .accessibilityValue(s.photo?.name ?? "No photo selected")
         }
+        .focusable().focused($keyboardFocus)
+        .onTapGesture { keyboardFocus=true }
+        .modifier(PhotoKeyboardShortcuts())
     }
 }
 

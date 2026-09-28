@@ -168,6 +168,15 @@ class Service:
                 if 'rating' in p:c.rate(p['photo_id'],p['rating'])
                 if 'flag' in p:c.flag(p['photo_id'],p['flag'])
                 return unpack(c.photo(p['photo_id']))
+            if method=='rate_photos':
+                fields={key:p[key] for key in ('rating','flag') if key in p}
+                if not fields:raise ValueError('Set a rating or pick flag')
+                ids=list(dict.fromkeys(p['photo_ids']))
+                for photo_id in ids:self.require(c,photo_id)
+                with c.db:
+                    c.db.executemany('UPDATE photos SET '+','.join(f'{key}=?' for key in fields)+' WHERE id=?',
+                                     [(*fields.values(),photo_id) for photo_id in ids])
+                return {'updated':[{'photo_id':photo_id,**fields} for photo_id in ids]}
             if method=='enqueue_exports':
                 digest=hashlib.sha256(json.dumps(p,sort_keys=True).encode()).hexdigest()
                 previous=c.db.execute('SELECT digest,result FROM requests WHERE key=?',(p['request_key'],)).fetchone()
