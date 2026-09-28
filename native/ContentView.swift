@@ -77,6 +77,7 @@ struct ContentView: View {
         .sheet(isPresented:$s.showFolderRelocation){FolderRelocationSheet(folder:s.relocationFolder)}
         .sheet(isPresented:$s.showFolderSync){FolderSyncSheet(folder:s.syncFolder)}
         .sheet(item:$s.shortcutEditor){KeywordShortcutEditor(source:$0)}
+        .sheet(item:$s.painterKeywordPicker){PainterKeywordPicker(model:$0)}
         .onChange(of:s.workspace) { _,_ in if !s.isMultiReview {s.reviewRenderer.stop()} else {s.updateReviewRequests()} }
         .onChange(of:s.develop) { _,value in if value {s.reviewRenderer.stop()} }
         .onChange(of:s.painterSource) { _,_ in s.cancelPainterStroke();if !s.painterInGrid { s.setPainting(false) } }

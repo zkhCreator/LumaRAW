@@ -98,6 +98,10 @@ when a clear function is more maintainable. Avoid unrelated formatting churn.
   global/catalog storage never moves existing sets. Keep temporary native edits
   separate from persisted presets and preserve their captured revision after an
   external refresh; never silently rebase stale drafts onto newer settings.
+  Multi-set choosers read revision-bound previews without changing the active
+  preset. Keep recent identities separate from custom slot text. Accumulate only
+  bounded local choices, freeze selected text, and invalidate reads on dismissal.
+  Confirmation replaces the shortcut once; browsing/cancel must not create tags.
 - Library Painter gestures capture the initial shortcut/configuration, visible
   photo metadata revisions and source/page. Deduplicate thumbnail hits, include
   intermediate thumbnails crossed by coalesced pointer events, and commit once

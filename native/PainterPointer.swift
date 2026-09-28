@@ -32,7 +32,17 @@ struct PainterPointerLayer: NSViewRepresentable {
     func makeNSView(context: Context) -> PainterPointerView { PainterPointerView() }
     func updateNSView(_ view: PainterPointerView,context: Context) {
         if view.dragging && (view.rectangles != rectangles || !s.painterCanReceive) { view.cancelStroke(deferred:true) }
+        let newlyActivated=s.painterEnabled && !view.painterActivated
+        let returningFromPicker=view.pickerPresented && s.painterKeywordPicker == nil
+        view.painterActivated=s.painterEnabled
+        view.pickerPresented=s.painterKeywordPicker != nil
         view.store=s;view.rectangles=rectangles;view.enabled=s.painterCanReceive
+        if newlyActivated || returningFromPicker {
+            DispatchQueue.main.async { [weak view] in
+                guard let view,view.enabled,view.store?.painterCanReceive == true else { return }
+                view.window?.makeFirstResponder(view)
+            }
+        }
         view.window?.invalidateCursorRects(for:view)
     }
     static func dismantleNSView(_ view: PainterPointerView,coordinator: ()) { view.cancelStroke(deferred:true) }
@@ -42,6 +52,8 @@ final class PainterPointerView: NSView {
     weak var store: Store?
     var rectangles: [Int:CGRect]=[:]
     var enabled=false
+    var painterActivated=false
+    var pickerPresented=false
     var dragging=false
     private var previous=CGPoint.zero
     override var isFlipped: Bool { true }
@@ -58,7 +70,13 @@ final class PainterPointerView: NSView {
         }
         return .crosshair
     }
-    override func flagsChanged(with event: NSEvent) { cursor.set() }
+    override func flagsChanged(with event: NSEvent) {
+        cursor.set()
+        if enabled,store?.painterKind == "keywords",
+           event.modifierFlags.intersection([.shift,.command,.option,.control]) == .shift {
+            cancelStroke();store?.choosePainterKeywordSets()
+        }
+    }
     override func mouseDown(with event: NSEvent) {
         guard enabled,store?.beginPainterStroke(erase:event.modifierFlags.contains(.option)) == true else { return }
         window?.makeFirstResponder(self);dragging=true

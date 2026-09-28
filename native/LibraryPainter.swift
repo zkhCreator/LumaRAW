@@ -46,7 +46,10 @@ struct PainterStroke {
 
 extension Store {
     var painterInGrid: Bool { workspace == "library" && !develop && libraryView == .grid }
-    var painterCanReceive: Bool { painterEnabled && painterInGrid && !painterBusy && !keywordBusy }
+    var painterCanReceive: Bool {
+        painterEnabled && painterInGrid && !painterBusy && !keywordBusy &&
+            painterKeywordPicker == nil && shortcutEditor == nil
+    }
     var painterSource: String {
         let filters=(try? JSONSerialization.data(withJSONObject:libraryFilters,options:.sortedKeys)).flatMap { String(data:$0,encoding:.utf8) } ?? ""
         return [workspace,String(develop),String(describing:libraryView),mode,String(collectionID ?? 0),
@@ -65,6 +68,7 @@ extension Store {
     }
 
     func prepareKeywordShortcut() async {
+        guard painterKeywordPicker == nil,!painterBusy,!keywordBusy else { return }
         cancelPainterStroke()
         await refreshKeywordShortcut()
         if let shortcut=keywordShortcut { shortcutEditor=KeywordShortcutEditorSource(shortcut:shortcut) }
@@ -95,6 +99,13 @@ extension Store {
     func setPainting(_ enabled: Bool) {
         cancelPainterStroke()
         painterEnabled=enabled && painterInGrid
+        if !painterEnabled { painterKeywordPicker?.invalidate();painterKeywordPicker=nil }
+    }
+
+    func choosePainterKeywordSets() {
+        guard painterCanReceive,painterKind == "keywords" else { return }
+        cancelPainterStroke()
+        painterKeywordPicker=PainterKeywordPickerModel()
     }
 
     func cancelPainterStroke(id: UUID?=nil) {

@@ -22,6 +22,7 @@ def main():
     parser.add_argument('--work',type=Path,required=True)
     parser.add_argument('--engine',type=Path,default=Path(sys.executable).with_name('lumaraw'))
     suites=('NativeStateRegression','NativeLibraryRegression','NativeSelectionRegression','NativeReviewRegression','NativeThumbnailRegression','NativeCollectionRegression','NativeVirtualCopyRegression','NativeConnectionRegression','NativeStackRegression','NativeAutoStackRegression','NativeFolderRegression','NativeKeywordRegression','NativeFolderRelocationRegression','NativeFolderSyncRegression','NativeExportMetadataRegression','NativeKeywordDetailsRegression','NativeKeywordVocabularyRegression','NativeKeywordExchangeRegression','NativeKeywordSetRegression','NativePainterRegression')
+    suites+=('NativePainterKeywordPickerRegression',)
     parser.add_argument('--suite',choices=suites,action='append',help='Run selected suites; default: all')
     args=parser.parse_args()
     work=args.work.resolve()

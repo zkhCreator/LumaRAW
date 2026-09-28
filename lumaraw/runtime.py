@@ -11,7 +11,7 @@ import json
 from pathlib import Path
 import sys
 
-ENGINE_GENERATION = 15
+ENGINE_GENERATION = 16
 CATALOG_VERSION = 14
 BROKER_PROTOCOL = 1
 

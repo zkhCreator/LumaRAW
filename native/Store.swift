@@ -64,6 +64,7 @@ import UniformTypeIdentifiers
     var keywordSetGeneration=0
     @Published var keywordShortcut: KeywordShortcut?
     @Published var shortcutEditor: KeywordShortcutEditorSource?
+    @Published var painterKeywordPicker: PainterKeywordPickerModel?
     var shortcutReadGeneration=0
     @Published var painterEnabled=false
     @Published var painterKind="keywords"

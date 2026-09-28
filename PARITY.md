@@ -64,9 +64,10 @@ gaps. Nothing below is full Lightroom parity merely because historical tests pas
 
 ## Active increment
 
-Persistent multi-keyword shortcuts and Library Painter metadata strokes. Complete
-Painter mode/keyword-set integration, reference presets/exchange, suggestions and
-the remaining full inventory stay in scope; this does not complete product parity.
+Painter's multi-set keyword chooser, including independent preset previews,
+cross-set drafts and identity-safe confirmation. Remaining Painter modes,
+reference presets/exchange, suggestions and the full inventory stay in scope;
+this does not complete product parity.
 
 ## Evidence log
 
@@ -1214,7 +1215,8 @@ metadata revision increments once. Active rating/flag display refreshes immediat
 without adopting a new Develop recipe revision. Recipes, originals and frozen
 exports remain unchanged; failures are never automatically replayed.
 
-This remains partial Painter parity. Shift's multi-set keyword chooser, inline
+This increment remained partial Painter parity. The multi-set chooser is covered
+by the following increment; inline
 keyword autocomplete, metadata/Develop-preset painting, rotation, target collection,
 cross-page dragging/autoscroll, precise reference eraser behavior outside keywords,
 metadata undo and rendered interaction remain open. Desktop pointer/keyboard
@@ -1270,3 +1272,64 @@ Final source/build/native logs have no compiler warnings or errors. Public sourc
 checks cover **269 files** without findings, including the extracted source archive.
 Remote refresh again found no unmerged branches. No full-parity or desktop-runtime
 acceptance is claimed by these checks.
+
+### Painter multi-set keyword chooser
+
+The native Painter can load keywords from several nine-slot sets in one chooser.
+Choose individual slots or Select All in This Set, browse another set, then review
+or remove choices before Load Painter. Selection order is preserved and duplicates
+are removed within the same identity/text source. The draft holds at most one
+hundred choices; an over-capacity Select All preserves the entire prior draft.
+The confirmation replaces the shortcut and never tags photos. Cancel, Escape or
+putting Painter away invalidate unconfirmed work. Custom slot text is frozen at
+selection; Recent Keywords retains stable IDs, including legacy literal separators.
+
+The portable `get_keyword_set` contract previews any set without selecting it,
+using the same shared-storage-before-catalog lock order and captured state token.
+Only thirty preset names and nine slots are read. Missing/deleted presets and
+changed scope, vocabulary, recent entries or preset revisions fail visibly.
+Initial native reads bind the shortcut and preset snapshot to the same vocabulary
+revision. Dismissal and newer requests reject late replies; a changed shortcut
+cannot be overwritten by an old chooser confirmation.
+
+The toolbar and Metadata menu expose the chooser; the Mac pointer responder
+handles Shift when keyword Painter has focus. Enabling Painter requests focus,
+and returning from the chooser restores it. This wiring and compilation do not
+establish rendered focus/keyboard behavior. Actual Shift dispatch, dialog layout,
+scrolling, VoiceOver and macOS 14 runtime remain unverified. Existing desktop
+automation was not authorized, and no equivalent observation is inferred from
+state/IPC tests. Inline autocomplete, built-in Adobe sets, `.lrtemplate` exchange,
+remaining Painter attributes and the full module inventory remain open.
+
+The full Python suite passes **359 tests with no skips**, including the pinned
+Nikon D3S NEF and required Metal dispatch. Seven added cases cover independent
+preview preservation, recent literal-name identities, five kinds of stale state,
+and bounded/missing preset pages. The initial native chooser passed 17 assertions;
+the final packaged chooser passes **19**, adding stale shortcut confirmation and
+dismissed in-flight reads. The Mac app targets 14.0, builds and verifies its local
+ad-hoc signature on macOS 26.6.2. Engine generation **16**, schema **14**, **87 tools**;
+manifest `30d6907507d7559323f0ff4c8a4832c871af09faeb828b01918caa493f3ec752`
+matches source, and its bundled usage guide matches the current document.
+
+Warm service/SQLite measurements after builds/tests finished, 30 samples on the
+same macOS 26.6.2 arm64/128 GB host. Sixty generated 8×8 images are metadata
+targets only; no image worker runs. Setup, IPC, pixels and rendered latency are
+excluded. These are bounded metadata reads, not processing-speed equivalence.
+
+| Operation (median / p95) | 10,000 tags / 1,000 presets | 100,000 tags / 10,000 presets |
+| --- | ---: | ---: |
+| Preview another set without selecting it | 1.947 / 2.322 ms | 2.102 / 2.476 ms |
+| Preview last preset-name page | 1.920 / 2.088 ms | 2.212 / 2.646 ms |
+| Read selected preset first page | 1.558 / 1.916 ms | 1.911 / 2.278 ms |
+| Read Recent Keywords | 1.623 / 2.139 ms | 1.674 / 1.877 ms |
+| Peak process RSS | 38.44 MB | 41.36 MB |
+
+Other-set responses are 1,434 / 1,436 bytes for these short labels. The selector
+holds one thirty-name/nine-slot page plus its bounded local draft, regardless of
+catalog size. Reproduce using the preview operations in tests/keyword_sets_probe.py.
+
+All six final packaged native suites pass **132 assertions**: chooser 19, Painter
+36, keyword sets 29, keyword organization 25, Library 13 and connection/handoff 10.
+Final build/native logs contain no compiler warnings or errors. Public checks cover
+**271 source files** without findings, including the clean extracted archive.
+Remote refresh and local/remote ancestry checks found no unmerged branches.

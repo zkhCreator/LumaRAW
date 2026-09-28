@@ -26,6 +26,7 @@ struct PainterToolbar: View {
                     HStack(spacing:10) {
                         if s.painterKind == "keywords" {
                             Button("Set Keywords… (\(s.keywordShortcut?.ids.count ?? 0))") { Task { await s.prepareKeywordShortcut() } }
+                            Button("Choose from Sets…") { s.choosePainterKeywordSets() }.help("Shift while the Painter has focus")
                             Text("Option removes these keywords").font(.caption).foregroundStyle(.secondary)
                         } else if s.painterKind == "rating" {
                             Picker("Rating",selection:$s.painterRating) { Text("None").tag(0);ForEach(1...5,id:\.self) { Text("\($0) stars").tag($0) } }.frame(width:135)

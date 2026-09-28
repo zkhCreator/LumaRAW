@@ -17,7 +17,7 @@ LumaRAW references your originals without changing them. The SwiftUI app and you
 | Library | Folder tree/search/favorites/labels, ratings, flags, catalog metadata/keywords, regular/live smart collections, nested sets, Quick/target collections, SQL filters/sorting, manual/capture-time stacks, duplicate/missing indexing, virtual copies/shared snapshots, selective sync, and backup/restore |
 | Culling | Grid/Loupe/Compare/Survey, anchored page selections, active-photo review actions, linked or independent full-resolution comparison viewports |
 | Export | JPEG and 16-bit TIFF with embedded sRGB, Display P3, Adobe RGB, or ProPhoto RGB ICC profiles; frozen catalog XMP/keyword policies, persistent queue, pause/cancel/retry, and collision-safe filenames |
-| Agents | 86 MCP tools, equivalent JSON CLI commands, and a bundled skill; app and agent edits share conflict detection |
+| Agents | 87 MCP tools, equivalent JSON CLI commands, and a bundled skill; app and agent edits share conflict detection |
 
 ## Build and run
 
@@ -162,8 +162,8 @@ Keyword forms include **Include on Export**, **Export Containing Keywords** and
 **Export Synonyms**. Each parent can stop traversal to higher ancestors; excluded
 names and their synonyms are omitted from flat keywords and hierarchy paths.
 **Will Export…** in the inspector previews resolved words and hierarchy pages.
-Keyword sets, Painter, vocabulary file exchange, unused-tag purge and metadata
-undo remain pending.
+Keyword sets, Painter and vocabulary file exchange are described below;
+unused-tag purge and metadata undo remain pending.
 
 The export sheet offers **None**, **Copyright Only**, or **Catalog Descriptions
 and Keywords**, plus optional Lightroom hierarchy paths. The catalog option
@@ -224,7 +224,7 @@ switch back to access them. Catalog backups include local sets and recent entrie
 but shared presets remain in the separate user preset store. Platform directory
 selection is isolated behind an adapter; `LUMARAW_PRESETS_ROOT` explicitly overrides
 it for isolated tests or deployments. Built-in Adobe presets, `.lrtemplate` exchange,
-suggestions and Painter remain pending. Native shortcut dispatch and rendered
+suggestions remain pending. Native shortcut dispatch and rendered
 interaction still require desktop acceptance.
 
 **Metadata → Set Keyword Shortcut** configures one or more keywords independently
@@ -241,7 +241,13 @@ before a keyword stroke to remove only the shortcut's keywords. Choose None or
 Unflagged to clear the other attributes. Esc puts the tool away and discards an
 unsubmitted stroke. Changing the page/source cancels that stroke; a stale target
 rejects the whole batch. Strokes are bounded to the current sixty-photo page.
-Shift keyword-set selection, metadata/Develop presets, rotation and target-collection
+Use **Choose from Sets…**, its Metadata menu action, or Shift with the Painter
+focused to open a multi-set chooser. Select individual slots or all slots in a set,
+switch sets to add more, and review/remove choices before **Load Painter**. This
+replaces the loaded shortcut; Cancel leaves it unchanged. Browsing does not change
+the sidebar's active preset. Recent choices retain IDs, including legacy literal
+names; custom choices retain the text shown when selected. The draft is bounded
+to one hundred choices. Metadata/Develop presets, rotation, target-collection
 painting, scrolling between pages, and rendered pointer/keyboard acceptance remain
 pending. Originals and Develop recipes remain unchanged.
 

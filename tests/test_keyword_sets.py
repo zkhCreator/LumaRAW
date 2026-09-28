@@ -46,6 +46,59 @@ def apply(s,slot=1,ids=(1,2),**kwargs):
     return s.dispatch('apply_keyword_set',{'slot':slot,'targets':targets(s,ids),'expected_revision':state(s)['revision'],**kwargs})
 
 
+def preview(s,set_id,**kwargs):
+    return s.dispatch('get_keyword_set',{'set_id':set_id,'expected_revision':state(s)['revision'],**kwargs})
+
+
+def test_preview_other_set_and_recent_preserves_all_persisted_state(library):
+    s,paths=library
+    first=preset(s,'First',['Uncreated | Child'])['selected']['id']
+    with s.catalog() as c,c.db:
+        legacy=c.db.execute("INSERT INTO keywords(name,normalized) VALUES('Literal, A | B','literal, a | b')").lastrowid
+        c.db.execute('UPDATE keyword_state SET revision=revision+1')
+    assign(s,legacy,[1])
+    preset(s,'Second',['Other'])
+    before=state(s);photos=[photo(s,i) for i in (1,2)];originals=[p.read_bytes() for p in paths]
+    shortcut=s.dispatch('get_keyword_shortcut')
+    result=preview(s,first)
+    assert result['selected']['slots'][0]=='Uncreated | Child'
+    assert result['selected']['keyword_ids']==[None]*9
+    assert result['revision']==before['revision']
+    recent=preview(s,'recent')['selected']
+    assert recent['keyword_ids']==[legacy]+[None]*8 and recent['slots'][0]=='Literal, A | B'
+    assert state(s)==before and photos==[photo(s,i) for i in (1,2)]
+    assert originals==[p.read_bytes() for p in paths] and s.dispatch('get_keyword_shortcut')==shortcut
+    assert s.dispatch('list_keywords')['total']==1
+    # The chooser can load the recent identity without interpreting its label.
+    selected=s.dispatch('set_keyword_shortcut',{'keyword_ids':[legacy],
+        'keyword_additions':[result['selected']['slots'][0]],'expected_revision':shortcut['revision']})
+    assert legacy in selected['keyword_ids'] and selected['total']==2
+    assert photos==[photo(s,i) for i in (1,2)]
+
+
+@pytest.mark.parametrize('change',['rename','delete','scope','recent','vocabulary'])
+def test_preview_rejects_changed_captured_state(library,change):
+    s,_=library;created=preset(s);id_=created['selected']['id']
+    if change=='rename':preset(s,'Renamed',set_id=id_)
+    elif change=='delete':action(s,'delete',set_id=id_)
+    elif change=='scope':action(s,'storage',store_with_catalog=True)
+    elif change=='recent':edit(s,[1],['Added'])
+    else:save(s,'Unused')
+    with pytest.raises(ValueError,match='changed'):
+        preview(s,id_,expected_revision=created['revision'])
+
+
+def test_preview_paged_names_remain_bounded_and_missing_id_fails(library):
+    s,_=library
+    ids=[preset(s,f'Set {i:02}',values=['海🌊'*1365])['selected']['id'] for i in range(35)]
+    before=state(s)
+    first=preview(s,ids[0],offset=0);last=preview(s,ids[0],offset=30)
+    assert len(first['sets'])==30 and len(last['sets'])==5 and last['offset']==30
+    assert first['selected']==last['selected'] and first['selected']['id']==ids[0]
+    assert len(json.dumps(first,ensure_ascii=False).encode())<160_000 and state(s)==before
+    with pytest.raises(ValueError,match='no longer exists'):preview(s,'missing')
+
+
 def test_create_apply_draft_rename_delete_preserves_originals_recipes(library):
     s,paths=library;originals=[p.read_bytes() for p in paths]
     old=save(s,'Keep');assign(s,old,[1,2])

@@ -221,7 +221,7 @@ the entire dictionary into native or Python arrays. Large edits still hold the
 catalog lock; durable background metadata jobs remain pending.
 
 The keyword layer stores export flags but does not encode image metadata.
-Keyword suggestions, Painter and metadata undo remain separate workflows;
+Keyword suggestions, Painter and metadata undo are separate workflows;
 hierarchical catalog storage does not establish those.
 
 `keyword_sets.py` owns schema 13's local presets, selected-set state and bounded
@@ -246,6 +246,16 @@ synchronization do not fabricate recent user actions. Applying a preset preserve
 unrelated assignments and recipes, with all targets and the 100-tag bound checked
 before commit. Native drafts are separate, retain their revision through external
 refresh, and require explicit update/save or discard. No Lua preset is executed.
+
+`get_keyword_set` previews any preset with the captured preset-state revision,
+without changing the active selection. It returns thirty names and nine slots,
+including parallel stable IDs for Recent Keywords. The native Painter chooser
+retains up to one hundred local choices across those pages. It binds its initial
+shortcut and preset reads to the same vocabulary revision, invalidates late reads
+on dismissal, and confirms one shortcut replacement. Custom slot text is frozen
+when selected; a later preset edit never silently changes an existing choice.
+The Mac pointer adapter owns Shift and focus; portable code owns preview/shortcut
+validation. Browsing and cancelling never create vocabulary or assign photographs.
 
 `library_painter.py` owns schema 14's catalog keyword shortcut and bounded Painter
 transactions. Shortcut entries contain stable IDs/positions; deletion prunes only

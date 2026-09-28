@@ -76,6 +76,8 @@ import AppKit
                     .disabled(store.keywordShortcut?.ids.isEmpty != false || store.actionPhotoIDs.isEmpty || store.painterBusy)
                 Toggle("Enable Painting",isOn:Binding(get:{store.painterEnabled},set:{store.setPainting($0)}))
                     .keyboardShortcut("k",modifiers:[.command,.option]).disabled(!store.painterInGrid || store.painterBusy)
+                Button("Choose Painter Keywords from Sets…") { store.choosePainterKeywordSets() }
+                    .disabled(!store.painterCanReceive || store.painterKind != "keywords")
                 Divider()
                 ForEach(1...9,id:\.self) { slot in
                     Button("Apply Keyword Set Slot \(slot)") { Task { await store.applyKeywordSlot(slot) } }

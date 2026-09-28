@@ -1,7 +1,7 @@
 """Measure bounded preset reads and sixty-photo keyword application.
 
 Inputs: explicit new work directory and synthetic vocabulary/preset counts.
-Outputs: warm service/SQLite timings, response sizes and peak RSS. Sixty tiny
+Outputs: warm service/SQLite timings, independent preview pages and peak RSS. Sixty tiny
 generated images are metadata targets only; no processing, IPC or desktop timing.
 Preset storage is isolated from the user's preferences. Setup is not timed.
 """
@@ -53,6 +53,14 @@ def main():
             result=s.dispatch('list_keyword_sets',params)
             report[name]=measure(lambda params=params:s.dispatch('list_keyword_sets',params),args.samples)
             report[name]['response_bytes']=len(json.dumps(result,ensure_ascii=False).encode())
+        captured=s.dispatch('list_keyword_sets')
+        for name,id_,offset in (('preview_other_set',str(args.sets-1),0),('preview_last_name_page','0',args.sets-1)):
+            params={'set_id':id_,'offset':offset,'expected_revision':captured['revision']}
+            result=s.dispatch('get_keyword_set',params)
+            report[name]=measure(lambda params=params:s.dispatch('get_keyword_set',params),args.samples)
+            report[name]['response_bytes']=len(json.dumps(result,ensure_ascii=False).encode())
+            assert result['selected']['id']==id_ and len(result['sets'])<=30
+        assert s.dispatch('list_keyword_sets')==captured
         def apply():
             state=s.dispatch('list_keyword_sets')
             with s.catalog() as c:

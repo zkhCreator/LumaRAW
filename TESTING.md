@@ -477,6 +477,23 @@ Build the optional backend with `uv run python scripts/build_metal.py`; `scripts
 
 `tests/acceleration_probe.py --engine ... --fixture ... --work <new-dir>` compares CPU/Metal with a creative recipe; add `--preset neutral` for defaults. Each run preserves its own image before another render can replace cache paths. `tests/bundle_probe.py --require-metal ...` asserts GPU dispatch for every completed export. The official MCP SDK probe now explicitly requests Metal and inspects actual preview/job processing receipts. See `METAL.md`.
 
+## Painter keyword-set chooser
+
+`NativePainterKeywordPickerRegression` uses the real engine to exercise multi-set
+accumulation, select-all deduplication/capacity, cancellation, recent identities,
+stale preset previews and one shortcut confirmation without tagging photos.
+`test_keyword_sets.py` additionally checks legacy literal labels, missing presets,
+scope/vocabulary/recent revision changes and bounded preview-name pages. Run with:
+
+```sh
+.venv/bin/python tests/run_native.py --work work/new-painter-picker-check --suite NativePainterKeywordPickerRegression
+```
+
+These are state/IPC checks. Shift dispatch, focus after enabling Painter, the
+rendered dialog, native accessibility and macOS 14 runtime need desktop acceptance.
+The picker extension in `tests/keyword_sets_probe.py` measures previewing other
+sets without changing the active preset; setup, IPC, images and UI are excluded.
+
 ## Public source check
 
 ```sh

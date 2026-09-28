@@ -2,7 +2,8 @@
 
 Inputs: text slots, captured state tokens and photo metadata revisions. Outputs:
 bounded preset pages and atomic additive photo tagging. Presets hold text, recent
-keywords hold stable catalog IDs. Switching storage never copies or deletes sets.
+keywords hold stable catalog IDs. Revision-bound previews never select a preset.
+Switching storage never copies or deletes sets.
 The shared SQLite transaction serializes scope/preset edits across catalog brokers;
 lock order is always shared storage then catalog. No pixels, original writes,
 Lua evaluation, inferred suggestions or platform path conventions live here.
@@ -104,10 +105,10 @@ class KeywordSets:
                   shared.execute('SELECT catalog FROM preset_storage').fetchone()[0], Keywords(catalog).revision()]
         return hashlib.sha256(json.dumps(values).encode()).hexdigest()
 
-    def snapshot(self, shared, catalog, offset=0):
+    def snapshot(self, shared, catalog, offset=0, preview_id=None):
         local = bool(shared.execute('SELECT catalog FROM preset_storage').fetchone()[0])
         db = catalog.db if local else shared
-        selected = db.execute('SELECT selected FROM keyword_set_state').fetchone()[0]
+        selected = preview_id or db.execute('SELECT selected FROM keyword_set_state').fetchone()[0]
         total = db.execute('SELECT COUNT(*) FROM keyword_sets').fetchone()[0]
         offset = min(offset, max(0, (total-1)//30*30))
         page = [dict(r) for r in db.execute('SELECT id,name FROM keyword_sets ORDER BY normalized,id LIMIT 30 OFFSET ?', (offset,))]
@@ -115,15 +116,18 @@ class KeywordSets:
             tags = Keywords(catalog)
             ids = [r[0] for r in catalog.db.execute('SELECT keyword_id FROM keyword_recent ORDER BY used DESC LIMIT 9')]
             slots = [' | '.join(a['name'] for a in tags.ancestors(id_)) for id_ in ids]
-            current = {'id':'recent', 'name':'Recent Keywords', 'slots':slots+['']*(9-len(slots))}
+            current = {'id':'recent', 'name':'Recent Keywords', 'slots':slots+['']*(9-len(slots)),
+                       'keyword_ids':ids+[None]*(9-len(ids))}
         else:
             row = db.execute('SELECT id,name,slots FROM keyword_sets WHERE id=?', (selected,)).fetchone()
             if not row:
                 raise ValueError('Selected keyword set no longer exists')
             current = dict(row)
             current['slots'] = json.loads(current['slots'])
+            current['keyword_ids'] = [None]*9
         return {'sets':page, 'selected':current, 'total':total, 'offset':offset,
-                'page_size':30, 'store_with_catalog':local, 'revision':self.token(shared,catalog)}
+                'page_size':30, 'store_with_catalog':local, 'revision':self.token(shared,catalog),
+                'keyword_revision':Keywords(catalog).revision()}
 
     def dispatch(self, method, params):
         with self.shared() as shared, self.service.catalog() as catalog:
@@ -136,6 +140,8 @@ class KeywordSets:
                 db = catalog.db if local else shared
                 if method != 'list_keyword_sets' and params['expected_revision'] != self.token(shared,catalog):
                     raise ValueError('Keyword sets or keywords changed; refresh before editing')
+                if method == 'get_keyword_set':
+                    return self.snapshot(shared,catalog,params.get('offset',0),params['set_id'])
                 if method == 'save_keyword_set':
                     name = unicodedata.normalize('NFC', params['name'].strip())
                     if not name or len(name)>120 or any(ord(c)<32 for c in name):

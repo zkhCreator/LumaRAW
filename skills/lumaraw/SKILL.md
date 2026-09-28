@@ -180,7 +180,15 @@ revision-checked photos, preserving unrelated tags and recipes. Optional
 Recent slots resolve by stable catalog identity. Empty slots, ambiguous text,
 stale state, missing targets or capacity errors commit nothing. Never retry an
 uncertain mutation response or silently replace the captured token. Adobe built-in
-preset contents, `.lrtemplate` exchange and Painter are not implemented.
+preset contents and `.lrtemplate` exchange are not implemented.
+
+`get_keyword_set(set_id,expected_revision,offset)` previews a set without selecting
+it. It returns the same thirty-name/nine-slot shape as `list_keyword_sets`, plus
+parallel `selected.keyword_ids` (IDs for Recent Keywords, nulls for custom text)
+and `keyword_revision`. Capture choices locally across sets. Browsing is read-only;
+use `set_keyword_shortcut` once to confirm chosen IDs and explicit text additions.
+Preserve the original shortcut revision and never split a recent display label.
+Custom slot text is frozen at selection; edits to that preset do not retarget it.
 
 ## Keyword shortcuts and Library Painter
 
