@@ -21,6 +21,18 @@ import UniformTypeIdentifiers
     @Published var offset=0
     @Published var mode="all"
     @Published var search=""
+    @Published var libraryFilters: [String: Any] = [:]
+    @Published var librarySort="imported"
+    @Published var sortDescending=true
+    @Published var collectionID: Int?
+    @Published var collections: [LibraryCollection] = []
+    @Published var collectionOffset=0
+    @Published var collectionTotal=0
+    @Published var showCollectionEditor=false
+    @Published var editingCollection: LibraryCollection?
+    @Published var showLibraryFilters=false
+    @Published var showMetadataEditor=false
+    @Published var metadataTargets: [Photo] = []
     @Published var workspace="library"
     @Published var develop=false
     @Published var showInspector=true
@@ -73,6 +85,7 @@ import UniformTypeIdentifiers
             defaults=schema["defaults"] as? [String:Any] ?? [:]
             presets=schema["presets"] as? [String:[String:Any]] ?? [:]
             await refreshMemory()
+            await refreshCollections()
             await refresh()
             let args=CommandLine.arguments
             if let i=args.firstIndex(of:"--import"),args.count>i+1 { await importPaths([args[i+1]]) }
@@ -86,7 +99,7 @@ import UniformTypeIdentifiers
                             guard !self.editing,self.pendingPatch.isEmpty,self.selected==current.id,self.photo?.revision==current.revision else{continue}
                             if updated.revision != current.revision {
                                 self.photo=updated;self.recipe=updated.recipe;self.message="Loaded edits from another client";self.render()
-                            } else if updated.rating != current.rating || updated.flag != current.flag {self.photo=updated}
+                            } else if updated.rating != current.rating || updated.flag != current.flag || updated.metadataRevision != current.metadataRevision {self.photo=updated}
                         }
                     }
                 }
@@ -98,10 +111,14 @@ import UniformTypeIdentifiers
         defer{if token==pageGeneration{browsing=false}}
         guard await flushEdits(),token==pageGeneration else{return}
         do {
-            let result=try await Backend.call("list_photos",["offset":offset,"mode":mode,"search":search])
+            var params: [String: Any] = ["offset":offset,"mode":mode,"search":search,
+                                       "filters":libraryFilters,"sort":librarySort,"descending":sortDescending]
+            if let collectionID { params["collection_id"]=collectionID }
+            let result=try await Backend.call("list_photos",params)
             guard token==pageGeneration else{return}
             photos=(result["photos"] as? [[String:Any]] ?? []).compactMap(Photo.init)
             total=result["total"] as? Int ?? 0
+            offset=result["offset"] as? Int ?? offset
             thumbnails=thumbnails.filter { id,_ in photos.contains{$0.id==id} }
             selection.formIntersection(Set(photos.map(\.id)))
             if selected==nil || !photos.contains(where:{$0.id==selected}) {
@@ -110,6 +127,14 @@ import UniformTypeIdentifiers
             }
             Task { [weak self] in
                 guard let self else{return}
+                let missing=self.photos.filter { self.thumbnails[$0.id] == nil }.map(\.id)
+                if !missing.isEmpty,let cached=try? await Backend.call("cached_thumbnails",["photo_ids":missing]),token==self.pageGeneration {
+                    for row in cached["thumbnails"] as? [[String:Any]] ?? [] {
+                        if let id=row["photo_id"] as? Int,let path=row["thumbnail"] as? String {
+                            self.thumbnails[id]=NSImage(contentsOfFile:path)
+                        }
+                    }
+                }
                 for p in self.photos where self.thumbnails[p.id]==nil {
                     guard token==self.pageGeneration else{return}
                     if let r=try? await Backend.call("thumbnail",["photo_id":p.id]),let path=r["thumbnail"] as? String,

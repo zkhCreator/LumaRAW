@@ -48,7 +48,38 @@ Compile `native/*.swift` except `LumaRAWApp.swift`, plus `tests/NativeHarness.sw
 The harness exercises the real native Store and JSON transport: import, RAW preview, save, service readback and external-edit polling. Its NSHostingView snapshots are not desktop evidence; offscreen system material layers may render differently. Run real keyboard, VoiceOver, resize, toolbar/inspector and display-color tests on an unlocked Mac before any release acceptance.
 
 
-## Native selection regression (0.3.1)
+## Current native state and library regression
+
+```sh
+.venv/bin/python tests/run_native.py --work work/native-check-01 \
+  --engine /absolute/LumaRAW.app/Contents/Resources/Engine/LumaRAWEngine
+```
+
+The runner compiles all native files except the app entry point, generates two
+small raster files and separate disposable catalogs, then runs both the
+15-assertion state suite and 13-assertion library suite. The library suite checks
+live smart membership, text search/sort, pagination, empty-filter selection,
+partial metadata writes and independent recipe/metadata conflict handling. JSON
+receipts stay in the ignored work directory. Without `--engine`, it uses the
+current Python environment's `lumaraw` executable.
+
+## Library organization and performance
+
+```sh
+.venv/bin/python -m pytest -q tests/test_organization.py tests/test_thumbnail_cache.py
+.venv/bin/python tests/library_probe.py --work work/library-probe-01 --rows 10000
+```
+
+Organization tests cover legacy migrations, many-to-many membership, live all/any
+rules, atomic batch conflicts, Unicode literal search, bounded stable pagination
+and backup/restore. Cache tests verify real cold-worker output, worker-free warm
+reads, source-stat invalidation and partial/symlink rejection. The benchmark
+reports sample count, median/p95, machine/OS, memory and dimensions. Its synthetic
+catalog does not establish large RAW library or desktop latency. Its warm-worker
+baseline deliberately repeats the prior per-photo process path. Desktop inspection
+still requires permission to control the test application.
+
+## Historical native selection regression (0.3.1)
 
 Compile `native/Backend.swift`, `native/Store.swift` and `tests/NativeStateRegression.swift` with `xcrun swiftc -swift-version 5 -parse-as-library`. Set `LUMARAW_ENGINE` to the packaged engine, `LUMARAW_CATALOG` to a new disposable directory, and `LUMARAW_TEST_FIXTURES` to two absolute image paths separated by `|`. The executable reports 15 assertions for selection, empty export, pending edits, rating/external revision conflicts and undo. This is not a substitute for actual UI testing.
 

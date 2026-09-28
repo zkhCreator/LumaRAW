@@ -2,6 +2,10 @@
 
 LumaRAW separates native macOS interaction from RAW processing, storage, queues, and agent contracts. This preserves a path to a Windows shell without coupling the portable domain layer to SwiftUI or Metal.
 
+The current product priority is Lightroom Classic for Mac functional workflows,
+excluding AI. See [PARITY.md](PARITY.md) for gaps and [DEVELOPMENT.md](DEVELOPMENT.md)
+for replacement boundaries, migration gates and performance evidence requirements.
+
 ## Layers
 
 | Layer | Implementation | Responsibility and boundary |
@@ -34,6 +38,18 @@ The native store clears photo-specific state when selection changes and intersec
 ## Memory and performance
 
 Library pages contain at most 60 summaries; full recipes are fetched on demand. Preview and export share strip processing, with overlap for neighborhood filters. Full-resolution viewports are limited to 2048 × 1536. LibRaw still decodes a complete RAW frame; linear pixel caches live on disk.
+
+Library organization lives in `organization.py`: catalog-only descriptive fields,
+normalized keyword relations, regular membership and live smart predicates. Metadata
+and collections have independent revisions. Grid filtering/counting/sorting runs in
+SQLite with a deterministic ID tie-breaker; summaries never select recipe or EXIF
+JSON. Collections also paginate at 60 and do not eagerly count every smart collection.
+
+`source_identity.py` provides stat-based cache identities without importing pixel
+libraries. The broker returns a page of completed thumbnail paths in one command;
+misses still use bounded image workers. Workers publish JPEG cache entries atomically.
+Warm cache lookup does not claim image processing ran. Source thumbnails currently
+do not reflect developed recipes; recipe-aware thumbnails remain tracked in parity.
 
 Each image worker exits after one operation, releasing native allocations. The parent samples RSS every 50 ms and stops work above the effective budget or after five minutes. The effective budget is the lower of the configured limit and 70% of available memory; this is not a system hard limit. When available memory falls below 384 MB, the queue pauses job acquisition. Independent catalogs can start separate brokers, so budgets are not a global quota.
 

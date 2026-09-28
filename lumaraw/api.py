@@ -5,6 +5,7 @@ No transport, pixels or UI dependencies. IDs refer only to the selected catalog.
 Tool annotations describe effects; they never substitute for user authorization.
 """
 from .model import LIMITS, Recipe, SYNC_GROUPS
+from .organization import COLORS, SORTS, FILTER_SCHEMA
 
 def obj(properties=None, required=()):
     return {'type':'object','properties':properties or {},'required':list(required),'additionalProperties':False}
@@ -20,13 +21,19 @@ def tool(name,description,properties=None,required=(),read=False):
 tool('status','Service version, catalog location, queue and processing state.',read=True)
 tool('recipe_schema','Supported recipe ranges, defaults, presets and sync groups.',read=True)
 tool('import_photos','Reference explicit local photos or directories; never copy or modify originals.',{'paths':array(PATH)},['paths'])
-tool('list_photos','Read a bounded page of at most 60 photos.',{'offset':integer(),'mode':{'enum':['all','stars','keepers','rejects','missing','duplicates']},'search':{'type':'string','maxLength':200}},read=True)
+tool('list_photos','Read at most 60 summaries with SQL filters, collection membership and stable sorting.',{'offset':integer(),'mode':{'enum':['all','stars','keepers','rejects','missing','duplicates']},'search':{'type':'string','maxLength':200},'filters':FILTER_SCHEMA,'collection_id':ID,'sort':{'enum':list(SORTS)},'descending':BOOL},read=True)
+tool('list_collections','Read at most 60 regular or smart collections.',{'offset':integer()},read=True)
+tool('save_collection','Create or edit a regular/smart collection. Updates require its revision; originals are unchanged.',{'collection_id':ID,'expected_revision':REV,'name':string(120),'kind':{'enum':['regular','smart']},'rules':FILTER_SCHEMA,'match':{'enum':['all','any']}},['name','kind'])
+tool('collection_membership','Add/remove photos in a regular collection atomically; never removes originals or catalog photos.',{'collection_id':ID,'expected_revision':REV,'photo_ids':array(ID,60),'action':{'enum':['add','remove']}},['collection_id','expected_revision','photo_ids','action'])
+tool('delete_collection','Delete only a collection and its membership; preserve all catalog photos and originals.',{'collection_id':ID,'expected_revision':REV},['collection_id','expected_revision'])
+tool('edit_metadata','Atomically update catalog-only descriptive metadata. Keywords replace the current set. Recipe revisions remain unchanged.',{'targets':array(obj({'photo_id':ID,'expected_metadata_revision':REV},['photo_id','expected_metadata_revision']),60),'patch':obj({'title':{'type':'string','maxLength':500},'caption':{'type':'string','maxLength':5000},'copyright':{'type':'string','maxLength':500},'color_label':{'enum':list(COLORS)},'keywords':{'type':'array','items':string(120),'maxItems':100}})},['targets','patch'])
 tool('get_photo','Read recipe, metadata and current revision before editing.',{'photo_id':ID},['photo_id'],True)
 tool('edit_photo','Merge a partial recipe using expected_revision; stale revisions fail without changes.',{'photo_id':ID,'expected_revision':REV,'patch':PATCH},['photo_id','expected_revision','patch'])
 tool('undo_photo','Undo the last edit only if the revision is current.',{'photo_id':ID,'expected_revision':REV},['photo_id','expected_revision'])
 tool('rate_photo','Set rating 0–5 and/or pick flag (-1 reject, 0 neutral, 1 pick).',{'photo_id':ID,'rating':integer(0,5),'flag':{'enum':[-1,0,1]}},['photo_id'])
 tool('preview_photo','Render an sRGB preview or full-resolution viewport. Returns local paths, histogram and metadata.',{'photo_id':ID,'client_id':string(128),'generation':integer(),'detail':obj({'cx':{'type':'number','minimum':0,'maximum':1},'cy':{'type':'number','minimum':0,'maximum':1},'width':integer(1,2048),'height':integer(1,1536)}),'display':obj({'gamut':BOOL,'proof_path':PATH,'proof_sha':string(64)})},['photo_id'],True)
 tool('thumbnail','Create/read a thumbnail for a catalog photo.',{'photo_id':ID},['photo_id'],True)
+tool('cached_thumbnails','Read completed thumbnail paths for up to 60 photos without starting image workers. Missing entries are omitted.',{'photo_ids':array(ID,60)},['photo_ids'],True)
 tool('enqueue_exports','Durably enqueue immutable recipe snapshots. Reusing request_key with the same arguments returns original jobs; different arguments fail.',{'photo_ids':array(ID),'destination':PATH,'format':{'enum':['tiff16','jpeg']},'options':obj({'space':{'enum':['srgb','adobe','p3','prophoto']},'max_edge':integer(0,16000),'quality':integer(1,100),'output_sharpen':{'type':'number','minimum':0,'maximum':150},'name':string(120),'priority':integer(0,9)}),'request_key':string(128)},['photo_ids','destination','format','request_key'])
 tool('get_job','Read a specific durable export receipt, including its recipe snapshot.',{'job_id':ID},['job_id'],True)
 tool('list_jobs','Read the latest 60 export jobs and aggregate queue counts.',read=True)

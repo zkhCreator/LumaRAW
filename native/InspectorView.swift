@@ -14,6 +14,11 @@ struct InspectorView:View {
                 HStack{Text("Adjustments").font(.title3.weight(.semibold));Spacer();Menu{Button("Save Edit Version…"){s.showVersions=true};Button("Export Recipe Bundle…"){s.recipeFile(save:true)};Button("Import Recipe Bundle…"){s.recipeFile(save:false)};Button("Full Recipe Editor…"){s.showRecipe=true};Divider();Button("Reset All Adjustments",role:.destructive){reset=true}}label:{Image(systemName:"ellipsis.circle")}.menuStyle(.borderlessButton).frame(width:25)}
                 HistogramView(data:s.histogram)
                 if let p=s.photo {
+                    VStack(alignment:.leading,spacing:6) {
+                        if !p.title.isEmpty { Text(p.title).font(.headline) }
+                        if !p.keywords.isEmpty { Text(p.keywords.joined(separator:", ")).font(.caption).foregroundStyle(.secondary) }
+                        Button("Edit Metadata…") { Task { await s.prepareMetadataEditor() } }
+                    }
                     HStack(spacing:7){ForEach(1..<6){value in Button{s.rate(p.rating==value ? 0:value)}label:{Image(systemName:p.rating>=value ? "star.fill":"star").foregroundStyle(p.rating>=value ? Color.yellow:Color.secondary)}.accessibilityLabel("Rate \(value) \(value == 1 ? "star" : "stars")")};Spacer();Button{s.flag(p.flag==1 ? 0:1)}label:{Image(systemName:p.flag==1 ? "flag.fill":"flag")}}
                         .buttonStyle(.plain).help("1–5 to rate, P to flag as a pick")
                 }

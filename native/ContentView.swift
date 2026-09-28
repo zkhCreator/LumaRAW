@@ -22,6 +22,7 @@ struct ContentView: View {
                     Button {s.workspace="exports"} label:{Label("Export Queue",systemImage:"square.and.arrow.up")}
                     Button {s.workspace="agent"} label:{Label("Agent Connection",systemImage:"terminal")}
                 }
+                CollectionsSidebar()
                 Section {
                     Button {s.libraryAction("index_library")} label:{Label("Update Library Index",systemImage:"arrow.triangle.2.circlepath")}.disabled(s.busy)
                     Button {s.backup()} label:{Label("Back Up Library…",systemImage:"externaldrive")}
@@ -59,6 +60,9 @@ struct ContentView: View {
         .sheet(isPresented:$s.showRecipe){RecipeSheet()}
         .sheet(isPresented:$s.showSync){SyncSheet()}
         .sheet(isPresented:$s.showCalibration){CalibrationSheet()}
+        .sheet(isPresented:$s.showCollectionEditor){CollectionEditor(original:s.editingCollection)}
+        .sheet(isPresented:$s.showLibraryFilters){LibraryFilterSheet(draft:LibraryFilterDraft(s.libraryFilters))}
+        .sheet(isPresented:$s.showMetadataEditor){MetadataEditor(targets:s.metadataTargets)}
         .onDrop(of:[UTType.fileURL],isTargeted:nil){providers in
             for provider in providers {provider.loadItem(forTypeIdentifier:UTType.fileURL.identifier,options:nil){item,_ in
                 if let data=item as? Data,let url=URL(dataRepresentation:data,relativeTo:nil){Task{@MainActor in await s.importPaths([url.path])}}
@@ -66,9 +70,9 @@ struct ContentView: View {
         }
     }
     func side(_ title:String,_ symbol:String,_ mode:String)->some View {
-        Button {s.mode=mode;s.workspace="library";s.offset=0;Task{await s.refresh()}} label:{
-            HStack{Label(title,systemImage:symbol);Spacer();if s.mode==mode && s.workspace=="library"{Image(systemName:"checkmark").font(.caption).foregroundStyle(.tint)}}
-        }.accessibilityAddTraits(s.mode==mode && s.workspace=="library" ? .isSelected:[])
+        Button {s.mode=mode;s.collectionID=nil;s.workspace="library";s.offset=0;Task{await s.refresh()}} label:{
+            HStack{Label(title,systemImage:symbol);Spacer();if s.mode==mode && s.collectionID==nil && s.workspace=="library"{Image(systemName:"checkmark").font(.caption).foregroundStyle(.tint)}}
+        }.accessibilityAddTraits(s.mode==mode && s.collectionID==nil && s.workspace=="library" ? .isSelected:[])
     }
     var workspace:some View {
         VStack(spacing:0){
@@ -86,11 +90,15 @@ struct ContentView: View {
                     } label:{Label(s.canvasTool=="view" ? "Tools":"Drawing",systemImage:s.canvasTool=="crop" ? "crop":"paintbrush.pointed")}
                     Picker("Zoom",selection:$s.detail){Text("Fit").tag(false);Text("1:1 Detail").tag(true)}.frame(width:155).onChange(of:s.detail){_,_ in s.render()}
                 } else {
-                    TextField("Search filenames",text:$s.search).textFieldStyle(.roundedBorder).frame(width:190).onSubmit{s.offset=0;Task{await s.refresh()}}
-                    Button{Task{await s.refresh()}}label:{Image(systemName:"arrow.clockwise")}.help("Refresh Library")
+                    TextField("Search photos and metadata",text:$s.search).textFieldStyle(.roundedBorder).frame(width:220).onSubmit{s.offset=0;Task{await s.refresh()}}
+                    Button{Task{await s.refreshCollections();await s.refresh()}}label:{Image(systemName:"arrow.clockwise")}.help("Refresh Library")
                 }
             }.padding(.horizontal,20).padding(.vertical,12)
             Divider()
+            if !s.develop {
+                LibraryToolbar()
+                Divider()
+            }
             if s.total==0 {empty}
             else if s.develop {PhotoCanvas();filmstrip}
             else {gallery}
@@ -107,10 +115,14 @@ struct ContentView: View {
     }
     var empty:some View {
         ContentUnavailableView {
-            Label("Your Next Great Photo",systemImage:"camera.aperture")
-        }description:{Text("Import Nikon NEF or other photos to begin non-destructive editing.\nYou can also drag a photo folder into this window.")}
-        actions:{Button("Import Photos…"){s.importPanel()}.buttonStyle(.borderedProminent).controlSize(.large)}
+            Label(filtered ? "No Matching Photos":"Your Next Great Photo",systemImage:filtered ? "line.3.horizontal.decrease.circle":"camera.aperture")
+        }description:{Text(filtered ? "This view has no photos. Adjust the filters or add photos to this collection." : "Import Nikon NEF or other photos to begin non-destructive editing.\nYou can also drag a photo folder into this window.")}
+        actions:{
+            if filtered { Button("Show All Photos"){s.mode="all";s.collectionID=nil;s.libraryFilters=[:];s.search="";s.offset=0;Task{await s.refresh()}} }
+            else { Button("Import Photos…"){s.importPanel()}.buttonStyle(.borderedProminent).controlSize(.large) }
+        }
     }
+    var filtered: Bool { s.mode != "all" || s.collectionID != nil || !s.libraryFilters.isEmpty || !s.search.isEmpty }
     var gallery:some View {
         ScrollView {
             LazyVGrid(columns:[GridItem(.adaptive(minimum:175,maximum:245),spacing:18)],spacing:20) {
@@ -122,7 +134,10 @@ struct ContentView: View {
                             else{Image(systemName:"photo").font(.largeTitle).foregroundStyle(.secondary).frame(maxWidth:.infinity,maxHeight:.infinity)}
                             if p.flag != 0 {Image(systemName:p.flag==1 ? "flag.fill":"xmark.circle.fill").padding(7).foregroundStyle(p.flag==1 ? .yellow:.gray)}
                         }.frame(height:145).clipShape(RoundedRectangle(cornerRadius:7)).overlay(RoundedRectangle(cornerRadius:7).stroke(s.selection.contains(p.id) ? Color.accentColor:.clear,lineWidth:3))
-                        Text(p.name).font(.callout).lineLimit(1)
+                        HStack(spacing:6){
+                            if p.colorLabel != "none" {Circle().fill(LibraryLabels.color(p.colorLabel)).frame(width:8,height:8).accessibilityLabel("\(p.colorLabel) label")}
+                            Text(p.name).font(.callout).lineLimit(1)
+                        }
                         HStack(spacing:2){ForEach(0..<5){i in Image(systemName:i<p.rating ? "star.fill":"star").font(.system(size:9)).foregroundStyle(i<p.rating ? Color.yellow:Color.secondary.opacity(0.4))};Spacer();Text(URL(fileURLWithPath:p.path).pathExtension.uppercased()).font(.caption2).foregroundStyle(.secondary)}
                     }.contentShape(Rectangle())
                     .onTapGesture(count:2){s.choose(p.id);s.develop=true}

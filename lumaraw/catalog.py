@@ -13,6 +13,7 @@ import sqlite3
 import time
 
 from .model import Recipe, ExportOptions, SYNC_GROUPS, IMAGE_EXTENSIONS
+from .organization import Organization, SORTS, criteria, folded, migrate, text_predicate
 
 class Catalog:
     def __init__(self, root):
@@ -20,6 +21,7 @@ class Catalog:
         self.root.mkdir(parents=True, exist_ok=True)
         self.db = sqlite3.connect(self.root / 'catalog.sqlite', timeout=10)
         self.db.row_factory = sqlite3.Row
+        self.db.create_function('casefold', 1, folded, deterministic=True)
         self.db.executescript('''
             PRAGMA journal_mode=WAL;
             PRAGMA busy_timeout=10000;
@@ -50,6 +52,7 @@ class Catalog:
             if name not in columns: self.db.execute(f'ALTER TABLE jobs ADD COLUMN {name} {definition}')
         self.db.executescript('CREATE TABLE IF NOT EXISTS versions(id INTEGER PRIMARY KEY,photo_id INTEGER NOT NULL,name TEXT NOT NULL,recipe TEXT NOT NULL,created REAL NOT NULL); CREATE INDEX IF NOT EXISTS photo_hash ON photos(sha256);')
         self.db.commit()
+        migrate(self.db)
 
     def setting(self, key, default=None):
         row = self.db.execute('SELECT value FROM settings WHERE key=?', (key,)).fetchone()
@@ -103,7 +106,12 @@ class Catalog:
 
     def photo(self, photo_id):
         row = self.db.execute('SELECT * FROM photos WHERE id=?', (photo_id,)).fetchone()
-        return dict(row) if row else None
+        if not row:
+            return None
+        result = dict(row)
+        result['keywords'] = [r[0] for r in self.db.execute(
+            'SELECT keyword FROM photo_keywords WHERE photo_id=? ORDER BY normalized', (photo_id,))]
+        return result
 
     def recipe(self, photo_id):
         return Recipe.parse(json.loads(self.photo(photo_id)['recipe']))
@@ -185,7 +193,7 @@ class Catalog:
             self.db.execute("UPDATE jobs SET state='pending',error='' WHERE state IN ('failed','interrupted','cancelled')")
 
 
-    def filter_sql(self,mode='all',search=''):
+    def filter_sql(self,mode='all',search='',filters=None,collection_id=None):
         clauses=[];params=[]
         if mode=='stars': clauses.append('rating>=3')
         elif mode=='rejects': clauses.append('flag=-1')
@@ -195,15 +203,29 @@ class Catalog:
         elif mode.startswith('burst:'):
             clauses.append('burst=?');params.append(int(mode.split(':')[1]))
         if search:
-            clauses.append('instr(lower(name),lower(?))>0');params.append(search[:200])
+            clause, values = text_predicate(search[:200])
+            clauses.append(clause);params.extend(values)
+        if filters:
+            clause, values = criteria(filters)
+            clauses.append(clause);params.extend(values)
+        if collection_id is not None:
+            clause, values = Organization(self).collection_predicate(collection_id)
+            clauses.append(clause);params.extend(values)
         return (' WHERE '+' AND '.join(clauses) if clauses else ''),params
 
-    def filtered_page(self,offset=0,mode='all',search=''):
-        where,params=self.filter_sql(mode,search)
-        return [dict(r) for r in self.db.execute('SELECT * FROM photos'+where+' ORDER BY id DESC LIMIT 60 OFFSET ?',params+[max(0,offset)])]
+    def filtered_page(self,offset=0,mode='all',search='',filters=None,collection_id=None,sort='imported',descending=True):
+        where,params=self.filter_sql(mode,search,filters,collection_id)
+        if sort not in SORTS:
+            raise ValueError('Unsupported library sort')
+        order = 'DESC' if descending else 'ASC'
+        # Keep large recipe/decoder metadata JSON out of the grid query entirely.
+        columns = 'id,path,name,bytes,mtime,rating,flag,revision,color_label,title,metadata_revision,taken,camera,missing,error'
+        return [dict(r) for r in self.db.execute(
+            f'SELECT {columns} FROM photos{where} ORDER BY {SORTS[sort]} {order},id {order} LIMIT 60 OFFSET ?',
+            params+[max(0,offset)])]
 
-    def filtered_count(self,mode='all',search=''):
-        where,params=self.filter_sql(mode,search)
+    def filtered_count(self,mode='all',search='',filters=None,collection_id=None):
+        where,params=self.filter_sql(mode,search,filters,collection_id)
         return self.db.execute('SELECT count(*) FROM photos'+where,params).fetchone()[0]
 
     def filtered_ids(self,mode='all',search=''):

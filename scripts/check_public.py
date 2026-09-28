@@ -14,6 +14,7 @@ import subprocess
 import zlib
 
 ROOT_FILES = {'.gitignore', 'LICENSE', 'README.md', 'ARCHITECTURE.md', 'METAL.md',
+              'AGENTS.md', 'DEVELOPMENT.md', 'PARITY.md',
               'TESTING.md', 'VERIFICATION.md', 'THIRD_PARTY_NOTICES.md',
               'PUBLIC_RELEASE.md', 'Package.swift', 'launch.py', 'pyproject.toml', 'uv.lock'}
 ROOT_DIRS = {'.github', 'assets', 'licenses', 'lumaraw', 'metal', 'native', 'scripts', 'skills', 'tests', 'examples'}

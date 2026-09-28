@@ -23,6 +23,24 @@ Example edit arguments:
 {"photo_id": 12, "expected_revision": 3, "patch": {"exposure": 0.35, "highlights": -20, "shadows": 12}}
 ```
 
+## Library organization
+
+`list_photos` accepts `filters`, `collection_id`, `sort` and `descending`, and
+returns a clamped offset plus at most 60 summaries. `list_collections` paginates
+regular and smart collections. Use `save_collection` with `collection_id` and
+`expected_revision` for updates; `collection_membership` applies only to regular
+collections and also requires their revision. Deleting a collection never removes
+photos or originals. Smart rules evaluate current metadata when the library is queried.
+
+`edit_metadata` takes at most 60 `{photo_id,expected_metadata_revision}` targets and
+a shared `patch` containing title/caption/copyright/color_label/keywords. Read each
+target before editing; keywords replace the current set. The response contains a
+single normalized patch and per-photo metadata revisions, not newer recipe state.
+Conflicts leave the whole batch unchanged. Metadata stays in the catalog; EXIF and
+sidecars are not rewritten. `cached_thumbnails` returns existing paths for a bounded
+page without starting workers; use `thumbnail` for missing entries. Source thumbnails
+do not represent developed edits.
+
 ## Batch and output
 
 - `lumaraw_sync_photos` copies only named groups and requires every target's current revision; `Composition`, `Local Masks`, `Camera Profile` and `LUT` are separate explicit choices.

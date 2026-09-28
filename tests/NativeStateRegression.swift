@@ -59,7 +59,7 @@ import Foundation
             let report:[String:Any]=["ok":true,"checks":checks,"desktop_ui":"NOT_VERIFIED","voiceover":"NOT_VERIFIED"]
             let data=try JSONSerialization.data(withJSONObject:report,options:[.prettyPrinted,.sortedKeys]);print(String(data:data,encoding:.utf8)!);exit(0)
         }catch {
-            let report:[String:Any]=["ok":false,"checks":checks,"error":error.localizedDescription]
+            let report:[String:Any]=["ok":false,"checks":checks,"error":error.localizedDescription,"store_error":s.error ?? "","store_message":s.message]
             let data=try! JSONSerialization.data(withJSONObject:report,options:[.prettyPrinted,.sortedKeys]);print(String(data:data,encoding:.utf8)!);exit(1)
         }
     }

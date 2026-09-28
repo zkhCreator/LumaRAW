@@ -25,8 +25,8 @@ import tifffile
 
 from .model import Recipe, RAW_EXTENSIONS
 from .performance import stage
+from .source_identity import PIPELINE_VERSION, fingerprint, cache_key, thumbnail_path, cached_thumbnail
 
-PIPELINE_VERSION = 'libraw-prophoto-d65-v3'
 PREVIEW_EDGE = 1680
 TILE_ROWS = 128
 SRGB_ICC = ImageCms.ImageCmsProfile(ImageCms.createProfile('sRGB')).tobytes()
@@ -38,16 +38,6 @@ SRGB_TO_PROPHOTO = np.array([[.529317, .330092, .140588],
                              [.016879, .117663, .865457]], dtype=np.float32)
 PROPHOTO_TO_SRGB = np.linalg.inv(SRGB_TO_PROPHOTO).astype(np.float32)
 LUMA = (np.array([.2126729, .7151522, .0721750], dtype=np.float32) @ PROPHOTO_TO_SRGB).astype(np.float32)
-
-
-def fingerprint(path):
-    p = Path(path).resolve(strict=True)
-    s = p.stat()
-    return hashlib.sha256(f'{p}|{s.st_size}|{s.st_mtime_ns}|{PIPELINE_VERSION}'.encode()).hexdigest()[:24]
-
-
-def cache_key(path, recipe, kind):
-    return hashlib.sha256((fingerprint(path) + kind + json.dumps(recipe.dict(), sort_keys=True)).encode()).hexdigest()
 
 
 def estimate_memory_mb(width, height, raw=True, preview=False):
@@ -233,10 +223,10 @@ def make_preview(path, recipe, cache, budget_mb, **kwargs):
 
 def make_thumbnail(path, cache, budget_mb):
     """Use camera JPEG only for labeled library thumbnails, never development/export."""
-    target = Path(cache) / (fingerprint(path) + '-thumb.jpg')
-    if target.exists():
-        os.utime(target, None)
-        return {'thumbnail': str(target)}
+    target = thumbnail_path(path, cache)
+    existing = cached_thumbnail(path, cache)
+    if existing:
+        return {'thumbnail': existing}
     target.parent.mkdir(parents=True, exist_ok=True)
     if Path(path).suffix.lower() in RAW_EXTENSIONS:
         with rawpy.RawPy() as raw:
@@ -261,7 +251,15 @@ def make_thumbnail(path, cache, budget_mb):
                 img = ImageCms.profileToProfile(img, ImageCms.ImageCmsProfile(io.BytesIO(icc)), ImageCms.createProfile('sRGB'), outputMode='RGB')
             else:
                 img = img.convert('RGB')
-    img.save(target, quality=82, icc_profile=SRGB_ICC)
+    # Publish complete cache entries atomically so the broker's cheap lookup
+    # never exposes a JPEG while it is still being encoded.
+    descriptor, temporary = tempfile.mkstemp(prefix='.thumbnail-', suffix='.part', dir=target.parent)
+    try:
+        with os.fdopen(descriptor, 'wb') as stream:
+            img.save(stream, format='JPEG', quality=82, icc_profile=SRGB_ICC)
+        os.replace(temporary, target)
+    finally:
+        Path(temporary).unlink(missing_ok=True)
     return {'thumbnail': str(target)}
 
 

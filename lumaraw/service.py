@@ -23,6 +23,8 @@ import psutil
 from .api import TOOLS
 from .catalog import Catalog, walk_images
 from .model import Recipe, ExportOptions, LIMITS, PRESETS, SYNC_GROUPS
+from .organization import Organization
+from .source_identity import cached_thumbnail
 
 class ConflictError(ValueError): pass
 
@@ -91,6 +93,12 @@ class Service:
             with self.catalog() as c:
                 return {'version':'0.4.1','api_version':1,'catalog':str(self.root),'photos':c.count(),'counts':c.job_counts(),'paused':self.paused,'active':self.active,**self.memory_status(),'peak_mb':round(self.peak,1)}
         if method=='recipe_schema':return {'defaults':Recipe().dict(),'limits':LIMITS,'presets':{k:v.dict() for k,v in PRESETS.items()},'groups':SYNC_GROUPS}
+        if method=='cached_thumbnails':
+            with self.catalog() as c:
+                rows=[self.require(c,photo_id) for photo_id in dict.fromkeys(p['photo_ids'])]
+            return {'thumbnails':[{'photo_id':row['id'],'thumbnail':path} for row in rows
+                                  if (path:=cached_thumbnail(row['path'],self.cache))],
+                    'worker_spawned':False}
         if method in ('preview_photo','thumbnail','calibrate_camera'):
             if method=='preview_photo' and p.get('client_id'):
                 if 'generation' not in p:raise ValueError('client_id requires generation')
@@ -103,6 +111,11 @@ class Service:
                         self.cancelled=True
                         if self.process.poll() is None:self.process.kill()
             with self.catalog() as c:row=self.require(c,p['photo_id'])
+            if method=='thumbnail':
+                path=cached_thumbnail(row['path'],self.cache)
+                if path:
+                    return {'thumbnail':path,'photo_id':row['id'],'revision':row['revision'],
+                            'cache_hit':True,'worker_spawned':False}
             request={'operation':{'preview_photo':'preview','thumbnail':'thumbnail','calibrate_camera':'calibrate'}[method],
                      'path':row['path'],'recipe':json.loads(row['recipe'])}
             request.update({k:v for k,v in p.items() if k!='photo_id'})
@@ -121,7 +134,24 @@ class Service:
                 count,skipped=c.import_paths(paths());return {'imported':count,'skipped':skipped,'total':c.count()}
             if method=='list_photos':
                 mode=p.get('mode','all');search=p.get('search','');offset=p.get('offset',0)
-                return {'photos':[{k:v for k,v in unpack(x).items() if k not in ('recipe','metadata')} for x in c.filtered_page(offset,mode,search)],'total':c.filtered_count(mode,search),'offset':offset,'page_size':60}
+                filters=p.get('filters');collection=p.get('collection_id')
+                total=c.filtered_count(mode,search,filters,collection)
+                offset=min(offset,max(0,((total-1)//60)*60))
+                return {'photos':c.filtered_page(offset,mode,search,filters,collection,p.get('sort','imported'),p.get('descending',True)),'total':total,'offset':offset,'page_size':60}
+            if method=='list_collections':return Organization(c).list_collections(p.get('offset',0))
+            if method=='save_collection':
+                if ('collection_id' in p) != ('expected_revision' in p):
+                    raise ValueError('Collection updates require collection_id and expected_revision together')
+                return Organization(c).save_collection(**p)
+            if method=='collection_membership':
+                return Organization(c).membership(p['collection_id'],p['expected_revision'],p['photo_ids'],p['action'])
+            if method=='delete_collection':
+                return Organization(c).delete_collection(p['collection_id'],p['expected_revision'])
+            if method=='edit_metadata':
+                ids=Organization(c).edit_metadata(p['targets'],p['patch'])
+                first=c.photo(ids[0])
+                return {'updated':[{'photo_id':photo_id,'metadata_revision':c.photo(photo_id)['metadata_revision']} for photo_id in ids],
+                        'patch':{key:first[key] for key in p['patch']}}
             if method=='get_photo':return unpack(self.require(c,p['photo_id']))
             if method in ('edit_photo','undo_photo','restore_version','load_recipe'):
                 row=self.check_revision(c,p['photo_id'],p['expected_revision'])

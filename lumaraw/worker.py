@@ -1,7 +1,7 @@
 """One request per disposable image subprocess.
 
 Reads bounded JSON from stdin, returns one JSON result; no pixel buffers cross IPC.
-The GUI owns scheduling, cancellation, and RSS monitoring. Process exit releases
+The catalog service owns scheduling, cancellation, and RSS monitoring. Process exit releases
 LibRaw/NumPy native allocations even after failure. Original files are read-only.
 """
 import json

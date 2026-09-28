@@ -56,12 +56,30 @@ struct Photo: Identifiable {
     var revision: Int
     var rating: Int
     var flag: Int
+    var title: String
+    var caption: String
+    var copyright: String
+    var colorLabel: String
+    var keywords: [String]
+    var metadataRevision: Int
     var recipe: [String: Any]
     var metadata: [String: Any]
     init?(_ row: [String: Any]) {
         guard let id = row["id"] as? Int else { return nil }
         self.id=id; name=row["name"] as? String ?? "Photo"; path=row["path"] as? String ?? ""
         revision=row["revision"] as? Int ?? 0; rating=row["rating"] as? Int ?? 0; flag=row["flag"] as? Int ?? 0
+        title=row["title"] as? String ?? ""; caption=row["caption"] as? String ?? ""
+        copyright=row["copyright"] as? String ?? ""; colorLabel=row["color_label"] as? String ?? "none"
+        keywords=row["keywords"] as? [String] ?? []; metadataRevision=row["metadata_revision"] as? Int ?? 0
         recipe=row["recipe"] as? [String: Any] ?? [:]; metadata=row["metadata"] as? [String: Any] ?? [:]
+    }
+
+    mutating func adoptLibraryPatch(_ patch: [String: Any], revision: Int) {
+        if let value=patch["title"] as? String { title=value }
+        if let value=patch["caption"] as? String { caption=value }
+        if let value=patch["copyright"] as? String { copyright=value }
+        if let value=patch["color_label"] as? String { colorLabel=value }
+        if let value=patch["keywords"] as? [String] { keywords=value }
+        metadataRevision=revision
     }
 }

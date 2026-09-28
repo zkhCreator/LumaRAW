@@ -23,6 +23,13 @@ import AppKit
                 Button("Undo Last Adjustment"){store.undo()}.keyboardShortcut("z").disabled(store.photo==nil || store.editing)
             }
             CommandMenu("Photo") {
+                Button("Edit Selected Metadata…"){Task{await store.prepareMetadataEditor()}}.disabled(store.selection.isEmpty)
+                Menu("Set Color Label") {
+                    ForEach(LibraryLabels.names,id:\.self) { label in
+                        Button(label.capitalized) { store.labelSelection(label) }
+                    }
+                }.disabled(store.selection.isEmpty)
+                Divider()
                 Button("Copy Adjustments"){store.copyEdits()}.keyboardShortcut("c",modifiers:[.command,.shift])
                 Button("Paste Adjustments"){store.pasteEdits()}.keyboardShortcut("v",modifiers:[.command,.shift])
                 Button("Sync Selected Photos…"){store.showSync=true}.disabled(store.selection.count<2)
@@ -34,6 +41,11 @@ import AppKit
                 Divider()
                 Button("Show in Finder"){store.reveal()}
                 Button("Locate Missing Original…"){store.relink()}
+            }
+            CommandMenu("Library") {
+                Button("New Collection…") { store.editCollection() }.keyboardShortcut("n",modifiers:[.command,.shift])
+                Button("Filter Photos…") { store.showLibraryFilters=true }
+                Button("Refresh Library") { Task { await store.refreshCollections(); await store.refresh() } }
             }
             CommandGroup(after:.toolbar) {
                 Button("Show Adjustment Inspector"){store.showInspector.toggle()}.keyboardShortcut("i",modifiers:[.command,.option])

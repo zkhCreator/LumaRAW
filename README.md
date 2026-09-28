@@ -14,9 +14,9 @@ LumaRAW references your originals without changing them. The SwiftUI app and you
 | Color | Custom tone curves, color mixer, camera-bound chart calibration, `.cube` LUTs, ICC soft proofing, and gamut warnings |
 | Detail and composition | Full-resolution 1:1 viewports, noise reduction, sharpening, defringing, rotation, crop, straighten, and perspective |
 | Local adjustments | Radial, gradient, luminance-range, and brush masks; manual lens distortion, vignette, and chromatic-aberration correction |
-| Library | Ratings, pick/reject flags, duplicate and missing-file indexing, edit versions, selective sync, recipe bundles, and backup/restore |
+| Library | Ratings, flags, color labels, catalog metadata/keywords, regular and live smart collections, SQL filters/sorting, duplicate/missing indexing, edit versions, selective sync, and backup/restore |
 | Export | JPEG and 16-bit TIFF with embedded sRGB, Display P3, Adobe RGB, or ProPhoto RGB ICC profiles; persistent queue, pause/cancel/retry, and collision-safe filenames |
-| Agents | 27 MCP tools, equivalent JSON CLI commands, and a bundled skill; app and agent edits share conflict detection |
+| Agents | 33 MCP tools, equivalent JSON CLI commands, and a bundled skill; app and agent edits share conflict detection |
 
 ## Build and run
 
@@ -47,6 +47,20 @@ The default catalog is `~/Library/Application Support/LumaRAW Native`. Use `--ca
 7. Press **⇧⌘E** to export. Choose a format, color space, long-edge size, and filename template. Existing files are preserved.
 
 Adjustments save automatically. Each photo supports up to 50 undo steps, named edit versions, and portable recipe bundles. The full recipe editor supports precise curve points and brush paths. Submitted exports retain their original recipe snapshot even if you continue editing.
+
+Use **Collections → New Collection** to create a regular collection or a smart
+collection with live rules. Add/remove selected photos from a regular collection
+through its contextual menu or **Organize**. Collection removal preserves catalog
+photos and originals. **Filter** combines rating, flag, color, keyword, text,
+camera and folder criteria; sorting is stable across 60-photo pages. Camera and
+capture-time filters require the library index to have read that metadata.
+
+**Organize → Edit Metadata** edits title, caption, copyright, keywords and labels.
+For a batch, check only the fields to apply; keywords replace the selected photos'
+current keyword sets. These changes are catalog-only, with separate metadata
+revision checks; they do not write EXIF/XMP into originals. Warm grid pages reuse
+completed thumbnail paths in one service call without starting image workers.
+Thumbnails currently show source images, not developed edits.
 
 ## Metal acceleration
 
@@ -94,6 +108,10 @@ Use the current revision from `get_photo` when editing. Long JSON can be passed 
 `recipe_schema` is the authority for supported parameters, presets, and sync groups. Group names are now English: `White Balance`, `Light`, `Color`, `Tone Curve`, `Detail`, `Lens`, `Composition`, `Local Masks`, `Camera Profile`, and `LUT`. Clients using the earlier local build's translated group names must refresh the schema. Existing recipe fields, originals, and user-entered names are unchanged.
 
 ## Architecture
+
+Development priorities, contributor instructions and the Lightroom Classic parity
+ledger are in [AGENTS.md](AGENTS.md), [DEVELOPMENT.md](DEVELOPMENT.md) and
+[PARITY.md](PARITY.md). Full non-AI Lightroom Classic parity is work in progress.
 
 ```text
 SwiftUI app ── JSON CLI ──┐
