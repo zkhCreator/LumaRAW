@@ -25,6 +25,7 @@ from .catalog import Catalog, walk_images
 from .model import Recipe, ExportOptions, LIMITS, PRESETS, SYNC_GROUPS
 from .organization import Organization
 from .collections import Collections
+from .virtual_copies import VirtualCopies
 from .source_identity import cached_thumbnail
 
 class ConflictError(ValueError): pass
@@ -184,6 +185,12 @@ class Service:
                 first=c.photo(ids[0])
                 return {'updated':[{'photo_id':photo_id,'metadata_revision':c.photo(photo_id)['metadata_revision']} for photo_id in ids],
                         'patch':{key:first[key] for key in p['patch']}}
+            if method=='create_virtual_copies':
+                if ('collection_id' in p) != ('expected_collection_revision' in p):
+                    raise ValueError('Collection ID and revision must be provided together')
+                return VirtualCopies(c).create(**p)
+            if method=='remove_virtual_copies':return VirtualCopies(c).remove(p['targets'])
+            if method=='set_copy_as_master':return unpack(VirtualCopies(c).promote(p))
             if method=='get_photo':return unpack(self.require(c,p['photo_id']))
             if method in ('edit_photo','undo_photo','restore_version','load_recipe'):
                 row=self.check_revision(c,p['photo_id'],p['expected_revision'])
@@ -220,8 +227,8 @@ class Service:
                 ids=[]
                 with c.db:
                     for row in rows:
-                        cur=c.db.execute('INSERT INTO jobs(photo_id,source,recipe,destination,format,created,options,priority) VALUES(?,?,?,?,?,?,?,?)',
-                            (row['id'],row['path'],row['recipe'],str(dest),p['format'],time.time(),json.dumps(options.dict()),options.priority));ids.append(cur.lastrowid)
+                        cur=c.db.execute('INSERT INTO jobs(photo_id,source,recipe,destination,format,created,options,priority,source_id) VALUES(?,?,?,?,?,?,?,?,?)',
+                            (row['id'],row['path'],row['recipe'],str(dest),p['format'],time.time(),json.dumps(options.dict()),options.priority,row['source_id']));ids.append(cur.lastrowid)
                     result={'job_ids':ids,'queued':len(ids)}
                     c.db.execute('INSERT INTO requests VALUES(?,?,?)',(p['request_key'],digest,json.dumps(result)))
                 self.wake.set();return result
@@ -232,7 +239,7 @@ class Service:
             if method=='list_jobs':return {'jobs':[{k:v for k,v in unpack(j).items() if k!='recipe'} for j in c.jobs(60)],'counts':c.job_counts(),'paused':self.paused,'active':self.active}
             if method=='save_version':self.require(c,p['photo_id']);c.save_version(p['photo_id'],p['name']);return {'saved':True}
             if method=='list_versions':
-                self.require(c,p['photo_id']);return {'versions':[unpack(dict(r)) for r in c.db.execute('SELECT id,photo_id,name,created FROM versions WHERE photo_id=? ORDER BY id DESC LIMIT 100',(p['photo_id'],))]}
+                row=self.require(c,p['photo_id']);return {'versions':[dict(r) for r in c.db.execute('SELECT id,photo_id,name,created FROM versions WHERE source_id=? ORDER BY id DESC LIMIT 100',(row['source_id'],))]}
             if method=='sync_photos':
                 source=json.loads(self.require(c,p['source_id'])['recipe']);changes=[]
                 for target in p['targets']:

@@ -24,6 +24,9 @@ FILTER_PROPERTIES = {
     'folder': {'type': 'string', 'minLength': 1, 'maxLength': 4096},
     'taken_from': {'type': 'integer', 'minimum': 0, 'maximum': 2**53-1},
     'taken_to': {'type': 'integer', 'minimum': 0, 'maximum': 2**53-1},
+    'is_virtual': {'type': 'boolean'},
+    'source_id': {'type': 'integer', 'minimum': 1, 'maximum': 2**53-1},
+    'copy_name': {'type': 'string', 'minLength': 1, 'maxLength': 120},
     'text': {'type': 'string', 'minLength': 1, 'maxLength': 200},
 }
 FILTER_SCHEMA = {'type': 'object', 'properties': FILTER_PROPERTIES,
@@ -74,6 +77,8 @@ def migrate(db):
     migrate_metadata(db)
     from .collections import migrate as migrate_collections
     migrate_collections(db)
+    from .virtual_copies import migrate as migrate_virtual_copies
+    migrate_virtual_copies(db)
 
 
 def text_predicate(text):
@@ -81,8 +86,9 @@ def text_predicate(text):
     return (
         '(instr(casefold(name), ?) > 0 OR instr(casefold(title), ?) > 0 '
         'OR instr(casefold(caption), ?) > 0 OR instr(casefold(copyright), ?) > 0 '
+        'OR instr(casefold(copy_name), ?) > 0 '
         'OR EXISTS (SELECT 1 FROM photo_keywords k WHERE k.photo_id=photos.id '
-        'AND instr(k.normalized, ?) > 0))', [folded(text)] * 5)
+        'AND instr(k.normalized, ?) > 0))', [folded(text)] * 6)
 
 
 def criteria(filters, match='all'):
@@ -99,9 +105,12 @@ def criteria(filters, match='all'):
             }[key]
             clauses.append(f'{column} {operation} ?')
             values.append(value)
-        elif key in ('flag', 'color_label', 'camera'):
+        elif key in ('flag', 'color_label', 'camera', 'is_virtual', 'source_id'):
             clauses.append(f'{key}=?')
             values.append(value)
+        elif key == 'copy_name':
+            clauses.append('instr(casefold(copy_name), ?) > 0')
+            values.append(folded(value))
         elif key == 'keyword':
             if not value.strip():
                 raise ValueError('Keyword cannot be blank')
@@ -172,7 +181,7 @@ class Organization:
                     raise ValueError('Keywords cannot be blank')
                 keywords.setdefault(folded(keyword), keyword)
         fields = {k: v for k, v in patch.items() if k != 'keywords'}
-        if set(fields) - {'title', 'caption', 'copyright', 'color_label'}:
+        if set(fields) - {'title', 'caption', 'copyright', 'color_label', 'copy_name'}:
             raise ValueError('Unsupported descriptive metadata field')
         with self.db:
             for photo_id in ids:

@@ -44,8 +44,8 @@ extension Store {
         } catch { self.error=error.localizedDescription; return false }
     }
 
-    func changeMembership(_ collection: LibraryCollection, action: String) async {
-        let ids=selection.sorted()
+    func changeMembership(_ collection: LibraryCollection, action: String, ids requested: [Int]?=nil) async {
+        let ids=requested ?? selection.sorted()
         guard !ids.isEmpty else { return }
         do {
             _=try await Backend.call("collection_membership", ["collection_id":collection.id,

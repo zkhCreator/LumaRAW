@@ -21,6 +21,9 @@ when a clear function is more maintainable. Avoid unrelated formatting churn.
   commands compatible; use explicit revisions for editable persisted objects.
 - Keep descriptive library metadata separate from decoder-derived EXIF and pixel
   recipes. Metadata edits must not invalidate pixel caches or adopt edit revisions.
+- Virtual copies share a stable source-family ID, never a fabricated file path.
+  Keep edits/metadata/history independent; share snapshots, indexing and relinking.
+  Deleting a virtual copy must preserve original files and frozen export jobs.
 - Store collection membership relationally. Compile supported filters to bound
   SQL parameters; whitelist sort columns. Smart collections evaluate stored rules
   at query time. Count and page queries must use identical predicates.

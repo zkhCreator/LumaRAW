@@ -63,6 +63,7 @@ struct ContentView: View {
         .sheet(isPresented:$s.showCollectionEditor){CollectionEditor(original:s.editingCollection,kind:s.newCollectionKind,parentID:s.newCollectionParent)}
         .sheet(isPresented:$s.showQuickSave){if let source=s.quickSaveSource {QuickCollectionSheet(source:source)}}
         .sheet(isPresented:$s.showLibraryFilters){LibraryFilterSheet(draft:LibraryFilterDraft(s.libraryFilters))}
+        .sheet(isPresented:$s.showCopyRemoval){VirtualCopyRemovalSheet(targets:s.copyRemovalTargets)}
         .sheet(isPresented:$s.showMetadataEditor){MetadataEditor(targets:s.metadataTargets)}
         .onChange(of:s.workspace) { _,_ in if !s.isMultiReview {s.reviewRenderer.stop()} else {s.updateReviewRequests()} }
         .onChange(of:s.develop) { _,value in if value {s.reviewRenderer.stop()} }
@@ -80,7 +81,7 @@ struct ContentView: View {
     var workspace:some View {
         VStack(spacing:0){
             HStack {
-                VStack(alignment:.leading,spacing:3){Text(s.develop ? (s.photo?.name ?? "Develop") : "Photo Library").font(.headline).lineLimit(1);Text(s.develop ? (s.metadata["camera"] as? String ?? "") : "\(s.total) photos · Selected: \(s.selection.count)").font(.caption).foregroundStyle(.secondary)}
+                VStack(alignment:.leading,spacing:3){Text(s.develop ? (s.photo?.displayName ?? "Develop") : "Photo Library").font(.headline).lineLimit(1);Text(s.develop ? (s.metadata["camera"] as? String ?? "") : "\(s.total) photos · Selected: \(s.selection.count)").font(.caption).foregroundStyle(.secondary)}
                 Spacer()
                 if s.develop {
                     Menu {
@@ -144,19 +145,19 @@ struct ContentView: View {
                             if let im=s.thumbnails[p.id]{Image(nsImage:im).resizable().aspectRatio(contentMode:.fit).padding(5)}
                             else{Image(systemName:s.thumbnailErrors[p.id] == nil ? "photo":"exclamationmark.triangle").font(.largeTitle).foregroundStyle(.secondary).frame(maxWidth:.infinity,maxHeight:.infinity)}
                             if p.flag != 0 {Image(systemName:p.flag==1 ? "flag.fill":"xmark.circle.fill").padding(7).foregroundStyle(p.flag==1 ? .yellow:.gray)}
-                        }.overlay(alignment:.topTrailing){TargetCollectionBadge(photoID:p.id).padding(6)}.frame(height:145).clipShape(RoundedRectangle(cornerRadius:7)).overlay(RoundedRectangle(cornerRadius:7).stroke(s.selection.contains(p.id) ? Color.accentColor:.clear,lineWidth:3))
+                        }.overlay(alignment:.bottomLeading){VirtualCopyBadge(photo:p).padding(6)}.overlay(alignment:.topTrailing){TargetCollectionBadge(photoID:p.id).padding(6)}.frame(height:145).clipShape(RoundedRectangle(cornerRadius:7)).overlay(RoundedRectangle(cornerRadius:7).stroke(s.selection.contains(p.id) ? Color.accentColor:.clear,lineWidth:3))
                         HStack(spacing:6){
                             if p.colorLabel != "none" {Circle().fill(LibraryLabels.color(p.colorLabel)).frame(width:8,height:8).accessibilityLabel("\(p.colorLabel) label")}
-                            Text(p.name).font(.callout).lineLimit(1)
+                            Text(p.displayName).font(.callout).lineLimit(1)
                         }
                         HStack(spacing:2){ForEach(0..<5){i in Image(systemName:i<p.rating ? "star.fill":"star").font(.system(size:9)).foregroundStyle(i<p.rating ? Color.yellow:Color.secondary.opacity(0.4))};Spacer();Text(URL(fileURLWithPath:p.path).pathExtension.uppercased()).font(.caption2).foregroundStyle(.secondary)}
                     }.contentShape(Rectangle())
                     .onTapGesture(count:2){s.choose(p.id);Task {await s.switchLibraryView(.loupe)}}
                     .onTapGesture {s.choose(p.id,extend:NSEvent.modifierFlags.contains(.command),range:NSEvent.modifierFlags.contains(.shift))}
-                    .help(s.thumbnailErrors[p.id] ?? p.name)
-                    .accessibilityElement(children:.combine).accessibilityLabel("\(p.name), \(p.rating) \(p.rating == 1 ? "star" : "stars")")
+                    .help(s.thumbnailErrors[p.id] ?? p.displayName)
+                    .accessibilityElement(children:.combine).accessibilityLabel("\(p.displayName), \(p.rating) \(p.rating == 1 ? "star" : "stars")")
                     .accessibilityAddTraits(.isButton).accessibilityAction{s.choose(p.id);Task {await s.switchLibraryView(.loupe)}}
-                    .contextMenu {Button("Develop"){s.choose(p.id);Task {await s.startDevelop()}};Button("Show in Finder"){NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath:p.path)])}}
+                    .contextMenu {VirtualCopyActions(photo:p);Divider();Button("Develop"){s.choose(p.id);Task {await s.startDevelop()}};Button("Show in Finder"){NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath:p.path)])}}
                 }
             }.padding(24)
         }.background(Color(nsColor:.underPageBackgroundColor))
@@ -177,8 +178,8 @@ struct ContentView: View {
     }
     var filmstrip:some View {
         ScrollView(.horizontal){HStack(spacing:10){ForEach(s.photos){p in Button{s.choose(p.id,extend:NSEvent.modifierFlags.contains(.command),range:NSEvent.modifierFlags.contains(.shift))}label:{
-            VStack(spacing:4){Group{if let im=s.thumbnails[p.id]{Image(nsImage:im).resizable().aspectRatio(contentMode:.fit)}else{Image(systemName:s.thumbnailErrors[p.id] == nil ? "photo":"exclamationmark.triangle")}}.frame(width:88,height:62).overlay(alignment:.topTrailing){TargetCollectionBadge(photoID:p.id).font(.caption2)}.background(.black.opacity(0.8)).clipShape(RoundedRectangle(cornerRadius:4)).overlay(RoundedRectangle(cornerRadius:4).stroke(s.selection.contains(p.id) ? Color.accentColor:.clear,lineWidth:2));Text(p.name).font(.system(size:9)).lineLimit(1).frame(width:88)}
-        }.buttonStyle(.plain).help(s.thumbnailErrors[p.id] ?? p.name).accessibilityLabel(p.name)}}.padding(12)}.frame(height:109).background(.bar).modifier(PhotoKeyboardShortcuts())
+            VStack(spacing:4){Group{if let im=s.thumbnails[p.id]{Image(nsImage:im).resizable().aspectRatio(contentMode:.fit)}else{Image(systemName:s.thumbnailErrors[p.id] == nil ? "photo":"exclamationmark.triangle")}}.frame(width:88,height:62).overlay(alignment:.bottomLeading){VirtualCopyBadge(photo:p)}.overlay(alignment:.topTrailing){TargetCollectionBadge(photoID:p.id).font(.caption2)}.background(.black.opacity(0.8)).clipShape(RoundedRectangle(cornerRadius:4)).overlay(RoundedRectangle(cornerRadius:4).stroke(s.selection.contains(p.id) ? Color.accentColor:.clear,lineWidth:2));Text(p.displayName).font(.system(size:9)).lineLimit(1).frame(width:88)}
+        }.buttonStyle(.plain).help(s.thumbnailErrors[p.id] ?? p.displayName).accessibilityLabel(p.displayName).contextMenu{VirtualCopyActions(photo:p)}}}.padding(12)}.frame(height:109).background(.bar).modifier(PhotoKeyboardShortcuts())
     }
 }
 
@@ -213,7 +214,7 @@ struct PhotoCanvas:View {
                 VStack {HStack{if s.compare{Text("Before").font(.caption.weight(.medium)).padding(8).background(.ultraThinMaterial,in:Capsule())};Spacer();if s.rendering && s.preview != nil{ProgressView().controlSize(.small).padding(8).background(.ultraThinMaterial,in:Circle())}};Spacer()}.padding(16)
             }
             .accessibilityLabel(s.compare ? "Photo before editing":"Photo after editing")
-            .accessibilityValue(s.photo?.name ?? "No photo selected")
+            .accessibilityValue(s.photo?.displayName ?? "No photo selected")
         }
         .focusable().focused($keyboardFocus)
         .onTapGesture { keyboardFocus=true }

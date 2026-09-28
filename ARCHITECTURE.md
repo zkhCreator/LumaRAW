@@ -42,7 +42,7 @@ Library pages contain at most 60 summaries; full recipes are fetched on demand. 
 Library organization lives in `organization.py`: catalog-only descriptive fields,
 normalized keyword relations and descriptive revisions. `collections.py` owns
 regular/Quick membership, live smart predicates, parent links and durable target
-state. Schema version 2 adds these without changing existing photo/collection IDs.
+state. Schema version 2 added these without changing existing photo/collection IDs.
 Ancestor revisions cover descendant changes, protecting subtree deletion/copy.
 Quick save/clear is one transaction; target membership checks both state and
 collection revisions. Set views combine relational descendants and live smart
@@ -53,6 +53,28 @@ Metadata
 and collections have independent revisions. Grid filtering/counting/sorting runs in
 SQLite with a deterministic ID tie-breaker; summaries never select recipe or EXIF
 JSON. Collections also paginate at 60 and do not eagerly count every smart collection.
+
+`virtual_copies.py` owns schema version 3 and catalog variants. A source-family ID
+is independent of photo identity; one partial unique index permits exactly one
+master for a path and another permits at most one master per family. Creation and
+promotion maintain that invariant transactionally. The migration rebuilds the
+photos table to remove path uniqueness for copies, preserves existing columns,
+indexes, triggers and IDs, and makes photo IDs non-reusable. It rolls back on
+unsupported schemas rather than guessing at constraints. A source import trigger
+allocates the family once; repeated import still deduplicates the master path.
+
+Each variant owns its recipe, undo history, descriptive metadata and collections.
+Named snapshots are keyed to the family and retain their creator ID as provenance.
+Creation checks recipe/metadata revisions; promotion/removal also check a separate
+family revision. Removal is catalog-only and preserves shared snapshots and export
+jobs. Jobs capture the family ID so explicit missing-source relinking can update
+eligible jobs even after their originating virtual copy is gone. Relinking and
+hash/EXIF indexing affect the whole family; indexing reads each physical original
+once. Duplicate detection counts distinct families, not copies of the same source.
+Native batch target capture is one bounded summary request. Identical recipes
+share source-keyed caches; different variants still carry distinct photo/revision
+identities in asynchronous native requests. This schema upgrade is not a supported
+downgrade path to older application builds.
 
 `source_identity.py` provides stat-based cache identities without importing pixel
 libraries. The broker returns a page of completed thumbnail paths in one command;

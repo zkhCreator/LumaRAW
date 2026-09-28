@@ -14,10 +14,10 @@ LumaRAW references your originals without changing them. The SwiftUI app and you
 | Color | Custom tone curves, color mixer, camera-bound chart calibration, `.cube` LUTs, ICC soft proofing, and gamut warnings |
 | Detail and composition | Full-resolution 1:1 viewports, noise reduction, sharpening, defringing, rotation, crop, straighten, and perspective |
 | Local adjustments | Radial, gradient, luminance-range, and brush masks; manual lens distortion, vignette, and chromatic-aberration correction |
-| Library | Ratings, flags, color labels, catalog metadata/keywords, regular/live smart collections, nested sets, Quick/target collections, SQL filters/sorting, duplicate/missing indexing, edit versions, selective sync, and backup/restore |
+| Library | Ratings, flags, color labels, catalog metadata/keywords, regular/live smart collections, nested sets, Quick/target collections, SQL filters/sorting, duplicate/missing indexing, virtual copies/shared snapshots, selective sync, and backup/restore |
 | Culling | Grid/Loupe/Compare/Survey, anchored page selections, active-photo review actions, linked or independent full-resolution comparison viewports |
 | Export | JPEG and 16-bit TIFF with embedded sRGB, Display P3, Adobe RGB, or ProPhoto RGB ICC profiles; persistent queue, pause/cancel/retry, and collision-safe filenames |
-| Agents | 42 MCP tools, equivalent JSON CLI commands, and a bundled skill; app and agent edits share conflict detection |
+| Agents | 45 MCP tools, equivalent JSON CLI commands, and a bundled skill; app and agent edits share conflict detection |
 
 ## Build and run
 
@@ -55,7 +55,7 @@ its remove button only deselects a photo. Click a selected photo to make it acti
 without losing the group. Full-resolution comparison and fitted Survey use separate
 preview requests; unchanged comparison frames are retained.
 
-Adjustments save automatically. Each photo supports up to 50 undo steps, named edit versions, and portable recipe bundles. The full recipe editor supports precise curve points and brush paths. Submitted exports retain their original recipe snapshot even if you continue editing.
+Adjustments save automatically. Each photo supports up to 50 undo steps, named snapshots shared by a source’s master and virtual copies, and portable recipe bundles. The full recipe editor supports precise curve points and brush paths. Submitted exports retain their original recipe snapshot even if you continue editing.
 
 Use **Collections → New Collection** to create a regular collection or a smart
 collection with live rules. Add/remove selected photos from a regular collection
@@ -89,6 +89,16 @@ affected image; metadata edits reuse its thumbnail. External edits to any visibl
 photo are detected by bounded summary polling. Refresh Library rechecks source
 files and retries missing or failed thumbnails. Legacy CLI thumbnail requests
 default to source previews; pass `kind: "developed"` for the edited result.
+
+Virtual copies share the original file while keeping independent adjustments,
+ratings and catalog metadata. Use **Photo → Create Virtual Copies**, rename with
+**Edit Metadata → Copy name**, and use **Set Copy as Master** to switch roles
+without replacing either edit. **Show Master and Copies** opens a bounded family
+view; filters can show only masters or virtual copies. In a regular or Quick
+collection, creation adds the new copies to that collection. Removing a virtual
+copy requires confirmation and removes its private history/memberships; shared
+snapshots and submitted export jobs survive. Folder-stack presentation and the
+copy-name export template token remain pending.
 
 ## Metal acceleration
 

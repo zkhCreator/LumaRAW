@@ -145,7 +145,7 @@ def restore_catalog(path,destination):
 
 def index_library(catalog,cancelled=lambda:False,progress=lambda n:None):
     total=0
-    for photo in catalog.db.execute('SELECT id,path,mtime,bytes,sha256 FROM photos ORDER BY id'):
+    for photo in catalog.db.execute('SELECT source_id,path,mtime,bytes,sha256 FROM photos WHERE is_virtual=0 ORDER BY id'):
         if cancelled(): break
         id_,path,mtime,size,sha=photo
         p=Path(path)
@@ -163,17 +163,17 @@ def index_library(catalog,cancelled=lambda:False,progress=lambda n:None):
             except (OSError,ValueError): pass
             if not sha or stat.st_mtime_ns!=mtime or stat.st_size!=size:
                 sha=hash_file(p,cancelled)
-            catalog.db.execute('UPDATE photos SET sha256=?,taken=?,camera=?,mtime=?,bytes=?,missing=0 WHERE id=?',
+            catalog.db.execute('UPDATE photos SET sha256=?,taken=?,camera=?,mtime=?,bytes=?,missing=0 WHERE source_id=?',
                                (sha,taken,camera,stat.st_mtime_ns,stat.st_size,id_))
         except InterruptedError: break
         except OSError:
-            catalog.db.execute('UPDATE photos SET missing=1 WHERE id=?',(id_,))
+            catalog.db.execute('UPDATE photos SET missing=1 WHERE source_id=?',(id_,))
         total+=1
         if total%25==0: catalog.db.commit();progress(total)
     catalog.db.commit()
     previous=None;group=0
-    for id_,camera,taken in catalog.db.execute('SELECT id,camera,taken FROM photos WHERE taken>0 ORDER BY camera,taken,id'):
+    for id_,camera,taken in catalog.db.execute('SELECT source_id,camera,taken FROM photos WHERE taken>0 AND is_virtual=0 ORDER BY camera,taken,id'):
         if cancelled(): break
         if previous is None or previous[0]!=camera or taken-previous[1]>2: group=id_
-        catalog.db.execute('UPDATE photos SET burst=? WHERE id=?',(group,id_));previous=(camera,taken)
+        catalog.db.execute('UPDATE photos SET burst=? WHERE source_id=?',(group,id_));previous=(camera,taken)
     catalog.db.commit();return {'indexed':total}

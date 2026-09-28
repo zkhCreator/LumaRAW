@@ -44,6 +44,9 @@ import UniformTypeIdentifiers
     @Published var showCollectionEditor=false
     @Published var editingCollection: LibraryCollection?
     @Published var showLibraryFilters=false
+    @Published var copyBusy=false
+    @Published var showCopyRemoval=false
+    @Published var copyRemovalTargets: [Photo] = []
     @Published var showMetadataEditor=false
     @Published var metadataTargets: [Photo] = []
     @Published var workspace="library"
@@ -121,7 +124,7 @@ import UniformTypeIdentifiers
                             guard !self.editing,self.pendingPatch.isEmpty,self.selected==current.id,self.photo?.revision==current.revision else{continue}
                             if updated.revision != current.revision {
                                 self.photo=updated;self.recipe=updated.recipe;self.message="Loaded edits from another client";self.render()
-                            } else if updated.rating != current.rating || updated.flag != current.flag || updated.metadataRevision != current.metadataRevision {self.photo=updated}
+                            } else if updated.rating != current.rating || updated.flag != current.flag || updated.metadataRevision != current.metadataRevision || updated.sourceRevision != current.sourceRevision {self.photo=updated}
                         }
                     }
                 }

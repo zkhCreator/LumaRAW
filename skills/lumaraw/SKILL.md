@@ -61,7 +61,7 @@ cannot be renamed, moved or deleted. Limits: 32 nesting levels, 128 smart descen
 in an aggregate view, and 1,000 collection nodes per subtree duplication.
 
 `edit_metadata` takes at most 60 `{photo_id,expected_metadata_revision}` targets and
-a shared `patch` containing title/caption/copyright/color_label/keywords. Read each
+a shared `patch` containing title/caption/copyright/color_label/keywords/copy_name. Read each
 target before editing; keywords replace the current set. The response contains a
 single normalized patch and per-photo metadata revisions, not newer recipe state.
 Conflicts leave the whole batch unchanged. Metadata stays in the catalog; EXIF and
@@ -73,6 +73,26 @@ captured recipe revision: reject stale results instead of labeling them as newer
 edits. A thumbnail client can use its own `client_id`/`generation` and
 `cancel_preview` to discard obsolete work. Metadata edits preserve the pixel cache;
 recipe, source or LUT changes invalidate it. The Mac shell uses developed images.
+
+## Virtual copies and snapshots
+
+`create_virtual_copies` takes up to 60 `{photo_id, expected_revision,
+expected_metadata_revision}` targets. It duplicates catalog edit/metadata state,
+never original files or prior undo history. Optional `collection_id` and
+`expected_collection_revision` add copies to a captured regular/Quick collection.
+`get_photo` and summaries expose `source_id`, `master_id`, `is_virtual`, `copy_name`
+and `source_revision`. Filter by `is_virtual`, `source_id` or literal `copy_name`.
+Use `edit_metadata` to rename a copy. `save_version`/`list_versions` are named
+snapshots shared by every variant of the same source; restore changes only the
+chosen photo's recipe and preserves undo.
+
+`set_copy_as_master` takes a target plus `expected_source_revision`; it swaps roles
+without changing IDs or recipes. `remove_virtual_copies` takes targets with that
+same source revision and removes only virtual copies, private history and
+memberships. This removal cannot be undone; the native app shows a confirmation.
+Original files, shared snapshots and submitted export jobs survive. Never silently
+retry stale removal/promotion by adopting newer revisions. Relinking a missing
+original applies to its family, including eligible jobs from removed copies.
 
 ## Batch and output
 

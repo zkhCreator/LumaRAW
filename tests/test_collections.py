@@ -154,7 +154,7 @@ def test_legacy_collection_migration_persistence_and_backup(tmp_path):
     backup_catalog(c,tmp_path/'backup');c.close()
     restored=restore_catalog(tmp_path/'backup',tmp_path/'restored');c=Catalog(restored)
     assert Collections(c).state()==state
-    assert c.db.execute('PRAGMA user_version').fetchone()[0]==2
+    assert c.db.execute('PRAGMA user_version').fetchone()[0]==3
     c.close()
 
 

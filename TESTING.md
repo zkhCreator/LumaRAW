@@ -57,7 +57,7 @@ The harness exercises the real native Store and JSON transport: import, RAW prev
 
 The runner compiles all native files except the app entry point, generates five
 small raster files and separate disposable catalogs, then runs the
-15-assertion state, 13-assertion library, 12-assertion culling, 20-assertion review and 14-assertion thumbnail and 17-assertion collection-tree suites. The library suite checks
+15-assertion state, 13-assertion library, 12-assertion culling, 20-assertion review and 14-assertion thumbnail, 17-assertion collection-tree and 19-assertion virtual-copy suites. The library suite checks
 live smart membership, text search/sort, pagination, empty-filter selection,
 partial metadata writes and independent recipe/metadata conflict handling. JSON
 receipts stay in the ignored work directory. Without `--engine`, it uses the
@@ -98,6 +98,26 @@ starts no image workers.
 
 These probes do not establish rendered disclosure, drag/drop or B-key mixed
 selection equivalence to Lightroom Classic.
+
+## Virtual copies
+
+`tests/test_virtual_copies.py` verifies the v2-to-v3 table rebuild preserves old
+photo, history, snapshot, job, keyword and collection references, plus custom
+columns/indexes. It checks independent edits, shared snapshots, master promotion,
+transactional conflicts, Unicode copy-name search, source-family indexing/relink,
+backup/restore and a real completed export after its copy has been removed.
+`--suite NativeVirtualCopyRegression` exercises the native copy/name/master/family/
+confirmation flows through the broker; no rendered UI claim is made.
+
+```sh
+.venv/bin/python tests/virtual_copy_probe.py --work work/virtual-probe-01
+```
+
+The default fixture has 10,000 physical source rows and 10,000 virtual copies.
+Thirty warm samples measure 60-row pages/target capture, copy filters, a source
+family and creation of 60 copies per call. Created rows remain (21,800 final rows).
+The receipt includes median/p95, RSS, machine/OS and zero pixel-worker activity;
+it excludes IPC, image decoding and desktop latency.
 
 ## Library organization and performance
 

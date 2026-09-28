@@ -29,14 +29,14 @@ gaps. Nothing below is full Lightroom parity merely because historical tests pas
 | --- | --- | --- |
 | Import and catalogs | Partial: referenced originals, backup/restore | Import preview/selection, copy workflows, metadata/develop presets, catalog switching/merge |
 | Library navigation | Partial: bounded grid/filmstrip, filters/sorting, regular/smart/Quick collections and nested sets | Folder tree, collection drag/drop/color labels, full smart criteria/import-export, source-selection memory, desktop acceptance |
-| Organization | Partial: duplicate/missing detection, flat keywords, title/caption/copyright, labels and batch metadata | Keyword hierarchy, complete IPTC, stacks, virtual copies, rename and sidecars |
+| Organization | Partial: duplicate/missing detection, flat keywords, title/caption/copyright, labels, batch metadata and virtual copies | Keyword hierarchy, complete IPTC, stacks, rename and sidecars |
 | Culling | Partial: Loupe/Compare/Survey, linked detail, anchored page selection | Desktop acceptance, cross-page selection, Develop reference view, auto advance, persistent workspace state |
 | Basic development | Partial: light/WB/color | Calibrated absolute WB, eyedropper, texture/clarity/dehaze, complete HSL/B&W and color grading |
 | Curves and profiles | Partial: custom composite curve, LUT/ICC | Interactive RGB curves, camera/profile browser, compatible preset import/export |
 | Detail and optics | Partial: noise/sharpen, manual lens | Complete manual detail controls, automatic lens profiles, bounded full-resolution acceptance |
 | Geometry | Partial: crop/rotate/straighten/perspective | Interactive retained handles/ratios/flip, guided transforms, crop state parity |
 | Local editing | Partial: radial/gradient/brush/luma | Mask list/edit/reorder/intersection, range masks, clone/heal, red-eye (non-AI) |
-| History and presets | Partial: 50-step undo, named versions | Redo, navigable history, preset management and import-time/batch application |
+| History and presets | Partial: 50-step undo, shared named snapshots | Redo, navigable history, preset management and import-time/batch application |
 | Preview/performance | Partial: Metal, proxies, 1:1 viewport, developed thumbnail fast path | Real-RAW catalog/slider latency, offline previews, cache controls and desktop acceptance |
 | Export | Partial: JPEG/16-bit TIFF, ICC, durable jobs | Presets, metadata policies, watermark, additional formats, publish workflows |
 | Merge | Missing | Non-AI HDR merge and panorama with bounded resources and reference acceptance |
@@ -45,13 +45,13 @@ gaps. Nothing below is full Lightroom parity merely because historical tests pas
 | Slideshow | Missing | Layout, timing, playback, audio, slideshow export |
 | Print | Missing | Contact sheets/packages, physical sizing, native print/ICC workflow |
 | Web | Missing | Local gallery templates and export; publishing requires explicit destination |
-| Platform/accessibility | Partial: Mac 14 target, Mac 26 historical checks | Current desktop checks, macOS 14, keyboard/VoiceOver, color management; Windows remains future |
+| Platform/accessibility | Partial: Mac 14 target, Mac 26 historical checks | Broker upgrade compatibility, current desktop checks, macOS 14, keyboard/VoiceOver, color management; Windows remains future |
 
 ## Active increment
 
-Collection hierarchy and Quick/target workflows: persistent nested sets, aggregate
-views, revision-safe moves/copies/deletion, one Quick Collection per catalog and
-atomic save/clear. Virtual copies and the other rows remain tracked separately.
+Virtual-copy workflows: independent catalog variants, copy naming/filtering,
+shared snapshots, master promotion, safe removal and family-wide source indexing/
+relinking. Stack presentation and the other inventory gaps remain open.
 
 ## Evidence log
 
@@ -245,3 +245,55 @@ All six native suites passed against the final packaged engine (**91 assertions*
 The Mac app built without Swift warnings and passed ad-hoc signature verification.
 The 177-file source archive passed the extracted strict source scan. Desktop UI
 and older-OS acceptance remain explicitly unverified.
+
+
+### Virtual-copy increment
+
+Reference behavior: [Adobe’s virtual-copy documentation](https://helpx.adobe.com/lightroom-classic/desktop/manage-catalogs-and-files/photos.html)
+and [Julieanne Kost’s virtual-copy workflow](https://jkost.com/blog/2024/08/working-with-virtual-copies-in-lightroom-classic.html).
+Copies reference one original, have independent adjustments and metadata, support
+copy names and master promotion, and expose shared source snapshots. Native menu,
+contextual grid/filmstrip actions, badges, family navigation, filters, metadata
+naming and removal confirmation are implemented. Batch creation captures at most
+60 summaries in one service call; it does not load 60 full recipes through IPC.
+
+Schema v3 preserves existing IDs/references when removing the old unique-path
+constraint and makes deleted photo IDs non-reusable. Family identity survives
+master changes and copy removal. Indexing reads each physical source once, copies
+do not count as physical duplicates, and relinking updates every variant plus
+eligible frozen jobs, including jobs from a removed copy. Removal keeps original
+files, shared snapshots and already-submitted exports.
+
+Synthetic service timings on macOS 26.6.2 arm64 / 128 GB: 10,000 physical source
+rows + 10,000 copies, warm SQLite, 30 samples per operation. No image workers, IPC
+or desktop latency are included.
+
+| Operation | Median | p95 |
+| --- | ---: | ---: |
+| Read a 60-photo page | 3.080 ms | 3.320 ms |
+| Filter virtual copies | 3.284 ms | 3.407 ms |
+| Read one source family | 2.813 ms | 2.971 ms |
+| Capture 60 summary targets | 1.291 ms | 1.388 ms |
+| Create 60 virtual copies | 6.625 ms | 10.612 ms |
+
+The creation probe retained all 1,800 new rows; final count 21,800. Broker RSS was
+39.55 MB, sampled worker peak zero. These are catalog timings, not RAW processing
+or native perceived latency.
+
+Final evidence: required-Metal Python suite **142 passed, 2 real-NEF tests skipped**.
+All seven native state suites passed against the final packaged engine, totaling
+**110 assertions**, including 19 virtual-copy assertions. The Mac app built
+without Swift warnings and passed ad-hoc signature verification. The 183-file
+source archive passed the extracted strict source scan. These receipts are not
+desktop UI evidence.
+
+Remaining parity: default folder stacks/collapse/order and master stack counts,
+stack behavior in collection contexts, copy-name export template tokens and exact
+shortcut/rendered interaction acceptance. This increment does not make those
+behaviors or the broader application 1:1 complete. Real NEF fixtures, macOS 14
+runtime, current desktop UI and VoiceOver evidence remain unavailable.
+
+Upgrade follow-up: the current transport reuses any broker for a catalog without
+checking its build/schema capabilities. A previously running older engine can
+therefore serve an updated client until it exits; safe broker-upgrade handling
+needs a dedicated change before release. No existing user broker was terminated.

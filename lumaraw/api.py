@@ -33,7 +33,13 @@ tool('collection_state','Read the durable Quick and target collections; optional
 tool('set_target_collection','Choose a regular target collection; null resets to Quick. Requires the current state revision.',{'collection_id':OPTIONAL_ID,'expected_revision':REV},['expected_revision'])
 tool('target_membership','Add/remove photos only if the captured target and collection revisions still match.',{'collection_id':ID,'expected_state_revision':REV,'expected_revision':REV,'photo_ids':array(ID,60),'action':{'enum':['add','remove']}},['collection_id','expected_state_revision','expected_revision','photo_ids','action'])
 tool('quick_collection','Clear Quick or atomically save it as a regular collection, optionally clearing afterward.',{'expected_revision':REV,'action':{'enum':['clear','save']},'name':string(120),'clear_after':BOOL,'parent_id':OPTIONAL_ID},['expected_revision','action'])
-tool('edit_metadata','Atomically update catalog-only descriptive metadata. Keywords replace the current set. Recipe revisions remain unchanged.',{'targets':array(obj({'photo_id':ID,'expected_metadata_revision':REV},['photo_id','expected_metadata_revision']),60),'patch':obj({'title':{'type':'string','maxLength':500},'caption':{'type':'string','maxLength':5000},'copyright':{'type':'string','maxLength':500},'color_label':{'enum':list(COLORS)},'keywords':{'type':'array','items':string(120),'maxItems':100}})},['targets','patch'])
+tool('edit_metadata','Atomically update catalog-only descriptive metadata. Keywords replace the current set. Recipe revisions remain unchanged.',{'targets':array(obj({'photo_id':ID,'expected_metadata_revision':REV},['photo_id','expected_metadata_revision']),60),'patch':obj({'copy_name':{'type':'string','maxLength':120},'title':{'type':'string','maxLength':500},'caption':{'type':'string','maxLength':5000},'copyright':{'type':'string','maxLength':500},'color_label':{'enum':list(COLORS)},'keywords':{'type':'array','items':string(120),'maxItems':100}})},['targets','patch'])
+COPY_TARGET={'photo_id':ID,'expected_revision':REV,'expected_metadata_revision':REV}
+COPY_REMOVE={**COPY_TARGET,'expected_source_revision':REV}
+tool('create_virtual_copies','Atomically create up to 60 independent catalog variants sharing their original files. Optionally add to a captured regular/Quick collection.',{'targets':array(obj(COPY_TARGET,COPY_TARGET),60),'collection_id':ID,'expected_collection_revision':REV},['targets'])
+tool('remove_virtual_copies','Remove only virtual copies and their private history/memberships; preserve originals, shared snapshots and queued export snapshots.',{'targets':array(obj(COPY_REMOVE,COPY_REMOVE),60)},['targets'])
+TOOLS['remove_virtual_copies']['annotations']['destructiveHint']=True
+tool('set_copy_as_master','Promote a virtual copy and demote the old master without changing IDs, recipes, collections or originals.',COPY_REMOVE,COPY_REMOVE)
 tool('get_photo','Read recipe, metadata and current revision before editing.',{'photo_id':ID},['photo_id'],True)
 tool('edit_photo','Merge a partial recipe using expected_revision; stale revisions fail without changes.',{'photo_id':ID,'expected_revision':REV,'patch':PATCH},['photo_id','expected_revision','patch'])
 tool('undo_photo','Undo the last edit only if the revision is current.',{'photo_id':ID,'expected_revision':REV},['photo_id','expected_revision'])
@@ -48,8 +54,8 @@ tool('enqueue_exports','Durably enqueue immutable recipe snapshots. Reusing requ
 tool('get_job','Read a specific durable export receipt, including its recipe snapshot.',{'job_id':ID},['job_id'],True)
 tool('list_jobs','Read the latest 60 export jobs and aggregate queue counts.',read=True)
 tool('queue_control','Pause after the current export, resume, cancel, or retry failed/interrupted exports. Cancelled exports require explicit retry_cancelled.',{'action':{'enum':['pause','resume','cancel','retry','retry_cancelled']},'job_id':ID},['action'])
-tool('save_version','Save a named recipe snapshot.',{'photo_id':ID,'name':string(120)},['photo_id','name'])
-tool('list_versions','List up to 100 saved edit versions.',{'photo_id':ID},['photo_id'],True)
+tool('save_version','Save a named recipe snapshot shared by all variants of this source.',{'photo_id':ID,'name':string(120)},['photo_id','name'])
+tool('list_versions','List up to 100 named snapshots shared by this photo family.',{'photo_id':ID},['photo_id'],True)
 tool('restore_version','Restore a version with conflict detection and undo history.',{'photo_id':ID,'version_id':ID,'expected_revision':REV},['photo_id','version_id','expected_revision'])
 tool('sync_photos','Copy selected parameter groups atomically; every target requires its current revision.',{'source_id':ID,'targets':array(obj({'photo_id':ID,'expected_revision':REV},['photo_id','expected_revision']),60),'groups':array({'enum':list(SYNC_GROUPS)},10)},['source_id','targets','groups'])
 tool('index_library','Hash originals read-only, detect duplicates, missing files and EXIF bursts.')

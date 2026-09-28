@@ -14,6 +14,8 @@ struct LibraryToolbar: View {
                 Button("Clear") { s.libraryFilters=[:];s.offset=0;Task { await s.refresh() } }
             }
             Menu("Organize") {
+                Button("Create Virtual Copies") { Task { await s.createVirtualCopies() } }.disabled(s.copyBusy)
+                Button("Remove Virtual Copies from Catalog…") { Task { await s.prepareCopyRemoval() } }.disabled(s.copyBusy)
                 Button("Edit Metadata…") { Task { await s.prepareMetadataEditor() } }
                 Menu("Color Label") {
                     ForEach(LibraryLabels.names,id:\.self) { label in
@@ -65,10 +67,14 @@ struct LibraryFilterFields: View {
         Picker("Keywords", selection:$draft.keywordPresence) {
             Text("Any").tag("any"); Text("Has keywords").tag("present"); Text("Without keywords").tag("absent")
         }
+        Picker("Photo type",selection:$draft.virtualType) {
+            Text("All photos").tag("all");Text("Master photos").tag("masters");Text("Virtual copies").tag("copies")
+        }
+        TextField("Copy name contains",text:$draft.copyName)
         TextField("Text contains",text:$draft.text)
         TextField("Camera model matches",text:$draft.camera)
         TextField("Folder and subfolders",text:$draft.folder)
-        Text("Text searches names, titles, captions, copyright and keywords. Camera and capture dates become available after updating the library index.")
+        Text("Text searches filenames, copy names, titles, captions, copyright and keywords. Camera and capture dates become available after updating the library index.")
             .font(.caption).foregroundStyle(.secondary)
     }
 }
@@ -127,7 +133,7 @@ struct CollectionEditor: View {
                     }
                 }.keyboardShortcut(.defaultAction).disabled(saving || name.trimmingCharacters(in:.whitespaces).isEmpty)
             }
-        }.padding(24).frame(width:520,height:kind == "smart" ? 740:380)
+        }.padding(24).frame(width:520,height:kind == "smart" ? 800:380)
         .sheet(isPresented:$choosingParent){CollectionLocationPicker(selection:$parentID,excludedID:original?.id)}
         .task(id:parentID) {
             if let parentID,let row=try? await Backend.call("get_collection",["collection_id":parentID]) { parentName=row["name"] as? String ?? "Collection Set" }
@@ -153,7 +159,7 @@ struct LibraryFilterSheet: View {
                     Task { await s.refresh() }; dismiss()
                 }.keyboardShortcut(.defaultAction)
             }
-        }.padding(24).frame(width:520,height:610)
+        }.padding(24).frame(width:520,height:710)
     }
 }
 
@@ -161,6 +167,7 @@ struct MetadataEditor: View {
     @EnvironmentObject var s: Store
     @Environment(\.dismiss) private var dismiss
     let targets: [Photo]
+    @State private var copyName: String
     @State private var title: String
     @State private var caption: String
     @State private var copyright: String
@@ -172,12 +179,13 @@ struct MetadataEditor: View {
     init(targets: [Photo]) {
         self.targets=targets
         let first=targets.first
+        _copyName=State(initialValue:first?.copyName ?? "")
         _title=State(initialValue:first?.title ?? "")
         _caption=State(initialValue:first?.caption ?? "")
         _copyright=State(initialValue:first?.copyright ?? "")
         _keywords=State(initialValue:first?.keywords.joined(separator:", ") ?? "")
         _label=State(initialValue:first?.colorLabel ?? "none")
-        _fields=State(initialValue:targets.count == 1 ? ["title","caption","copyright","keywords","color_label"]:[])
+        _fields=State(initialValue:targets.count == 1 ? ["copy_name","title","caption","copyright","keywords","color_label"]:[])
     }
 
     func enabled(_ key: String) -> Binding<Bool> {
@@ -190,6 +198,7 @@ struct MetadataEditor: View {
             Text("Only checked fields will be applied to every selected photo. Keywords replace the existing set. Changes stay in this catalog.")
                 .font(.callout).foregroundStyle(.secondary)
             Form {
+                Toggle("Apply copy name",isOn:enabled("copy_name")); TextField("Copy name",text:$copyName).disabled(!fields.contains("copy_name"))
                 Toggle("Apply title",isOn:enabled("title")); TextField("Title",text:$title).disabled(!fields.contains("title"))
                 Toggle("Apply caption",isOn:enabled("caption")); TextField("Caption",text:$caption,axis:.vertical).lineLimit(3...5).disabled(!fields.contains("caption"))
                 Toggle("Apply copyright",isOn:enabled("copyright")); TextField("Copyright",text:$copyright).disabled(!fields.contains("copyright"))
@@ -204,7 +213,7 @@ struct MetadataEditor: View {
                 Spacer()
                 Button("Save Metadata") {
                     var patch: [String: Any] = [:]
-                    for (key,value) in [("title",title),("caption",caption),("copyright",copyright),("color_label",label)] where fields.contains(key) { patch[key]=value }
+                    for (key,value) in [("copy_name",copyName),("title",title),("caption",caption),("copyright",copyright),("color_label",label)] where fields.contains(key) { patch[key]=value }
                     if fields.contains("keywords") {
                         patch["keywords"]=keywords.components(separatedBy:CharacterSet(charactersIn:",\n")).map { $0.trimmingCharacters(in:.whitespacesAndNewlines) }.filter { !$0.isEmpty }
                     }
@@ -212,6 +221,6 @@ struct MetadataEditor: View {
                     Task { if await s.saveMetadata(targets:targets,patch:patch) { dismiss() }; saving=false }
                 }.keyboardShortcut(.defaultAction).disabled(fields.isEmpty || saving)
             }
-        }.padding(24).frame(width:560,height:650)
+        }.padding(24).frame(width:560,height:720)
     }
 }

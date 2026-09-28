@@ -68,10 +68,14 @@ struct LibraryFilterDraft {
     var text = ""
     var camera = ""
     var folder = ""
+    var virtualType = "all"
+    var copyName = ""
     private var retained: [String: Any] = [:]
 
     init(_ rules: [String: Any] = [:]) {
         retained=rules
+        if let virtual=rules["is_virtual"] as? Bool { virtualType=virtual ? "copies":"masters" }
+        copyName=rules["copy_name"] as? String ?? ""
         minimum=rules["rating_min"] as? Int ?? -1
         maximum=rules["rating_max"] as? Int ?? -1
         flag=rules["flag"] as? Int ?? 2
@@ -85,15 +89,16 @@ struct LibraryFilterDraft {
 
     var rules: [String: Any] {
         var result=retained
-        for key in ["rating_min", "rating_max", "flag", "color_label", "keyword", "has_keywords", "text", "camera", "folder"] {
+        for key in ["rating_min", "rating_max", "flag", "color_label", "keyword", "has_keywords", "text", "camera", "folder", "is_virtual", "copy_name"] {
             result.removeValue(forKey: key)
         }
+        if virtualType != "all" { result["is_virtual"]=virtualType == "copies" }
         if minimum >= 0 { result["rating_min"]=minimum }
         if maximum >= 0 { result["rating_max"]=maximum }
         if flag != 2 { result["flag"]=flag }
         if color != "any" { result["color_label"]=color }
         if keywordPresence != "any" { result["has_keywords"]=keywordPresence == "present" }
-        for (key, value) in [("keyword",keyword), ("text",text), ("camera",camera), ("folder",folder)] {
+        for (key, value) in [("copy_name",copyName), ("keyword",keyword), ("text",text), ("camera",camera), ("folder",folder)] {
             let trimmed=value.trimmingCharacters(in: .whitespacesAndNewlines)
             if !trimmed.isEmpty { result[key]=trimmed }
         }

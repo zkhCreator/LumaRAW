@@ -126,12 +126,12 @@ struct ReviewPhotoCard: View {
             ReviewImage(photoID:photo.id,renderer:renderer)
             HStack(spacing:4) {
                 if photo.colorLabel != "none" { Circle().fill(LibraryLabels.color(photo.colorLabel)).frame(width:7,height:7) }
-                Text(photo.name).font(.caption).lineLimit(1)
+                Text(photo.displayName).font(.caption).lineLimit(1)
                 Spacer(minLength:0)
                 if compact { actionsMenu }
                 Button { s.deselectReviewPhoto(photo.id) } label: { Image(systemName:"xmark.circle") }
                     .buttonStyle(.plain).help("Remove from review, keep in library")
-                    .accessibilityLabel("Deselect \(photo.name)")
+                    .accessibilityLabel("Deselect \(photo.displayName)")
             }.padding(.horizontal,6)
             if !compact {
                 ViewThatFits(in:.horizontal) {
@@ -139,12 +139,12 @@ struct ReviewPhotoCard: View {
                         ForEach(1...5,id:\.self) { rating in
                             Button { rate(photo.rating == rating ? 0:rating) } label: {
                                 Image(systemName:photo.rating >= rating ? "star.fill":"star").foregroundStyle(photo.rating >= rating ? Color.yellow:Color.secondary)
-                            }.accessibilityLabel("Rate \(photo.name) \(rating) stars")
+                            }.accessibilityLabel("Rate \(photo.displayName) \(rating) stars")
                         }
                         Button { flag(photo.flag == 1 ? 0:1) } label: { Image(systemName:photo.flag == 1 ? "flag.fill":"flag") }
-                            .accessibilityLabel("Pick \(photo.name)")
+                            .accessibilityLabel("Pick \(photo.displayName)")
                         Button { flag(photo.flag == -1 ? 0:-1) } label: { Image(systemName:photo.flag == -1 ? "xmark.square.fill":"xmark.square") }
-                            .accessibilityLabel("Reject \(photo.name)")
+                            .accessibilityLabel("Reject \(photo.displayName)")
                         labelMenu
                     }.buttonStyle(.plain).fixedSize()
                     actionsMenu
@@ -158,7 +158,7 @@ struct ReviewPhotoCard: View {
         .onTapGesture { s.activateReviewPhoto(photo.id) }
         .contextMenu { menuItems }
         .accessibilityElement(children:.contain)
-        .accessibilityLabel("\(role ?? "Survey photo"): \(photo.name)")
+        .accessibilityLabel("\(role ?? "Survey photo"): \(photo.displayName)")
         .accessibilityAddTraits(s.selected == photo.id ? .isSelected:[])
     }
 

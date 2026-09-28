@@ -23,6 +23,11 @@ import AppKit
                 Button("Undo Last Adjustment"){store.undo()}.keyboardShortcut("z").disabled(store.photo==nil || store.editing)
             }
             CommandMenu("Photo") {
+                Button("Create Virtual Copies") { Task { await store.createVirtualCopies() } }.keyboardShortcut("\"").disabled(store.actionPhotoIDs.isEmpty || store.copyBusy)
+                Button("Set Copy as Master") { Task { await store.setCopyAsMaster() } }.disabled(store.photo?.isVirtual != true || store.copyBusy)
+                Button("Show Master and Copies") { if let photo=store.photo { Task { await store.showPhotoFamily(photo) } } }.disabled(store.photo == nil)
+                Button("Remove Virtual Copies from Catalog…") { Task { await store.prepareCopyRemoval() } }.disabled(store.actionPhotoIDs.isEmpty || store.copyBusy)
+                Divider()
                 Button("Add to / Remove from Target Collection") { Task { await store.toggleTargetMembership() } }.disabled(store.actionPhotoIDs.isEmpty)
                 Divider()
                 Button("Edit Selected Metadata…"){Task{await store.prepareMetadataEditor()}}.disabled(store.selection.isEmpty)

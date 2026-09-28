@@ -15,7 +15,11 @@ import time
 from .model import Recipe, ExportOptions, SYNC_GROUPS, IMAGE_EXTENSIONS
 from .organization import Organization, SORTS, criteria, folded, migrate, text_predicate
 
-SUMMARY_COLUMNS = 'id,path,name,bytes,mtime,rating,flag,revision,color_label,title,metadata_revision,taken,camera,missing,error'
+FAMILY_COLUMNS = ('source_id,is_virtual,copy_name,'
+                  '(SELECT revision FROM photo_sources WHERE id=photos.source_id) AS source_revision,'
+                  '(SELECT id FROM photos master WHERE master.source_id=photos.source_id AND master.is_virtual=0) AS master_id')
+SUMMARY_COLUMNS = ('id,path,name,bytes,mtime,rating,flag,revision,color_label,title,metadata_revision,taken,camera,missing,error,'
+                   + FAMILY_COLUMNS)
 
 class Catalog:
     def __init__(self, root):
@@ -107,7 +111,7 @@ class Catalog:
             (min(max(limit, 1), 60), max(offset, 0)))]
 
     def photo(self, photo_id):
-        row = self.db.execute('SELECT * FROM photos WHERE id=?', (photo_id,)).fetchone()
+        row = self.db.execute('SELECT photos.*, (SELECT revision FROM photo_sources WHERE id=photos.source_id) AS source_revision, (SELECT id FROM photos master WHERE master.source_id=photos.source_id AND master.is_virtual=0) AS master_id FROM photos WHERE id=?', (photo_id,)).fetchone()
         if not row:
             return None
         result = dict(row)
@@ -139,7 +143,7 @@ class Catalog:
 
     def update_metadata(self, photo_id, metadata):
         with self.db:
-            self.db.execute("UPDATE photos SET metadata=?,error='' WHERE id=?", (json.dumps(metadata), photo_id))
+            self.db.execute("UPDATE photos SET metadata=?,error='' WHERE source_id=(SELECT source_id FROM photos WHERE id=?)", (json.dumps(metadata), photo_id))
 
     def set_error(self, photo_id, message):
         with self.db:
@@ -161,8 +165,8 @@ class Catalog:
             for photo_id in ids:
                 row = self.photo(photo_id)
                 if row:
-                    self.db.execute('INSERT INTO jobs(photo_id,source,recipe,destination,format,created,options,priority) VALUES(?,?,?,?,?,?,?,?)',
-                                    (photo_id, row['path'], row['recipe'], str(dest), fmt, time.time(),json.dumps(options.dict()),options.priority))
+                    self.db.execute('INSERT INTO jobs(photo_id,source,recipe,destination,format,created,options,priority,source_id) VALUES(?,?,?,?,?,?,?,?,?)',
+                                    (photo_id, row['path'], row['recipe'], str(dest), fmt, time.time(),json.dumps(options.dict()),options.priority,row['source_id']))
                     count += 1
         return count
 
@@ -201,7 +205,7 @@ class Catalog:
         elif mode=='rejects': clauses.append('flag=-1')
         elif mode=='keepers': clauses.append('flag=1')
         elif mode=='missing': clauses.append('missing=1')
-        elif mode=='duplicates': clauses.append("sha256!='' AND sha256 IN (SELECT sha256 FROM photos WHERE sha256!='' GROUP BY sha256 HAVING count(*)>1)")
+        elif mode=='duplicates': clauses.append("sha256!='' AND sha256 IN (SELECT sha256 FROM photos WHERE sha256!='' GROUP BY sha256 HAVING count(DISTINCT source_id)>1)")
         elif mode.startswith('burst:'):
             clauses.append('burst=?');params.append(int(mode.split(':')[1]))
         if search:
@@ -245,18 +249,18 @@ class Catalog:
         with self.db: self.db.execute('UPDATE photos SET flag=? WHERE id=?',(value,photo_id))
 
     def bursts(self):
-        return [dict(r) for r in self.db.execute('SELECT burst,camera,min(taken) AS taken,count(*) AS count FROM photos WHERE burst>0 GROUP BY burst HAVING count(*)>1 ORDER BY taken DESC LIMIT 200')]
+        return [dict(r) for r in self.db.execute('SELECT burst,camera,min(taken) AS taken,count(*) AS count FROM photos WHERE burst>0 AND is_virtual=0 GROUP BY burst HAVING count(*)>1 ORDER BY taken DESC LIMIT 200')]
 
     def save_version(self,photo_id,name):
         if not name.strip(): raise ValueError('Version name must not be empty')
         with self.db:
-            self.db.execute('INSERT INTO versions(photo_id,name,recipe,created) VALUES(?,?,?,?)',(photo_id,name[:120],self.photo(photo_id)['recipe'],time.time()))
+            self.db.execute('INSERT INTO versions(photo_id,name,recipe,created,source_id) VALUES(?,?,?,?,?)',(photo_id,name[:120],self.photo(photo_id)['recipe'],time.time(),self.photo(photo_id)['source_id']))
 
     def versions(self,photo_id):
-        return [dict(r) for r in self.db.execute('SELECT * FROM versions WHERE photo_id=? ORDER BY id DESC',(photo_id,))]
+        return [dict(r) for r in self.db.execute('SELECT * FROM versions WHERE source_id=? ORDER BY id DESC LIMIT 100',(self.photo(photo_id)['source_id'],))]
 
     def restore_version(self,photo_id,version_id):
-        row=self.db.execute('SELECT recipe FROM versions WHERE id=? AND photo_id=?',(version_id,photo_id)).fetchone()
+        row=self.db.execute('SELECT recipe FROM versions WHERE id=? AND source_id=?',(version_id,self.photo(photo_id)['source_id'])).fetchone()
         if not row: raise ValueError('Edit version does not exist')
         recipe=Recipe.parse(json.loads(row[0]));self.edit(photo_id,recipe,'Restore Edit Version');return recipe
 
@@ -279,8 +283,9 @@ class Catalog:
             if hash_file(p)!=old['sha256']: raise ValueError('New file content differs from the indexed original')
         stat=p.stat()
         with self.db:
-            self.db.execute("UPDATE photos SET path=?,name=?,bytes=?,mtime=?,missing=0,error='' WHERE id=?",(str(p),p.name,stat.st_size,stat.st_mtime_ns,photo_id))
-            self.db.execute("UPDATE jobs SET source=? WHERE photo_id=? AND state IN ('pending','interrupted','failed','cancelled')",(str(p),photo_id))
+            self.db.execute('UPDATE photo_sources SET revision=revision+1 WHERE id=?',(old['source_id'],))
+            self.db.execute("UPDATE photos SET path=?,name=?,bytes=?,mtime=?,missing=0,error='' WHERE source_id=?",(str(p),p.name,stat.st_size,stat.st_mtime_ns,old['source_id']))
+            self.db.execute("UPDATE jobs SET source=? WHERE source_id=? AND state IN ('pending','interrupted','failed','cancelled')",(str(p),old['source_id']))
 
     def prioritize(self,job_id,priority=9):
         with self.db: self.db.execute("UPDATE jobs SET priority=? WHERE id=? AND state='pending'",(max(0,min(9,priority)),job_id))

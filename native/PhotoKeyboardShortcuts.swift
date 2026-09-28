@@ -9,9 +9,13 @@ struct PhotoKeyboardShortcuts: ViewModifier {
 
     func body(content: Content) -> some View {
         content.onKeyPress(.delete) {
-            guard let collection=s.activeCollection,collection.id == s.collectionID,
-                  ["regular","quick"].contains(collection.kind),!s.selection.isEmpty else { return .ignored }
-            Task { await s.changeMembership(collection,action:"remove") }
+            guard !s.actionPhotoIDs.isEmpty else { return .ignored }
+            if let collection=s.activeCollection,collection.id == s.collectionID,
+               ["regular","quick"].contains(collection.kind) {
+                Task { await s.changeMembership(collection,action:"remove",ids:s.actionPhotoIDs) }
+            } else if s.photos.filter({s.actionPhotoIDs.contains($0.id)}).allSatisfy(\.isVirtual) {
+                Task { await s.prepareCopyRemoval() }
+            } else { return .ignored }
             return .handled
         }.onKeyPress(characters:CharacterSet(charactersIn:"012345pxu\\gecnd/b")) { press in
             guard press.modifiers.isEmpty, s.selected != nil else { return .ignored }
