@@ -23,13 +23,46 @@ The Swift `Backend` launches an explicit executable through `Process`, without a
 
 On macOS/Linux, IPC uses a Unix socket in a user-only temporary directory (0700). Bounded JSON crosses `send_bytes`/`recv_bytes`; no pickle deserialization is used. A startup lock prevents competing brokers. Windows has AF_PIPE and msvcrt locking branches, but these have not been validated on Windows.
 
+## Broker compatibility
+
+`runtime.py` identifies an engine by broker protocol, ordered generation, source/
+dependency digest and supported catalog version. Source runs hash the engine and
+Metal sources plus dependency declarations; packaged builds read an embedded
+manifest. Each process retains its identity for its lifetime. Every command uses a
+read-only transport handshake before mutation, and the broker checks the admitted
+identity again. A second broker must acquire a nonblocking lifetime owner lock
+before migration or endpoint replacement. Startup and lifetime locks are separate.
+
+Newer generations automatically request an idle handoff. Different builds within
+one generation require `service_connection(action: activate)` / the Mac Settings
+connection action. A newer generation or schema cannot be downgraded. Active
+commands (including response delivery), reserved exports and image workers defer
+handoff without cancellation. Once idle, admission closes, queue acquisition stops,
+and a durable target reservation and exact-target clean receipt are written. The
+next matching broker consumes the receipt once, preserving pending jobs and the
+queue's pause setting. Other restarts keep ordinary interrupted-job recovery.
+Lost handoff replies cannot strand the retiring service. Uncertain domain-command
+responses are never automatically resubmitted.
+
+Legacy brokers without negotiation are detected before the requested domain
+command is sent. Their work is left running; the error explains finishing exports,
+closing older app/agent clients, and reconnecting after the idle exit. Legacy
+clients also cannot mutate a newly negotiated broker. Windows branches retain
+named pipes/locking but still need Windows runtime acceptance.
+
+Image workers verify the broker's expected build before opening pixels or outputs.
+If files were replaced in place, the affected export becomes interrupted and the
+queue pauses, preserving remaining pending jobs for explicit reconnection/retry.
+This check detects changed builds, not malicious modifications that also falsify
+the manifest; binaries remain subject to release signing/notarization controls.
+
 ## Consistency and recovery
 
 - `get_photo` returns a revision. Edits, undo, version restore, recipe import, and sync require the expected revision. Stale writes fail; the caller must read again and reconcile.
 - Service database access is serialized. Sync validates every target before one transaction writes all changes. Ratings and flags are separate explicit operations.
 - Export submission freezes the recipe, source, destination, and output options. The request key, normalized argument digest, and job IDs are stored atomically. The same key and arguments return the original result; different arguments with that key fail.
 - Originals are never written. Output is written to a temporary `.part`, flushed, then hard-linked to a new collision-safe name. A late cancellation preserves an output already published.
-- Running and pending jobs become interrupted after abnormal service restart. They are never silently replayed. A forced exit can leave an uncertain publication outcome; inspect the destination before retrying.
+- Running and pending jobs become interrupted after abnormal service restart. A sealed idle handoff has the narrowly scoped pending-job exception described above. They are never silently replayed. A forced exit can leave an uncertain publication outcome; inspect the destination before retrying.
 - Image workers monitor the broker and exit when it disappears. This is not an operating-system transaction over the entire process tree.
 - The UI polls jobs and selected-photo revisions every two seconds. A local editing barrier protects pending edits; the service revision check remains authoritative.
 

@@ -27,6 +27,7 @@ from .organization import Organization
 from .collections import Collections
 from .virtual_copies import VirtualCopies
 from .source_identity import cached_thumbnail
+from .runtime import engine_identity, EngineChangedError
 
 class ConflictError(ValueError): pass
 
@@ -41,18 +42,25 @@ def unpack(row):
     return row
 
 class Service:
-    def __init__(self,root):
+    def __init__(self,root,identity=None):
         self.root=Path(root).resolve();self.root.mkdir(parents=True,exist_ok=True)
         self.cache=self.root/'cache';self.cache.mkdir(exist_ok=True)
         self.lock=threading.RLock();self.image_lock=threading.Lock();self.state_lock=threading.RLock()
         self.stopping=threading.Event();self.wake=threading.Event();self.active=None;self.peak=0
-        self.cancel_jobs=set();self.preview_versions={}
+        self.cancel_jobs=set();self.preview_versions={};self.upgrading=False
+        self.worker_identity=engine_identity()
         self.last_activity=time.monotonic()
         with self.catalog() as c:
+            handoff=c.setting('clean_handoff')
+            clean=(identity is not None and handoff == {'target':identity}
+                   and c.job_counts().get('running',0)==0)
             c.recover_jobs()
-            # A broker restart also leaves unstarted exports for explicit review.
+            # Only a sealed, idle handoff to this exact engine preserves pending
+            # work. Crashes and unrelated engines retain explicit recovery.
             with c.db:
-                c.db.execute("UPDATE jobs SET state='interrupted',error='Service restarted; check output before retrying' WHERE state='pending'")
+                c.db.execute("DELETE FROM settings WHERE key='clean_handoff'")
+                if not clean:
+                    c.db.execute("UPDATE jobs SET state='interrupted',error='Service restarted; check output before retrying' WHERE state='pending'")
                 c.db.execute('CREATE TABLE IF NOT EXISTS requests(key TEXT PRIMARY KEY,digest TEXT NOT NULL,result TEXT NOT NULL)')
             self.paused=c.setting('paused',False)
             self.budget=c.setting('budget_mb',4096)
@@ -274,7 +282,8 @@ class Service:
                     row=c.db.execute('SELECT state FROM jobs WHERE id=?',(request['job_id'],)).fetchone()
                     if row and row[0]=='cancelled':raise InterruptedError('Cancelled')
             memory=self.memory_status();budget=memory['effective_budget_mb']
-            request={**request,'cache':str(self.cache),'budget_mb':budget,'parent_pid':os.getpid(),'compute_backend':self.compute_backend}
+            request={**request,'cache':str(self.cache),'budget_mb':budget,'parent_pid':os.getpid(),
+                     'compute_backend':self.compute_backend,'engine_identity':self.worker_identity}
             env={**os.environ,'OMP_NUM_THREADS':'2','OPENBLAS_NUM_THREADS':'1','VECLIB_MAXIMUM_THREADS':'2'}
             with tempfile.TemporaryFile() as output,tempfile.TemporaryFile() as errors:
                 with self.state_lock:
@@ -300,6 +309,7 @@ class Service:
                         if result.get('processing'):self.last_processing=result['processing']
                         return {**result,'peak_mb':round(peak,1)}
                     if self.cancelled:raise InterruptedError('Cancelled; check the destination for any completed output')
+                    if result.get('type')=='EngineChangedError':raise EngineChangedError(result['error'])
                     message=failure or result.get('error','Image worker exited without a result')
                     if memory['limited_by_available_memory'] and (failure or result.get('type')=='MemoryError'):
                         message+=f" Configured budget: {memory['budget_mb']} MB; available memory: {memory['available_mb']} MB. This job is capped at 70% of available memory; increasing the setting cannot exceed this cap."
@@ -320,7 +330,7 @@ class Service:
         while not self.stopping.is_set():
             self.wake.wait(.2);self.wake.clear()
             with self.catalog() as c:
-                if self.paused:continue
+                if self.paused or self.upgrading:continue
                 if psutil.virtual_memory().available<384*1024**2:
                     self.paused=True;c.set_setting('paused',True);continue
                 job=c.next_job()
@@ -332,8 +342,11 @@ class Service:
                     c.finish_job(job['id'],'done',peak_mb=result['peak_mb'],output=result['output'])
                     with c.db:c.db.execute('UPDATE jobs SET processing=? WHERE id=?',(json.dumps(result.get('processing',{})),job['id']))
             except Exception as e:
-                state='cancelled' if isinstance(e,InterruptedError) else 'failed'
-                with self.catalog() as c:c.finish_job(job['id'],state,str(e),peak_mb=getattr(e,'peak_mb',0))
+                state='interrupted' if isinstance(e,EngineChangedError) else 'cancelled' if isinstance(e,InterruptedError) else 'failed'
+                with self.catalog() as c:
+                    c.finish_job(job['id'],state,str(e),peak_mb=getattr(e,'peak_mb',0))
+                    if isinstance(e,EngineChangedError):
+                        self.paused=True;c.set_setting('paused',True)
             self.last_activity=time.monotonic()
 
     def control(self,p):

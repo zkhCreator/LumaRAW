@@ -134,6 +134,11 @@ struct SettingsView:View {
                 Text("Available memory: about \(Int(s.availableMemory)) MB. Each job uses the lower of the configured limit and 70% of available memory. RSS is sampled, not a system hard limit.").font(.caption).foregroundStyle(.secondary)
                 Button("Refresh Memory Status"){Task{await s.refreshMemory()}}}
             Section("Library"){Text(Backend.catalog).font(.caption).textSelection(.enabled);Button("Show in Finder"){NSWorkspace.shared.open(URL(fileURLWithPath:Backend.catalog))}}
+            Section("Background Service") {
+                Button(s.connectingService ? "Connecting…":"Connect with This Version") { Task { await s.activateCurrentService() } }.disabled(s.connectingService)
+                Text("If another build is connected, switch when image processing is idle. Submitted exports and the queue's pause setting are preserved.").font(.caption).foregroundStyle(.secondary)
+                if !s.serviceConnectionMessage.isEmpty { Text(s.serviceConnectionMessage).font(.caption) }
+            }
             Section("Color"){Text("Non-destructive editing leaves originals unchanged. NEF decoding uses LibRaw; HE / HE* support and camera-specific color require testing.").font(.callout).foregroundStyle(.secondary)}
         }.formStyle(.grouped).padding(12).task{await s.refreshMemory()}
     }

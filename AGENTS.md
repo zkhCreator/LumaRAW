@@ -49,6 +49,10 @@ Keep the explicit publication allowlist current when adding public documentation
 - Use bounded queries, pages, worker concurrency, caches and memory. Never load
   a whole catalog to filter or sort it. Keep CPU reference/fallback behavior and
   report actual Metal dispatch, not just library availability.
+- Negotiate engine identity before broker commands. Never retire a broker with
+  active commands or image work, and never retry an uncertain mutation response.
+  Increment `runtime.ENGINE_GENERATION` for a new engine release; build digests
+  distinguish development builds. Keep `CATALOG_VERSION` aligned with migrations.
 - Keep schema migrations additive where possible, idempotent and tested against
   an old catalog. No silent data loss or silent precision reduction.
 

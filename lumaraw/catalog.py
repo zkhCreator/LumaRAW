@@ -12,6 +12,7 @@ from pathlib import Path
 import sqlite3
 import time
 
+from .runtime import CATALOG_VERSION
 from .model import Recipe, ExportOptions, SYNC_GROUPS, IMAGE_EXTENSIONS
 from .organization import Organization, SORTS, criteria, folded, migrate, text_predicate
 
@@ -26,6 +27,9 @@ class Catalog:
         self.root = Path(root).resolve()
         self.root.mkdir(parents=True, exist_ok=True)
         self.db = sqlite3.connect(self.root / 'catalog.sqlite', timeout=10)
+        if self.db.execute("PRAGMA user_version").fetchone()[0] > CATALOG_VERSION:
+            self.db.close()
+            raise ValueError("This catalog was upgraded by a newer LumaRAW version; open it with that version")
         self.db.row_factory = sqlite3.Row
         self.db.create_function('casefold', 1, folded, deterministic=True)
         self.db.executescript('''

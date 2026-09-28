@@ -11,6 +11,29 @@ LUMARAW_TEST_NEF=/absolute/nikon.NEF uv run --frozen pytest -q
 
 The two `test_core.py` real-RAW tests skip if that environment variable is absent. `test_service.py` verifies revision conflicts, invalid edit atomicity, all-target sync, immutable export snapshots, deduplication keys, bounded queue pages and specific receipts, memory stopping, cancellation while a worker slot is occupied, superseded UI previews, cold job recovery and newline MCP framing through real subprocesses.
 
+## Broker lifecycle
+
+`tests/test_broker_lifecycle.py` uses real isolated processes to test build
+negotiation, automatic newer-generation handoff, explicit same-generation switch,
+legacy/newer-client rejection, active preview and export preservation, second-owner
+rejection, lost handoff replies, and no retry after an uncertain command response.
+It also checks one-use clean receipts, future-schema refusal, source/dependency
+identity and rejecting a replaced worker before reading images or creating output.
+
+`NativeConnectionRegression` starts from a differently tagged test broker using
+`tests/broker_fixture.py`. The native Store must surface the mismatch, activate the
+packaged engine, preserve the paused job and its recipe, and avoid restarting a
+matching service. The runner owns only this fixture process and catalog. This is
+state/IPC evidence, not rendered Settings/alert acceptance.
+
+```sh
+.venv/bin/python tests/connection_probe.py --engine /absolute/LumaRAW.app/Contents/Resources/Engine/LumaRAWEngine --work work/connection-probe-01
+```
+
+The benchmark compares one status RPC, negotiated status RPC and full packaged CLI
+startup on the same empty, warm catalog. It records 30 samples, median/p95 and RSS;
+no pixels, desktop latency or speed claim about actual photo processing is included.
+
 ## Packaged engine
 
 ```sh
@@ -57,7 +80,7 @@ The harness exercises the real native Store and JSON transport: import, RAW prev
 
 The runner compiles all native files except the app entry point, generates five
 small raster files and separate disposable catalogs, then runs the
-15-assertion state, 13-assertion library, 12-assertion culling, 20-assertion review and 14-assertion thumbnail, 17-assertion collection-tree and 19-assertion virtual-copy suites. The library suite checks
+15-assertion state, 13-assertion library, 12-assertion culling, 20-assertion review and 14-assertion thumbnail, 17-assertion collection-tree and 19-assertion virtual-copy and 10-assertion service-connection suites. The library suite checks
 live smart membership, text search/sort, pagination, empty-filter selection,
 partial metadata writes and independent recipe/metadata conflict handling. JSON
 receipts stay in the ignored work directory. Without `--engine`, it uses the

@@ -9,6 +9,24 @@ Use the LumaRAW MCP tools when connected. The native app's **Agent Connection** 
 
 If MCP is unavailable, call the packaged engine at `<LumaRAW.app>/Contents/Resources/Engine/LumaRAWEngine`. Pass `--catalog <catalog-path> <method>` and a JSON object on stdin. `status` and `recipe_schema` need no input. Source checkout fallback: `uv run --frozen lumaraw --catalog <path> <method>` from the project directory. The CLI wraps results in `{ok,result}` or `{ok,error,type}`; stdout of `--mcp` is JSON-RPC only.
 
+## Service compatibility
+
+All commands negotiate with the catalog's running engine before execution.
+`service_connection` with `action: status` reports client compatibility and the
+broker identity. Newer generations can take over only when no command or image
+operation is active. A same-generation build switch requires `action: activate`
+when switching is part of the user's request; it does not interrupt active work.
+Clean handoff preserves pending jobs and pause state. Do not retry uncertain
+mutation replies; keep export request keys for their existing idempotency contract.
+Older generations and schemas cannot downgrade a newer catalog.
+
+A legacy broker without this handshake must finish its work and exit naturally.
+Report the instruction to close older app/agent clients and reconnect after the
+three-minute idle period; never kill a user broker as a workaround. If an engine
+was replaced while running, a worker refuses mismatched code before opening images;
+the affected export is interrupted and the remaining queue is paused. Reconnect,
+inspect jobs and retry only under the user's export authorization.
+
 ## Editing workflow
 
 1. `lumaraw_status` identifies the active catalog; do not assume an unrelated catalog is the user's library.

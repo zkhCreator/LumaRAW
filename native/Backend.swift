@@ -6,6 +6,7 @@ import AppKit
 
 struct EngineFailure: LocalizedError {
     let message: String
+    var canActivateService=false
     var errorDescription: String? { message }
 }
 struct Backend {
@@ -40,7 +41,8 @@ struct Backend {
                         throw EngineFailure(message: "The service returned an invalid response")
                     }
                     guard envelope["ok"] as? Bool == true, let result = envelope["result"] as? [String: Any] else {
-                        throw EngineFailure(message: envelope["error"] as? String ?? "The service request failed")
+                        throw EngineFailure(message: envelope["error"] as? String ?? "The service request failed",
+                                            canActivateService:envelope["can_activate"] as? Bool ?? false)
                     }
                     continuation.resume(returning: result)
                 } catch { continuation.resume(throwing: error) }

@@ -17,7 +17,7 @@ LumaRAW references your originals without changing them. The SwiftUI app and you
 | Library | Ratings, flags, color labels, catalog metadata/keywords, regular/live smart collections, nested sets, Quick/target collections, SQL filters/sorting, duplicate/missing indexing, virtual copies/shared snapshots, selective sync, and backup/restore |
 | Culling | Grid/Loupe/Compare/Survey, anchored page selections, active-photo review actions, linked or independent full-resolution comparison viewports |
 | Export | JPEG and 16-bit TIFF with embedded sRGB, Display P3, Adobe RGB, or ProPhoto RGB ICC profiles; persistent queue, pause/cancel/retry, and collision-safe filenames |
-| Agents | 45 MCP tools, equivalent JSON CLI commands, and a bundled skill; app and agent edits share conflict detection |
+| Agents | 46 MCP tools, equivalent JSON CLI commands, and a bundled skill; app and agent edits share conflict detection |
 
 ## Build and run
 
@@ -36,6 +36,13 @@ Replace `/absolute/new-build-directory` with a new directory that does not alrea
 Open `Package.swift` for Swift development. A standalone Swift executable needs `LUMARAW_ENGINE` set to the engine executable; use the build script for a self-contained app.
 
 The default catalog is `~/Library/Application Support/LumaRAW Native`. Use `--catalog /absolute/catalog` or `LUMARAW_CATALOG` for a separate library. Imports reference original file locations; they do not copy photos. Back up a catalog before migration, and do not open the same SQLite catalog simultaneously with an older Qt application.
+
+If another build already owns the catalog service, use **Settings → Background
+Service → Connect with This Version** when image processing is idle. Newer engine
+releases switch automatically when idle; a clean handoff preserves pending exports
+and pause state. A genuinely older, pre-handshake service must finish its work and
+exit first: close its app/agent clients and reconnect after three minutes. Failed
+or uncertain exports still require explicit review/retry.
 
 ## Editing workflow
 

@@ -45,13 +45,13 @@ gaps. Nothing below is full Lightroom parity merely because historical tests pas
 | Slideshow | Missing | Layout, timing, playback, audio, slideshow export |
 | Print | Missing | Contact sheets/packages, physical sizing, native print/ICC workflow |
 | Web | Missing | Local gallery templates and export; publishing requires explicit destination |
-| Platform/accessibility | Partial: Mac 14 target, Mac 26 historical checks | Broker upgrade compatibility, current desktop checks, macOS 14, keyboard/VoiceOver, color management; Windows remains future |
+| Platform/accessibility | Partial: Mac 14 target, Mac 26 historical checks | Legacy upgrade recovery, current desktop checks, macOS 14, keyboard/VoiceOver, color management; Windows remains future |
 
 ## Active increment
 
-Virtual-copy workflows: independent catalog variants, copy naming/filtering,
-shared snapshots, master promotion, safe removal and family-wide source indexing/
-relinking. Stack presentation and the other inventory gaps remain open.
+Broker compatibility: identity negotiation, single-owner admission, idle handoff
+with durable queue preservation, worker-build checks and native reconnection.
+Photo stacks and the remaining feature inventory follow this integration work.
 
 ## Evidence log
 
@@ -293,7 +293,53 @@ shortcut/rendered interaction acceptance. This increment does not make those
 behaviors or the broader application 1:1 complete. Real NEF fixtures, macOS 14
 runtime, current desktop UI and VoiceOver evidence remain unavailable.
 
-Upgrade follow-up: the current transport reuses any broker for a catalog without
-checking its build/schema capabilities. A previously running older engine can
-therefore serve an updated client until it exits; safe broker-upgrade handling
-needs a dedicated change before release. No existing user broker was terminated.
+Upgrade issue found during this increment: previously, a client reused any broker
+for its catalog. The following increment adds negotiation and safe handoff. No
+existing user broker was terminated.
+
+
+### Broker compatibility increment
+
+Engine protocol/generation/build/schema identities are negotiated before each
+command and verified again at admission. A lifetime owner lock prevents a second
+broker from unlinking the live endpoint. Newer generations can hand off when idle;
+same-generation different builds need the native Settings/connection action.
+Newer schema/generation downgrades are rejected. Active requests include response
+delivery, and both foreground preview work and reserved/running exports defer a
+switch without cancellation.
+
+A clean handoff seals admission and queue acquisition, writes a durable exact-target
+receipt and retires the old process. Its matching successor consumes the receipt
+once, retaining pending job snapshots and pause state. Ordinary crashes and wrong
+targets still require interrupted-job recovery. Lost handoff replies finish safely;
+uncertain mutation replies are not retried. Workers check the expected engine before
+opening pixels/output; in-place engine replacement interrupts the affected export
+and pauses the remaining queue.
+
+The Mac startup error offers explicit reconnection, Settings exposes the same
+action, and startup can recover after a mismatch. Legacy pre-handshake brokers are
+detected before mutations and left to finish/exit naturally. Their existing code
+cannot perform the new clean handoff; this is a documented upgrade boundary,
+not an automatic legacy-process termination policy. Windows locking/named-pipe
+branches, rendered connection alerts, VoiceOver and macOS 14 remain unverified.
+
+
+Required-Metal Python verification: **155 passed, 2 real-NEF tests skipped**.
+Thirteen broker lifecycle tests cover real process switches, active preview/export
+preservation, ownership, lost responses and conservative recovery. The new native
+connection suite adds ten assertions for startup recovery and unchanged job state.
+
+Packaged-engine connection probe: empty catalog, warm broker, macOS 26.6.2 arm64,
+128 GB, 30 samples per path. Single status RPC measured **0.883 ms median /
+1.122 ms p95**; negotiated status **0.877 / 1.091 ms**; complete packaged CLI launch
+plus negotiated status **53.034 / 54.059 ms**. The near-equal RPC results do not
+establish a speedup; this probe overlapped native compilation and is a latency
+observation, not a controlled comparative benchmark. Broker RSS was 34.56 MB and
+no image workers ran. Photo processing and rendered UI latency are excluded.
+
+
+All eight native suites passed against the packaged engine: **120 assertions**.
+The app built without Swift warnings and passed ad-hoc signature verification after
+the bundled service-compatibility instructions were updated. The 189-file source
+archive passed the extracted strict source check. Desktop alerts/Settings and
+macOS 14 runtime still require separate verification.

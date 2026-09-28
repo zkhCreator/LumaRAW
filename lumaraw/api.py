@@ -19,6 +19,7 @@ TOOLS={}
 def tool(name,description,properties=None,required=(),read=False):
     TOOLS[name]={'name':name,'description':description,'inputSchema':obj(properties,required),
         'annotations':{'readOnlyHint':read,'destructiveHint':False,'idempotentHint':read,'openWorldHint':False}}
+tool('service_connection','Inspect engine compatibility or explicitly activate this build when the broker is idle. Preserves pending jobs on a clean handoff; never interrupts active work.',{'action':{'enum':['status','activate']}},['action'])
 tool('status','Service version, catalog location, queue and processing state.',read=True)
 tool('recipe_schema','Supported recipe ranges, defaults, presets and sync groups.',read=True)
 tool('import_photos','Reference explicit local photos or directories; never copy or modify originals.',{'paths':array(PATH)},['paths'])

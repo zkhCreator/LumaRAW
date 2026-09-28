@@ -3,6 +3,7 @@
 Reads bounded JSON from stdin, returns one JSON result; no pixel buffers cross IPC.
 The catalog service owns scheduling, cancellation, and RSS monitoring. Process exit releases
 LibRaw/NumPy native allocations even after failure. Original files are read-only.
+The engine identity must match its broker before any pixels or outputs are opened.
 """
 import json
 import sys
@@ -12,6 +13,10 @@ import time
 def main():
     try:
         request = json.loads(sys.stdin.buffer.readline(256*1024))
+        if 'engine_identity' in request:
+            from .runtime import engine_identity, EngineChangedError
+            if request['engine_identity'] != engine_identity():
+                raise EngineChangedError('The installed engine changed while its service was running. Reconnect with this version in Settings, then retry interrupted exports. No pixels were processed.')
         # Stop orphaned image work when the owning broker disappears.
         if request.get('parent_pid'):
             import os, threading

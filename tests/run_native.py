@@ -5,19 +5,23 @@ synthetic photographs and JSON receipts inside that directory. No personal libra
 or desktop automation. Source engine uses this environment's installed CLI entry.
 """
 import argparse
+import json
+from multiprocessing.connection import Client
 import os
 from pathlib import Path
 import subprocess
 import sys
+import time
 
 from PIL import Image
+from lumaraw.bridge import endpoint
 
 
 def main():
     parser=argparse.ArgumentParser()
     parser.add_argument('--work',type=Path,required=True)
     parser.add_argument('--engine',type=Path,default=Path(sys.executable).with_name('lumaraw'))
-    suites=('NativeStateRegression','NativeLibraryRegression','NativeSelectionRegression','NativeReviewRegression','NativeThumbnailRegression','NativeCollectionRegression','NativeVirtualCopyRegression')
+    suites=('NativeStateRegression','NativeLibraryRegression','NativeSelectionRegression','NativeReviewRegression','NativeThumbnailRegression','NativeCollectionRegression','NativeVirtualCopyRegression','NativeConnectionRegression')
     parser.add_argument('--suite',choices=suites,action='append',help='Run selected suites; default: all')
     args=parser.parse_args()
     work=args.work.resolve()
@@ -39,7 +43,27 @@ def main():
         suite_paths=paths if suite in ('NativeSelectionRegression','NativeReviewRegression','NativeThumbnailRegression','NativeCollectionRegression','NativeVirtualCopyRegression') else paths[:2]
         env={**os.environ,'LUMARAW_ENGINE':str(args.engine.resolve()),
             'LUMARAW_CATALOG':str(work/'catalogs'/suite),'LUMARAW_TEST_FIXTURES':'|'.join(suite_paths)}
-        result=subprocess.run([str(executable)],env=env,capture_output=True,text=True,timeout=120)
+        fixture=None
+        try:
+            if suite=='NativeConnectionRegression':
+                catalog=Path(env['LUMARAW_CATALOG'])
+                fixture=subprocess.Popen([sys.executable,str(root/'tests'/'broker_fixture.py'),'--catalog',str(catalog),
+                    *[arg for path in suite_paths for arg in ('--photo',path)]],stdout=subprocess.DEVNULL,stderr=subprocess.PIPE)
+                address,family=endpoint(catalog);deadline=time.monotonic()+8
+                while True:
+                    if fixture.poll() is not None:raise RuntimeError(fixture.stderr.read().decode())
+                    try:
+                        with Client(address,family=family) as conn:
+                            conn.send_bytes(json.dumps({'method':'__broker_info__'}).encode())
+                            if conn.poll(1) and json.loads(conn.recv_bytes()).get('ok'):break
+                    except (OSError,EOFError):pass
+                    if time.monotonic()>deadline:raise RuntimeError('Connection fixture did not become ready')
+                    time.sleep(.03)
+            result=subprocess.run([str(executable)],env=env,capture_output=True,text=True,timeout=120)
+        finally:
+            if fixture is not None:
+                if fixture.poll() is None:fixture.terminate()
+                fixture.wait(timeout=5);fixture.stderr.close()
         (work/f'{suite}.json').write_text(result.stdout)
         print(result.stdout)
         if result.returncode:

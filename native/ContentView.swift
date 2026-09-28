@@ -53,6 +53,10 @@ struct ContentView: View {
             InspectorView().inspectorColumnWidth(min:310,ideal:340,max:420)
         }
         .alert("Unable to Complete Action",isPresented:Binding(get:{s.error != nil},set:{if !$0{s.error=nil}})) {
+            if s.serviceUpgradeNeeded {
+                Button("Connect with This Version") { Task { await s.activateCurrentService() } }
+                    .disabled(s.connectingService)
+            }
             Button("OK",role:.cancel){s.error=nil}
         } message:{Text(s.error ?? "")}
         .sheet(isPresented:$s.showExport){ExportSheet()}

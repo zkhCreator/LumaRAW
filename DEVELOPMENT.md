@@ -32,6 +32,28 @@ when a clear function is more maintainable. Avoid unrelated formatting churn.
 - Test migration with existing photos, edits and jobs. Backups include all new
   catalog state; export jobs keep their original recipe and destination snapshots.
 
+## Engine changes and handoff
+
+`runtime.ENGINE_GENERATION` orders portable-engine releases. Increment it when
+shipping changed domain/processing behavior; source and dependency digests also
+distinguish builds within a generation. Same-generation switches are explicit;
+older generations cannot take over a newer pinned catalog. Mac-only view edits do
+not require an engine generation change. The build embeds the digest without
+machine paths. Do not change engine sources while building its manifest/bundle.
+
+`CATALOG_VERSION` must equal the latest schema migration. Reject newer catalogs
+before writes. Transport admission and a lifetime owner lock protect the catalog;
+never bypass them to replace a running service. An idle, sealed handoff stores an
+exact-target, one-use receipt before stopping queue acquisition. Only this receipt
+can preserve pending jobs. Crashes, wrong targets and running jobs keep explicit
+recovery. A worker checks its broker's identity before opening images or outputs;
+a replaced engine interrupts that job and pauses the remaining queue.
+
+Test legacy rejection, idle switch, active command/export protection, lost handoff
+replies, uncertain mutation replies, ownership, queue snapshots and native retry.
+Keep legacy services running until their work finishes; do not terminate an unknown
+process merely to make a newer client connect.
+
 ## Mac presentation
 
 Use native navigation, menus, focus, file panels and accessibility. Capture the

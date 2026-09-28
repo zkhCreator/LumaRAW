@@ -73,6 +73,9 @@ import UniformTypeIdentifiers
     @Published var rendering=false
     @Published var editing=false
     @Published var error: String?
+    @Published var serviceUpgradeNeeded=false
+    @Published var connectingService=false
+    @Published var serviceConnectionMessage=""
     @Published var message="Originals are read-only · Edits save automatically"
     @Published var jobs: [[String: Any]] = []
     @Published var paused=false
@@ -129,7 +132,28 @@ import UniformTypeIdentifiers
                     }
                 }
             }
-        } catch { self.error=error.localizedDescription }
+        } catch {
+            started=false
+            serviceUpgradeNeeded=(error as? EngineFailure)?.canActivateService ?? false
+            self.error=error.localizedDescription
+        }
+    }
+
+    func activateCurrentService() async {
+        guard !connectingService else { return }
+        connectingService=true
+        defer { connectingService=false }
+        do {
+            _=try await Backend.call("service_connection",["action":"activate"])
+            serviceUpgradeNeeded=false;serviceConnectionMessage="Connected with this version of LumaRAW"
+            error=nil
+            if !started { await start() }
+            else { await refreshMemory();await refreshCollections();await refresh() }
+        } catch {
+            serviceConnectionMessage=error.localizedDescription
+            serviceUpgradeNeeded=(error as? EngineFailure)?.canActivateService ?? false
+            self.error=error.localizedDescription
+        }
     }
     func refresh() async {
         pageGeneration += 1;let token=pageGeneration;browsing=true

@@ -5,6 +5,7 @@ Inputs: source and an explicit, new build directory. Outputs: a local ad-hoc sig
 or public distribution claim. Builds can be repeated into a fresh directory.
 """
 import argparse
+import json
 from pathlib import Path
 import plistlib
 import shutil
@@ -19,8 +20,13 @@ def main():
     build.mkdir(parents=True)
     from build_metal import build as build_metal
     metal_library=build_metal(source)
+    sys.path.insert(0,str(source))
+    from lumaraw.runtime import source_digest
+    manifest=build/'engine_build.json'
+    manifest.write_text(json.dumps({'digest':source_digest(source)}))
     subprocess.run([sys.executable,'-m','PyInstaller','--clean','--noconfirm','--onedir','--console',
         '--name','LumaRAWEngine','--exclude-module','PySide6','--exclude-module','shiboken6','--exclude-module','pytest','--exclude-module','tkinter',
+        '--add-data',str(manifest)+':lumaraw',
         '--add-binary',str(metal_library)+':lumaraw/accelerators','--collect-data','lumaraw','--collect-data','jsonschema_specifications',
         '--distpath',str(build/'engine'),'--workpath',str(build/'intermediate'),'--specpath',str(build),
         '--paths',str(source),str(source/'launch.py')],check=True,cwd=source)
