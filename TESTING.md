@@ -57,7 +57,7 @@ The harness exercises the real native Store and JSON transport: import, RAW prev
 
 The runner compiles all native files except the app entry point, generates five
 small raster files and separate disposable catalogs, then runs the
-15-assertion state, 13-assertion library, 12-assertion culling and 20-assertion review suites. The library suite checks
+15-assertion state, 13-assertion library, 12-assertion culling, 20-assertion review and 14-assertion thumbnail suites. The library suite checks
 live smart membership, text search/sort, pagination, empty-filter selection,
 partial metadata writes and independent recipe/metadata conflict handling. JSON
 receipts stay in the ignored work directory. Without `--engine`, it uses the
@@ -81,11 +81,18 @@ The synthetic preview benchmark is `tests/review_probe.py --work work/review-pro
 outputs per warm-decode scenario, including worker startup/encoding, dimensions,
 actual backend dispatch and sampled memory. It excludes UI and IPC latency.
 
+The thumbnail suite uses real service output to verify saved crop/rotation updates,
+external non-active edits, metadata reuse and cache eviction. Controlled late replies
+verify generation and revision rejection. `tests/test_developed_thumbnails.py`
+compares geometry/color against fitted previews with JPEG tolerances, checks
+original hashes and verifies cache invalidation/reuse and client cancellation.
+
 ## Library organization and performance
 
 ```sh
 .venv/bin/python -m pytest -q tests/test_organization.py tests/test_thumbnail_cache.py
 .venv/bin/python tests/library_probe.py --work work/library-probe-01 --rows 10000
+.venv/bin/python tests/library_probe.py --work work/developed-probe-01 --rows 10000 --thumbnail-kind developed
 ```
 
 Organization tests cover legacy migrations, many-to-many membership, live all/any

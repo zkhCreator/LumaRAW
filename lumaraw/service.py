@@ -103,32 +103,40 @@ class Service:
                 cancelled=False
                 if (self.active and self.active.get('client_id')==client
                         and self.active.get('generation',-1)<generation
-                        and self.active.get('operation') in ('preview','detail')):
+                        and self.active.get('operation') in ('preview','detail','thumbnail')):
                     self.cancelled=True
                     if self.process.poll() is None:self.process.kill();cancelled=True
                 return {'cancelled':cancelled,'generation':generation}
         if method=='cached_thumbnails':
             with self.catalog() as c:
                 rows=[self.require(c,photo_id) for photo_id in dict.fromkeys(p['photo_ids'])]
-            return {'thumbnails':[{'photo_id':row['id'],'thumbnail':path} for row in rows
-                                  if (path:=cached_thumbnail(row['path'],self.cache))],
-                    'worker_spawned':False}
+            developed=p.get('kind') == 'developed'
+            entries=[]
+            for row in rows:
+                recipe=Recipe.parse(json.loads(row['recipe'])) if developed else None
+                if path:=cached_thumbnail(row['path'],self.cache,recipe):
+                    entry={'photo_id':row['id'],'thumbnail':path}
+                    if developed:entry.update(revision=row['revision'],kind='developed',source=row['path'])
+                    entries.append(entry)
+            return {'thumbnails':entries,'worker_spawned':False}
         if method in ('preview_photo','thumbnail','calibrate_camera'):
-            if method=='preview_photo' and p.get('client_id'):
+            if method in ('preview_photo','thumbnail') and p.get('client_id'):
                 if 'generation' not in p:raise ValueError('client_id requires generation')
                 with self.state_lock:
                     client=p['client_id'];generation=p['generation']
                     if generation<self.preview_versions.get(client,-1):raise InterruptedError('Preview is superseded')
                     self.preview_versions[client]=generation
                     if len(self.preview_versions)>128:self.preview_versions.pop(next(iter(self.preview_versions)))
-                    if self.active and self.active.get('client_id')==client and self.active.get('generation',-1)<generation:
+                    if (self.active and self.active.get('client_id')==client and self.active.get('generation',-1)<generation
+                            and self.active.get('operation') in ('preview','detail','thumbnail')):
                         self.cancelled=True
                         if self.process.poll() is None:self.process.kill()
             with self.catalog() as c:row=self.require(c,p['photo_id'])
             if method=='thumbnail':
-                path=cached_thumbnail(row['path'],self.cache)
+                recipe=Recipe.parse(json.loads(row['recipe'])) if p.get('kind') == 'developed' else None
+                path=cached_thumbnail(row['path'],self.cache,recipe)
                 if path:
-                    return {'thumbnail':path,'photo_id':row['id'],'revision':row['revision'],
+                    return {'thumbnail':path,'photo_id':row['id'],'revision':row['revision'],'kind':p.get('kind','source'),'source':row['path'],
                             'cache_hit':True,'worker_spawned':False}
             request={'operation':{'preview_photo':'preview','thumbnail':'thumbnail','calibrate_camera':'calibrate'}[method],
                      'path':row['path'],'recipe':json.loads(row['recipe'])}
@@ -136,7 +144,7 @@ class Service:
             result=self.run_worker(request)
             if 'metadata' in result:
                 with self.catalog() as c:c.update_metadata(row['id'],result['metadata'])
-            return {**result,'photo_id':row['id'],'revision':row['revision']}
+            return {**result,'photo_id':row['id'],'revision':row['revision'],'source':row['path']}
         if method=='queue_control':return self.control(p)
         with self.catalog() as c:
             if method=='photo_summaries':return {'photos':c.summaries(p['photo_ids'])}

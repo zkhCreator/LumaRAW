@@ -13,6 +13,10 @@ import UniformTypeIdentifiers
     @Published var photo: Photo?
     @Published var recipe: [String: Any] = [:]
     @Published var thumbnails: [Int: NSImage] = [:]
+    @Published var thumbnailErrors: [Int: String] = [:]
+    lazy var thumbnailRenderer=ThumbnailRenderer(changed: { [weak self] images,errors in
+        self?.thumbnails=images;self?.thumbnailErrors=errors
+    })
     @Published var preview: NSImage?
     @Published var before: NSImage?
     @Published var histogram: [[Double]] = []
@@ -102,7 +106,7 @@ import UniformTypeIdentifiers
                     try? await Task.sleep(nanoseconds:2_000_000_000)
                     guard let self else { return }
                     await self.refreshJobs()
-                    await self.refreshReviewSummaries()
+                    await self.refreshVisibleSummaries()
                     if let current=self.photo, !self.editing, self.pendingPatch.isEmpty {
                         if let row=try? await Backend.call("get_photo",["photo_id":current.id]),let updated=Photo(row) {
                             guard !self.editing,self.pendingPatch.isEmpty,self.selected==current.id,self.photo?.revision==current.revision else{continue}
@@ -136,22 +140,7 @@ import UniformTypeIdentifiers
                 else{selected=nil;selection=[];clearPhoto()}
             }
             reviewSelectionChanged()
-            Task { [weak self] in
-                guard let self else{return}
-                let missing=self.photos.filter { self.thumbnails[$0.id] == nil }.map(\.id)
-                if !missing.isEmpty,let cached=try? await Backend.call("cached_thumbnails",["photo_ids":missing]),token==self.pageGeneration {
-                    for row in cached["thumbnails"] as? [[String:Any]] ?? [] {
-                        if let id=row["photo_id"] as? Int,let path=row["thumbnail"] as? String {
-                            self.thumbnails[id]=NSImage(contentsOfFile:path)
-                        }
-                    }
-                }
-                for p in self.photos where self.thumbnails[p.id]==nil {
-                    guard token==self.pageGeneration else{return}
-                    if let r=try? await Backend.call("thumbnail",["photo_id":p.id]),let path=r["thumbnail"] as? String,
-                       token==self.pageGeneration {self.thumbnails[p.id]=NSImage(contentsOfFile:path)}
-                }
-            }
+            updateThumbnails(force:true)
         } catch {self.error=error.localizedDescription}
     }
     func clearPhoto() {
@@ -211,10 +200,13 @@ import UniformTypeIdentifiers
         do {
             let row=try await Backend.call("get_photo",["photo_id":id])
             guard selected==id,token==generation,let p=Photo(row) else{return}
-            photo=p;recipe=p.recipe;metadata=p.metadata;loading=false;render()
+            photo=p;recipe=p.recipe;metadata=p.metadata;loading=false
+            if let index=photos.firstIndex(where: { $0.id == p.id }) { photos[index]=p }
+            render()
         } catch {if selected==id,token==generation{self.error=error.localizedDescription}}
     }
     func render() {
+        updateThumbnails()
         if isMultiReview { updateReviewRequests();return }
         guard let p=photo,p.id==selected,!loading else{return}
         generation += 1;let token=generation

@@ -26,7 +26,8 @@ from .model import Recipe, ExportOptions
 from .performance import stage
 from .accelerators import grade_output
 from .color import to_output, output_matrix, encode, decode, icc_profile, mix_hues, apply_lut, soft_proof
-from .imaging import load_source, fingerprint, cache_key, LUMA
+from .imaging import load_source, fingerprint, cache_key, write_thumbnail, LUMA
+from .source_identity import thumbnail_path, cached_thumbnail
 
 ROWS=128
 HALO=32
@@ -253,6 +254,25 @@ def render_u8(plan,rect=None,display=None):
     if display.get('proof_path'):
         pixels=soft_proof(pixels,display['proof_path'],display['proof_sha'],display.get('gamut',False))
     return pixels,hist.tolist(),out_count/(w*h)*100
+
+
+def make_thumbnail(path, recipe, cache, budget_mb):
+    """Render a 320-pixel edited thumbnail using the same geometry/color pipeline."""
+    existing=cached_thumbnail(path,cache,recipe)
+    if existing:
+        return {'thumbnail':existing,'kind':'developed','cache_hit':True}
+    target=thumbnail_path(path,cache,recipe)
+    source,meta,base=base_image(path,recipe,cache,budget_mb)
+    validate_camera(recipe,meta)
+    plan=RenderPlan(source,recipe,320)
+    plan.pixel_scale *= max(source.shape[:2])/max(meta['width'],meta['height'])
+    pixels,_,_=render_u8(plan)
+    if thumbnail_path(path,cache,recipe) != target:
+        raise ValueError('Source or LUT changed during thumbnail processing; retry with the current file')
+    write_thumbnail(Image.fromarray(pixels),target,icc_profile('srgb'),quality=88)
+    return {'thumbnail':str(target),'kind':'developed','metadata':meta,
+            'width':plan.width,'height':plan.height,
+            'cache_keep':[base,str(Path(base).with_suffix('.json')),str(target)]}
 
 
 def make_preview(path,recipe,cache,budget_mb,detail=None,display=None,include_before=True,max_edge=None):

@@ -48,8 +48,16 @@ JSON. Collections also paginate at 60 and do not eagerly count every smart colle
 `source_identity.py` provides stat-based cache identities without importing pixel
 libraries. The broker returns a page of completed thumbnail paths in one command;
 misses still use bounded image workers. Workers publish JPEG cache entries atomically.
-Warm cache lookup does not claim image processing ran. Source thumbnails currently
-do not reflect developed recipes; recipe-aware thumbnails remain tracked in parity.
+Warm cache lookup does not claim image processing ran. Source thumbnail requests
+remain the default API behavior; the Mac app requests `kind: developed`. These
+320-pixel thumbnails use the shared geometry/color renderer and ICC output. Cache
+identity covers source stat, full recipe, pipeline version and LUT stat; metadata
+revisions do not invalidate pixels. Undo can reuse an earlier recipe image.
+Native page requests retain matching images, reject mismatched or late revisions,
+and cancel obsolete thumbnail generations through their own client ID. All visible
+photo summaries are polled; active inspector recipes keep their separate edit
+barrier. Refresh rechecks source state, and per-photo errors remain visible.
+Offline-source cache lookup is not yet supported.
 
 Library Compare retains at most two revision-keyed frames and Survey at most 60
 512-pixel fitted frames. Compare detail requests use physical display scale and

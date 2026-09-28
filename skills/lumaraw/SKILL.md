@@ -20,7 +20,7 @@ If MCP is unavailable, call the packaged engine at `<LumaRAW.app>/Contents/Resou
    reads at most 60 existing IDs without recipe/EXIF payloads. A preview client may
    pass its own `client_id` and monotonically increasing `generation`;
    `cancel_preview` with a newer generation invalidates only that client's older
-   preview work, leaving other clients and exports intact.
+   preview/thumbnail work, leaving other clients and exports intact.
 5. Save named versions before exploratory changes if useful. Undo affects the last recipe edit; ratings and flags are separate.
 
 Example edit arguments:
@@ -48,8 +48,13 @@ target before editing; keywords replace the current set. The response contains a
 single normalized patch and per-photo metadata revisions, not newer recipe state.
 Conflicts leave the whole batch unchanged. Metadata stays in the catalog; EXIF and
 sidecars are not rewritten. `cached_thumbnails` returns existing paths for a bounded
-page without starting workers; use `thumbnail` for missing entries. Source thumbnails
-do not represent developed edits.
+page without starting workers; use `thumbnail` for missing entries. Both commands
+accept `kind: "developed"` for a 320-pixel recipe-aware image, or `kind: "source"`
+(the default) for the original/source preview. Developed replies include the
+captured recipe revision: reject stale results instead of labeling them as newer
+edits. A thumbnail client can use its own `client_id`/`generation` and
+`cancel_preview` to discard obsolete work. Metadata edits preserve the pixel cache;
+recipe, source or LUT changes invalidate it. The Mac shell uses developed images.
 
 ## Batch and output
 

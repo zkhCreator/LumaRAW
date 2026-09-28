@@ -37,7 +37,7 @@ gaps. Nothing below is full Lightroom parity merely because historical tests pas
 | Geometry | Partial: crop/rotate/straighten/perspective | Interactive retained handles/ratios/flip, guided transforms, crop state parity |
 | Local editing | Partial: radial/gradient/brush/luma | Mask list/edit/reorder/intersection, range masks, clone/heal, red-eye (non-AI) |
 | History and presets | Partial: 50-step undo, named versions | Redo, navigable history, preset management and import-time/batch application |
-| Preview/performance | Partial: Metal, proxies, 1:1 viewport | Large-catalog query baselines, edited thumbnails, persistent thumbnail fast path, slider latency |
+| Preview/performance | Partial: Metal, proxies, 1:1 viewport | Real-RAW catalog/slider latency, offline previews, cache controls and desktop acceptance |
 | Export | Partial: JPEG/16-bit TIFF, ICC, durable jobs | Presets, metadata policies, watermark, additional formats, publish workflows |
 | Merge | Missing | Non-AI HDR merge and panorama with bounded resources and reference acceptance |
 | Map | Missing | GPS metadata, map navigation, track import, location editing with explicit persistence |
@@ -49,10 +49,9 @@ gaps. Nothing below is full Lightroom parity merely because historical tests pas
 
 ## Active increment
 
-Library review: Loupe, Compare and Survey with bounded previews, candidate roles,
-linked full-resolution viewports, active-photo actions and cancellation isolation.
-Collection sets, quick collection, virtual copies, edited thumbnails and the other
-rows remain tracked separately.
+Developed thumbnails: saved recipes appear in the grid and filmstrip, with bounded
+rendering, source/recipe/LUT cache identity and stale-response rejection. Collection
+sets, quick collection, virtual copies and the other rows remain tracked separately.
 
 ## Evidence log
 
@@ -100,8 +99,8 @@ whole-desktop latency, or performance guarantees on other hardware. Reproduce vi
 
 ### Next work
 
-Continue first with developed thumbnails and cache invalidation, then collection
-sets and quick collection, virtual copies and keyword hierarchy. Then close Develop and
+Continue with collection sets and quick collection, virtual copies and keyword
+hierarchy. Offline preview caches and cache-size controls remain pending. Then close Develop and
 export gaps in the inventory. Preserve pending desktop/older-OS acceptance rather
 than removing it from the completion criteria.
 
@@ -162,3 +161,39 @@ was 54.62 MB; sampled worker peak across cases was 146.14 MB. The comparison
 request reduced measured median time by about 34%; this includes startup and
 encoding but excludes IPC and desktop presentation, and is not a RAW performance
 claim. Reproduce with `tests/review_probe.py`; private receipts remain ignored.
+
+### Developed grid and filmstrip thumbnails
+
+The Mac app now uses edited 320-pixel thumbnails from the shared render pipeline,
+including geometry, color and masks. The default CLI/MCP source thumbnail behavior
+is preserved; explicit `kind: developed` opts into recipe-aware results. Atomic
+ICC-tagged JPEG publication, original/LUT stat identity, recipe hashes and reported
+source/revision keep stale content separate. Undo can reuse an earlier image;
+metadata changes reuse existing pixels.
+
+The native loader retains unchanged images, rejects old generations and mismatched
+source/revision replies, and cancels obsolete page workers independently of exports.
+Lightweight visible-page polling detects external edits to non-active photographs.
+The active inspector retains its optimistic-edit barrier. Relinking an original
+also invalidates native image state even when the recipe revision is unchanged.
+Refresh rechecks sources, retries failures and regenerates evicted cache entries.
+
+Python suite with Metal required: **125 passed, 2 real-NEF tests skipped**. Eight
+new Python cases verify fitted-preview color/geometry within JPEG tolerances,
+original hashes, metadata independence, undo reuse, source/LUT invalidation,
+mid-render source changes, captured revisions and cancellation. Fourteen new
+native checks cover the real Store/engine flow plus deterministic delayed replies.
+All five native suites passed against the packaged engine (**74 assertions**).
+The final app compiled without Swift warnings, packaged and passed ad-hoc signature
+verification. Its 171-file extracted source archive passed the strict source check.
+Desktop interaction, macOS 14 runtime and offline-source thumbnail lookup remain
+unverified or incomplete; this is not full Library parity.
+
+Synthetic CPU cache probe: 12 generated 600 × 400 images in a 10,000-row catalog,
+128 GB arm64 Mac, macOS 26.6.2. Cold developed-page generation took **3866.21 ms**
+(one sample). Warm page requests that intentionally start workers took **2877.17 ms**
+median / **2909.83 ms** p95 (three samples); the bulk cache path took **2.37 ms**
+median / **2.79 ms** p95 (30 samples). Broker RSS was 49.00 MB; sampled worker peak
+was 76.23 MB. These are service/worker timings, excluding IPC and desktop drawing,
+and do not establish camera RAW speed. Reproduce with the library probe's
+`--thumbnail-kind developed` option.

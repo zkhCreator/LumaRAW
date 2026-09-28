@@ -26,14 +26,20 @@ def cache_key(path, recipe, kind):
                            json.dumps(recipe.dict(), sort_keys=True)).encode()).hexdigest()
 
 
-def thumbnail_path(path, cache):
-    return Path(cache) / (fingerprint(path) + '-thumb.jpg')
+def thumbnail_path(path, cache, recipe=None):
+    if recipe is None:
+        return Path(cache) / (fingerprint(path) + '-thumb.jpg')
+    # Imported LUTs are immutable by contract. Stat identity prevents reusing a
+    # thumbnail after external removal/replacement; the worker verifies its SHA.
+    asset = fingerprint(recipe.lut['path']) if recipe.lut else ''
+    key = cache_key(path, recipe, 'developed-thumb-320-v1' + asset)
+    return Path(cache) / (key + '-developed.jpg')
 
 
-def cached_thumbnail(path, cache):
+def cached_thumbnail(path, cache, recipe=None):
     """Do not return partial legacy writes or follow a cache-entry symlink."""
     try:
-        target = thumbnail_path(path, cache)
+        target = thumbnail_path(path, cache, recipe)
         if target.is_symlink() or not target.is_file() or not 4 <= target.stat().st_size <= 2*1024**2:
             return None
         with target.open('rb') as stream:

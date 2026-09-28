@@ -221,8 +221,11 @@ def make_preview(path, recipe, cache, budget_mb, **kwargs):
     return render(path,recipe,cache,budget_mb,**kwargs)
 
 
-def make_thumbnail(path, cache, budget_mb):
-    """Use camera JPEG only for labeled library thumbnails, never development/export."""
+def make_thumbnail(path, cache, budget_mb, recipe=None):
+    """Source thumbnails may use camera JPEG; developed ones use the shared renderer."""
+    if recipe is not None:
+        from .render import make_thumbnail as developed_thumbnail
+        return developed_thumbnail(path, recipe, cache, budget_mb)
     target = thumbnail_path(path, cache)
     existing = cached_thumbnail(path, cache)
     if existing:
@@ -251,16 +254,21 @@ def make_thumbnail(path, cache, budget_mb):
                 img = ImageCms.profileToProfile(img, ImageCms.ImageCmsProfile(io.BytesIO(icc)), ImageCms.createProfile('sRGB'), outputMode='RGB')
             else:
                 img = img.convert('RGB')
+    write_thumbnail(img, target, SRGB_ICC)
+    return {'thumbnail': str(target)}
+
+
+def write_thumbnail(image, target, profile, quality=82):
+    """Publish a complete ICC-tagged cache JPEG, replacing only its cache entry."""
     # Publish complete cache entries atomically so the broker's cheap lookup
     # never exposes a JPEG while it is still being encoded.
     descriptor, temporary = tempfile.mkstemp(prefix='.thumbnail-', suffix='.part', dir=target.parent)
     try:
         with os.fdopen(descriptor, 'wb') as stream:
-            img.save(stream, format='JPEG', quality=82, icc_profile=SRGB_ICC)
+            image.save(stream, format='JPEG', quality=quality, icc_profile=profile)
         os.replace(temporary, target)
     finally:
         Path(temporary).unlink(missing_ok=True)
-    return {'thumbnail': str(target)}
 
 
 def export_image(path, recipe, destination, fmt, budget_mb, job_id, **kwargs):

@@ -35,7 +35,8 @@ def main():
             from .calibration import calibrate
             result = calibrate(request['path'],request['reference'],request['source_rect'],request['reference_rect'],request['cache'],request['budget_mb'],request['name'],request['lighting'])
         elif operation == 'thumbnail':
-            result = make_thumbnail(request['path'], request['cache'], request['budget_mb'])
+            result = make_thumbnail(request['path'], request['cache'], request['budget_mb'],
+                                    recipe=recipe if request.get('kind') == 'developed' else None)
         elif operation == 'export':
             result = export_image(request['path'], recipe, request['destination'], request['format'],
                                   request['budget_mb'], request['job_id'],options=request.get('options'),cache=request['cache'])

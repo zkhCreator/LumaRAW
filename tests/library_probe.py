@@ -36,6 +36,7 @@ def main():
     parser.add_argument('--rows',type=int,default=10000)
     parser.add_argument('--samples',type=int,default=30)
     parser.add_argument('--thumbnails',type=int,default=12)
+    parser.add_argument('--thumbnail-kind',choices=('source','developed'),default='source')
     args=parser.parse_args()
     if not 1 <= args.rows <= 1000000 or not 1 <= args.samples <= 1000 or not 1 <= args.thumbnails <= 60:
         raise SystemExit('Counts are outside probe bounds')
@@ -63,7 +64,7 @@ def main():
             'rules':{'rating_min':4,'color_label':'red'}})
         report={'platform':platform.platform(),'machine':platform.machine(),
                 'memory_gb':round(psutil.virtual_memory().total/1024**3,1),'catalog_rows':max(args.rows,args.thumbnails),
-                'thumbnail_count':args.thumbnails,'thumbnail_source_dimensions':[600,400],
+                'thumbnail_count':args.thumbnails,'thumbnail_kind':args.thumbnail_kind,'thumbnail_source_dimensions':[600,400],
                 'scope':'Synthetic catalog, CPU thumbnail workers; not RAW processing or desktop latency'}
         report['smart_collection_matches']=service.dispatch('list_photos',{'collection_id':smart['id']})['total']
         for name,params in (
@@ -73,10 +74,10 @@ def main():
         ):
             report[name]=measure(lambda params=params:service.dispatch('list_photos',params),args.samples)
         photo_ids=list(range(1,args.thumbnails+1))
-        report['cold_thumbnail_page']=measure(lambda:[service.dispatch('thumbnail',{'photo_id':i}) for i in photo_ids],1)
+        report['cold_thumbnail_page']=measure(lambda:[service.dispatch('thumbnail',{'photo_id':i,'kind':args.thumbnail_kind}) for i in photo_ids],1)
         report['warm_worker_page_baseline']=measure(lambda:[service.run_worker({
-            'operation':'thumbnail','path':path,'recipe':Recipe().dict()}) for path in paths],3)
-        report['warm_cached_page']=measure(lambda:service.dispatch('cached_thumbnails',{'photo_ids':photo_ids}),args.samples)
+            'operation':'thumbnail','path':path,'recipe':Recipe().dict(),'kind':args.thumbnail_kind}) for path in paths],3)
+        report['warm_cached_page']=measure(lambda:service.dispatch('cached_thumbnails',{'photo_ids':photo_ids,'kind':args.thumbnail_kind}),args.samples)
         report['broker_rss_mb']=round(psutil.Process().memory_info().rss/1024**2,2)
         report['sampled_worker_peak_mb']=round(service.peak,2)
         (work/'report.json').write_text(json.dumps(report,indent=2))

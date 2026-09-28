@@ -119,20 +119,4 @@ extension Store {
         }
         reviewRenderer.request(requests,force:force)
     }
-
-    func refreshReviewSummaries() async {
-        let ids=reviewPhotoIDs
-        guard isMultiReview,!ids.isEmpty else { return }
-        do {
-            let result=try await Backend.call("photo_summaries",["photo_ids":ids])
-            guard isMultiReview,reviewPhotoIDs == ids else { return }
-            for row in result["photos"] as? [[String: Any]] ?? [] {
-                guard let updated=Photo(row),let index=photos.firstIndex(where: { $0.id == updated.id }) else { continue }
-                // Summary changes repaint review frames; the selected full recipe
-                // still goes through Store's authoritative full-photo polling.
-                photos[index]=updated
-            }
-            updateReviewRequests()
-        } catch { message=error.localizedDescription }
-    }
 }

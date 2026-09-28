@@ -69,7 +69,12 @@ For a batch, check only the fields to apply; keywords replace the selected photo
 current keyword sets. These changes are catalog-only, with separate metadata
 revision checks; they do not write EXIF/XMP into originals. Warm grid pages reuse
 completed thumbnail paths in one service call without starting image workers.
-Thumbnails currently show source images, not developed edits.
+Mac grid and filmstrip thumbnails show the saved edits, including crop, rotation,
+color and masks, through the shared renderer. Recipe changes invalidate only the
+affected image; metadata edits reuse its thumbnail. External edits to any visible
+photo are detected by bounded summary polling. Refresh Library rechecks source
+files and retries missing or failed thumbnails. Legacy CLI thumbnail requests
+default to source previews; pass `kind: "developed"` for the edited result.
 
 ## Metal acceleration
 
