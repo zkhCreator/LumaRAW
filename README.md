@@ -14,10 +14,10 @@ LumaRAW references your originals without changing them. The SwiftUI app and you
 | Color | Custom tone curves, color mixer, camera-bound chart calibration, `.cube` LUTs, ICC soft proofing, and gamut warnings |
 | Detail and composition | Full-resolution 1:1 viewports, noise reduction, sharpening, defringing, rotation, crop, straighten, and perspective |
 | Local adjustments | Radial, gradient, luminance-range, and brush masks; manual lens distortion, vignette, and chromatic-aberration correction |
-| Library | Ratings, flags, color labels, catalog metadata/keywords, regular and live smart collections, SQL filters/sorting, duplicate/missing indexing, edit versions, selective sync, and backup/restore |
+| Library | Ratings, flags, color labels, catalog metadata/keywords, regular/live smart collections, nested sets, Quick/target collections, SQL filters/sorting, duplicate/missing indexing, edit versions, selective sync, and backup/restore |
 | Culling | Grid/Loupe/Compare/Survey, anchored page selections, active-photo review actions, linked or independent full-resolution comparison viewports |
 | Export | JPEG and 16-bit TIFF with embedded sRGB, Display P3, Adobe RGB, or ProPhoto RGB ICC profiles; persistent queue, pause/cancel/retry, and collision-safe filenames |
-| Agents | 36 MCP tools, equivalent JSON CLI commands, and a bundled skill; app and agent edits share conflict detection |
+| Agents | 42 MCP tools, equivalent JSON CLI commands, and a bundled skill; app and agent edits share conflict detection |
 
 ## Build and run
 
@@ -59,10 +59,24 @@ Adjustments save automatically. Each photo supports up to 50 undo steps, named e
 
 Use **Collections → New Collection** to create a regular collection or a smart
 collection with live rules. Add/remove selected photos from a regular collection
-through its contextual menu or **Organize**. Collection removal preserves catalog
+through its contextual menu or **Organize**. Collection sets lazily expand and
+show the union of their nested regular and smart collections. **Edit / Move**
+changes a collection's parent; **Duplicate** copies its rules and memberships.
+Creating a regular collection can include the selected photographs atomically.
+Collection removal preserves catalog
 photos and originals. **Filter** combines rating, flag, color, keyword, text,
 camera and folder criteria; sorting is stable across 60-photo pages. Camera and
 capture-time filters require the library index to have read that metadata.
+
+The **Quick Collection** is persistent and unique per catalog. Its contextual menu
+can save it as a regular collection, optionally clearing it in the same operation.
+Set any regular collection as the target; a **+** identifies it. Press **B** with a
+photo view focused, or click a thumbnail circle, to add/remove target members.
+A fully included selection is removed; otherwise selected photos are added.
+Target actions reject stale target/membership versions from another client. Delete
+in a focused photo view removes membership when a regular/Quick collection is open.
+Deleting a set also removes its nested collections, after confirmation, while
+preserving catalog photos and originals.
 
 **Organize → Edit Metadata** edits title, caption, copyright, keywords and labels.
 For a batch, check only the fields to apply; keywords replace the selected photos'

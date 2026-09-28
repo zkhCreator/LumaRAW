@@ -11,14 +11,36 @@ struct LibraryCollection: Identifiable {
     let revision: Int
     let rules: [String: Any]
     let match: String
+    let parentID: Int?
+    var symbol: String { kind == "set" ? "folder" : kind == "smart" ? "gearshape.2" : kind == "quick" ? "circle.dashed" : "square.stack" }
 
     init?(_ row: [String: Any]) {
         guard let id=row["id"] as? Int, let name=row["name"] as? String else { return nil }
-        self.id=id; self.name=name
+        self.id=id; self.name=name;parentID=row["parent_id"] as? Int
         kind=row["kind"] as? String ?? "regular"
         revision=row["revision"] as? Int ?? 0
         rules=row["rules"] as? [String: Any] ?? [:]
         match=row["match"] as? String ?? "all"
+    }
+}
+
+struct CollectionPage {
+    let items: [LibraryCollection]
+    let offset: Int
+    let total: Int
+}
+
+struct CollectionState {
+    let revision: Int
+    let quick: LibraryCollection
+    let target: LibraryCollection
+    let members: Set<Int>
+    init?(_ row: [String:Any]) {
+        guard let quick=LibraryCollection(row["quick"] as? [String:Any] ?? [:]),
+              let target=LibraryCollection(row["target"] as? [String:Any] ?? [:]) else { return nil }
+        self.quick=quick;self.target=target
+        revision=row["revision"] as? Int ?? 0
+        members=Set(row["members"] as? [Int] ?? [])
     }
 }
 

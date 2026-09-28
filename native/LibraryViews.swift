@@ -25,7 +25,7 @@ struct LibraryToolbar: View {
                         Button(collection.name) { Task { await s.changeMembership(collection,action:"add") } }
                     }
                 }
-                if let collection=s.collections.first(where: { $0.id == s.collectionID && $0.kind == "regular" }) {
+                if let collection=s.activeCollection,collection.id == s.collectionID,["regular","quick"].contains(collection.kind) {
                     Button("Remove from Collection") { Task { await s.changeMembership(collection,action:"remove") } }
                 }
             }.disabled(s.selection.isEmpty)
@@ -40,53 +40,6 @@ struct LibraryToolbar: View {
                 .help(s.sortDescending ? "Descending; click for ascending":"Ascending; click for descending")
                 .accessibilityLabel(s.sortDescending ? "Sort descending":"Sort ascending")
         }.controlSize(.small).padding(.horizontal,20).padding(.vertical,8)
-    }
-}
-
-struct CollectionsSidebar: View {
-    @EnvironmentObject var s: Store
-    @State private var deleting: LibraryCollection?
-    var body: some View {
-        Section("Collections") {
-            Button { s.editCollection() } label: { Label("New Collection…", systemImage:"plus") }
-            ForEach(s.collections) { collection in
-                Button { Task { await s.openCollection(collection) } } label: {
-                    HStack {
-                        Label(collection.name, systemImage:collection.kind == "smart" ? "gearshape.2":"square.stack")
-                            .lineLimit(1)
-                        Spacer()
-                        if s.collectionID == collection.id { Image(systemName:"checkmark").font(.caption) }
-                    }
-                }
-                .accessibilityAddTraits(s.collectionID == collection.id ? .isSelected:[])
-                .contextMenu {
-                    Button("Edit Collection…") { s.editCollection(collection) }
-                    if collection.kind == "regular" {
-                        Button("Add Selected Photos") { Task { await s.changeMembership(collection,action:"add") } }
-                            .disabled(s.selection.isEmpty)
-                        Button("Remove Selected Photos") { Task { await s.changeMembership(collection,action:"remove") } }
-                            .disabled(s.selection.isEmpty)
-                    }
-                    Button("Delete Collection…", role:.destructive) { deleting=collection }
-                }
-            }
-            if s.collectionTotal > 60 {
-                HStack {
-                    Button("Previous") { s.collectionOffset=max(0,s.collectionOffset-60); Task { await s.refreshCollections() } }
-                        .disabled(s.collectionOffset == 0)
-                    Spacer()
-                    Button("Next") { s.collectionOffset+=60; Task { await s.refreshCollections() } }
-                        .disabled(s.collectionOffset+60 >= s.collectionTotal)
-                }.font(.caption)
-            }
-        }
-        .confirmationDialog("Delete \(deleting?.name ?? "collection")?",
-                            isPresented:Binding(get:{deleting != nil},set:{if !$0 { deleting=nil }})) {
-            Button("Delete Collection",role:.destructive) {
-                if let collection=deleting { Task { await s.deleteCollection(collection) } }
-                deleting=nil
-            }
-        } message: { Text("Photos and originals will remain in your library.") }
     }
 }
 
@@ -129,11 +82,16 @@ struct CollectionEditor: View {
     @State private var match: String
     @State private var draft: LibraryFilterDraft
     @State private var saving=false
+    @State private var parentID: Int?
+    @State private var parentName="None"
+    @State private var choosingParent=false
+    @State private var includePhotos=false
 
-    init(original: LibraryCollection?) {
+    init(original: LibraryCollection?,kind: String="regular",parentID: Int?=nil) {
         self.original=original
         _name=State(initialValue:original?.name ?? "")
-        _kind=State(initialValue:original?.kind ?? "regular")
+        _kind=State(initialValue:original?.kind ?? kind)
+        _parentID=State(initialValue:original?.parentID ?? parentID)
         _match=State(initialValue:original?.match ?? "all")
         _draft=State(initialValue:LibraryFilterDraft(original?.rules ?? [:]))
     }
@@ -144,11 +102,15 @@ struct CollectionEditor: View {
             Form {
                 TextField("Name",text:$name)
                 Picker("Type",selection:$kind) {
-                    Text("Collection").tag("regular"); Text("Smart Collection").tag("smart")
+                    Text("Collection").tag("regular"); Text("Smart Collection").tag("smart"); Text("Collection Set").tag("set")
                 }.disabled(original != nil)
+                Button("Inside: \(parentName)") { choosingParent=true }
+                if original == nil,kind == "regular" { Toggle("Include selected photos",isOn:$includePhotos).disabled(s.selection.isEmpty) }
                 if kind == "smart" {
                     Picker("Match",selection:$match) { Text("All rules").tag("all"); Text("Any rule").tag("any") }
                     LibraryFilterFields(draft:$draft)
+                } else if kind == "set" {
+                    Text("Sets contain collections and other sets. Select a set to view its combined photos.").font(.caption).foregroundStyle(.secondary)
                 } else {
                     Text("Add photos using the collection's contextual menu. A photo can belong to more than one collection.")
                         .font(.caption).foregroundStyle(.secondary)
@@ -160,12 +122,17 @@ struct CollectionEditor: View {
                 Button("Save") {
                     saving=true
                     Task {
-                        if await s.saveCollection(name:name,kind:kind,rules:kind == "smart" ? draft.rules:[:],match:match,original:original) { dismiss() }
+                        if await s.saveCollection(name:name,kind:kind,rules:kind == "smart" ? draft.rules:[:],match:match,original:original,parentID:parentID,includePhotos:includePhotos && kind == "regular") { dismiss() }
                         saving=false
                     }
                 }.keyboardShortcut(.defaultAction).disabled(saving || name.trimmingCharacters(in:.whitespaces).isEmpty)
             }
-        }.padding(24).frame(width:520,height:kind == "smart" ? 690:320)
+        }.padding(24).frame(width:520,height:kind == "smart" ? 740:380)
+        .sheet(isPresented:$choosingParent){CollectionLocationPicker(selection:$parentID,excludedID:original?.id)}
+        .task(id:parentID) {
+            if let parentID,let row=try? await Backend.call("get_collection",["collection_id":parentID]) { parentName=row["name"] as? String ?? "Collection Set" }
+            else { parentName="None" }
+        }
     }
 }
 

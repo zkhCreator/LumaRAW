@@ -23,6 +23,8 @@ import AppKit
                 Button("Undo Last Adjustment"){store.undo()}.keyboardShortcut("z").disabled(store.photo==nil || store.editing)
             }
             CommandMenu("Photo") {
+                Button("Add to / Remove from Target Collection") { Task { await store.toggleTargetMembership() } }.disabled(store.actionPhotoIDs.isEmpty)
+                Divider()
                 Button("Edit Selected Metadata…"){Task{await store.prepareMetadataEditor()}}.disabled(store.selection.isEmpty)
                 Menu("Set Color Label") {
                     ForEach(LibraryLabels.names,id:\.self) { label in
@@ -48,6 +50,8 @@ import AppKit
                 }
                 Divider()
                 Button("New Collection…") { store.editCollection() }.keyboardShortcut("n",modifiers:[.command,.shift])
+                Button("New Collection Set…") { store.editCollection(kind:"set") }
+                Button("Show Quick Collection") { if let quick=store.collectionState?.quick { Task { await store.openCollection(quick) } } }
                 Button("Filter Photos…") { store.showLibraryFilters=true }
                 Button("Refresh Library") { Task { await store.refreshCollections(); await store.refresh() } }
             }

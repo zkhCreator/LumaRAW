@@ -1,6 +1,6 @@
 """Portable catalog organization, independent of pixels and platform presentation.
 
-Purpose: persist descriptive metadata and regular/smart collections, and compile
+Purpose: persist descriptive metadata, delegate collection hierarchy workflows, and compile
 bounded library queries. Inputs are schema-validated commands plus a catalog-owned
 SQLite connection. Outputs are rows, parameterized predicates and transactions.
 Non-goals: no original/sidecar writes, EXIF rewriting, image decoding or UI state.
@@ -8,7 +8,6 @@ Metadata revisions are separate from recipes; smart membership is evaluated live
 """
 import json
 import os
-import time
 import unicodedata
 
 COLORS = ('none', 'red', 'yellow', 'green', 'blue', 'purple')
@@ -35,7 +34,7 @@ def folded(value):
     return unicodedata.normalize('NFC', value or '').casefold()
 
 
-def migrate(db):
+def migrate_metadata(db):
     """Add library state once, preserving all previous photo/job identifiers."""
     if db.execute('PRAGMA user_version').fetchone()[0] >= 1:
         return
@@ -69,6 +68,12 @@ def migrate(db):
         for statement in statements:
             db.execute(statement)
         db.execute('PRAGMA user_version=1')
+
+
+def migrate(db):
+    migrate_metadata(db)
+    from .collections import migrate as migrate_collections
+    migrate_collections(db)
 
 
 def text_predicate(text):
@@ -125,82 +130,28 @@ class Organization:
         self.catalog = catalog
         self.db = catalog.db
 
+    @property
+    def collections(self):
+        from .collections import Collections
+        return Collections(self.catalog)
+
     def collection(self, collection_id):
-        row = self.db.execute('SELECT * FROM collections WHERE id=?', (collection_id,)).fetchone()
-        if not row:
-            raise ValueError('Collection does not exist')
-        result = dict(row)
-        result['rules'] = json.loads(result['rules'])
-        return result
+        return self.collections.get(collection_id)
 
     def collection_predicate(self, collection_id):
-        row = self.collection(collection_id)
-        if row['kind'] == 'smart':
-            return criteria(row['rules'], row['match'])
-        return 'id IN (SELECT photo_id FROM collection_photos WHERE collection_id=?)', [collection_id]
+        return self.collections.predicate(collection_id)
 
-    def list_collections(self, offset=0):
-        rows = self.db.execute('SELECT id FROM collections ORDER BY name COLLATE NOCASE, id '
-                               'LIMIT 60 OFFSET ?', (offset,)).fetchall()
-        # Membership counts are obtained when a collection is opened, avoiding an
-        # expensive whole-catalog predicate scan for every smart sidebar entry.
-        return {'collections': [self.collection(row[0]) for row in rows],
-                'total': self.db.execute('SELECT count(*) FROM collections').fetchone()[0],
-                'offset': offset, 'page_size': 60}
+    def list_collections(self, **params):
+        return self.collections.list(**params)
 
-    def save_collection(self, name, kind='regular', rules=None, match='all',
-                        collection_id=None, expected_revision=None):
-        name = name.strip()
-        if not name:
-            raise ValueError('Collection name cannot be blank')
-        rules = rules or {}
-        criteria(rules, match)
-        if kind == 'regular' and rules:
-            raise ValueError('Only smart collections can have rules')
-        if collection_id is not None:
-            row = self.collection(collection_id)
-            if row['revision'] != expected_revision:
-                raise ValueError('Collection conflict; reload the collection before editing')
-            if row['kind'] != kind:
-                raise ValueError('Collection type cannot be changed')
-        with self.db:
-            if collection_id is None:
-                cursor = self.db.execute(
-                    'INSERT INTO collections(name,kind,rules,match,created) VALUES(?,?,?,?,?)',
-                    (name, kind, json.dumps(rules), match, time.time()))
-                collection_id = cursor.lastrowid
-            else:
-                self.db.execute('UPDATE collections SET name=?,rules=?,match=?,revision=revision+1 '
-                                'WHERE id=?', (name, json.dumps(rules), match, collection_id))
-        return self.collection(collection_id)
+    def save_collection(self, **params):
+        return self.collections.save(**params)
 
     def membership(self, collection_id, expected_revision, ids, action):
-        row = self.collection(collection_id)
-        if row['revision'] != expected_revision:
-            raise ValueError('Collection conflict; reload the collection before editing')
-        if row['kind'] != 'regular':
-            raise ValueError('Smart collection membership is determined by its rules')
-        ids = list(dict.fromkeys(ids))
-        if any(not self.catalog.photo(photo_id) for photo_id in ids):
-            raise ValueError('Photo does not exist')
-        with self.db:
-            if action == 'add':
-                self.db.executemany('INSERT OR IGNORE INTO collection_photos VALUES(?,?)',
-                                    [(collection_id, photo_id) for photo_id in ids])
-            else:
-                self.db.executemany('DELETE FROM collection_photos WHERE collection_id=? AND photo_id=?',
-                                    [(collection_id, photo_id) for photo_id in ids])
-            self.db.execute('UPDATE collections SET revision=revision+1 WHERE id=?', (collection_id,))
-        return self.collection(collection_id)
+        return self.collections.membership(collection_id,expected_revision,ids,action)
 
     def delete_collection(self, collection_id, expected_revision):
-        row = self.collection(collection_id)
-        if row['revision'] != expected_revision:
-            raise ValueError('Collection conflict; reload the collection before deleting')
-        with self.db:
-            self.db.execute('DELETE FROM collection_photos WHERE collection_id=?', (collection_id,))
-            self.db.execute('DELETE FROM collections WHERE id=?', (collection_id,))
-        return {'deleted': collection_id}
+        return self.collections.delete(collection_id,expected_revision)
 
     def edit_metadata(self, targets, patch):
         ids = [target['photo_id'] for target in targets]

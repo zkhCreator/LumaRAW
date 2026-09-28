@@ -29,8 +29,17 @@ import UniformTypeIdentifiers
     @Published var librarySort="imported"
     @Published var sortDescending=true
     @Published var collectionID: Int?
+    @Published var activeCollection: LibraryCollection?
     @Published var collections: [LibraryCollection] = []
     @Published var collectionOffset=0
+    @Published var collectionPages: [Int:CollectionPage] = [:]
+    var collectionPageGenerations: [Int:Int] = [:]
+    @Published var expandedCollections: Set<Int> = []
+    @Published var collectionState: CollectionState?
+    @Published var newCollectionKind="regular"
+    @Published var newCollectionParent: Int?
+    @Published var showQuickSave=false
+    @Published var quickSaveSource: LibraryCollection?
     @Published var collectionTotal=0
     @Published var showCollectionEditor=false
     @Published var editingCollection: LibraryCollection?
@@ -141,6 +150,7 @@ import UniformTypeIdentifiers
             }
             reviewSelectionChanged()
             updateThumbnails(force:true)
+            await refreshCollectionState()
         } catch {self.error=error.localizedDescription}
     }
     func clearPhoto() {

@@ -37,10 +37,28 @@ metadata revisions. Use `rate_photo` for the existing single-photo contract.
 
 `list_photos` accepts `filters`, `collection_id`, `sort` and `descending`, and
 returns a clamped offset plus at most 60 summaries. `list_collections` paginates
-regular and smart collections. Use `save_collection` with `collection_id` and
+regular/smart collections and sets, excluding the single Quick Collection. Omit
+`parent_id` for the flat list; use null for root children or a set ID for its
+children. `get_collection` also returns its ancestor path. Use `save_collection`
+with `collection_id` and
 `expected_revision` for updates; `collection_membership` applies only to regular
-collections and also requires their revision. Deleting a collection never removes
+or Quick collections and also requires their revision. `parent_id` moves a
+collection; new regular collections can take `photo_ids` to add initial members.
+Sets aggregate nested collections without owning photos directly. Ancestor revisions
+change when descendants change. Deleting a set removes the entire subtree and
+memberships; `duplicate_collection` copies it, preserving rules/memberships.
+Deleting a collection never removes
 photos or originals. Smart rules evaluate current metadata when the library is queried.
+
+`collection_state` returns the Quick/target collections and independent state
+revision; optional `photo_ids` returns target membership for that page. Target
+changes require `set_target_collection` with the state revision; null resets to
+Quick. `target_membership` requires the captured target ID, its collection revision
+and the state revision, and an explicit add/remove action. Never refresh and retry
+a target conflict blindly. `quick_collection` saves or clears Quick using its
+collection revision; save can atomically clear afterward. The Quick Collection
+cannot be renamed, moved or deleted. Limits: 32 nesting levels, 128 smart descendants
+in an aggregate view, and 1,000 collection nodes per subtree duplication.
 
 `edit_metadata` takes at most 60 `{photo_id,expected_metadata_revision}` targets and
 a shared `patch` containing title/caption/copyright/color_label/keywords. Read each

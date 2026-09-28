@@ -24,6 +24,7 @@ from .api import TOOLS
 from .catalog import Catalog, walk_images
 from .model import Recipe, ExportOptions, LIMITS, PRESETS, SYNC_GROUPS
 from .organization import Organization
+from .collections import Collections
 from .source_identity import cached_thumbnail
 
 class ConflictError(ValueError): pass
@@ -161,7 +162,15 @@ class Service:
                 total=c.filtered_count(mode,search,filters,collection)
                 offset=min(offset,max(0,((total-1)//60)*60))
                 return {'photos':c.filtered_page(offset,mode,search,filters,collection,p.get('sort','imported'),p.get('descending',True)),'total':total,'offset':offset,'page_size':60}
-            if method=='list_collections':return Organization(c).list_collections(p.get('offset',0))
+            if method=='list_collections':return Collections(c).list(**p)
+            if method=='get_collection':
+                store=Collections(c);row=store.get(p['collection_id'])
+                return {**row,'ancestors':list(reversed(store.ancestors(row['parent_id'])))}
+            if method=='duplicate_collection':return Collections(c).duplicate(**p)
+            if method=='collection_state':return Collections(c).state(p.get('photo_ids',()))
+            if method=='set_target_collection':return Collections(c).set_target(**p)
+            if method=='target_membership':return Collections(c).target_membership(**p)
+            if method=='quick_collection':return Collections(c).quick(**p)
             if method=='save_collection':
                 if ('collection_id' in p) != ('expected_revision' in p):
                     raise ValueError('Collection updates require collection_id and expected_revision together')

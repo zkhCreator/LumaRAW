@@ -25,11 +25,11 @@ Official references checked September 2026:
 “Partial” means an implementation exists, with important workflow or verification
 gaps. Nothing below is full Lightroom parity merely because historical tests pass.
 
-| Area | Baseline | Remaining acceptance / work |
+| Area | Current implementation | Remaining acceptance / work |
 | --- | --- | --- |
 | Import and catalogs | Partial: referenced originals, backup/restore | Import preview/selection, copy workflows, metadata/develop presets, catalog switching/merge |
-| Library navigation | Partial: bounded grid/filmstrip, flags/stars | Folders, collections/sets, smart/quick collections, stable sorting, metadata/keyword filters |
-| Organization | Partial: duplicate/missing detection | Keywords/hierarchy, IPTC, labels, stacks, virtual copies, rename, multi-photo metadata, sidecars |
+| Library navigation | Partial: bounded grid/filmstrip, filters/sorting, regular/smart/Quick collections and nested sets | Folder tree, collection drag/drop/color labels, full smart criteria/import-export, source-selection memory, desktop acceptance |
+| Organization | Partial: duplicate/missing detection, flat keywords, title/caption/copyright, labels and batch metadata | Keyword hierarchy, complete IPTC, stacks, virtual copies, rename and sidecars |
 | Culling | Partial: Loupe/Compare/Survey, linked detail, anchored page selection | Desktop acceptance, cross-page selection, Develop reference view, auto advance, persistent workspace state |
 | Basic development | Partial: light/WB/color | Calibrated absolute WB, eyedropper, texture/clarity/dehaze, complete HSL/B&W and color grading |
 | Curves and profiles | Partial: custom composite curve, LUT/ICC | Interactive RGB curves, camera/profile browser, compatible preset import/export |
@@ -37,7 +37,7 @@ gaps. Nothing below is full Lightroom parity merely because historical tests pas
 | Geometry | Partial: crop/rotate/straighten/perspective | Interactive retained handles/ratios/flip, guided transforms, crop state parity |
 | Local editing | Partial: radial/gradient/brush/luma | Mask list/edit/reorder/intersection, range masks, clone/heal, red-eye (non-AI) |
 | History and presets | Partial: 50-step undo, named versions | Redo, navigable history, preset management and import-time/batch application |
-| Preview/performance | Partial: Metal, proxies, 1:1 viewport | Real-RAW catalog/slider latency, offline previews, cache controls and desktop acceptance |
+| Preview/performance | Partial: Metal, proxies, 1:1 viewport, developed thumbnail fast path | Real-RAW catalog/slider latency, offline previews, cache controls and desktop acceptance |
 | Export | Partial: JPEG/16-bit TIFF, ICC, durable jobs | Presets, metadata policies, watermark, additional formats, publish workflows |
 | Merge | Missing | Non-AI HDR merge and panorama with bounded resources and reference acceptance |
 | Map | Missing | GPS metadata, map navigation, track import, location editing with explicit persistence |
@@ -49,9 +49,9 @@ gaps. Nothing below is full Lightroom parity merely because historical tests pas
 
 ## Active increment
 
-Developed thumbnails: saved recipes appear in the grid and filmstrip, with bounded
-rendering, source/recipe/LUT cache identity and stale-response rejection. Collection
-sets, quick collection, virtual copies and the other rows remain tracked separately.
+Collection hierarchy and Quick/target workflows: persistent nested sets, aggregate
+views, revision-safe moves/copies/deletion, one Quick Collection per catalog and
+atomic save/clear. Virtual copies and the other rows remain tracked separately.
 
 ## Evidence log
 
@@ -99,8 +99,8 @@ whole-desktop latency, or performance guarantees on other hardware. Reproduce vi
 
 ### Next work
 
-Continue with collection sets and quick collection, virtual copies and keyword
-hierarchy. Offline preview caches and cache-size controls remain pending. Then close Develop and
+Continue with virtual copies and keyword hierarchy. Offline preview caches,
+cache-size controls and native polling/process-startup costs remain pending. Then close Develop and
 export gaps in the inventory. Preserve pending desktop/older-OS acceptance rather
 than removing it from the completion criteria.
 
@@ -197,3 +197,51 @@ median / **2.79 ms** p95 (30 samples). Broker RSS was 49.00 MB; sampled worker p
 was 76.23 MB. These are service/worker timings, excluding IPC and desktop drawing,
 and do not establish camera RAW speed. Reproduce with the library probe's
 `--thumbnail-kind developed` option.
+
+### Collection sets and Quick/target workflow
+
+Schema version 2 preserves existing IDs, adds parent links and creates one durable
+Quick Collection. Collection sets support nested regular/smart/set children,
+combined photo views, moves, subtree duplication and deletion. A parent revision
+changes with descendant mutations, so stale subtree deletion/copy fails. New
+regular collections can include the selected photos in their creation transaction.
+
+Quick can be saved as a regular collection, optionally clearing in the same
+transaction. Target collection choice is durable and has a separate revision.
+Target membership checks both the captured target and its membership revision;
+concurrent target changes fail visibly instead of redirecting the action. Deleting
+a target or an enclosing set resets the target to Quick and leaves photos intact.
+
+The native sidebar lazily expands 60-child pages, releases collapsed branches,
+marks the target with a plus and provides edit/move/duplicate actions. B and
+thumbnail-circle actions add/remove target members. Delete in a focused photo
+view removes regular/Quick membership. Forms support nested creation, initial
+selection and Quick save/clear, with explicit subtree-delete confirmation.
+
+New evidence: eight Python workflow tests cover nested live aggregation, invalid
+parents/cycles/depth, initial-member atomicity, ancestor conflicts, safe subtree
+removal, Quick save/clear, target conflicts, duplication, v1 migration, backup and
+pagination. Seventeen new native assertions passed through the real broker. The
+full required-Metal Python run passed **133 tests, 2 real-NEF tests skipped**.
+
+Explicit resource bounds: 32 nesting levels; 128 smart collections per set
+aggregate; 1,000 collection nodes per duplication. These are current limits, not
+Lightroom limits. Collection drag/drop, color labels on collections, smart-rule
+import/export, source-selection memory, rendered disclosure/keyboard acceptance
+and macOS 14 runtime remain incomplete. B currently removes a fully included
+selection and otherwise adds it; mixed-selection equivalence to Lightroom has
+not been independently verified. These gaps remain part of the full goal.
+
+Synthetic collection probe (10,000 catalog rows, 13-node set, macOS 26.6.2 arm64,
+128 GB RAM; no image workers): aggregate 60-photo page **8.96 ms** median /
+**9.82 ms** p95, child page **1.13 / 1.26 ms**, target page state **1.10 / 1.20 ms**
+(30 samples each). Saving a 10,000-member Quick Collection took **11.82 / 11.85 ms**
+and duplicating the 13-node subtree with those memberships **17.03 / 19.12 ms**
+(three samples each). Broker RSS was 39.45 MB. These measure synthetic SQLite and
+service commands, excluding CLI startup, IPC and desktop drawing. Reproduce with
+`tests/collection_probe.py`.
+
+All six native suites passed against the final packaged engine (**91 assertions**).
+The Mac app built without Swift warnings and passed ad-hoc signature verification.
+The 177-file source archive passed the extracted strict source scan. Desktop UI
+and older-OS acceptance remain explicitly unverified.

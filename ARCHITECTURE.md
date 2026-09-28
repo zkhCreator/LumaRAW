@@ -40,7 +40,16 @@ The native store clears photo-specific state when selection changes and intersec
 Library pages contain at most 60 summaries; full recipes are fetched on demand. Preview and export share strip processing, with overlap for neighborhood filters. Full-resolution viewports are limited to 2048 × 1536. LibRaw still decodes a complete RAW frame; linear pixel caches live on disk.
 
 Library organization lives in `organization.py`: catalog-only descriptive fields,
-normalized keyword relations, regular membership and live smart predicates. Metadata
+normalized keyword relations and descriptive revisions. `collections.py` owns
+regular/Quick membership, live smart predicates, parent links and durable target
+state. Schema version 2 adds these without changing existing photo/collection IDs.
+Ancestor revisions cover descendant changes, protecting subtree deletion/copy.
+Quick save/clear is one transaction; target membership checks both state and
+collection revisions. Set views combine relational descendants and live smart
+predicates. Children page at 60; collapsed branches release native cached pages.
+Nesting is limited to 32 levels, aggregate views to 128 smart descendants, and
+subtree duplication to 1,000 collection nodes. These resource bounds are explicit.
+Metadata
 and collections have independent revisions. Grid filtering/counting/sorting runs in
 SQLite with a deterministic ID tie-breaker; summaries never select recipe or EXIF
 JSON. Collections also paginate at 60 and do not eagerly count every smart collection.

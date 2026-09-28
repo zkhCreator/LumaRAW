@@ -6,36 +6,36 @@ import Foundation
 
 extension Store {
     func refreshCollections() async {
-        do {
-            let requestedOffset=collectionOffset
-            let result=try await Backend.call("list_collections", ["offset":requestedOffset])
-            guard requestedOffset == collectionOffset else { return }
-            collections=(result["collections"] as? [[String: Any]] ?? []).compactMap(LibraryCollection.init)
-            collectionTotal=result["total"] as? Int ?? 0
-            if collections.isEmpty && collectionOffset > 0 {
-                collectionOffset=max(0,collectionOffset-60)
-                await refreshCollections()
-            }
-        } catch { self.error=error.localizedDescription }
+        await loadCollectionPage(parent:nil,offset:collectionOffset)
+        for id in expandedCollections.sorted() {
+            await loadCollectionPage(parent:id,offset:collectionPages[id]?.offset ?? 0)
+        }
+        await refreshCollectionState()
+        if let id=collectionID,let row=try? await Backend.call("get_collection",["collection_id":id]),collectionID == id {
+            activeCollection=LibraryCollection(row)
+        }
     }
 
     func openCollection(_ collection: LibraryCollection) async {
+        activeCollection=collection
         collectionID=collection.id; mode="all"; workspace="library"; offset=0
         await refresh()
     }
 
-    func editCollection(_ collection: LibraryCollection? = nil) {
+    func editCollection(_ collection: LibraryCollection? = nil,kind: String="regular",parent: Int?=nil) {
+        newCollectionKind=kind;newCollectionParent=parent
         editingCollection=collection
         showCollectionEditor=true
     }
 
     func saveCollection(name: String, kind: String, rules: [String: Any], match: String,
-                        original: LibraryCollection?) async -> Bool {
-        var params: [String: Any] = ["name":name, "kind":kind, "rules":rules, "match":match]
+                        original: LibraryCollection?,parentID: Int?=nil,includePhotos: Bool=false) async -> Bool {
+        var params: [String: Any] = ["name":name, "kind":kind, "rules":rules, "match":match,"parent_id":parentID as Any? ?? NSNull()]
         if let original {
             params["collection_id"]=original.id
             params["expected_revision"]=original.revision
         }
+        if includePhotos,!selection.isEmpty { params["photo_ids"]=selection.sorted() }
         do {
             let result=try await Backend.call("save_collection", params)
             await refreshCollections()
@@ -57,10 +57,13 @@ extension Store {
     }
 
     func deleteCollection(_ collection: LibraryCollection) async {
+        let viewed=collectionID
+        let current=await collectionContainsCurrentSource(collection)
         do {
             _=try await Backend.call("delete_collection", ["collection_id":collection.id,
                 "expected_revision":collection.revision])
-            if collectionID == collection.id { collectionID=nil; offset=0 }
+            if current,collectionID == viewed { collectionID=nil;activeCollection=nil;offset=0 }
+            collapseCollection(collection.id)
             await refreshCollections()
             await refresh()
             message="Collection removed; photos remain in the library"

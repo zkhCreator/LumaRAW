@@ -27,6 +27,7 @@ extension Store {
             }
             updateThumbnails()
             updateReviewRequests()
+            await refreshCollectionState()
         } catch { message=error.localizedDescription }
     }
 }

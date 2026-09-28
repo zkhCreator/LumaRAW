@@ -57,7 +57,7 @@ The harness exercises the real native Store and JSON transport: import, RAW prev
 
 The runner compiles all native files except the app entry point, generates five
 small raster files and separate disposable catalogs, then runs the
-15-assertion state, 13-assertion library, 12-assertion culling, 20-assertion review and 14-assertion thumbnail suites. The library suite checks
+15-assertion state, 13-assertion library, 12-assertion culling, 20-assertion review and 14-assertion thumbnail and 17-assertion collection-tree suites. The library suite checks
 live smart membership, text search/sort, pagination, empty-filter selection,
 partial metadata writes and independent recipe/metadata conflict handling. JSON
 receipts stay in the ignored work directory. Without `--engine`, it uses the
@@ -86,6 +86,18 @@ external non-active edits, metadata reuse and cache eviction. Controlled late re
 verify generation and revision rejection. `tests/test_developed_thumbnails.py`
 compares geometry/color against fitted previews with JPEG tolerances, checks
 original hashes and verifies cache invalidation/reuse and client cancellation.
+
+The collection-tree suite verifies native nesting/aggregation, Quick save/clear,
+target changes, stale target rejection, subtree duplication/removal and state in
+a new Store. `tests/test_collections.py` adds database migration/backup evidence,
+ancestor conflicts, live aggregate membership, cycle/depth checks and pagination.
+`tests/collection_probe.py --work work/collection-probe-01` measures a generated
+10,000-photo catalog and 13-node set: aggregate/child/state queries, Quick save and
+subtree duplication. It records median/p95, counts and RSS, excludes IPC/UI and
+starts no image workers.
+
+These probes do not establish rendered disclosure, drag/drop or B-key mixed
+selection equivalence to Lightroom Classic.
 
 ## Library organization and performance
 
