@@ -139,6 +139,25 @@ to true. Parents can stop further ancestor traversal. Excluded names/synonyms ar
 also omitted from hierarchy paths. Limits are 32
 levels, 30 synonyms per tag and 100 direct tags per photo.
 
+`is_person` is a manual keyword classification, accepted by save_keyword and
+returned by list/get. Omission preserves an existing value; new tags default false.
+It does not invoke recognition.
+
+`import_keywords(path,expected_revision)` reads a UTF-8 tab-indented .txt or keyword
+options .csv dictionary, validates the whole input, then adds new tags atomically.
+Tabs define hierarchy, square brackets mark excluded text keywords, and nested
+braces identify synonyms. Existing tags keep their IDs, synonyms and flags; imports
+do not rename/delete tags or alter photo assignments. An invalid file or stale
+revision commits nothing. Limits: 64 MiB, one million tags, 32 levels, 30 synonyms.
+
+`export_keywords(path,format,expected_revision)` writes a new .txt (`text`) or .csv
+(`csv`) file. CSV retains all four keyword flags; text retains hierarchy, synonyms
+and Include on Export, reporting `omitted_options` for tags with other nondefault
+flags. Existing files/symlinks are never replaced. Unrepresentable legacy names
+fail without publishing a partial file. Receipts remain compact; the dictionaries
+travel as explicit files, not oversized broker responses. Do not automatically
+retry a mutation after an uncertain response.
+
 ## Folder sources
 
 `list_folders` pages visible roots or a `parent_id` at 60 items. Optional `search`,

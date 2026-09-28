@@ -21,6 +21,7 @@ struct LibraryKeyword: Identifiable {
     let includeExport: Bool
     let exportContaining: Bool
     let exportSynonyms: Bool
+    let isPerson: Bool
     init?(_ row: [String:Any], revision: Int, selection: [Int]) {
         guard let id=row["id"] as? Int,let name=row["name"] as? String else { return nil }
         self.id=id;self.name=name;self.revision=revision;self.selection=selection
@@ -32,6 +33,7 @@ struct LibraryKeyword: Identifiable {
         includeExport=(row["include_export"] as? Int ?? 1) != 0
         exportContaining=(row["export_containing"] as? Int ?? 1) != 0
         exportSynonyms=(row["export_synonyms"] as? Int ?? 1) != 0
+        isPerson=(row["is_person"] as? Int ?? 0) != 0
         hasChildren=row["has_children"] as? Bool ?? false
         photoCount=row["photo_count"] as? Int ?? 0;selectedCount=row["selected_count"] as? Int ?? 0
     }
@@ -144,7 +146,7 @@ extension Store {
         }
     }
 
-    func saveKeyword(name: String, synonyms: [String], parentID: Int?, original: LibraryKeyword?, revision: Int, targets: [Photo]=[], includeExport: Bool?=nil, exportContaining: Bool?=nil, exportSynonyms: Bool?=nil) async -> Bool {
+    func saveKeyword(name: String, synonyms: [String], parentID: Int?, original: LibraryKeyword?, revision: Int, targets: [Photo]=[], includeExport: Bool?=nil, exportContaining: Bool?=nil, exportSynonyms: Bool?=nil, isPerson: Bool?=nil) async -> Bool {
         guard !keywordBusy else { return false }
         guard original?.detailsDeferred != true else {
             error="Read complete keyword details before editing"
@@ -157,6 +159,7 @@ extension Store {
         if let includeExport { params["include_export"]=includeExport }
         if let exportContaining { params["export_containing"]=exportContaining }
         if let exportSynonyms { params["export_synonyms"]=exportSynonyms }
+        if let isPerson { params["is_person"]=isPerson }
         if !targets.isEmpty { params["targets"]=targets.map { ["photo_id":$0.id,"expected_metadata_revision":$0.metadataRevision] } }
         do {
             _=try await Backend.call("save_keyword",params)

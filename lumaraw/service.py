@@ -119,6 +119,9 @@ class Service:
             with self.catalog() as c:
                 return {'version':'0.4.1','api_version':1,'catalog':str(self.root),'photos':c.count(),'counts':c.job_counts(),'paused':self.paused,'active':self.active,**self.memory_status(),'peak_mb':round(self.peak,1)}
         if method=='recipe_schema':return {'defaults':Recipe().dict(),'limits':LIMITS,'presets':{k:v.dict() for k,v in PRESETS.items()},'groups':SYNC_GROUPS}
+        if method in ('import_keywords','export_keywords'):
+            from .keyword_exchange import import_file, export_file
+            return (import_file if method=='import_keywords' else export_file)(self, **p)
         if method in ('scan_folder_relocation','apply_folder_relocation'):
             return self.run_relocation(method,p)
         if method=='cancel_folder_relocation':

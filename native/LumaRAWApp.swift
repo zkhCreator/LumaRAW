@@ -67,6 +67,9 @@ import AppKit
                 }))
                 Button("Refresh Library") { Task { await store.refreshCollections(); await store.refresh() } }
             }
+            CommandMenu("Metadata") {
+                KeywordExchangeActions().environmentObject(store)
+            }
             CommandGroup(after:.toolbar) {
                 Button("Show Adjustment Inspector"){store.showInspector.toggle()}.keyboardShortcut("i",modifiers:[.command,.option])
                 Button("Before / After"){store.compare.toggle()}

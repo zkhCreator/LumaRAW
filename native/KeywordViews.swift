@@ -14,6 +14,8 @@ struct KeywordsSidebar: View {
                 Menu {
                     Button("Create Keyword…") { Task { await s.editKeyword() } }
                     Button("Refresh Keywords") { Task { await s.refreshKeywords() } }
+                    Divider()
+                    KeywordExchangeActions().environmentObject(s)
                 } label: { Image(systemName:"plus") }.help("Keyword Options")
                     .disabled(s.keywordRevision < 0 || s.keywordBusy || s.keywordEditorLoading)
                 if s.keywordEditorLoading { ProgressView().controlSize(.small).help("Reading keyword details") }
@@ -100,6 +102,7 @@ struct KeywordEditor: View {
     @State private var includeExport: Bool
     @State private var exportContaining: Bool
     @State private var exportSynonyms: Bool
+    @State private var isPerson: Bool
     @State private var parentID: Int?
     @State private var parentName: String
     @State private var choosingParent=false
@@ -112,6 +115,7 @@ struct KeywordEditor: View {
         _includeExport=State(initialValue:original?.includeExport ?? true)
         _exportContaining=State(initialValue:original?.exportContaining ?? true)
         _exportSynonyms=State(initialValue:original?.exportSynonyms ?? true)
+        _isPerson=State(initialValue:original?.isPerson ?? false)
         _parentID=State(initialValue:original?.parentID ?? parent?.id)
         let oldPath=original?.parentPath ?? ""
         _parentName=State(initialValue:parent?.path ?? (oldPath.isEmpty ? "None":oldPath))
@@ -133,6 +137,7 @@ struct KeywordEditor: View {
                 Toggle("Include on Export",isOn:$includeExport)
                 Toggle("Export Containing Keywords",isOn:$exportContaining)
                 Toggle("Export Synonyms",isOn:$exportSynonyms).disabled(!includeExport)
+                Toggle("Person Keyword",isOn:$isPerson)
                 if original == nil {
                     Toggle("Add to \(targets.count) Selected Photos",isOn:$includePhotos).disabled(targets.isEmpty)
                 }
@@ -146,7 +151,7 @@ struct KeywordEditor: View {
                     saving=true
                     Task {
                         let aliases=synonyms.components(separatedBy:",").map { $0.trimmingCharacters(in:.whitespacesAndNewlines) }.filter { !$0.isEmpty }
-                        if await s.saveKeyword(name:name,synonyms:aliases,parentID:parentID,original:original,revision:revision,targets:includePhotos ? targets:[],includeExport:includeExport,exportContaining:exportContaining,exportSynonyms:exportSynonyms) { dismiss() }
+                        if await s.saveKeyword(name:name,synonyms:aliases,parentID:parentID,original:original,revision:revision,targets:includePhotos ? targets:[],includeExport:includeExport,exportContaining:exportContaining,exportSynonyms:exportSynonyms,isPerson:isPerson) { dismiss() }
                         saving=false
                     }
                 }.keyboardShortcut(.defaultAction).disabled(name.trimmingCharacters(in:.whitespacesAndNewlines).isEmpty)

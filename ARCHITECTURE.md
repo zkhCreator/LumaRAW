@@ -221,8 +221,21 @@ the entire dictionary into native or Python arrays. Large edits still hold the
 catalog lock; durable background metadata jobs remain pending.
 
 The keyword layer stores export flags but does not encode image metadata.
-Vocabulary file exchange, keyword sets/suggestions, Painter and metadata undo
-remain separate workflows; hierarchical catalog storage does not establish those.
+Keyword sets/suggestions, Painter and metadata undo remain separate workflows;
+hierarchical catalog storage does not establish those.
+
+`keyword_exchange.py` owns schema 12's manual person-keyword flag and dictionary
+file exchange. Bounded UTF-8 input is copied and fingerprinted outside the catalog
+lock, then validated in a temporary SQLite database with a 4 MiB page cache. The
+complete stage merges new hierarchy nodes in one transaction, preserving existing
+IDs, attributes, synonyms and all assignments. No image metadata is rewritten.
+Export walks the hierarchy into a local temporary snapshot under the catalog lock,
+then copies and atomically links it into a new destination outside that lock.
+It never loads the entire vocabulary into a Python/native array. CSV retains the
+manual person and export flags; text retains only Include on Export plus hierarchy
+and synonyms. Input limits are 64 MiB, one million tags, 32 levels and thirty
+synonyms per tag. These explicit bounds are not proof of complete Adobe file
+interoperability; legacy unrepresentable names fail visibly.
 
 `keyword_details.py` bounds photo keyword descriptions without changing assignments.
 Photo reads retain every assigned ID and count. A recursive byte-length query

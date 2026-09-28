@@ -17,7 +17,7 @@ LumaRAW references your originals without changing them. The SwiftUI app and you
 | Library | Folder tree/search/favorites/labels, ratings, flags, catalog metadata/keywords, regular/live smart collections, nested sets, Quick/target collections, SQL filters/sorting, manual/capture-time stacks, duplicate/missing indexing, virtual copies/shared snapshots, selective sync, and backup/restore |
 | Culling | Grid/Loupe/Compare/Survey, anchored page selections, active-photo review actions, linked or independent full-resolution comparison viewports |
 | Export | JPEG and 16-bit TIFF with embedded sRGB, Display P3, Adobe RGB, or ProPhoto RGB ICC profiles; frozen catalog XMP/keyword policies, persistent queue, pause/cancel/retry, and collision-safe filenames |
-| Agents | 77 MCP tools, equivalent JSON CLI commands, and a bundled skill; app and agent edits share conflict detection |
+| Agents | 79 MCP tools, equivalent JSON CLI commands, and a bundled skill; app and agent edits share conflict detection |
 
 ## Build and run
 
@@ -142,6 +142,13 @@ also includes nested keywords and clears other source/filter restrictions.
 Large vocabulary rows show an abbreviated path; **Edit Keyword…** reads the full
 path, synonyms and options before opening. Parent selection also resolves complete
 paths. A changed keyword list requires reopening the editor with fresh values.
+**Metadata → Import Keywords…** adds a UTF-8 tab-indented text or keyword-options
+CSV dictionary. It preserves existing keywords and their attributes, synonyms and
+photo assignments. The entire file must validate before any new tags are added.
+**Export Keywords** writes a new file: CSV includes export options and the manual
+**Person Keyword** classification; text retains hierarchy, synonyms and Include on
+Export. Files may contain up to 64 MiB and one million unique tags. Existing output
+files are never replaced. The same commands are available in the Keyword List menu.
 The metadata editor accepts qualified paths such as `Places | Coast` (also `>` or
 reversed `<`). Equal leaf names under different parents retain separate IDs;
 ambiguous unqualified names require a path. Keyword changes remain in the catalog.

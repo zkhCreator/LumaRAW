@@ -27,6 +27,8 @@ Official references checked September 2026:
 - [XMP basic properties](https://developer.adobe.com/xmp/docs/xmp-namespaces/xmp/) and [Dublin Core properties](https://developer.adobe.com/xmp/docs/xmp-namespaces/dc/)
 - [Hierarchical keywords, synonyms and export options](https://helpx.adobe.com/lightroom-classic/desktop/organize-photos-in-lightroom-classic/keywords.html)
 - [Preset storage locations and catalog storage option](https://helpx.adobe.com/lightroom-classic/desktop/kb/preference-file-and-other-file-locations.html)
+- [Firsthand dictionary import behavior and preserved existing attributes](https://community.adobe.com/questions-675/importing-keywords-into-lightroom-classic-as-non-exported-keywords-1638903)
+- [Firsthand CSV field layout and tab indentation](https://community.adobe.com/questions-675/lightroom-classique-15-3-unable-to-import-keywords-from-csv-file-1560047)
 - [Export metadata and hierarchy settings](https://helpx.adobe.com/lightroom-classic/desktop/export-photos/export-files-disk-or-cd.html)
 - [XMP specifications, including Part 3 storage and Extended JPEG](https://developer.adobe.com/xmp/docs/xmp-specifications/)
 
@@ -39,7 +41,7 @@ gaps. Nothing below is full Lightroom parity merely because historical tests pas
 | --- | --- | --- |
 | Import and catalogs | Partial: referenced originals, backup/restore | Import preview/selection, copy workflows, metadata/develop presets, tethered capture, catalog switching/merge |
 | Library navigation | Partial: bounded grid/filmstrip, folder tree/search/favorites/labels, durable missing-folder relocation and folder synchronization, direct/recursive sources, filters/sorting, regular/smart/Quick collections and nested sets | Multi-source selection, complete sync Import Dialog/duplicate policy, folder move/rename, relocation overlap/collision handling, collection drag/drop/color labels, full smart criteria/import-export, source-selection memory, desktop acceptance |
-| Organization | Partial: duplicate/missing detection, hierarchical keywords/synonyms/export flags/Will Export preview, title/caption/copyright, labels, batch metadata, virtual copies, manual/split/capture-time scoped stacks | Keyword policy reference acceptance, sets/import-export/undo/Painter, complete IPTC, stack interaction acceptance, rename and sidecars |
+| Organization | Partial: duplicate/missing detection, hierarchical keywords/synonyms/export flags/Will Export preview, text/CSV vocabulary exchange and manual person tags, title/caption/copyright, labels, batch metadata, virtual copies, manual/split/capture-time scoped stacks | Keyword policy/file reference acceptance, sets/undo/Painter, complete IPTC, stack interaction acceptance, rename and sidecars |
 | Culling | Partial: Loupe/Compare/Survey, linked detail, anchored page selection | Desktop acceptance, cross-page selection, Develop reference view, auto advance, persistent workspace state |
 | Basic development | Partial: light/WB/color | Calibrated absolute WB, eyedropper, texture/clarity/dehaze, complete HSL/B&W and color grading |
 | Curves and profiles | Partial: custom composite curve, LUT/ICC | Interactive RGB curves, camera/profile browser, compatible preset import/export |
@@ -60,8 +62,8 @@ gaps. Nothing below is full Lightroom parity merely because historical tests pas
 
 ## Active increment
 
-Bounded complete vocabulary browsing, editing and parent selection. Next continue
-keyword sets and vocabulary exchange. The remaining inventory stays in scope.
+Keyword vocabulary file exchange and manual person classification. Keyword sets,
+reference-file interoperability and the remaining inventory stay in scope.
 
 ## Evidence log
 
@@ -1049,3 +1051,76 @@ catalog-only tag groups with complete keyword-set parity. Preset selection,
 recent keywords, built-in sets, rename/delete, keyboard behavior and cross-catalog
 storage all need separate acceptance. Rendered desktop/VoiceOver, macOS 14 runtime
 and the remaining non-AI inventory are still unverified or incomplete.
+
+### Keyword dictionary exchange increment
+
+The Mac Metadata menu and Keyword List expose UTF-8 dictionary import and text/CSV
+export. Input is copied with size/identity checks and a SHA-256 receipt outside the
+catalog lock. Disk-backed SQLite staging validates every hierarchy row, synonym
+and CSV option before a single additive catalog transaction. It preserves existing
+keyword IDs, spellings, synonyms, options and all photo assignments/revisions.
+Repeated import of an unchanged dictionary adds nothing and does not advance the
+vocabulary revision. Invalid input or a stale revision commits nothing.
+
+Dictionary output includes the complete hierarchy and synonyms independently of
+photo export filtering. CSV also retains the three export flags and manual person
+classification; text represents Include on Export and reports other nondefault
+options it cannot encode. Schema 12 adds the manual person flag with default false,
+without running recognition. Native forms can edit that flag. Existing and symlink
+destinations are preserved, and malformed/unrepresentable hierarchy data cannot
+publish a partial file. Output is generated into a local snapshot under the catalog
+lock, then written and atomically linked at the destination outside that lock.
+
+Official help establishes dictionary exchange and the two formats. Firsthand
+Adobe Community reports establish the English four-option CSV header, tab nesting,
+and preservation of attributes/synonyms on existing tags. Generated fixtures cover
+the implementation's combined format behavior; a complete Adobe-generated/exported
+fixture matrix and round trip through Lightroom itself have **not** been verified.
+In particular, CSV synonym-row variants, legacy delimiter-containing names and
+reference-app merge edge cases remain acceptance work. Native file panels,
+rendered interaction, VoiceOver and macOS 14 runtime remain unverified.
+
+Required-Metal Python regression passed **324 tests, no skips**, using the pinned
+Nikon D3S NEF. The source-engine native exchange suite passed **23 assertions**.
+New tests cover complete option round trips, unchanged originals and frozen jobs,
+malformed/oversized input, transaction rollback, genuine schema-11 migration,
+backup/restore, collision/symlink protection, compact real-IPC receipts and source/
+destination I/O that releases the catalog lock.
+
+The final macOS 14-target app built and passed local ad-hoc signature verification
+on macOS 26.6.2. Its manifest matches generation 13 / schema 12 / 79 tools. Five
+related native suites passed **98 assertions against the packaged engine**:
+dictionary exchange, keyword organization, complete vocabulary, export metadata
+and connection/handoff. The final source/build/native logs have no compiler warnings
+or errors; an earlier test-only string concatenation compile failure was corrected
+before the passing source and packaged runs. Public source checks covered 255
+files without findings, including the extracted source archive. Remote refresh
+again found no unmerged branches.
+
+Performance testing exposed a staging lookup that could not use its expression
+index. Matching the lookup to the indexed parent expression reduced the observed
+10,000-leaf parsing time from 1,739.405 ms to 67.069 ms. The slow 100,000-leaf run
+was explicitly stopped before changing source; its incomplete measurements are
+not reported as completed evidence.
+
+Current measurements on macOS 26.6.2 arm64, 128 GB RAM. The freshly generated
+UTF-8 file is warm in the OS cache; the initial catalog is new. Each leaf has one
+synonym, and each dictionary includes one additional excluded parent.
+
+| Operation | 10,000 leaves | 100,000 leaves |
+| --- | ---: | ---: |
+| Copy/hash/parse into staging, one run | 67.069 ms | 655.721 ms |
+| Initial atomic apply, one run | 99.132 ms | 1,112.378 ms |
+| Reimport, median of three | 104.213 ms | 1,051.043 ms |
+| Text export, median of three | 41.596 ms | 395.017 ms |
+| CSV export, median of three | 47.584 ms | 456.347 ms |
+| Text bytes | 380,009 | 3,800,009 |
+| CSV bytes | 500,097 | 5,000,097 |
+| Peak process RSS | 44.58 MB | 64.38 MB |
+
+No image workers ran. These measurements include local file and service/SQLite
+work, excluding photographs, network volumes, IPC and desktop responsiveness.
+The initial transaction still holds the catalog lock for its measured duration;
+this is not a claim of zero interactive contention. Reproduce with
+tests/keyword_exchange_probe.py. Keyword sets, suggestions, Painter, metadata
+undo and the remaining non-AI feature inventory are still pending.

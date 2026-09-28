@@ -96,6 +96,8 @@ def migrate(db):
     migrate_folder_sync(db)
     from .keyword_exports import migrate as migrate_keyword_exports
     migrate_keyword_exports(db)
+    from .keyword_exchange import migrate as migrate_keyword_exchange
+    migrate_keyword_exchange(db)
 
 
 def text_predicate(text):

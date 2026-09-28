@@ -94,7 +94,8 @@ small raster files and separate disposable catalogs, then runs the
 10-assertion service-connection, 22-assertion stack, 19-assertion auto-stack,
 24-assertion folder, 25-assertion keyword, 17-assertion folder-relocation and
 24-assertion folder-synchronization, 16-assertion export-metadata, and
-21-assertion photo-keyword-detail and 24-assertion complete-vocabulary suites.
+21-assertion photo-keyword-detail, 24-assertion complete-vocabulary and 23-assertion
+dictionary-exchange suites.
 Each suite has its own
 fresh image directory, so a relink test cannot move another suite's fixture. The library suite checks
 live smart membership, text search/sort, pagination, empty-filter selection,
@@ -121,6 +122,24 @@ synthetic dictionary; it does not measure IPC, pixels or rendered responsiveness
 .venv/bin/python tests/keyword_vocabulary_probe.py --work work/keyword-vocabulary-10k --tags 10000 --samples 30
 .venv/bin/python tests/keyword_vocabulary_probe.py --work work/keyword-vocabulary-100k --tags 100000 --samples 30
 ```
+
+`test_keyword_exchange.py` checks additive text/CSV import, unchanged existing
+options/synonyms/assignments and frozen jobs, full option round trips, malformed
+input and transaction rollback, real v11 migration and backup/restore, collision
+and symlink safety, source/destination I/O outside the catalog lock, and compact
+real-broker receipts. Generated format fixtures establish internal behavior, not
+an Adobe-produced/imported-file acceptance claim. Native exchange checks use
+real files and IPC; native file panels and rendered interactions are unverified.
+
+```sh
+.venv/bin/python tests/keyword_exchange_probe.py --work work/keyword-exchange-10k --tags 10000
+.venv/bin/python tests/keyword_exchange_probe.py --work work/keyword-exchange-100k --tags 100000
+```
+
+The probe separates disk-backed parsing and initial SQL transaction time, then
+measures repeated imports and text/CSV exports. Files are freshly generated and
+warm in the OS cache; the initial catalog is new. It uses no photos or image
+workers and does not measure network volumes or desktop responsiveness.
 
 The relocation suite moves only its generated fixture directory, scans a nested
 tree with a missing file and a virtual copy, applies explicitly, and checks source

@@ -83,6 +83,13 @@ when a clear function is more maintainable. Avoid unrelated formatting churn.
   the captured list revision before editing or choosing a parent; discard replies
   for superseded forms and dismissed pickers. Use the authoritative parent path
   instead of splitting display strings that may contain legacy literal separators.
+  Dictionary imports validate a stable file snapshot in disk-backed staging before
+  one additive transaction. Preserve existing tag identities, synonyms and policies;
+  file imports do not rename/delete tags or change photo metadata revisions. Parse
+  input and publish output outside the catalog lock. Stream hierarchy export into
+  a snapshot, preserve UTF-8, report options omitted by text, and never publish a
+  partial file or overwrite an existing destination. Reject unrepresentable names
+  instead of silently changing them. Person classification is manual metadata.
 
 ## Engine changes and handoff
 
