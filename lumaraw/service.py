@@ -112,7 +112,7 @@ class Service:
         self.last_activity=time.monotonic();p={} if p is None else p
         if method not in TOOLS: raise ValueError('Unknown operation: '+method)
         jsonschema.validate(p,TOOLS[method]['inputSchema'])
-        if method in ('prepare_folder_sync','get_folder_sync','scan_folder_sync','select_folder_sync_items','apply_folder_sync','cancel_folder_sync'):
+        if method in ('prepare_folder_sync','get_folder_sync','get_folder_sync_metadata','scan_folder_sync','select_folder_sync_items','apply_folder_sync','cancel_folder_sync'):
             return self.folder_sync.dispatch(method,p)
         if method=='status':
             with self.catalog() as c:

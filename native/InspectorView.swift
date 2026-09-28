@@ -1,5 +1,6 @@
-// Purpose: accessible, keyboard-operable editing controls over the shared recipe.
-// Inputs: bounded numeric and structured recipe values. Output: partial patches.
+// Purpose: accessible recipe controls and entry points for catalog metadata review.
+// Inputs: the active photo and bounded recipe values. Outputs: partial recipe
+// patches and explicit metadata/edit/export-preview workflows through Store.
 // Temperature is relative to camera white balance; lens controls are manual.
 import SwiftUI
 

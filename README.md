@@ -17,7 +17,7 @@ LumaRAW references your originals without changing them. The SwiftUI app and you
 | Library | Folder tree/search/favorites/labels, ratings, flags, catalog metadata/keywords, regular/live smart collections, nested sets, Quick/target collections, SQL filters/sorting, manual/capture-time stacks, duplicate/missing indexing, virtual copies/shared snapshots, selective sync, and backup/restore |
 | Culling | Grid/Loupe/Compare/Survey, anchored page selections, active-photo review actions, linked or independent full-resolution comparison viewports |
 | Export | JPEG and 16-bit TIFF with embedded sRGB, Display P3, Adobe RGB, or ProPhoto RGB ICC profiles; frozen catalog XMP/keyword policies, persistent queue, pause/cancel/retry, and collision-safe filenames |
-| Agents | 73 MCP tools, equivalent JSON CLI commands, and a bundled skill; app and agent edits share conflict detection |
+| Agents | 74 MCP tools, equivalent JSON CLI commands, and a bundled skill; app and agent edits share conflict detection |
 
 ## Build and run
 
@@ -117,6 +117,8 @@ trees and colliding catalog photo paths are not supported.
 Choose **Synchronize Folder…** from an available folder's menu to scan its full
 subtree. Review new files, missing originals and changed metadata in bounded
 pages; select individual files, all items of one kind, or a folder subtree.
+Large metadata opens **Review Complete Metadata…**, preserving every scanned
+description and paging full keyword paths without enlarging the file list.
 **Synchronize** imports selected new files in place. **Remove missing photos from
 catalog** is off by default: enabling it also removes their virtual copies, edits,
 snapshots and memberships, while preserving export receipts and files on disk.

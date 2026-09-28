@@ -276,7 +276,12 @@ not an OS-wide filesystem transaction; later external file changes remain possib
 `folder_sync.py` owns schema version 10. One durable synchronization plan snapshots
 the recursive source families and queues directory/file observations. Directory
 iteration visits at most 256 entries per request; file inspection and review pages
-contain at most 60 originals. One iterator is retained between requests; after a
+contain at most 60 originals. List queries omit metadata patches larger than
+4 KiB in SQLite and set metadata_deferred; complete staged values remain intact.
+Explicit revision-bound detail reads return full descriptive fields and twenty
+complete keyword paths, keeping extreme Unicode metadata below the broker frame
+limit. Native review opens a separate read-only detail sheet for deferred patches.
+One iterator is retained between requests; after a
 restart, replay uses unique staging rows and cannot duplicate discoveries. Hidden
 entries and symlinks are excluded from discovery; a catalog path replaced by a
 symlink is an error. File/sidecar reads and final fingerprint checks release the

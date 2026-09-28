@@ -59,10 +59,9 @@ gaps. Nothing below is full Lightroom parity merely because historical tests pas
 
 ## Active increment
 
-Keyword export policies, Will Export previews, frozen export metadata and actual
-JPEG/TIFF XMP output. First close the reproduced folder-sync metadata response
-size gap, then continue keyword sets and vocabulary exchange. The remaining
-inventory stays in scope.
+Bounded folder-sync metadata summaries and complete revision-bound detail views.
+Next close the reproduced full-photo keyword payload gap, then continue keyword
+sets and vocabulary exchange. The remaining inventory stays in scope.
 
 ## Evidence log
 
@@ -110,7 +109,7 @@ whole-desktop latency, or performance guarantees on other hardware. Reproduce vi
 
 ### Next work
 
-Continue with bounded folder-sync metadata review, keyword sets and vocabulary exchange, complete synchronization import options, relocation edge cases, stack ordinal badges and
+Continue with bounded full-photo keyword details, keyword sets and vocabulary exchange, complete synchronization import options, relocation edge cases, stack ordinal badges and
 cross-page cover focus. Offline preview caches,
 cache-size controls and native polling/process-startup costs remain pending. Then close Develop and
 export gaps in the inventory. Preserve pending desktop/older-OS acceptance rather
@@ -885,3 +884,45 @@ updates. Its serialized response is 1,215,035 bytes, exceeding the 1,048,576-byt
 broker limit. This is a confirmed review/transport gap, not an image-processing
 failure. Keep the full scanned values in staging; provide compact list summaries
 and bounded detail access before claiming this edge case is accepted.
+
+### Bounded synchronization metadata review increment
+
+The reproduced response-size gap now has compact summaries and explicit complete
+detail access. SQLite omits patches above 4 KiB from 60-row list queries, avoiding
+eager deserialization of sixty large metadata trees. The metadata_deferred marker
+is explicit; the staged data is retained intact. get_folder_sync_metadata reads
+one captured plan/item/revision, returning full descriptive values and twenty
+complete keyword paths per page. Wrong, removed or changed plan/item references
+cannot silently replace the original review. Mac review opens a read-only detail
+sheet with pagination and visible errors.
+
+The original 60-photo fixture now returns **15,875 bytes** for its summary and
+**20,290 bytes** for one complete description, versus **1,215,035 bytes** for the
+old summary. All sixty values remain staged, and the 5,000-character four-byte
+Unicode description reads back exactly. This is response-size evidence, not a
+RAW throughput or desktop responsiveness benchmark.
+
+The full required-Metal Python run passed **300 tests, no skips**, using the pinned
+real NEF. New real-broker coverage scans, reviews and applies sixty long captions,
+checks unchanged originals and rejects stale/removed detail requests. Another case
+pages 100 maximal 32-level, 120-character Unicode keyword paths without dropping
+any values; each detail response stays below 512 KiB. The source-engine native
+folder-sync suite passed **24 assertions**, including complete field/keyword
+readback, pagination, wrong-response rejection and application.
+
+The final macOS 14-target app built and passed local ad-hoc signature verification
+on macOS 26.6.2. Its manifest matches generation 10 / schema 11 / 74 tools. Four
+affected suites passed **65 assertions against the packaged engine**: native state,
+connection/handoff, folder synchronization and export metadata. The previous
+increment's 15-suite/264-assertion evidence remains historical, not a claim that
+all fifteen suites were rerun for this fix. Public source checks covered 241 files
+without findings.
+
+This closes the reproduced synchronization review transport case. A follow-up
+fixture with 100 maximal 32-level Unicode keyword paths applies successfully, but
+get_photo expands both display paths and tag paths into **3,054,478 bytes**, above
+the same broker limit. list_photos and photo_summaries remain compact at 664 and
+515 bytes for that one-photo fixture. Full-photo keyword access/editing needs a
+paged contract before claiming the complete extreme-keyword workflow. Full Import Dialog,
+reference-app metadata semantics, rendered desktop/VoiceOver, macOS 14 runtime
+and the rest of the non-AI inventory remain pending.

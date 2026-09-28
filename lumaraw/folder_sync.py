@@ -2,8 +2,9 @@
 
 Inputs: a catalog folder, captured revisions, bounded filesystem observations and
 explicit import/remove/read-metadata selections. Outputs: review pages and one
-transaction preserving existing edits, copies and frozen export jobs. Filesystem
-I/O belongs to folder_sync_io/runner; this module never opens or deletes originals.
+transaction preserving existing edits, copies and frozen export jobs. Large
+metadata stays out of list queries and is read explicitly in bounded detail pages.
+Filesystem I/O belongs to folder_sync_io/runner; this module never opens or deletes originals.
 New imports reference files in place. Removal is catalog-only and includes a
 missing original's variants; descriptive XMP updates apply to its master only.
 """
@@ -104,16 +105,39 @@ class FolderSync:
         if plan['state'] not in ACTIVE:
             total = 0
         offset = min(offset,max(0,(total-1)//60*60))
-        rows = self.db.execute('SELECT id,path,source_id,state,selected,patch,clock,notes,error,'
+        rows = self.db.execute('SELECT id,path,source_id,state,selected,'
+            'CASE WHEN length(CAST(patch AS BLOB))<=4096 THEN patch ELSE NULL END AS patch,clock,notes,error,'
             '(SELECT count(*) FROM folder_sync_photos p WHERE p.plan_id=f.plan_id AND p.source_id=f.source_id) AS catalog_photos '
             'FROM folder_sync_files f WHERE plan_id=?'+clause+' ORDER BY id LIMIT 60 OFFSET ?',[*params,offset]) if total else []
         items = []
         for row in rows:
             item = dict(row)
+            item['metadata_deferred'] = item['patch'] is None
+            item['patch'] = item['patch'] or '{}'
             for key in ('patch','clock','notes'):
                 item[key] = json.loads(item[key])
             items.append(item)
         return {'plan':plan,'items':items,'total':total,'offset':offset,'page_size':60}
+
+    def metadata(self,plan_id,item_id,expected_revision,offset=0):
+        plan = self.row(plan_id)
+        if plan['revision'] != expected_revision:
+            raise ValueError('Synchronization plan changed; refresh the review before reading metadata')
+        row = self.db.execute('SELECT id,path,state,patch,clock,notes,error FROM folder_sync_files '
+                              'WHERE plan_id=? AND id=?',(plan_id,item_id)).fetchone()
+        if row is None:
+            raise ValueError('Synchronization item is no longer available')
+        item = dict(row)
+        for key in ('patch','clock','notes'):
+            item[key] = json.loads(item[key])
+        paths = item['patch'].get('keyword_paths',[])
+        # Twenty full paths leave ample room for four-byte Unicode, long
+        # descriptions and JSON escaping within the broker's 1 MiB frame.
+        offset = min(offset,max(0,(len(paths)-1)//20*20))
+        if 'keyword_paths' in item['patch']:
+            item['patch']['keyword_paths'] = paths[offset:offset+20]
+        return {'plan_id':plan_id,'revision':plan['revision'],'item':item,
+                'offset':offset,'total':len(paths),'page_size':20}
 
     def prepare(self,folder_id,expected_revision,scan_metadata,fingerprint):
         with self.db:

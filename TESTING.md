@@ -93,7 +93,7 @@ small raster files and separate disposable catalogs, then runs the
 14-assertion thumbnail, 21-assertion collection-tree, 19-assertion virtual-copy,
 10-assertion service-connection, 22-assertion stack, 19-assertion auto-stack,
 24-assertion folder, 25-assertion keyword, 17-assertion folder-relocation and
-17-assertion folder-synchronization, and 16-assertion export-metadata suites.
+24-assertion folder-synchronization, and 16-assertion export-metadata suites.
 Each suite has its own
 fresh image directory, so a relink test cannot move another suite's fixture. The library suite checks
 live smart membership, text search/sort, pagination, empty-filter selection,
@@ -126,6 +126,13 @@ backup/restore and genuine v9
 migration. `test_xmp_read.py` verifies supported RDF fields, sidecar precedence,
 standard embedded TIFF/JPEG/PNG packets, bounded XML/headers, unsupported values
 and unchanged source hashes. These fixtures do not prove Adobe pixel equivalence.
+
+The sync metadata detail checks exercise complete long descriptions, twenty-path
+paging, wrong-item/plan/revision rejection and full application. The two
+`test_folder_sync_metadata.py` cases reproduce 60 long Unicode descriptions through
+a real broker and page 100 maximal 32-level keyword paths. Responses stay bounded
+without truncating staged values; changed plans cannot silently replace a detail
+view's captured revision.
 
 The export-metadata native suite covers keyword flags, read-only preview paging
 and revisions, metadata choices, immutable submitted receipts and an actual JPEG

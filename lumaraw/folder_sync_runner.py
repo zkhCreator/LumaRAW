@@ -33,9 +33,11 @@ class FolderSyncRunner:
             fingerprint = directory_identity(folder['path'])
             with self.service.catalog() as catalog:
                 return FolderSync(catalog).prepare(**params,fingerprint=fingerprint)
-        if method in ('get_folder_sync','select_folder_sync_items'):
+        if method in ('get_folder_sync','get_folder_sync_metadata','select_folder_sync_items'):
             with self.service.catalog() as catalog:
                 domain = FolderSync(catalog)
+                if method == 'get_folder_sync_metadata':
+                    return domain.metadata(**params)
                 return domain.get(**params) if method == 'get_folder_sync' else domain.select(**params)
         if method == 'cancel_folder_sync':
             with self.state_lock:

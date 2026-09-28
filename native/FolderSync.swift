@@ -28,6 +28,7 @@ struct FolderSyncItem: Identifiable {
     let clock: [String:Any]
     let notes: [String]
     let error: String
+    let metadataDeferred: Bool
     var selectable: Bool { ["new","missing","updated"].contains(state) }
     var folder: String { URL(fileURLWithPath:path).deletingLastPathComponent().path }
     var metadataKeys: [String] { patch.keys.sorted() + ["taken","camera"].filter { clock[$0] != nil } }
@@ -56,6 +57,7 @@ struct FolderSyncItem: Identifiable {
         photos=row["catalog_photos"] as? Int ?? 0;patch=row["patch"] as? [String:Any] ?? [:]
         clock=row["clock"] as? [String:Any] ?? [:]
         notes=row["notes"] as? [String] ?? [];error=row["error"] as? String ?? ""
+        metadataDeferred=row["metadata_deferred"] as? Bool ?? false
     }
 }
 
@@ -204,6 +206,7 @@ struct FolderSyncSheet: View {
     @EnvironmentObject var s: Store
     @Environment(\.dismiss) private var dismiss
     @StateObject private var model: FolderSyncModel
+    @State private var metadataItem: FolderSyncItem?
     init(folder: LibraryFolder?) { _model=StateObject(wrappedValue:FolderSyncModel(folder:folder)) }
     var body: some View {
         VStack(alignment:.leading,spacing:14) {
@@ -261,7 +264,10 @@ struct FolderSyncSheet: View {
                                     VStack(alignment:.leading,spacing:3) {
                                         Text(item.path).textSelection(.enabled)
                                         Text(item.state.capitalized+(item.photos>1 ? " · \(item.photos) catalog photos":"")).foregroundStyle(.secondary)
-                                        if !item.metadataKeys.isEmpty {
+                                        if item.metadataDeferred {
+                                            Button("Review Complete Metadata…") { metadataItem=item }
+                                                .disabled(model.busy || model.loading)
+                                        } else if !item.metadataKeys.isEmpty {
                                             DisclosureGroup("Review Metadata") {
                                                 ForEach(item.metadataKeys,id:\.self) { key in
                                                     Text("\(item.label(key)): \(item.value(key).isEmpty ? "(empty)":item.value(key))").textSelection(.enabled)
@@ -312,6 +318,9 @@ struct FolderSyncSheet: View {
             }
         }.padding(24).frame(width:740)
             .interactiveDismissDisabled(model.busy)
+            .sheet(item:$metadataItem) { item in
+                if let plan=model.plan { FolderSyncMetadataSheet(planID:plan.id,itemID:item.id,revision:plan.revision) }
+            }
             .task { await model.reload() }
             .onDisappear { model.invalidate() }
     }

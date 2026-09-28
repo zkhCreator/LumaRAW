@@ -163,7 +163,13 @@ the global folder `expected_revision`, and required `scan_metadata`. Continue
 `scan_folder_sync(plan_id,expected_revision)` while `planning` or `interrupted`,
 adopting each returned revision. `get_folder_sync` pages 60 files with `kind`
 `changes`, `all`, `new`, `missing`, `updated`, `error` or `unchanged`. Review counts,
-metadata values, notes and errors before applying. `select_folder_sync_items`
+metadata values, notes and errors before applying. Items with `metadata_deferred`
+keep large scanned values out of the list response. Read them with
+`get_folder_sync_metadata(plan_id,item_id,expected_revision,offset)` using the
+captured plan revision. It returns complete fields and 20 keyword paths per page;
+continue until `offset + page_size >= total`. A changed plan requires refreshing
+the review. Never treat a deferred empty patch as absent metadata.
+`select_folder_sync_items`
 uses a revision, `selected`, and a `kind` of `new`, `missing` or `updated`; choose
 at most 60 `item_ids`, a `folder` subtree, or omit both to select the whole kind.
 
