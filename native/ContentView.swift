@@ -24,6 +24,7 @@ struct ContentView: View {
                 }
                 FoldersSidebar()
                 CollectionsSidebar()
+                KeywordsSidebar()
                 Section {
                     Button {s.libraryAction("index_library")} label:{Label("Update Library Index",systemImage:"arrow.triangle.2.circlepath")}.disabled(s.busy)
                     Button {s.backup()} label:{Label("Back Up Library…",systemImage:"externaldrive")}
@@ -70,6 +71,7 @@ struct ContentView: View {
         .sheet(isPresented:$s.showLibraryFilters){LibraryFilterSheet(draft:LibraryFilterDraft(s.libraryFilters))}
         .sheet(isPresented:$s.showCopyRemoval){VirtualCopyRemovalSheet(targets:s.copyRemovalTargets)}
         .sheet(isPresented:$s.showMetadataEditor){MetadataEditor(targets:s.metadataTargets)}
+        .sheet(isPresented:$s.showKeywordEditor){KeywordEditor(original:s.editingKeyword,parent:s.newKeywordParent,revision:s.keywordEditorRevision,targets:s.keywordEditorTargets)}
         .sheet(isPresented:$s.showAutoStack){if let source=s.autoStackSource {AutoStackSheet(source:source)}}
         .onChange(of:s.workspace) { _,_ in if !s.isMultiReview {s.reviewRenderer.stop()} else {s.updateReviewRequests()} }
         .onChange(of:s.develop) { _,value in if value {s.reviewRenderer.stop()} }

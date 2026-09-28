@@ -108,7 +108,7 @@ class VirtualCopies:
                           'created':time.time(), 'revision':0, 'metadata_revision':0}
                 new_id = self.db.execute('INSERT INTO photos (' + ','.join(columns) + ') VALUES (' +
                     ','.join('?' for _ in columns) + ')', [values[key] for key in columns]).lastrowid
-                self.db.execute('INSERT INTO photo_keywords SELECT ?,normalized,keyword FROM photo_keywords WHERE photo_id=?',
+                self.db.execute('INSERT INTO keyword_photos SELECT ?,keyword_id FROM keyword_photos WHERE photo_id=?',
                                 (new_id, row['id']))
                 if collection:
                     self.db.execute('INSERT INTO collection_photos VALUES(?,?)', (collection_id, new_id))
@@ -152,7 +152,7 @@ class VirtualCopies:
                 self.db.execute('UPDATE collections SET revision=revision+1 WHERE id=?', (collection['id'],))
                 Collections(self.catalog).touch_ancestors(collection['parent_id'])
             # Shared snapshots and immutable export jobs intentionally survive.
-            for table, column in (('history','photo_id'), ('photo_keywords','photo_id'),
+            for table, column in (('history','photo_id'), ('keyword_photos','photo_id'),
                                   ('collection_photos','photo_id'), ('photos','id')):
                 self.db.execute(f'DELETE FROM {table} WHERE {column} IN ({placeholders})', ids)
             self.touch(row['source_id'] for row in rows)

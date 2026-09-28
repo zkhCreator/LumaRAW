@@ -91,8 +91,8 @@ The runner compiles all native files except the app entry point, generates five
 small raster files and separate disposable catalogs, then runs the
 15-assertion state, 13-assertion library, 12-assertion culling, 20-assertion review,
 14-assertion thumbnail, 21-assertion collection-tree, 19-assertion virtual-copy,
-10-assertion service-connection, 22-assertion stack, 19-assertion auto-stack and
-24-assertion folder suites.
+10-assertion service-connection, 22-assertion stack, 19-assertion auto-stack,
+24-assertion folder and 25-assertion keyword suites.
 Each suite has its own
 fresh image directory, so a relink test cannot move another suite's fixture. The library suite checks
 live smart membership, text search/sort, pagination, empty-filter selection,
@@ -101,6 +101,27 @@ receipts stay in the ignored work directory. Without `--engine`, it uses the
 current Python environment's `lumaraw` executable.
 The folder suite adds 64 copies of its own generated fixture to test locating a
 photo beyond the first page; it never copies a personal photograph.
+
+The keyword suite checks lazy hierarchy/pages, Grid/active-photo scope, mixed selection,
+captured create-and-assign targets, stale revisions, parent filters, ancestor
+rename, synonym lookup, external updates and empty-page polling. It exercises the
+real native Store and IPC without automating the rendered desktop.
+
+`tests/test_keywords.py` covers genuine v7 migration and denied-write rollback,
+legacy literal names, backup/restore, duplicate leaf identities, Unicode/literal
+search, subtree moves/deletion, bounded pages/depth, assignment limits, independent
+virtual copies, source/smart filters and atomic create/assign conflicts. The older
+collection migration fixture uses v4 SQL state rather than calling current photo
+commands against tables that intentionally do not exist until upgrade.
+
+```sh
+.venv/bin/python tests/keyword_probe.py --work work/keyword-probe-01 --rows 100000 --samples 30
+```
+
+This metadata-only probe creates 1,010 tags and two direct assignments per synthetic
+photo, then measures warm paged lookup, selected-tag counts, ancestor filters,
+qualified photo details and five parent renames. It reports peak RSS and verifies
+that no image worker ran; timings exclude IPC and desktop presentation.
 
 The culling suite uses five generated images to check anchored Shift selection,
 Command toggling, visible-page selection, all-target batch flags/ratings, recipe

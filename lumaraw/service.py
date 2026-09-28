@@ -29,6 +29,7 @@ from .virtual_copies import VirtualCopies
 from .stacks import Stacks
 from .auto_stacks import AutoStacks
 from .folders import Folders
+from .keywords import Keywords
 from .source_identity import cached_thumbnail
 from .runtime import engine_identity, EngineChangedError
 
@@ -160,8 +161,12 @@ class Service:
             return {**result,'photo_id':row['id'],'revision':row['revision'],'source':row['path']}
         if method=='queue_control':return self.control(p)
         with self.catalog() as c:
-            if method=='photo_summaries':return {'photos':c.summaries(p['photo_ids']),'stack_revision':Stacks(c).revision(),'folder_revision':Folders(c).revision()}
-            if method=='library_state':return {'stack_revision':Stacks(c).revision(),'folder_revision':Folders(c).revision()}
+            if method=='photo_summaries':return {'photos':c.summaries(p['photo_ids']),'stack_revision':Stacks(c).revision(),'folder_revision':Folders(c).revision(),'keyword_revision':Keywords(c).revision()}
+            if method=='library_state':return {'stack_revision':Stacks(c).revision(),'folder_revision':Folders(c).revision(),'keyword_revision':Keywords(c).revision()}
+            if method=='list_keywords':return Keywords(c).list(**p)
+            if method=='save_keyword':return Keywords(c).save(**p)
+            if method=='delete_keyword':return Keywords(c).delete(**p)
+            if method=='keyword_membership':return Keywords(c).membership(**p)
             if method=='list_folders':return Folders(c).list(**p)
             if method=='get_folder':return Folders(c).details(**p)
             if method=='edit_folder':return Folders(c).edit(**p)
@@ -180,7 +185,7 @@ class Service:
                 folder=p.get('folder_id');subfolders=p.get('include_subfolders',True)
                 total=c.filtered_count(mode,search,filters,collection,stacked,folder,subfolders)
                 offset=min(offset,max(0,((total-1)//60)*60))
-                return {'photos':c.filtered_page(offset,mode,search,filters,collection,p.get('sort','imported'),p.get('descending',True),stacked,folder,subfolders),'total':total,'offset':offset,'page_size':60,'stack_revision':Stacks(c).revision(),'folder_revision':Folders(c).revision()}
+                return {'photos':c.filtered_page(offset,mode,search,filters,collection,p.get('sort','imported'),p.get('descending',True),stacked,folder,subfolders),'total':total,'offset':offset,'page_size':60,'stack_revision':Stacks(c).revision(),'folder_revision':Folders(c).revision(),'keyword_revision':Keywords(c).revision()}
             if method=='stack_state':return {'revision':Stacks(c).revision()}
             if method=='stack_photos':return Stacks(c).change(**p)
             if method=='set_stack_visibility':return Stacks(c).visibility(**p)

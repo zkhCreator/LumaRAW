@@ -14,7 +14,7 @@ from lumaraw.catalog import Catalog
 from lumaraw.collections import Collections, migrate, migrate_identities
 from lumaraw.organization import migrate_metadata
 from lumaraw.virtual_copies import migrate as migrate_copies
-from lumaraw.stacks import Stacks, migrate as migrate_stacks
+from lumaraw.stacks import migrate as migrate_stacks
 from lumaraw.model import Recipe
 from lumaraw.runtime import CATALOG_VERSION
 from lumaraw.service import Service
@@ -43,8 +43,15 @@ def test_v4_migration_preserves_live_references_and_schema_objects(tmp_path,monk
             for i in range(2):
                 c.db.execute('INSERT INTO photos(path,name,bytes,mtime,recipe,created) VALUES(?,?,0,0,?,0)',
                     (str(tmp_path/f'{i}.png'),f'{i}.png',json.dumps(Recipe().dict())))
-        store.membership(album['id'],0,[1,2],'add')
-        stacks=Stacks(c);stacks.change('group',[1,2],stacks.revision(),collection_id=album['id'])
+        # Build the v4 fixture with its own schema. Current domain commands read
+        # current keyword tables, which deliberately do not exist before upgrade.
+        with c.db:
+            c.db.executemany('INSERT INTO collection_photos VALUES(?,?)', [(album['id'],1),(album['id'],2)])
+            scope=f"collection:{album['id']}"
+            stack=c.db.execute('INSERT INTO photo_stacks(scope,folder,collapsed,top_id,size) VALUES(?,?,0,1,2)',
+                               (scope,'')).lastrowid
+            c.db.executemany('INSERT INTO stack_members(scope,photo_id,stack_id,position) VALUES(?,?,?,?)',
+                            [(scope,1,stack,0),(scope,2,stack,1)])
         tables=('collections','collection_state','collection_photos','photo_stacks','stack_members','stack_state','collection_audit')
         before={table:[tuple(row) for row in c.db.execute(f'SELECT * FROM {table}')] for table in tables}
         assert c.db.execute('PRAGMA user_version').fetchone()[0]==4

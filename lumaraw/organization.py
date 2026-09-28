@@ -19,6 +19,7 @@ FILTER_PROPERTIES = {
     'flag': {'enum': [-1, 0, 1]},
     'color_label': {'enum': list(COLORS)},
     'keyword': {'type': 'string', 'minLength': 1, 'maxLength': 120},
+    'keyword_id': {'type': 'integer', 'minimum': 1, 'maximum': 2**53-1},
     'has_keywords': {'type': 'boolean'},
     'camera': {'type': 'string', 'minLength': 1, 'maxLength': 200},
     'folder': {'type': 'string', 'minLength': 1, 'maxLength': 4096},
@@ -87,16 +88,19 @@ def migrate(db):
     migrate_capture_time(db)
     from .folders import migrate as migrate_folders
     migrate_folders(db)
+    from .keywords import migrate as migrate_keywords
+    migrate_keywords(db)
 
 
 def text_predicate(text):
     """Search literal Unicode text; '%' and '_' never become SQL wildcards."""
+    from .keywords import matching
+    keyword_clause, keyword_values = matching(text, partial=True)
     return (
         '(instr(casefold(name), ?) > 0 OR instr(casefold(title), ?) > 0 '
         'OR instr(casefold(caption), ?) > 0 OR instr(casefold(copyright), ?) > 0 '
         'OR instr(casefold(copy_name), ?) > 0 '
-        'OR EXISTS (SELECT 1 FROM photo_keywords k WHERE k.photo_id=photos.id '
-        'AND instr(k.normalized, ?) > 0))', [folded(text)] * 6)
+        'OR ' + keyword_clause + ')', [folded(text)] * 5 + keyword_values)
 
 
 def criteria(filters, match='all'):
@@ -122,11 +126,18 @@ def criteria(filters, match='all'):
         elif key == 'keyword':
             if not value.strip():
                 raise ValueError('Keyword cannot be blank')
-            clauses.append('id IN (SELECT photo_id FROM photo_keywords WHERE normalized=?)')
-            values.append(folded(value.strip()))
+            from .keywords import matching
+            clause, params = matching(value.strip())
+            clauses.append(clause)
+            values.extend(params)
+        elif key == 'keyword_id':
+            from .keywords import descendants
+            clauses.append('id IN (SELECT photo_id FROM keyword_photos WHERE keyword_id IN ('+
+                           descendants('SELECT id FROM keywords WHERE id=?')+'))')
+            values.append(value)
         elif key == 'has_keywords':
             clauses.append(('' if value else 'NOT ') +
-                           'EXISTS (SELECT 1 FROM photo_keywords k WHERE k.photo_id=photos.id)')
+                           'EXISTS (SELECT 1 FROM keyword_photos k WHERE k.photo_id=photos.id)')
         elif key == 'folder':
             prefix = os.path.abspath(os.path.expanduser(value)).rstrip(os.sep) + os.sep
             clauses.append('substr(path, 1, ?) = ?')
@@ -171,35 +182,20 @@ class Organization:
         return self.collections.delete(collection_id,expected_revision)
 
     def edit_metadata(self, targets, patch):
-        ids = [target['photo_id'] for target in targets]
-        if len(ids) != len(set(ids)):
-            raise ValueError('Duplicate photo targets are not allowed')
-        for target in targets:
-            row = self.catalog.photo(target['photo_id'])
-            if not row:
-                raise ValueError('Photo does not exist')
-            if row['metadata_revision'] != target['expected_metadata_revision']:
-                raise ValueError('Metadata conflict; reload the photo before editing')
-        keywords = None
-        if 'keywords' in patch:
-            keywords = {}
-            for keyword in patch['keywords']:
-                keyword = unicodedata.normalize('NFC', keyword.strip())
-                if not keyword:
-                    raise ValueError('Keywords cannot be blank')
-                keywords.setdefault(folded(keyword), keyword)
+        from .keywords import Keywords
+        store = Keywords(self.catalog)
         fields = {k: v for k, v in patch.items() if k != 'keywords'}
         if set(fields) - {'title', 'caption', 'copyright', 'color_label', 'copy_name'}:
             raise ValueError('Unsupported descriptive metadata field')
         with self.db:
+            self.db.execute('BEGIN IMMEDIATE')
+            ids = store.check_targets(targets)
+            if 'keywords' in patch:
+                store.replace(ids, patch['keywords'])
             for photo_id in ids:
                 if fields:
                     self.db.execute('UPDATE photos SET ' + ','.join(f'{key}=?' for key in fields)
                                     + ' WHERE id=?', [*fields.values(), photo_id])
-                if keywords is not None:
-                    self.db.execute('DELETE FROM photo_keywords WHERE photo_id=?', (photo_id,))
-                    self.db.executemany('INSERT INTO photo_keywords VALUES(?,?,?)',
-                                        [(photo_id, key, value) for key, value in keywords.items()])
                 if patch:
                     self.db.execute('UPDATE photos SET metadata_revision=metadata_revision+1 WHERE id=?',
                                     (photo_id,))

@@ -49,6 +49,19 @@ import UniformTypeIdentifiers
     var folderRevision = -1
     var photoFolderRevision = -1
     var sourceNavigationGeneration=0
+    @Published var keywordSearch=""
+    @Published var keywordPages: [Int:KeywordPage]=[:]
+    @Published var expandedKeywords: Set<Int>=[]
+    @Published var keywordBusy=false
+    @Published var showKeywordEditor=false
+    @Published var editingKeyword: LibraryKeyword?
+    @Published var newKeywordParent: LibraryKeyword?
+    var keywordEditorTargets: [Photo]=[]
+    var keywordEditorRevision=0
+    var keywordRevision = -1
+    var photoKeywordRevision = -1
+    var keywordPageGenerations: [Int:Int]=[:]
+    var keywordSearchTask: Task<Void,Never>?
     @Published var collections: [LibraryCollection] = []
     @Published var collectionOffset=0
     @Published var collectionPages: [Int:CollectionPage] = [:]
@@ -188,6 +201,7 @@ import UniformTypeIdentifiers
             photos=(result["photos"] as? [[String:Any]] ?? []).compactMap(Photo.init)
             adoptStacks(result)
             photoFolderRevision=result["folder_revision"] as? Int ?? photoFolderRevision
+            photoKeywordRevision=result["keyword_revision"] as? Int ?? photoKeywordRevision
             total=result["total"] as? Int ?? 0
             offset=result["offset"] as? Int ?? offset
             thumbnails=thumbnails.filter { id,_ in photos.contains{$0.id==id} }
@@ -201,6 +215,7 @@ import UniformTypeIdentifiers
             updateThumbnails(force:true)
             await refreshCollectionState()
             if folderRevision != photoFolderRevision { await refreshFolders() }
+            if keywordRevision != photoKeywordRevision { await refreshKeywords();await refreshKeywordPhoto() }
         } catch {self.error=error.localizedDescription}
     }
     func clearPhoto() {

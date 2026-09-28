@@ -22,6 +22,7 @@ Official references checked September 2026:
 - [Photo stacks and source boundaries](https://helpx.adobe.com/lightroom-classic/desktop/organize-photos-in-lightroom-classic/grouping-photos-stacks.html)
 - [Stacking shortcuts, Adobe's Julieanne Kost](https://jkost.com/blog/2024/07/stacking-similar-photos-in-lightroom-classic.html)
 - [Folder hierarchy, subfolder inclusion and synchronization](https://helpx.adobe.com/lightroom-classic/desktop/manage-catalogs-and-files/create-folders.html)
+- [Missing-photo and missing-folder relinking](https://helpx.adobe.com/lightroom-classic/desktop/manage-catalogs-and-files/locate-missing-photos.html)
 - [Hierarchical keywords, synonyms and export options](https://helpx.adobe.com/lightroom-classic/desktop/organize-photos-in-lightroom-classic/keywords.html)
 
 ## Feature inventory
@@ -31,9 +32,9 @@ gaps. Nothing below is full Lightroom parity merely because historical tests pas
 
 | Area | Current implementation | Remaining acceptance / work |
 | --- | --- | --- |
-| Import and catalogs | Partial: referenced originals, backup/restore | Import preview/selection, copy workflows, metadata/develop presets, catalog switching/merge |
+| Import and catalogs | Partial: referenced originals, backup/restore | Import preview/selection, copy workflows, metadata/develop presets, tethered capture, catalog switching/merge |
 | Library navigation | Partial: bounded grid/filmstrip, folder tree/search/favorites/labels, direct/recursive sources, filters/sorting, regular/smart/Quick collections and nested sets | Multi-source selection, folder sync/relocation/move/rename, collection drag/drop/color labels, full smart criteria/import-export, source-selection memory, desktop acceptance |
-| Organization | Partial: duplicate/missing detection, flat keywords, title/caption/copyright, labels, batch metadata, virtual copies, manual/split/capture-time scoped stacks | Keyword hierarchy, complete IPTC, stack interaction acceptance, rename and sidecars |
+| Organization | Partial: duplicate/missing detection, hierarchical keywords/synonyms, title/caption/copyright, labels, batch metadata, virtual copies, manual/split/capture-time scoped stacks | Keyword export policies/sets/import-export/undo/Painter, complete IPTC, stack interaction acceptance, rename and sidecars |
 | Culling | Partial: Loupe/Compare/Survey, linked detail, anchored page selection | Desktop acceptance, cross-page selection, Develop reference view, auto advance, persistent workspace state |
 | Basic development | Partial: light/WB/color | Calibrated absolute WB, eyedropper, texture/clarity/dehaze, complete HSL/B&W and color grading |
 | Curves and profiles | Partial: custom composite curve, LUT/ICC | Interactive RGB curves, camera/profile browser, compatible preset import/export |
@@ -43,6 +44,7 @@ gaps. Nothing below is full Lightroom parity merely because historical tests pas
 | History and presets | Partial: 50-step undo, shared named snapshots | Redo, navigable history, preset management and import-time/batch application |
 | Preview/performance | Partial: Metal, proxies, 1:1 viewport, developed thumbnail fast path | Real-RAW catalog/slider latency, offline previews, cache controls and desktop acceptance |
 | Export | Partial: JPEG/16-bit TIFF, ICC, durable jobs | Presets, metadata policies, watermark, additional formats, publish workflows |
+| External editing and video | Missing | External-editor setup and derivative round trips; supported video import/playback, frame capture, trimming and export |
 | Merge | Missing | Non-AI HDR merge and panorama with bounded resources and reference acceptance |
 | Map | Missing | GPS metadata, map navigation, track import, location editing with explicit persistence |
 | Book | Missing | Templates, layouts, typography, PDF/JPEG output; external fulfillment is a separate integration |
@@ -53,9 +55,9 @@ gaps. Nothing below is full Lightroom parity merely because historical tests pas
 
 ## Active increment
 
-Folder navigation, independent direct/recursive sources, maintained counts,
-favorites/labels, parent presentation and photo-to-folder location. Keyword
-hierarchy follows; the remaining inventory stays in scope.
+Keyword hierarchy, stable identities, synonyms, batch assignment and native
+tree/forms. Folder synchronization/relocation follows; the remaining inventory
+stays in scope.
 
 ## Evidence log
 
@@ -103,7 +105,7 @@ whole-desktop latency, or performance guarantees on other hardware. Reproduce vi
 
 ### Next work
 
-Continue with keyword hierarchy, folder synchronization/relocation, stack ordinal badges and
+Continue with keyword export workflows, folder synchronization/relocation, stack ordinal badges and
 cross-page cover focus. Offline preview caches,
 cache-size controls and native polling/process-startup costs remain pending. Then close Develop and
 export gaps in the inventory. Preserve pending desktop/older-OS acceptance rather
@@ -572,3 +574,70 @@ worker RSS at **282 MB**, Metal shared buffers at **19.61 MB**. Original hashes
 were unchanged and no partial export files remained. Six repeated exports of one
 sample are process/resource evidence, not six independent camera samples or an
 Adobe color-fidelity benchmark.
+
+### Hierarchical keyword increment
+
+Schema 8 gives tags stable IDs, scoped sibling names, nested parents, synonyms and
+independent photo assignments. Equal names in different branches remain distinct.
+Create-and-assign, add/remove, rename/move and subtree deletion are atomic and
+revision checked. Ancestor edits invalidate affected photo metadata revisions
+without touching recipes. Virtual copies preserve IDs on creation and keep later
+assignments independent. ID/name/synonym filters include descendants and intersect
+folder/collection sources and smart criteria. List counts and mixed-selection
+indicators describe direct assignments. Pages hold at most 60 tags; paths are
+limited to 32 levels and each photo to 100 direct tags.
+
+The Mac sidebar includes lazy branches, synonym search, contextual editing and
+parent picking, Grid batch actions and active-photo-only actions outside Grid.
+Show Photos filters the library independently of previous sources. New-keyword
+forms capture their selection. Metadata forms retain untouched structured tags
+instead of splitting old literal commas while editing another field. Genuine v7
+migration preserves legacy separator names, while ambiguous textual collisions
+fail without changing assignments; ID-based checkbox commands remain usable.
+
+The final required-Metal Python suite passed **214 tests, no skips**, using the
+same pinned read-only D3S fixture documented above. New cases cover migration
+rollback/backup, duplicate names, legacy path round trips, Unicode, atomic target
+conflicts, subtree edits, bounded pages/depth, independent copies and smart/source
+filters. An old v4 fixture initially called current photo code before keyword
+migration; it now constructs genuine v4 SQL state. A native run was also rejected
+by the compiler because a form changed during compilation; that incomplete run
+is retained privately and excluded from final evidence.
+
+Keyword export flags/XMP/image metadata, vocabulary import/export, sets,
+suggestions, persistent default-parent/shortcut actions, drag/drop/Painter,
+unused-tag purge and metadata undo remain pending. Direct Lightroom behavior,
+rendered desktop, VoiceOver and macOS 14 runtime remain unverified. Folder sync
+and bulk missing-folder relocation are still next in the Library workstream;
+they must preserve photo/copy identities, recipes, memberships and folder metadata
+and explicitly handle partial availability and destination conflicts.
+
+After freezing the final sources, all twelve native suites passed against the
+final packaged engine: **214 assertions**, including 25 keyword checks. The Mac
+app targets macOS 14, compiled without Swift warnings and passed ad-hoc signature
+verification. Its embedded manifest matches engine generation 6 / catalog schema
+8, exposing 61 shared commands. Compilation/state/IPC evidence does not establish
+rendered desktop or older-OS compatibility. The current 215-file source scan also
+reported no findings; generated fixtures, binaries and receipts remain private.
+
+Warm keyword probe on the same M3 Max / 128 GB / macOS 26.6.2 host, run after
+compilation and native regressions completed: 1,010 tags and two assignments per
+synthetic photo; 30 read samples and five parent renames. No photographs or workers.
+
+| Complete service/SQL request | 10k photos median / p95 | 100k photos median / p95 |
+| --- | ---: | ---: |
+| Root tags/counts | 1.700 / 1.862 ms | 1.716 / 3.089 ms |
+| Child page and 60-photo selection state | 2.687 / 2.863 ms | 3.007 / 3.182 ms |
+| Flat tag search | 2.063 / 2.255 ms | 2.281 / 2.513 ms |
+| Parent-tag photo page | 5.436 / 5.893 ms | 20.373 / 21.195 ms |
+| Final tagged-photo page | 5.887 / 6.277 ms | 27.495 / 28.494 ms |
+| Keyword-name photo filter | 5.509 / 5.881 ms | 20.576 / 21.840 ms |
+| Qualified photo metadata | 1.079 / 1.195 ms | 1.067 / 1.116 ms |
+| Parent rename with affected photo revisions | 25.180 / 30.191 ms | 286.228 / 395.111 ms |
+
+Renames affect 1,000 / 10,000 photos respectively. Peak process RSS was 40.77 /
+58.08 MB, with zero worker RSS. Metadata-only setup through production triggers
+took 1.598 / 15.907 seconds (one sample), excluding file import and EXIF. Query
+plans use the parent and assignment covering indexes. These measurements exclude
+IPC, desktop presentation and RAW processing; large metadata writes still need
+background jobs. Reproduce with `tests/keyword_probe.py`.

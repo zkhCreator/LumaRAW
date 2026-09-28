@@ -130,8 +130,9 @@ class Catalog:
         if not row:
             return None
         result = dict(row)
-        result['keywords'] = [r[0] for r in self.db.execute(
-            'SELECT keyword FROM photo_keywords WHERE photo_id=? ORDER BY normalized', (photo_id,))]
+        from .keywords import Keywords
+        result['keyword_tags'] = Keywords(self).photo(photo_id)
+        result['keywords'] = [tag['path'] for tag in result['keyword_tags']]
         return result
 
     def recipe(self, photo_id):

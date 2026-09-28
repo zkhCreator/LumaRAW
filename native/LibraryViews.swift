@@ -219,9 +219,10 @@ struct MetadataEditor: View {
                 Button("Save Metadata") {
                     var patch: [String: Any] = [:]
                     for (key,value) in [("copy_name",copyName),("title",title),("caption",caption),("copyright",copyright),("color_label",label)] where fields.contains(key) { patch[key]=value }
-                    if fields.contains("keywords") {
-                        patch["keywords"]=keywords.components(separatedBy:CharacterSet(charactersIn:",\n")).map { $0.trimmingCharacters(in:.whitespacesAndNewlines) }.filter { !$0.isEmpty }
+                    if fields.contains("keywords"),let values=metadataKeywordReplacement(keywords,original:targets.first?.keywords ?? [],targetCount:targets.count) {
+                        patch["keywords"]=values
                     }
+                    if patch.isEmpty { dismiss();return }
                     saving=true
                     Task { if await s.saveMetadata(targets:targets,patch:patch) { dismiss() }; saving=false }
                 }.keyboardShortcut(.defaultAction).disabled(fields.isEmpty || saving)

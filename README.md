@@ -17,7 +17,7 @@ LumaRAW references your originals without changing them. The SwiftUI app and you
 | Library | Folder tree/search/favorites/labels, ratings, flags, catalog metadata/keywords, regular/live smart collections, nested sets, Quick/target collections, SQL filters/sorting, manual/capture-time stacks, duplicate/missing indexing, virtual copies/shared snapshots, selective sync, and backup/restore |
 | Culling | Grid/Loupe/Compare/Survey, anchored page selections, active-photo review actions, linked or independent full-resolution comparison viewports |
 | Export | JPEG and 16-bit TIFF with embedded sRGB, Display P3, Adobe RGB, or ProPhoto RGB ICC profiles; persistent queue, pause/cancel/retry, and collision-safe filenames |
-| Agents | 57 MCP tools, equivalent JSON CLI commands, and a bundled skill; app and agent edits share conflict detection |
+| Agents | 61 MCP tools, equivalent JSON CLI commands, and a bundled skill; app and agent edits share conflict detection |
 
 ## Build and run
 
@@ -101,6 +101,20 @@ target even beyond the first page. Folder rename/move, synchronization, multi-fo
 selection and empty-directory import remain unfinished.
 Use **Folder Options → Refresh Folders** after a volume goes offline or returns;
 directory availability is checked when folder pages are read.
+
+The **Keyword List** supports nested keywords, synonyms, search and 60-item pages.
+Its checkboxes add/remove tags on the Grid selection, or just the active photo in
+Loupe, Compare, Survey and Develop. A minus indicates a mixed selection. Create a
+keyword from the **+** menu, optionally assigning it to the captured selection in
+the same transaction. Context menus create children, edit names/synonyms/parents,
+show matching photos or delete a subtree and its assignments. Photo files and
+recipes remain unchanged. List counts describe direct assignments; **Show Photos**
+also includes nested keywords and clears other source/filter restrictions.
+The metadata editor accepts qualified paths such as `Places | Coast` (also `>` or
+reversed `<`). Equal leaf names under different parents retain separate IDs;
+ambiguous unqualified names require a path. Keyword changes remain in the catalog.
+XMP/export keyword policies, keyword sets, Painter, import/export of word lists,
+unused-tag purge and metadata undo remain pending.
 
 Use **Collections → New Collection** to create a regular collection or a smart
 collection with live rules. Add/remove selected photos from a regular collection

@@ -4,6 +4,15 @@
 import Foundation
 import SwiftUI
 
+func metadataKeywordReplacement(_ text: String, original: [String], targetCount: Int) -> [String]? {
+    // Display separators are not an encoding for old literal names. Preserve
+    // untouched structured values, and avoid reassigning a single photo's tags
+    // merely because its title/caption is being edited in the same form.
+    if text == original.joined(separator:", ") { return targetCount == 1 ? nil:original }
+    return text.components(separatedBy:CharacterSet(charactersIn:",\n"))
+        .map { $0.trimmingCharacters(in:.whitespacesAndNewlines) }.filter { !$0.isEmpty }
+}
+
 struct LibraryCollection: Identifiable {
     let id: Int
     let name: String

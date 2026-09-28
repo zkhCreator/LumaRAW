@@ -42,6 +42,11 @@ when a clear function is more maintainable. Avoid unrelated formatting churn.
 - Keep Library sources separate from metadata filters. Folder counts describe
   catalog membership independently of the filtered/stacked photo page. Imports,
   variants, removal and relinking must maintain these counts transactionally.
+- Keyword assignments reference stable tag IDs. Names are unique only within one
+  parent; never merge equal leaf names from different branches. Preserve qualified
+  paths and invalidate affected photo metadata revisions on ancestor rename/move.
+  Batch tag addition/removal preserves unrelated assignments; replacing a string
+  list must reject ambiguous leaf names instead of picking an arbitrary branch.
 
 ## Engine changes and handoff
 
@@ -105,6 +110,9 @@ Run targeted regression tests first, then the relevant existing suite and Mac
 compile. Use disposable catalogs and generated images by default. Real RAW and
 Lightroom references must be explicit read-only inputs. Preserve test failures
 and unavailable environments in the work log; never convert skips into passes.
+Freeze native sources while compiling, including the per-suite compiles in
+`run_native.py`. If a fix changes an input during compilation, retain the failed
+receipt and rerun against stable sources; mixed-source runs are not final evidence.
 
 Benchmark visible latency and whole operations: cold/warm import, first grid,
 filter/sort page, first/warm preview, slider-to-preview, 1:1 viewport, full-size

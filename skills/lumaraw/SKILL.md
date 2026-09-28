@@ -92,6 +92,29 @@ edits. A thumbnail client can use its own `client_id`/`generation` and
 `cancel_preview` to discard obsolete work. Metadata edits preserve the pixel cache;
 recipe, source or LUT changes invalidate it. The Mac shell uses developed images.
 
+## Hierarchical keywords
+
+`list_keywords` returns at most 60 roots, children of `parent_id`, or flat name/
+synonym search matches. Pass a bounded `photo_ids` selection for direct assignment
+counts. Each page carries `keyword_revision`. `save_keyword` creates/renames/moves
+a tag with this `expected_revision`, a name, optional parent (null/omitted means
+root) and synonyms. Optional photo `targets` atomically assign a newly created tag;
+each target needs its current `expected_metadata_revision`.
+
+`keyword_membership` adds/removes one ID for up to 60 revision-checked targets and
+preserves other tags. `delete_keyword` removes a complete subtree and assignments,
+with the captured global revision. Both preserve original files and pixel recipes.
+Read before editing, and never resubmit a stale mutation automatically. A failed
+batch leaves every target unchanged.
+
+`get_photo` includes `keyword_tags` IDs/qualified paths and compatible `keywords`
+strings. A replacement string list accepts `parent | child`, `parent > child` or
+`child < parent`; ambiguous bare leaf names fail. `filters.keyword_id` selects a
+stable tag plus descendants; name and synonym filters can match multiple branches.
+Tag IDs are never reused after deletion. Synonyms are searchable catalog terms;
+XMP and exported-image keyword policies are not yet implemented. Limits are 32
+levels, 30 synonyms per tag and 100 direct tags per photo.
+
 ## Folder sources
 
 `list_folders` pages visible roots or a `parent_id` at 60 items. Optional `search`,
@@ -103,7 +126,7 @@ The photo offset assumes unfiltered, unstacked import order descending.
 Pass `folder_id` and optional `include_subfolders` (default true) to `list_photos`.
 A collection and folder source are mutually exclusive. Keep source selection
 separate from the existing `filters.folder` metadata criterion, which remains
-recursive for compatibility. `library_state` returns structural folder/stack
+recursive for compatibility. `library_state` returns structural folder/stack/keyword
 revisions for empty-page polling. A folder's counts include virtual copies and
 ignore photo filters; unavailable directories remain catalog entries.
 

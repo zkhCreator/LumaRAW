@@ -73,7 +73,8 @@ The native store clears photo-specific state when selection changes and intersec
 Library pages contain at most 60 summaries; full recipes are fetched on demand. Preview and export share strip processing, with overlap for neighborhood filters. Full-resolution viewports are limited to 2048 × 1536. LibRaw still decodes a complete RAW frame; linear pixel caches live on disk.
 
 Library organization lives in `organization.py`: catalog-only descriptive fields,
-normalized keyword relations and descriptive revisions. `collections.py` owns
+keyword-aware predicates and descriptive revisions. `keywords.py` owns tag identity,
+hierarchy and assignments. `collections.py` owns
 regular/Quick membership, live smart predicates, parent links and durable target
 state. Schema version 2 added these without changing existing photo/collection IDs.
 Ancestor revisions cover descendant changes, protecting subtree deletion/copy.
@@ -186,6 +187,36 @@ superseded requests. Photo-to-folder navigation uses explicit tree and photo-pag
 offsets, clears filters and switches to a flat direct-folder view; it does not
 change saved stack visibility. Folder synchronization, physical moves/renames,
 multi-source selection and persistent workspace preferences remain future work.
+
+`keywords.py` owns schema version 8: durable keyword IDs, parent links, synonyms
+and many-to-many direct photo assignments. The migration consolidates legacy
+normalized names into root tags with a deterministic display spelling and retains
+all assignments, including unusual legacy names. `photo_keywords` becomes a
+read-only direct-assignment view; production writers use `keyword_photos` through
+the domain service. Copies duplicate tag IDs and keep later assignments independent.
+Photo deletion cleans up assignments. Backup/restore includes the complete tree.
+
+Names are unique within a parent, not globally. Qualified paths preserve equal
+leaf names in different branches. Renaming or moving an ancestor invalidates the
+metadata revision of each affected photo once; pixel recipes/caches are unchanged.
+The global keyword revision protects forms and assignment commands, and assignment
+triggers advance it for copy/removal events. Native polling sees keyword changes
+even on empty photo pages. Creating a tag and assigning captured photos is atomic;
+both tag and photo revisions are validated before any mutation.
+
+Tree/search pages contain at most 60 tags; hierarchy depth is limited to 32, tag
+synonyms to 30, assignments to 100 per photo and batch targets to 60. Native pages
+are released when collapsed/replaced, and selection/query generations reject late
+replies. Direct counts/selection states use indexed assignments. Keyword ID, name,
+synonym and text predicates include descendants via recursive SQL and intersect
+other library sources/filters. Smart rules may retain a stable keyword ID; deleted
+IDs match nothing and cannot be reused. Subtree edits use SQL rather than loading
+the entire dictionary into native or Python arrays. Large edits still hold the
+catalog lock; durable background metadata jobs remain pending.
+
+This layer does not write XMP or exported image keywords. Export flags, vocabulary
+file exchange, keyword sets/suggestions, Painter and metadata undo need separate
+workflows and evidence; hierarchical catalog storage does not establish those.
 
 `source_identity.py` provides stat-based cache identities without importing pixel
 libraries. The broker returns a page of completed thumbnail paths in one command;
