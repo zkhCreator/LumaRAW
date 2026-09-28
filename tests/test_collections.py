@@ -141,16 +141,20 @@ def test_duplicate_subtree_and_move_preserve_rules_and_membership(library):
     assert {row['kind'] for row in copychildren}=={'set','smart'}
 
 
-def test_legacy_collection_migration_persistence_and_backup(tmp_path):
-    root=tmp_path/'legacy';c=Catalog(root);store=Collections(c)
-    regular=store.save('Existing');quick=store.state()['quick']['id']
-    with c.db:
-        c.db.execute('DELETE FROM collections WHERE id=?',(quick,))
-        c.db.execute('DROP TABLE collection_state');c.db.execute('DROP INDEX collection_parent')
-        c.db.execute('ALTER TABLE collections DROP COLUMN parent_id');c.db.execute('PRAGMA user_version=1')
-    c.close();c=Catalog(root);store=Collections(c)
-    assert store.get(regular['id'])['name']=='Existing'
-    store.set_target(0,regular['id']);state=store.state()
+def test_legacy_collection_migration_persistence_and_backup(tmp_path,monkeypatch):
+    from lumaraw import catalog as module
+    from lumaraw.organization import migrate_metadata
+    root=tmp_path/'legacy'
+    with monkeypatch.context() as patch:
+        patch.setattr(module,'migrate',migrate_metadata)
+        c=Catalog(root)
+        with c.db:
+            regular=c.db.execute("INSERT INTO collections(name,kind,created) VALUES('Existing','regular',0)").lastrowid
+        assert c.db.execute('PRAGMA user_version').fetchone()[0]==1
+        c.close()
+    c=Catalog(root);store=Collections(c)
+    assert store.get(regular)['name']=='Existing'
+    store.set_target(0,regular);state=store.state()
     assert c.db.execute("SELECT count(*) FROM collections WHERE kind='quick'").fetchone()[0]==1
     backup_catalog(c,tmp_path/'backup');c.close()
     restored=restore_catalog(tmp_path/'backup',tmp_path/'restored');c=Catalog(restored)

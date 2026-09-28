@@ -14,10 +14,10 @@ LumaRAW references your originals without changing them. The SwiftUI app and you
 | Color | Custom tone curves, color mixer, camera-bound chart calibration, `.cube` LUTs, ICC soft proofing, and gamut warnings |
 | Detail and composition | Full-resolution 1:1 viewports, noise reduction, sharpening, defringing, rotation, crop, straighten, and perspective |
 | Local adjustments | Radial, gradient, luminance-range, and brush masks; manual lens distortion, vignette, and chromatic-aberration correction |
-| Library | Ratings, flags, color labels, catalog metadata/keywords, regular/live smart collections, nested sets, Quick/target collections, SQL filters/sorting, manual/capture-time folder and collection stacks, duplicate/missing indexing, virtual copies/shared snapshots, selective sync, and backup/restore |
+| Library | Folder tree/search/favorites/labels, ratings, flags, catalog metadata/keywords, regular/live smart collections, nested sets, Quick/target collections, SQL filters/sorting, manual/capture-time stacks, duplicate/missing indexing, virtual copies/shared snapshots, selective sync, and backup/restore |
 | Culling | Grid/Loupe/Compare/Survey, anchored page selections, active-photo review actions, linked or independent full-resolution comparison viewports |
 | Export | JPEG and 16-bit TIFF with embedded sRGB, Display P3, Adobe RGB, or ProPhoto RGB ICC profiles; persistent queue, pause/cancel/retry, and collision-safe filenames |
-| Agents | 52 MCP tools, equivalent JSON CLI commands, and a bundled skill; app and agent edits share conflict detection |
+| Agents | 57 MCP tools, equivalent JSON CLI commands, and a bundled skill; app and agent edits share conflict detection |
 
 ## Build and run
 
@@ -87,6 +87,20 @@ Classic TIFF-family, JPEG and PNG EXIF are supported; other containers and malfo
 metadata remain unknown. Dates without offsets use the camera clock, so mixed
 timezone sources need review. Older catalogs need a refresh to populate precise
 clocks; original files remain unchanged.
+
+The **Folders** sidebar follows imported photo locations with bounded child pages,
+direct/descendant photo counts, text search, favorites and color labels. Selecting
+a folder changes the browsing source while preserving metadata filters.
+**Include Photos from Subfolders** changes the source scope and displayed counts.
+Root-folder menus expose **Show Parent Folder** and **Hide This Parent**; parents
+with directly contained photos cannot be hidden. These actions change catalog
+presentation only. An unavailable directory keeps its catalog counts and is marked
+in the sidebar. **Go to Folder in Library**, available from a photo's menu or
+inspector, clears filters and shows individual photos in import order, locating the
+target even beyond the first page. Folder rename/move, synchronization, multi-folder
+selection and empty-directory import remain unfinished.
+Use **Folder Options → Refresh Folders** after a volume goes offline or returns;
+directory availability is checked when folder pages are read.
 
 Use **Collections → New Collection** to create a regular collection or a smart
 collection with live rules. Add/remove selected photos from a regular collection

@@ -17,6 +17,9 @@ extension Store {
     }
 
     func openCollection(_ collection: LibraryCollection) async {
+        sourceNavigationGeneration+=1;let token=sourceNavigationGeneration
+        guard await flushEdits(),token == sourceNavigationGeneration else { return }
+        folderID=nil;activeFolder=nil
         activeCollection=collection
         showStacks=true
         collectionID=collection.id; mode="all"; workspace="library"; offset=0

@@ -100,6 +100,8 @@ extension Store {
         guard canStack else { return }
         if let collection=activeCollection,collection.id == collectionID {
             autoStackSource=AutoStackSource(folder:nil,collectionID:collection.id,title:collection.name)
+        } else if let folder=activeFolder,folder.id == folderID {
+            autoStackSource=AutoStackSource(folder:folder.path,collectionID:nil,title:folder.name)
         } else if let folder=libraryFilters["folder"] as? String {
             autoStackSource=AutoStackSource(folder:folder,collectionID:nil,title:URL(fileURLWithPath:folder).lastPathComponent)
         } else if let photo {

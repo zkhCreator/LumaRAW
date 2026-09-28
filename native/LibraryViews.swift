@@ -7,6 +7,9 @@ struct LibraryToolbar: View {
     @EnvironmentObject var s: Store
     var body: some View {
         HStack(spacing:12) {
+            if let folder=s.activeFolder,folder.id == s.folderID {
+                Label(folder.name,systemImage:"folder").lineLimit(1).help(folder.path)
+            }
             Button { s.showLibraryFilters=true } label: {
                 Label(s.libraryFilters.isEmpty ? "Filter":"Filter (\(s.libraryFilters.count))",systemImage:"line.3.horizontal.decrease.circle")
             }
@@ -32,10 +35,12 @@ struct LibraryToolbar: View {
                 }
             }.disabled(s.selection.isEmpty)
             Spacer()
-            Picker("Sort",selection:$s.librarySort) {
+            Picker("Sort",selection:Binding(get:{s.librarySort},set:{value in
+                s.librarySort=value;s.offset=0;Task { await s.refresh() }
+            })) {
                 Text("Import Order").tag("imported");Text("Filename").tag("name")
                 Text("Rating").tag("rating");Text("Capture Time").tag("captured");Text("Color Label").tag("color")
-            }.frame(width:180).onChange(of:s.librarySort) { _,_ in s.offset=0;Task { await s.refresh() } }
+            }.frame(width:180)
             Button {
                 s.sortDescending.toggle();s.offset=0;Task { await s.refresh() }
             } label: { Image(systemName:s.sortDescending ? "arrow.down":"arrow.up") }

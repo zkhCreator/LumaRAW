@@ -32,6 +32,8 @@ class Catalog:
             raise ValueError("This catalog was upgraded by a newer LumaRAW version; open it with that version")
         self.db.row_factory = sqlite3.Row
         self.db.create_function('casefold', 1, folded, deterministic=True)
+        from .folders import register
+        register(self.db)
         self.db.executescript('''
             PRAGMA journal_mode=WAL;
             PRAGMA busy_timeout=10000;
@@ -212,7 +214,9 @@ class Catalog:
             self.db.execute("UPDATE jobs SET state='pending',error='' WHERE state IN ('failed','interrupted','cancelled')")
 
 
-    def filter_sql(self,mode='all',search='',filters=None,collection_id=None):
+    def filter_sql(self,mode='all',search='',filters=None,collection_id=None,folder_id=None,include_subfolders=True):
+        if collection_id is not None and folder_id is not None:
+            raise ValueError('Choose either a folder or collection source')
         clauses=[];params=[]
         if mode=='stars': clauses.append('rating>=3')
         elif mode=='rejects': clauses.append('flag=-1')
@@ -230,10 +234,14 @@ class Catalog:
         if collection_id is not None:
             clause, values = Organization(self).collection_predicate(collection_id)
             clauses.append(clause);params.extend(values)
+        if folder_id is not None:
+            from .folders import Folders
+            clause, values = Folders(self).predicate(folder_id,include_subfolders)
+            clauses.append(clause);params.extend(values)
         return (' WHERE '+' AND '.join(clauses) if clauses else ''),params
 
-    def filtered_page(self,offset=0,mode='all',search='',filters=None,collection_id=None,sort='imported',descending=True,stacked=True):
-        where,params=self.filter_sql(mode,search,filters,collection_id)
+    def filtered_page(self,offset=0,mode='all',search='',filters=None,collection_id=None,sort='imported',descending=True,stacked=True,folder_id=None,include_subfolders=True):
+        where,params=self.filter_sql(mode,search,filters,collection_id,folder_id,include_subfolders)
         if stacked:
             from .stacks import Stacks
             return Stacks(self).projection(where,params,collection_id,sort,descending,offset)
@@ -252,8 +260,11 @@ class Catalog:
         return [dict(row) for row in self.db.execute(
             f'SELECT {SUMMARY_COLUMNS} FROM photos WHERE id IN ({placeholders}) ORDER BY id',ids)]
 
-    def filtered_count(self,mode='all',search='',filters=None,collection_id=None,stacked=True):
-        where,params=self.filter_sql(mode,search,filters,collection_id)
+    def filtered_count(self,mode='all',search='',filters=None,collection_id=None,stacked=True,folder_id=None,include_subfolders=True):
+        if folder_id is not None and collection_id is None and mode=='all' and not search and not filters:
+            from .folders import Folders
+            return Folders(self).count(folder_id,include_subfolders,stacked)
+        where,params=self.filter_sql(mode,search,filters,collection_id,folder_id,include_subfolders)
         if stacked:
             from .stacks import Stacks
             return Stacks(self).projection(where,params,collection_id)

@@ -159,6 +159,34 @@ their shared clock fields, without hashing or image workers. Native progress can
 stop between pages. It captures source/duration, drops late previews and disables
 confirmation when the displayed plan no longer matches the current query.
 
+`folders.py` owns schema version 7. A relational folder/photo index is maintained
+by insert/delete/relink triggers, including virtual copies. Direct and descendant
+counts are updated along the ancestor chain; reads do not recount every photo.
+The migration backfills with a streaming SQL insert and rolls back on failure.
+Path-parent/name functions are registered on each catalog connection. Direct
+external SQLite writers must honor this schema contract; application writes use
+the service. Folder IDs are non-reused, while labels/favorites have their own
+optimistic revisions. Counts and presentation changes advance a separate global
+folder revision, so native polling sees external imports even on an empty page.
+
+Imported directories become visible roots unless an existing root contains them.
+Importing into a parent coalesces descendant roots. Show/hide-parent commands only
+alter catalog presentation and check the global revision; hiding a parent with
+direct photos is rejected. Empty former locations remain represented. Tree pages
+and flat name/favorite/color searches return at most 60 folders; hidden ancestors
+do not leak into searches. A bounded page checks directory availability, without
+recursively scanning disk. Ancestor navigation is limited to 256 levels.
+
+`list_photos` accepts a folder source independently of metadata filters, mutually
+exclusive with a collection source. Descendant inclusion defaults to true. An
+unfiltered folder count uses maintained totals minus collapsed stack children;
+filtered queries retain exact SQL predicates. Native folder pages load lazily and
+release collapsed branches. Source navigation flushes pending edits and rejects
+superseded requests. Photo-to-folder navigation uses explicit tree and photo-page
+offsets, clears filters and switches to a flat direct-folder view; it does not
+change saved stack visibility. Folder synchronization, physical moves/renames,
+multi-source selection and persistent workspace preferences remain future work.
+
 `source_identity.py` provides stat-based cache identities without importing pixel
 libraries. The broker returns a page of completed thumbnail paths in one command;
 misses still use bounded image workers. Workers publish JPEG cache entries atomically.

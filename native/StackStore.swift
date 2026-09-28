@@ -34,6 +34,7 @@ extension Store {
         let wanted=Set(requested ?? actionPhotoIDs)
         let ids=photos.map(\.id).filter { wanted.contains($0) }
         let source=collectionID
+        let folder=folderID
         let revision=stackRevision
         let active=selected
         let focus=(action == "collapse" || action == "toggle") ? ids.first.flatMap { photoStacks[$0]?.top } : active
@@ -47,9 +48,9 @@ extension Store {
             if action == "group",let active,ids.contains(active) { params["active_id"]=active }
             _=try await Backend.call("stack_photos",params)
             await refreshCollections()
-            let stillHere=collectionID == source && selected == active
+            let stillHere=collectionID == source && folderID == folder && selected == active
             await refresh()
-            if stillHere,collectionID == source,let focus,photos.contains(where: { $0.id == focus }) { choose(focus) }
+            if stillHere,collectionID == source,folderID == folder,let focus,photos.contains(where: { $0.id == focus }) { choose(focus) }
             message="Updated photo stacks"
         } catch { self.error=error.localizedDescription }
     }
@@ -58,6 +59,9 @@ extension Store {
         guard canStack else { return }
         var params: [String:Any] = ["collapsed":collapsed,"expected_revision":stackRevision]
         if let collectionID { params["collection_id"]=collectionID }
+        else if let folder=activeFolder,folder.id == folderID {
+            params["folder"]=folder.path;params["include_subfolders"]=includeSubfolders
+        }
         else if let folder=libraryFilters["folder"] as? String { params["folder"]=folder }
         stackBusy=true
         defer { stackBusy=false }

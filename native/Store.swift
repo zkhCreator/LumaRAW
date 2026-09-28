@@ -36,6 +36,19 @@ import UniformTypeIdentifiers
     @Published var sortDescending=true
     @Published var collectionID: Int?
     @Published var activeCollection: LibraryCollection?
+    @Published var folderID: Int?
+    @Published var activeFolder: LibraryFolder?
+    @Published var includeSubfolders=true
+    @Published var folderSearch=""
+    @Published var folderFavorites=false
+    @Published var folderColor="any"
+    @Published var folderPages: [Int:FolderPage]=[:]
+    @Published var expandedFolders: Set<Int>=[]
+    var folderPageGenerations: [Int:Int]=[:]
+    var folderSearchTask: Task<Void,Never>?
+    var folderRevision = -1
+    var photoFolderRevision = -1
+    var sourceNavigationGeneration=0
     @Published var collections: [LibraryCollection] = []
     @Published var collectionOffset=0
     @Published var collectionPages: [Int:CollectionPage] = [:]
@@ -169,10 +182,12 @@ import UniformTypeIdentifiers
             var params: [String: Any] = ["offset":offset,"mode":mode,"search":search,
                                        "filters":libraryFilters,"sort":librarySort,"descending":sortDescending,"stacked":showStacks]
             if let collectionID { params["collection_id"]=collectionID }
+            if let folderID { params["folder_id"]=folderID;params["include_subfolders"]=includeSubfolders }
             let result=try await Backend.call("list_photos",params)
             guard token==pageGeneration else{return}
             photos=(result["photos"] as? [[String:Any]] ?? []).compactMap(Photo.init)
             adoptStacks(result)
+            photoFolderRevision=result["folder_revision"] as? Int ?? photoFolderRevision
             total=result["total"] as? Int ?? 0
             offset=result["offset"] as? Int ?? offset
             thumbnails=thumbnails.filter { id,_ in photos.contains{$0.id==id} }
@@ -185,6 +200,7 @@ import UniformTypeIdentifiers
             reviewSelectionChanged()
             updateThumbnails(force:true)
             await refreshCollectionState()
+            if folderRevision != photoFolderRevision { await refreshFolders() }
         } catch {self.error=error.localizedDescription}
     }
     func clearPhoto() {

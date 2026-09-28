@@ -37,6 +37,11 @@ when a clear function is more maintainable. Avoid unrelated formatting churn.
   pagination and never decode image pixels merely to search the library.
 - Test migration with existing photos, edits and jobs. Backups include all new
   catalog state; export jobs keep their original recipe and destination snapshots.
+  Construct legacy fixtures with the actual earlier migration chain; changing only
+  `user_version` on a newer schema does not prove upgrade compatibility.
+- Keep Library sources separate from metadata filters. Folder counts describe
+  catalog membership independently of the filtered/stacked photo page. Imports,
+  variants, removal and relinking must maintain these counts transactionally.
 
 ## Engine changes and handoff
 
@@ -68,6 +73,9 @@ selection or request-generation change. Flush edits before changing contexts.
 Show empty filtered results differently from an empty catalog. Offer keyboard
 equivalents without consuming text-field input. Long operations run off the main
 actor; the UI holds only a bounded page and file-backed images.
+Distinguish explicit user-control setters from programmatic navigation restores:
+changing a sort or source preference during photo location must not trigger a
+second UI callback that resets its computed page offset.
 
 ## Replaceable platform architecture
 

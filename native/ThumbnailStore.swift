@@ -14,13 +14,16 @@ extension Store {
         let ids=snapshot.map(\.id)
         guard !browsing else { return }
         if ids.isEmpty {
-            if let result=try? await Backend.call("stack_state"),let revision=result["revision"] as? Int,
-               !browsing,photos.isEmpty,revision != stackRevision { await refresh() }
+            if let result=try? await Backend.call("library_state"),!browsing,photos.isEmpty,
+               (result["stack_revision"] as? Int != stackRevision || result["folder_revision"] as? Int != photoFolderRevision) {
+                await refresh()
+            }
             return
         }
         do {
             let result=try await Backend.call("photo_summaries",["photo_ids":ids])
             guard !browsing,photos.map(\.id) == ids else { return }
+            if let revision=result["folder_revision"] as? Int,revision != photoFolderRevision { await refresh();return }
             if let revision=result["stack_revision"] as? Int,revision != stackRevision { await refresh();return }
             let rows=result["photos"] as? [[String:Any]] ?? []
             if rows.count != ids.count { await refresh();return }

@@ -22,6 +22,7 @@ struct ContentView: View {
                     Button {s.workspace="exports"} label:{Label("Export Queue",systemImage:"square.and.arrow.up")}
                     Button {s.workspace="agent"} label:{Label("Agent Connection",systemImage:"terminal")}
                 }
+                FoldersSidebar()
                 CollectionsSidebar()
                 Section {
                     Button {s.libraryAction("index_library")} label:{Label("Update Library Index",systemImage:"arrow.triangle.2.circlepath")}.disabled(s.busy)
@@ -79,9 +80,9 @@ struct ContentView: View {
         }
     }
     func side(_ title:String,_ symbol:String,_ mode:String)->some View {
-        Button {s.mode=mode;s.showStacks=true;s.collectionID=nil;s.workspace="library";s.offset=0;Task{await s.refresh()}} label:{
-            HStack{Label(title,systemImage:symbol);Spacer();if s.mode==mode && s.collectionID==nil && s.workspace=="library"{Image(systemName:"checkmark").font(.caption).foregroundStyle(.tint)}}
-        }.accessibilityAddTraits(s.mode==mode && s.collectionID==nil && s.workspace=="library" ? .isSelected:[])
+        Button {Task{await s.openLibraryMode(mode)}} label:{
+            HStack{Label(title,systemImage:symbol);Spacer();if s.mode==mode && s.collectionID==nil && s.folderID==nil && s.workspace=="library"{Image(systemName:"checkmark").font(.caption).foregroundStyle(.tint)}}
+        }.accessibilityAddTraits(s.mode==mode && s.collectionID==nil && s.folderID==nil && s.workspace=="library" ? .isSelected:[])
     }
     var workspace:some View {
         VStack(spacing:0){
@@ -133,13 +134,13 @@ struct ContentView: View {
     var empty:some View {
         ContentUnavailableView {
             Label(filtered ? "No Matching Photos":"Your Next Great Photo",systemImage:filtered ? "line.3.horizontal.decrease.circle":"camera.aperture")
-        }description:{Text(filtered ? "This view has no photos. Adjust the filters or add photos to this collection." : "Import Nikon NEF or other photos to begin non-destructive editing.\nYou can also drag a photo folder into this window.")}
+        }description:{Text(filtered ? "This view has no photos. Choose another source or adjust the filters." : "Import Nikon NEF or other photos to begin non-destructive editing.\nYou can also drag a photo folder into this window.")}
         actions:{
-            if filtered { Button("Show All Photos"){s.mode="all";s.collectionID=nil;s.libraryFilters=[:];s.search="";s.offset=0;Task{await s.refresh()}} }
+            if filtered { Button("Show All Photos"){Task{await s.openLibraryMode("all",clearFilters:true)}} }
             else { Button("Import Photos…"){s.importPanel()}.buttonStyle(.borderedProminent).controlSize(.large) }
         }
     }
-    var filtered: Bool { s.mode != "all" || s.collectionID != nil || !s.libraryFilters.isEmpty || !s.search.isEmpty }
+    var filtered: Bool { s.mode != "all" || s.collectionID != nil || s.folderID != nil || !s.libraryFilters.isEmpty || !s.search.isEmpty }
     var gallery:some View {
         ScrollView {
             LazyVGrid(columns:[GridItem(.adaptive(minimum:175,maximum:245),spacing:18)],spacing:20) {
@@ -162,7 +163,7 @@ struct ContentView: View {
                     .help(s.thumbnailErrors[p.id] ?? p.displayName)
                     .accessibilityElement(children:.combine).accessibilityLabel("\(p.displayName), \(p.rating) \(p.rating == 1 ? "star" : "stars")")
                     .accessibilityAddTraits(.isButton).accessibilityAction{s.choose(p.id);Task {await s.switchLibraryView(.loupe)}}
-                    .contextMenu {StackActions(photoID:p.id);VirtualCopyActions(photo:p);Divider();Button("Develop"){s.choose(p.id);Task {await s.startDevelop()}};Button("Show in Finder"){NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath:p.path)])}}
+                    .contextMenu {StackActions(photoID:p.id);VirtualCopyActions(photo:p);PhotoFolderAction(photo:p);Divider();Button("Develop"){s.choose(p.id);Task {await s.startDevelop()}};Button("Show in Finder"){NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath:p.path)])}}
                 }
             }.padding(24)
         }.background(Color(nsColor:.underPageBackgroundColor))
@@ -184,7 +185,7 @@ struct ContentView: View {
     var filmstrip:some View {
         ScrollView(.horizontal){HStack(spacing:10){ForEach(s.photos){p in Button{s.choose(p.id,extend:NSEvent.modifierFlags.contains(.command),range:NSEvent.modifierFlags.contains(.shift))}label:{
             VStack(spacing:4){Group{if let im=s.thumbnails[p.id]{Image(nsImage:im).resizable().aspectRatio(contentMode:.fit)}else{Image(systemName:s.thumbnailErrors[p.id] == nil ? "photo":"exclamationmark.triangle")}}.frame(width:88,height:62).overlay(alignment:.topLeading){StackBadge(photoID:p.id).padding(4)}.overlay(alignment:.bottomLeading){VirtualCopyBadge(photo:p)}.overlay(alignment:.topTrailing){TargetCollectionBadge(photoID:p.id).font(.caption2)}.background(.black.opacity(0.8)).clipShape(RoundedRectangle(cornerRadius:4)).overlay(RoundedRectangle(cornerRadius:4).stroke(s.selection.contains(p.id) ? Color.accentColor:.clear,lineWidth:2));Text(p.displayName).font(.system(size:9)).lineLimit(1).frame(width:88)}
-        }.buttonStyle(.plain).help(s.thumbnailErrors[p.id] ?? p.displayName).accessibilityLabel(p.displayName).contextMenu{StackActions(photoID:p.id);VirtualCopyActions(photo:p)}}}.padding(12)}.frame(height:109).background(.bar).modifier(PhotoKeyboardShortcuts())
+        }.buttonStyle(.plain).help(s.thumbnailErrors[p.id] ?? p.displayName).accessibilityLabel(p.displayName).contextMenu{StackActions(photoID:p.id);VirtualCopyActions(photo:p);PhotoFolderAction(photo:p)}}}.padding(12)}.frame(height:109).background(.bar).modifier(PhotoKeyboardShortcuts())
     }
 }
 

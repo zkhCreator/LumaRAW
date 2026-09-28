@@ -16,6 +16,7 @@ extension Store {
         let ids=requested ?? actionPhotoIDs
         let active=selected
         let source=collectionID
+        let folder=folderID
         let collection=activeCollection
         guard !ids.isEmpty,!copyBusy else { return }
         copyBusy=true
@@ -31,7 +32,7 @@ extension Store {
             let copies=(result["photos"] as? [[String:Any]] ?? []).compactMap(Photo.init)
             await refreshCollections()
             await refresh()
-            if selected == active,collectionID == source,let first=copies.first,photos.contains(where: { $0.id == first.id }) {
+            if selected == active,collectionID == source,folderID == folder,let first=copies.first,photos.contains(where: { $0.id == first.id }) {
                 choose(first.id)
                 selection=Set(copies.map(\.id)).intersection(Set(photos.map(\.id)))
                 reviewSelectionChanged()
@@ -83,7 +84,9 @@ extension Store {
     }
 
     func showPhotoFamily(_ target: Photo,masterOnly: Bool=false) async {
-        guard await flushEdits() else { return }
+        sourceNavigationGeneration+=1;let token=sourceNavigationGeneration
+        guard await flushEdits(),token == sourceNavigationGeneration else { return }
+        folderID=nil;activeFolder=nil
         collectionID=nil;activeCollection=nil;search="";mode="all";workspace="library"
         showStacks=false
         libraryFilters=["source_id":target.sourceID]

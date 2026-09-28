@@ -180,19 +180,30 @@ def test_relink_to_other_folder_detaches_only_folder_stack(service,tmp_path):
     assert len(ids(s))==6 and len(ids(s,collection_id=album))==1
 
 
-def test_v3_migration_retains_photos_without_inventing_stacks(service):
-    s=service
-    with s.catalog() as c:
-        original=c.summaries([1,2])
+def test_v3_migration_retains_photos_without_inventing_stacks(tmp_path,monkeypatch):
+    from lumaraw import catalog as module
+    from lumaraw.organization import migrate_metadata
+    from lumaraw.collections import migrate as migrate_collections
+    from lumaraw.virtual_copies import migrate as migrate_copies
+
+    def legacy(db):
+        migrate_metadata(db);migrate_collections(db);migrate_copies(db)
+    root=tmp_path/'catalog'
+    with monkeypatch.context() as patch:
+        patch.setattr(module,'migrate',legacy)
+        c=Catalog(root)
         with c.db:
-            triggers=c.db.execute("SELECT name FROM sqlite_master WHERE type='trigger' AND name LIKE '%stack%'").fetchall()
-            for row in triggers:c.db.execute('DROP TRIGGER '+row[0])
-            for table in ('stack_state','stack_members','photo_stacks'):c.db.execute('DROP TABLE '+table)
-            c.db.execute('PRAGMA user_version=3')
-    with s.catalog() as c:
+            c.db.executemany('INSERT INTO photos(path,name,bytes,mtime,recipe,created) VALUES(?,?,0,0,?,0)',
+                [(str(tmp_path/f'{i}.png'),f'{i}.png',json.dumps(Recipe().dict())) for i in range(6)])
+        original=c.summaries([1,2])
+        assert c.db.execute('PRAGMA user_version').fetchone()[0]==3
+        c.close()
+    c=Catalog(root)
+    try:
         assert c.db.execute('PRAGMA user_version').fetchone()[0]==CATALOG_VERSION
         assert c.summaries([1,2])==original
         assert Stacks(c).revision()==0 and c.filtered_count()==6
+    finally:c.close()
 
 
 def test_copy_collection_and_quick_save_preserve_stack_organization(service):

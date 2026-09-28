@@ -209,7 +209,7 @@ class Stacks:
                 Collections(self.catalog).touch_ancestors(collection['parent_id'])
         return {'revision':self.revision()}
 
-    def visibility(self, collapsed, expected_revision, collection_id=None, folder=None):
+    def visibility(self, collapsed, expected_revision, collection_id=None, folder=None,include_subfolders=True):
         with self.db:
             self.db.execute('BEGIN IMMEDIATE')
             self.check(expected_revision)
@@ -221,8 +221,12 @@ class Stacks:
                     raise ValueError('Choose either a collection or folder stack source')
                 path=os.path.abspath(os.path.expanduser(folder)).rstrip(os.sep) or os.sep
                 prefix=path.rstrip(os.sep)+os.sep
-                where+=' AND (folder=? OR substr(folder,1,?)=?)'
-                params.extend((path,len(prefix),prefix))
+                if include_subfolders:
+                    where+=' AND (folder=? OR substr(folder,1,?)=?)'
+                    params.extend((path,len(prefix),prefix))
+                else:
+                    where+=' AND folder=?'
+                    params.append(path)
             count=self.db.execute('UPDATE photo_stacks SET collapsed=? WHERE '+where,
                                   [int(collapsed),*params]).rowcount
             if collection_id is not None and count:

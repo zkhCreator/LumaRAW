@@ -20,6 +20,7 @@ struct InspectorView:View {
                         if !p.title.isEmpty { Text(p.title).font(.headline) }
                         if !p.keywords.isEmpty { Text(p.keywords.joined(separator:", ")).font(.caption).foregroundStyle(.secondary) }
                         Button("Edit Metadata…") { Task { await s.prepareMetadataEditor() } }
+                        Button("Go to Folder in Library") { Task { await s.showPhotoFolder(p) } }
                     }
                     HStack(spacing:7){ForEach(1..<6){value in Button{s.rate(p.rating==value ? 0:value)}label:{Image(systemName:p.rating>=value ? "star.fill":"star").foregroundStyle(p.rating>=value ? Color.yellow:Color.secondary)}.accessibilityLabel("Rate \(value) \(value == 1 ? "star" : "stars")")};Spacer();Button{s.flag(p.flag==1 ? 0:1)}label:{Image(systemName:p.flag==1 ? "flag.fill":"flag")}}
                         .buttonStyle(.plain).help("1–5 to rate, P to flag as a pick")

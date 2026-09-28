@@ -11,6 +11,15 @@ LUMARAW_TEST_NEF=/absolute/nikon.NEF uv run --frozen pytest -q
 
 The two `test_core.py` real-RAW tests skip if that environment variable is absent. `test_service.py` verifies revision conflicts, invalid edit atomicity, all-target sync, immutable export snapshots, deduplication keys, bounded queue pages and specific receipts, memory stopping, cancellation while a worker slot is occupied, superseded UI previews, cold job recovery and newline MCP framing through real subprocesses.
 
+The folder increment also ran the complete suite with rawpy's public
+[Nikon D3S regression fixture at a pinned commit](https://github.com/letmaik/rawpy/blob/5ab750e3044b55549bf2b21ada46df815a016103/test/iss030e122639.NEF).
+Its size is 10,656,312 bytes and SHA-256 is
+`5922721d13f11795557d97fdeb0a60b900086c402bc82a848ff280d15b99ffd4`.
+Acquire the file separately, verify its hash and pass its absolute path through
+`LUMARAW_TEST_NEF`. The image and generated outputs are not distributed with this
+project. One sample verifies these regression contracts, not all Nikon cameras,
+HE/HE* decoding, calibrated color or Adobe pixel equivalence.
+
 ## Broker lifecycle
 
 `tests/test_broker_lifecycle.py` uses real isolated processes to test build
@@ -82,13 +91,16 @@ The runner compiles all native files except the app entry point, generates five
 small raster files and separate disposable catalogs, then runs the
 15-assertion state, 13-assertion library, 12-assertion culling, 20-assertion review,
 14-assertion thumbnail, 21-assertion collection-tree, 19-assertion virtual-copy,
-10-assertion service-connection, 22-assertion stack and 19-assertion auto-stack suites.
+10-assertion service-connection, 22-assertion stack, 19-assertion auto-stack and
+24-assertion folder suites.
 Each suite has its own
 fresh image directory, so a relink test cannot move another suite's fixture. The library suite checks
 live smart membership, text search/sort, pagination, empty-filter selection,
 partial metadata writes and independent recipe/metadata conflict handling. JSON
 receipts stay in the ignored work directory. Without `--engine`, it uses the
 current Python environment's `lumaraw` executable.
+The folder suite adds 64 copies of its own generated fixture to test locating a
+photo beyond the first page; it never copies a personal photograph.
 
 The culling suite uses five generated images to check anchored Shift selection,
 Command toggling, visible-page selection, all-target batch flags/ratings, recipe
@@ -129,6 +141,28 @@ starts no image workers.
 
 These probes do not establish rendered disclosure, drag/drop or B-key mixed
 selection equivalence to Lightroom Classic.
+
+## Folder navigation
+
+`tests/test_folders.py` verifies hierarchy/coalesced roots, direct/descendant counts,
+source/filter independence, labels/favorites and stale edits, copy/removal/relink
+maintenance, offline folders, stack visibility scope, bounded pages and photo
+location. A real v6 fixture checks migration rollback after denied writes and
+backup preservation. Older collection/stack migration tests now construct genuine
+v1/v3 catalogs instead of merely lowering a newer catalog's schema number.
+`NativeFolderRegression` tests native source navigation, lazy pages, parent display,
+metadata filters, labels, external membership polling and locating an older photo
+on a later page. It uses isolated generated rasters; no desktop control occurs.
+
+```sh
+.venv/bin/python tests/folder_probe.py --work work/folder-probe-01 --rows 100000 --samples 30
+```
+
+The fixture uses 1,000 leaf directories and 10 intermediate years. Timings cover
+warm tree/search queries and photo pages, including metadata filters and deep
+offsets, plus metadata-only SQL insertion with production triggers. They exclude
+file import/EXIF, IPC, pixel work and native UI. Counts include virtual copies and
+are independent of the current photograph filters.
 
 ## Photo stacks
 

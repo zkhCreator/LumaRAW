@@ -49,6 +49,7 @@ import AppKit
                 Button("Clear Flag"){store.flag(0)}
                 Divider()
                 Button("Show in Finder"){store.reveal()}
+                Button("Go to Folder in Library") { if let photo=store.photo { Task { await store.showPhotoFolder(photo) } } }.disabled(store.photo == nil)
                 Button("Locate Missing Original…"){store.relink()}
             }
             CommandMenu("Library") {
@@ -61,6 +62,9 @@ import AppKit
                 Button("Show Quick Collection") { if let quick=store.collectionState?.quick { Task { await store.openCollection(quick) } } }
                 Button("Filter Photos…") { store.showLibraryFilters=true }
                 Toggle("Show Photo Stacks",isOn:Binding(get:{store.showStacks},set:{value in store.showStacks=value;Task { await store.refresh() }}))
+                Toggle("Include Photos from Subfolders",isOn:Binding(get:{store.includeSubfolders},set:{value in
+                    Task { await store.changeSubfolderInclusion(value) }
+                }))
                 Button("Refresh Library") { Task { await store.refreshCollections(); await store.refresh() } }
             }
             CommandGroup(after:.toolbar) {

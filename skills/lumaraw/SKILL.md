@@ -92,6 +92,27 @@ edits. A thumbnail client can use its own `client_id`/`generation` and
 `cancel_preview` to discard obsolete work. Metadata edits preserve the pixel cache;
 recipe, source or LUT changes invalidate it. The Mac shell uses developed images.
 
+## Folder sources
+
+`list_folders` pages visible roots or a `parent_id` at 60 items. Optional `search`,
+`favorites` and `color_label` produce a flat folder list, independent of photo
+filters. `get_folder` takes exactly one `folder_id` or `photo_id`; its ancestors,
+tree `page_offset` and direct-folder `photo_offset` support explicit navigation.
+The photo offset assumes unfiltered, unstacked import order descending.
+
+Pass `folder_id` and optional `include_subfolders` (default true) to `list_photos`.
+A collection and folder source are mutually exclusive. Keep source selection
+separate from the existing `filters.folder` metadata criterion, which remains
+recursive for compatibility. `library_state` returns structural folder/stack
+revisions for empty-page polling. A folder's counts include virtual copies and
+ignore photo filters; unavailable directories remain catalog entries.
+
+`edit_folder` changes only `favorite`/`color_label` with the row's revision.
+`set_folder_visibility` checks the global folder revision and uses `show_parent`
+or `hide_parent`; a parent with direct photos cannot be hidden. These commands do
+not create, rename, move or delete physical folders. Do not infer that a displayed
+empty/unavailable folder authorizes deleting originals or removing catalog photos.
+
 ## Photo stacks
 
 `list_photos` defaults to source-scoped stacks and includes `stack_revision` plus
@@ -114,7 +135,8 @@ It retains selected internal order in a new expanded stack; singletons are unsta
 
 `set_stack_visibility` expands/collapses every stack in a captured source, without
 depending on photo selection or metadata filters. Pass `collapsed`, the current
-stack revision and either `collection_id` or `folder` (including descendants).
+stack revision and either `collection_id` or `folder` (including descendants unless
+`include_subfolders` is false).
 Omitting the source affects all folder stacks. `stack_state` reads the revision
 without photo payloads. New virtual copies automatically join an expanded folder
 stack, even when created in a collection; no collection stack is invented.

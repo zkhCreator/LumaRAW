@@ -85,6 +85,8 @@ def migrate(db):
     migrate_identities(db)
     from .capture_time import migrate as migrate_capture_time
     migrate_capture_time(db)
+    from .folders import migrate as migrate_folders
+    migrate_folders(db)
 
 
 def text_predicate(text):

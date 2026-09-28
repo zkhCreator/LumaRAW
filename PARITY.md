@@ -22,6 +22,7 @@ Official references checked September 2026:
 - [Photo stacks and source boundaries](https://helpx.adobe.com/lightroom-classic/desktop/organize-photos-in-lightroom-classic/grouping-photos-stacks.html)
 - [Stacking shortcuts, Adobe's Julieanne Kost](https://jkost.com/blog/2024/07/stacking-similar-photos-in-lightroom-classic.html)
 - [Folder hierarchy, subfolder inclusion and synchronization](https://helpx.adobe.com/lightroom-classic/desktop/manage-catalogs-and-files/create-folders.html)
+- [Hierarchical keywords, synonyms and export options](https://helpx.adobe.com/lightroom-classic/desktop/organize-photos-in-lightroom-classic/keywords.html)
 
 ## Feature inventory
 
@@ -31,7 +32,7 @@ gaps. Nothing below is full Lightroom parity merely because historical tests pas
 | Area | Current implementation | Remaining acceptance / work |
 | --- | --- | --- |
 | Import and catalogs | Partial: referenced originals, backup/restore | Import preview/selection, copy workflows, metadata/develop presets, catalog switching/merge |
-| Library navigation | Partial: bounded grid/filmstrip, filters/sorting, regular/smart/Quick collections and nested sets | Folder tree, collection drag/drop/color labels, full smart criteria/import-export, source-selection memory, desktop acceptance |
+| Library navigation | Partial: bounded grid/filmstrip, folder tree/search/favorites/labels, direct/recursive sources, filters/sorting, regular/smart/Quick collections and nested sets | Multi-source selection, folder sync/relocation/move/rename, collection drag/drop/color labels, full smart criteria/import-export, source-selection memory, desktop acceptance |
 | Organization | Partial: duplicate/missing detection, flat keywords, title/caption/copyright, labels, batch metadata, virtual copies, manual/split/capture-time scoped stacks | Keyword hierarchy, complete IPTC, stack interaction acceptance, rename and sidecars |
 | Culling | Partial: Loupe/Compare/Survey, linked detail, anchored page selection | Desktop acceptance, cross-page selection, Develop reference view, auto advance, persistent workspace state |
 | Basic development | Partial: light/WB/color | Calibrated absolute WB, eyedropper, texture/clarity/dehaze, complete HSL/B&W and color grading |
@@ -52,9 +53,9 @@ gaps. Nothing below is full Lightroom parity merely because historical tests pas
 
 ## Active increment
 
-Capture-time auto stacking and selected-subset splitting, precise read-only EXIF
-clocks, stable collection identities and packaged Mac workflow verification.
-Folder navigation and keyword hierarchy follow; the remaining inventory stays in scope.
+Folder navigation, independent direct/recursive sources, maintained counts,
+favorites/labels, parent presentation and photo-to-folder location. Keyword
+hierarchy follows; the remaining inventory stays in scope.
 
 ## Evidence log
 
@@ -102,7 +103,7 @@ whole-desktop latency, or performance guarantees on other hardware. Reproduce vi
 
 ### Next work
 
-Continue with folder navigation, keyword hierarchy, stack ordinal badges and
+Continue with keyword hierarchy, folder synchronization/relocation, stack ordinal badges and
 cross-page cover focus. Offline preview caches,
 cache-size controls and native polling/process-startup costs remain pending. Then close Develop and
 export gaps in the inventory. Preserve pending desktop/older-OS acceptance rather
@@ -113,7 +114,8 @@ children, bounded counts/pages, optional inclusion of descendants, and locating 
 selected photo's folder. Source navigation must remain distinct from metadata
 filters. Favorites, labels, missing-folder relinking, synchronization and explicit
 filesystem rename/move workflows remain separate unfinished requirements; a tree
-view alone does not complete folder parity.
+view alone does not complete folder parity. The navigation/favorites/labels portion
+is implemented below; synchronization and filesystem workflows remain pending.
 
 Full completion still requires closing all non-AI gaps above. Historical receipts
 in `VERIFICATION.md` do not validate this increment.
@@ -485,3 +487,88 @@ engine manifest matches the final source (generation 4, catalog schema 6, 52 too
 Rendered desktop interaction, VoiceOver, macOS 14 runtime and real-camera/Adobe
 reference acceptance remain unverified. Folder navigation, keyword hierarchy and
 the full non-AI feature inventory remain unfinished.
+
+### Folder navigation and source counts increment
+
+Schema v7 adds a relational folder/photo index with maintained direct/descendant
+counts. Imports, virtual copies, removal and relinking update it transactionally;
+no image decoding or recursive filesystem scan is used. The upgrade preserves
+existing photo rows and rolls back a denied write. Backup/restore retains the tree,
+labels and favorites. Legacy collection/stack migration fixtures now build genuine
+v1/v3 databases instead of lowering the schema number of a newer database that
+still contained newer tables.
+
+The Mac sidebar exposes paged folder roots/children, text/favorite/color filtering,
+unavailable-directory indicators, catalog labels and Show/Hide Parent. Imported
+parents coalesce descendant roots; hiding a parent with direct photos fails
+explicitly. Availability is checked when a folder page is read, including explicit
+refresh; disk-watch automation is not implemented. Counts include virtual copies
+and do not change with photograph metadata filters.
+
+Folder sources are independent of metadata filters and mutually exclusive with
+collection sources. Descendant inclusion defaults to true; exact-folder views and
+stack visibility respect its toggle. External folder revisions refresh native
+pages and sidebar counts, including a previously empty filtered result. Navigation
+flushes edits and rejects superseded source requests. Go to Folder clears filters,
+shows individual photos in import order, computes the correct photo/tree pages
+and reveals the containing branch. It changes the current flat-view preference,
+without rewriting saved stack visibility. Exact preservation of Lightroom view
+preferences on this action still needs direct comparison.
+
+Synthetic warm timings on macOS 26.6.2 arm64, 128 GB, 1,000 leaf folders under ten
+intermediate year folders, 30 samples, no concurrent test/build workload:
+
+| Operation | 10,000 photos median / p95 | 100,000 photos median / p95 |
+| --- | ---: | ---: |
+| Folder root page | 1.500 / 1.648 ms | 1.545 / 3.140 ms |
+| Child folder page | 1.543 / 1.601 ms | 1.600 / 1.756 ms |
+| Folder name search | 4.527 / 4.610 ms | 4.629 / 4.937 ms |
+| Descendant photo page | 8.306 / 8.658 ms | 40.458 / 43.191 ms |
+| Descendant rating filter | 12.692 / 13.496 ms | 94.382 / 96.495 ms |
+| Direct leaf photo page | 3.448 / 3.509 ms | 3.923 / 4.322 ms |
+| Descendant final page | 10.537 / 11.386 ms | 68.708 / 70.045 ms |
+| Photo's folder/offset | 1.182 / 1.417 ms | 1.251 / 1.450 ms |
+
+Peak process RSS was 41.12 / 67.59 MB; no image worker ran. Metadata-only insertion
+with production triggers took 1.343 / 14.579 seconds (one setup sample), excluding
+file import and EXIF reads. Initial 100k descendant/final pages measured 91.347 /
+120.821 ms median. Maintained totals minus hidden stack children avoid rescanning
+all members for unfiltered counts; filtered queries retain exact SQL counts. These
+measurements exclude IPC, image processing and desktop latency. Reproduce using
+`tests/folder_probe.py`; long metadata imports and indexing still need persistent
+jobs to avoid holding the service lock for their duration.
+
+Remaining folder parity includes multi-folder selection, grouped favorite sources,
+volume/display modes, synchronization, missing-folder bulk relocation, safe physical
+rename/move and empty-folder creation/import. Rendered controls, keyboard/VoiceOver,
+macOS 14 runtime and direct Lightroom workflow acceptance remain unverified.
+
+Final required-Metal verification initially passed **202 tests with 2 real-NEF
+skips**. A separately acquired upstream fixture then enabled the entire suite:
+**204 tests passed, no skips**. The pinned
+[rawpy D3S sample](https://github.com/letmaik/rawpy/blob/5ab750e3044b55549bf2b21ada46df815a016103/test/iss030e122639.NEF)
+is 10,656,312 bytes with SHA-256
+`5922721d13f11795557d97fdeb0a60b900086c402bc82a848ff280d15b99ffd4`.
+It stays in an ignored test directory and is not redistributed. Real-RAW tests
+verify bounded previews, full-size 16-bit TIFF/ICC, unchanged source hashes and
+color-matrix agreement with LibRaw's own sRGB reference, not Adobe processing.
+The capture reader used 818 header bytes and matched the independently read EXIF
+original date/fraction (`2012:03:04 17:20:59`, `06`) as camera wall time. Broader
+camera/HE/HE* coverage remains pending.
+
+All eleven native suites passed against the final self-contained engine: **189
+assertions**, including 24 folder checks and later-page photo location. The Mac
+app compiled without Swift warnings, passed local ad-hoc signature verification,
+and embeds a manifest matching the final engine source (generation 5, schema 7,
+57 tools). These state/IPC checks do not establish rendered desktop acceptance.
+
+The packaged engine additionally completed six full-size 4284 × 2844 D3S exports,
+alternating JPEG/16-bit TIFF and four output spaces, in **9.09 seconds** on Apple
+M3 Max. The run includes queue/worker startup and encoding; five source decodes
+were uncached for their white-balance settings and the sixth reused a source cache.
+All jobs reported actual Metal grading (23 tiles each), with LibRaw CPU decoding,
+no fallback and at most one image child. Broker RSS peaked at **42.97 MB**, sampled
+worker RSS at **282 MB**, Metal shared buffers at **19.61 MB**. Original hashes
+were unchanged and no partial export files remained. Six repeated exports of one
+sample are process/resource evidence, not six independent camera samples or an
+Adobe color-fidelity benchmark.
