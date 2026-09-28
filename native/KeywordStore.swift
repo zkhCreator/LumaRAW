@@ -102,6 +102,7 @@ extension Store {
             }
         }
         await refreshKeywordSets()
+        await refreshKeywordShortcut()
     }
 
     func scheduleKeywordSearch() {
@@ -202,13 +203,14 @@ extension Store {
         await refresh()
     }
 
-    func refreshKeywordPhoto() async {
+    func refreshKeywordPhoto(includeCulling: Bool=false) async {
         guard let id=selected else { return }
         guard let row=try? await Backend.call("get_photo",["photo_id":id]),let fresh=Photo(row),
               selected == id,var current=photo,current.id == id,current.metadataRevision <= fresh.metadataRevision else { return }
         current.adoptLibraryPatch(["keywords":fresh.keywords,"title":fresh.title,"caption":fresh.caption,
             "keyword_ids":fresh.keywordIDs,"keyword_count":fresh.keywordCount,"keywords_deferred":fresh.keywordsDeferred,
             "copyright":fresh.copyright,"color_label":fresh.colorLabel,"copy_name":fresh.copyName],revision:fresh.metadataRevision)
+        if includeCulling { current.rating=fresh.rating;current.flag=fresh.flag }
         photo=current
     }
 }

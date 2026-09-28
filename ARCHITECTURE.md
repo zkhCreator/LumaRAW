@@ -247,6 +247,24 @@ unrelated assignments and recipes, with all targets and the 100-tag bound checke
 before commit. Native drafts are separate, retain their revision through external
 refresh, and require explicit update/save or discard. No Lua preset is executed.
 
+`library_painter.py` owns schema 14's catalog keyword shortcut and bounded Painter
+transactions. Shortcut entries contain stable IDs/positions; deletion prunes only
+affected entries, and renaming changes displayed paths without retargeting them.
+Read responses keep all one hundred possible IDs and twenty full paths. A token
+binds the shortcut revision, vocabulary state and catalog. Setting a shortcut may
+create explicitly typed tags but never assigns photos or changes recency.
+
+Painter accepts up to sixty captured targets and one attribute: shortcut keywords,
+rating, flag or color label. It checks all metadata revisions and keyword capacity
+before writing, changes each photo's metadata revision once, and leaves recipes,
+originals and submitted jobs unchanged. Keyword erasure removes only loaded IDs;
+other attributes clear through explicit zero/none values. The native Store keeps
+stroke state separate from selection and submits once at mouse-up. A replaceable
+AppKit pointer adapter reports thumbnail intersections, including coalesced drag
+segments; pending state cancels on changed layout/source/page. Deferred teardown
+captures a stroke identity to avoid mutating SwiftUI during updates or cancelling
+a new stroke. Culling readback updates rating/flag without adopting recipe revisions.
+
 `keyword_exchange.py` owns schema 12's manual person-keyword flag and dictionary
 file exchange. Bounded UTF-8 input is copied and fingerprinted outside the catalog
 lock, then validated in a temporary SQLite database with a 4 MiB page cache. The

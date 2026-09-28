@@ -1,7 +1,8 @@
 // Purpose: complete paged keyword review and a local assignment-set picker.
 // Inputs: captured photo revisions or complete stable keyword IDs, plus searches.
-// Outputs: read-only path pages and a draft ID set returned to the metadata form.
-// No catalog mutations. Saving the parent form validates every target atomically.
+// Outputs: read-only path pages and a draft ID set returned to a parent form.
+// Metadata and shortcut editors share the picker; it never mutates the catalog.
+// Saving the parent form validates its captured revisions atomically.
 import SwiftUI
 
 struct KeywordPath: Identifiable {
@@ -112,13 +113,14 @@ struct KeywordSelectionSheet: View {
     @Environment(\.dismiss) private var dismiss
     @StateObject private var model: KeywordSelectionModel
     let accept: ([Int])->Void
-    init(ids: [Int],accept: @escaping ([Int])->Void) {
-        _model=StateObject(wrappedValue:KeywordSelectionModel(ids:ids));self.accept=accept
+    let explanation: String
+    init(ids: [Int],explanation: String="This replacement set is applied when you save the metadata form.",accept: @escaping ([Int])->Void) {
+        _model=StateObject(wrappedValue:KeywordSelectionModel(ids:ids));self.accept=accept;self.explanation=explanation
     }
     var body: some View {
         VStack(alignment:.leading,spacing:14) {
             Text("Choose Existing Keywords").font(.title2)
-            Text("This replacement set is applied when you save the metadata form.").foregroundStyle(.secondary)
+            Text(explanation).foregroundStyle(.secondary)
             HStack {
                 Text("Selected · \(model.ids.count)/100").font(.headline)
                 Spacer()

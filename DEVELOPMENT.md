@@ -98,6 +98,16 @@ when a clear function is more maintainable. Avoid unrelated formatting churn.
   global/catalog storage never moves existing sets. Keep temporary native edits
   separate from persisted presets and preserve their captured revision after an
   external refresh; never silently rebase stale drafts onto newer settings.
+- Library Painter gestures capture the initial shortcut/configuration, visible
+  photo metadata revisions and source/page. Deduplicate thumbnail hits, include
+  intermediate thumbnails crossed by coalesced pointer events, and commit once
+  at mouse-up. Publish highlight changes only when a new photo is touched, not on
+  every pointer event. Validate every target and assignment capacity before any write.
+  Painter never changes selection or Develop recipes. Cancel pending strokes on
+  Escape, source/page changes and pointer-layout invalidation. Do not publish
+  SwiftUI state during representable updates; defer cancellation with a captured
+  stroke identity so an old callback cannot clear a new gesture. Shortcut IDs
+  remain complete while labels page at twenty; never split old literal labels.
 
 ## Engine changes and handoff
 

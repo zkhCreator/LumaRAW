@@ -76,8 +76,10 @@ struct ContentView: View {
         .sheet(isPresented:$s.showAutoStack){if let source=s.autoStackSource {AutoStackSheet(source:source)}}
         .sheet(isPresented:$s.showFolderRelocation){FolderRelocationSheet(folder:s.relocationFolder)}
         .sheet(isPresented:$s.showFolderSync){FolderSyncSheet(folder:s.syncFolder)}
+        .sheet(item:$s.shortcutEditor){KeywordShortcutEditor(source:$0)}
         .onChange(of:s.workspace) { _,_ in if !s.isMultiReview {s.reviewRenderer.stop()} else {s.updateReviewRequests()} }
         .onChange(of:s.develop) { _,value in if value {s.reviewRenderer.stop()} }
+        .onChange(of:s.painterSource) { _,_ in s.cancelPainterStroke();if !s.painterInGrid { s.setPainting(false) } }
         .onDrop(of:[UTType.fileURL],isTargeted:nil){providers in
             for provider in providers {provider.loadItem(forTypeIdentifier:UTType.fileURL.identifier,options:nil){item,_ in
                 if let data=item as? Data,let url=URL(dataRepresentation:data,relativeTo:nil){Task{@MainActor in await s.importPaths([url.path])}}
@@ -115,6 +117,7 @@ struct ContentView: View {
             Divider()
             if !s.develop {
                 LibraryToolbar()
+                PainterToolbar()
                 Picker("Library View",selection:Binding(get:{s.libraryView},set:{view in Task {await s.switchLibraryView(view)}})) {
                     ForEach(LibraryViewMode.allCases,id:\.self) { view in Label(view.title,systemImage:view.symbol).tag(view) }
                 }.pickerStyle(.segmented).padding(.horizontal,20).padding(.bottom,8)
@@ -156,7 +159,8 @@ struct ContentView: View {
                             if let im=s.thumbnails[p.id]{Image(nsImage:im).resizable().aspectRatio(contentMode:.fit).padding(5)}
                             else{Image(systemName:s.thumbnailErrors[p.id] == nil ? "photo":"exclamationmark.triangle").font(.largeTitle).foregroundStyle(.secondary).frame(maxWidth:.infinity,maxHeight:.infinity)}
                             if p.flag != 0 {Image(systemName:p.flag==1 ? "flag.fill":"xmark.circle.fill").padding(7).foregroundStyle(p.flag==1 ? .yellow:.gray)}
-                        }.overlay(alignment:.topLeading){StackBadge(photoID:p.id).padding(4)}.overlay(alignment:.bottomLeading){VirtualCopyBadge(photo:p).padding(6)}.overlay(alignment:.topTrailing){TargetCollectionBadge(photoID:p.id).padding(6)}.frame(height:145).clipShape(RoundedRectangle(cornerRadius:7)).overlay(RoundedRectangle(cornerRadius:7).stroke(s.selection.contains(p.id) ? Color.accentColor:.clear,lineWidth:3))
+                        }.overlay(alignment:.topLeading){StackBadge(photoID:p.id).padding(4)}.overlay(alignment:.bottomLeading){VirtualCopyBadge(photo:p).padding(6)}.overlay(alignment:.topTrailing){TargetCollectionBadge(photoID:p.id).padding(6)}.frame(height:145).clipShape(RoundedRectangle(cornerRadius:7)).overlay(RoundedRectangle(cornerRadius:7).stroke(s.painterTouched.contains(p.id) ? Color.orange:s.selection.contains(p.id) ? Color.accentColor:.clear,lineWidth:3))
+                            .anchorPreference(key:PainterThumbnailAnchors.self,value:.bounds) { [p.id:$0] }
                         HStack(spacing:6){
                             if p.colorLabel != "none" {Circle().fill(LibraryLabels.color(p.colorLabel)).frame(width:8,height:8).accessibilityLabel("\(p.colorLabel) label")}
                             Text(p.displayName).font(.callout).lineLimit(1)
@@ -168,9 +172,14 @@ struct ContentView: View {
                     .help(s.thumbnailErrors[p.id] ?? p.displayName)
                     .accessibilityElement(children:.combine).accessibilityLabel("\(p.displayName), \(p.rating) \(p.rating == 1 ? "star" : "stars")")
                     .accessibilityAddTraits(.isButton).accessibilityAction{s.choose(p.id);Task {await s.switchLibraryView(.loupe)}}
-                    .contextMenu {StackActions(photoID:p.id);VirtualCopyActions(photo:p);PhotoFolderAction(photo:p);Divider();Button("Develop"){s.choose(p.id);Task {await s.startDevelop()}};Button("Show in Finder"){NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath:p.path)])}}
+                    .contextMenu {StackActions(photoID:p.id);VirtualCopyActions(photo:p);PhotoFolderAction(photo:p);PhotoKeywordShortcutActions(photoID:p.id);Divider();Button("Develop"){s.choose(p.id);Task {await s.startDevelop()}};Button("Show in Finder"){NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath:p.path)])}}
                 }
-            }.padding(24)
+            }.padding(24).overlayPreferenceValue(PainterThumbnailAnchors.self) { anchors in
+                GeometryReader { geometry in
+                    PainterPointerLayer(rectangles:anchors.mapValues { geometry[$0] })
+                        .frame(width:geometry.size.width,height:geometry.size.height)
+                }
+            }
         }.background(Color(nsColor:.underPageBackgroundColor))
         .focusable()
         .modifier(PhotoKeyboardShortcuts())
@@ -190,7 +199,7 @@ struct ContentView: View {
     var filmstrip:some View {
         ScrollView(.horizontal){HStack(spacing:10){ForEach(s.photos){p in Button{s.choose(p.id,extend:NSEvent.modifierFlags.contains(.command),range:NSEvent.modifierFlags.contains(.shift))}label:{
             VStack(spacing:4){Group{if let im=s.thumbnails[p.id]{Image(nsImage:im).resizable().aspectRatio(contentMode:.fit)}else{Image(systemName:s.thumbnailErrors[p.id] == nil ? "photo":"exclamationmark.triangle")}}.frame(width:88,height:62).overlay(alignment:.topLeading){StackBadge(photoID:p.id).padding(4)}.overlay(alignment:.bottomLeading){VirtualCopyBadge(photo:p)}.overlay(alignment:.topTrailing){TargetCollectionBadge(photoID:p.id).font(.caption2)}.background(.black.opacity(0.8)).clipShape(RoundedRectangle(cornerRadius:4)).overlay(RoundedRectangle(cornerRadius:4).stroke(s.selection.contains(p.id) ? Color.accentColor:.clear,lineWidth:2));Text(p.displayName).font(.system(size:9)).lineLimit(1).frame(width:88)}
-        }.buttonStyle(.plain).help(s.thumbnailErrors[p.id] ?? p.displayName).accessibilityLabel(p.displayName).contextMenu{StackActions(photoID:p.id);VirtualCopyActions(photo:p);PhotoFolderAction(photo:p)}}}.padding(12)}.frame(height:109).background(.bar).modifier(PhotoKeyboardShortcuts())
+        }.buttonStyle(.plain).help(s.thumbnailErrors[p.id] ?? p.displayName).accessibilityLabel(p.displayName).contextMenu{StackActions(photoID:p.id);VirtualCopyActions(photo:p);PhotoFolderAction(photo:p);PhotoKeywordShortcutActions(photoID:p.id)}}}.padding(12)}.frame(height:109).background(.bar).modifier(PhotoKeyboardShortcuts())
     }
 }
 

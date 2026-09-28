@@ -182,6 +182,26 @@ stale state, missing targets or capacity errors commit nothing. Never retry an
 uncertain mutation response or silently replace the captured token. Adobe built-in
 preset contents, `.lrtemplate` exchange and Painter are not implemented.
 
+## Keyword shortcuts and Library Painter
+
+`get_keyword_shortcut` returns complete `keyword_ids`, twenty full paths and a
+captured `revision`. Use `offset` and `expected_revision` for consistent additional
+pages. `set_keyword_shortcut(keyword_ids,expected_revision,keyword_additions)`
+replaces the shortcut, resolving explicit additional text paths in one transaction.
+Empty IDs and no additions clear it; at most one hundred keywords are allowed.
+The shortcut preserves IDs through rename and prunes deleted tags. Setting it does
+not assign photos. Never reparse existing labels containing literal separators.
+
+`paint_library` applies `kind: keywords|rating|flag|label` to up to sixty `targets`
+with `photo_id` and `expected_metadata_revision`. Keywords require
+`expected_shortcut_revision`; optional `erase:true` removes only the loaded
+shortcut IDs. Other modes take `value` (0–5 rating, -1/0/1 flag, or a supported
+color label); use 0/`none` to clear, not keyword erasure. Omit shortcut revision and
+erase for these modes. All targets and keyword capacity validate before commit.
+Recipes, originals and frozen jobs are preserved. Native gestures submit on
+mouse-up without selecting painted photos; agents use explicit target lists.
+An uncertain or stale stroke must never be automatically replayed.
+
 ## Folder sources
 
 `list_folders` pages visible roots or a `parent_id` at 60 items. Optional `search`,

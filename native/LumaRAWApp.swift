@@ -70,6 +70,13 @@ import AppKit
             CommandMenu("Metadata") {
                 KeywordExchangeActions().environmentObject(store)
                 Divider()
+                Button("Set Keyword Shortcut…") { Task { await store.prepareKeywordShortcut() } }
+                    .keyboardShortcut("k",modifiers:[.command,.option,.shift]).disabled(store.painterBusy)
+                Button("Add Keyword Shortcut") { store.applyKeywordShortcut() }
+                    .disabled(store.keywordShortcut?.ids.isEmpty != false || store.actionPhotoIDs.isEmpty || store.painterBusy)
+                Toggle("Enable Painting",isOn:Binding(get:{store.painterEnabled},set:{store.setPainting($0)}))
+                    .keyboardShortcut("k",modifiers:[.command,.option]).disabled(!store.painterInGrid || store.painterBusy)
+                Divider()
                 ForEach(1...9,id:\.self) { slot in
                     Button("Apply Keyword Set Slot \(slot)") { Task { await store.applyKeywordSlot(slot) } }
                         .keyboardShortcut(KeyEquivalent(Character(String(slot))),modifiers:.option)

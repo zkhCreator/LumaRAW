@@ -26,6 +26,8 @@ Official references checked September 2026:
 - [Metadata storage and supported workflows](https://helpx.adobe.com/lightroom-classic/desktop/organize-photos-in-lightroom-classic/metadata-basics-actions.html)
 - [XMP basic properties](https://developer.adobe.com/xmp/docs/xmp-namespaces/xmp/) and [Dublin Core properties](https://developer.adobe.com/xmp/docs/xmp-namespaces/dc/)
 - [Hierarchical keywords, synonyms and export options](https://helpx.adobe.com/lightroom-classic/desktop/organize-photos-in-lightroom-classic/keywords.html)
+- [Keyword shortcuts, Painter and keyboard behavior, Adobe's Julieanne Kost](https://jkost.com/blog/2024/07/working-with-keywords-in-lightroom-classic-2.html)
+- [Rating, flag and label Painter workflows](https://helpx.adobe.com/lightroom-classic/desktop/organize-photos-in-lightroom-classic/flag-label-rate-photos.html)
 - [Preset storage locations and catalog storage option](https://helpx.adobe.com/lightroom-classic/desktop/kb/preference-file-and-other-file-locations.html)
 - [Firsthand dictionary import behavior and preserved existing attributes](https://community.adobe.com/questions-675/importing-keywords-into-lightroom-classic-as-non-exported-keywords-1638903)
 - [Firsthand CSV field layout and tab indentation](https://community.adobe.com/questions-675/lightroom-classique-15-3-unable-to-import-keywords-from-csv-file-1560047)
@@ -41,7 +43,7 @@ gaps. Nothing below is full Lightroom parity merely because historical tests pas
 | --- | --- | --- |
 | Import and catalogs | Partial: referenced originals, backup/restore | Import preview/selection, copy workflows, metadata/develop presets, tethered capture, catalog switching/merge |
 | Library navigation | Partial: bounded grid/filmstrip, folder tree/search/favorites/labels, durable missing-folder relocation and folder synchronization, direct/recursive sources, filters/sorting, regular/smart/Quick collections and nested sets | Multi-source selection, complete sync Import Dialog/duplicate policy, folder move/rename, relocation overlap/collision handling, collection drag/drop/color labels, full smart criteria/import-export, source-selection memory, desktop acceptance |
-| Organization | Partial: duplicate/missing detection, hierarchical keywords/synonyms/export flags/Will Export preview, text/CSV vocabulary exchange and manual person tags, custom nine-slot keyword sets/recent entries/shared or catalog storage, title/caption/copyright, labels, batch metadata, virtual copies, manual/split/capture-time scoped stacks | Keyword policy/file and preset reference acceptance, built-in sets/suggestions/undo/Painter, complete IPTC, stack interaction acceptance, rename and sidecars |
+| Organization | Partial: duplicate/missing detection, hierarchical keywords/synonyms/export flags/Will Export preview, text/CSV vocabulary exchange and manual person tags, custom nine-slot keyword sets/recent entries/shared or catalog storage, multi-keyword shortcuts and keyword/rating/flag/label Painter strokes, title/caption/copyright, labels, batch metadata, virtual copies, manual/split/capture-time scoped stacks | Keyword policy/file and preset reference acceptance, built-in sets/suggestions/undo, remaining Painter modes and desktop acceptance, complete IPTC, stack interaction acceptance, rename and sidecars |
 | Culling | Partial: Loupe/Compare/Survey, linked detail, anchored page selection | Desktop acceptance, cross-page selection, Develop reference view, auto advance, persistent workspace state |
 | Basic development | Partial: light/WB/color | Calibrated absolute WB, eyedropper, texture/clarity/dehaze, complete HSL/B&W and color grading |
 | Curves and profiles | Partial: custom composite curve, LUT/ICC | Interactive RGB curves, camera/profile browser, compatible preset import/export |
@@ -62,9 +64,9 @@ gaps. Nothing below is full Lightroom parity merely because historical tests pas
 
 ## Active increment
 
-Custom keyword sets, recent entries and replaceable shared/catalog preset storage.
-Reference preset contents/exchange, suggestions, Painter and the remaining full
-inventory stay in scope; this increment does not complete keyword or product parity.
+Persistent multi-keyword shortcuts and Library Painter metadata strokes. Complete
+Painter mode/keyword-set integration, reference presets/exchange, suggestions and
+the remaining full inventory stay in scope; this does not complete product parity.
 
 ## Evidence log
 
@@ -1190,3 +1192,81 @@ excluded. First-page responses are 1,338 / 1,339 bytes for these short labels;
 the regression with nine 4,096-character Unicode slots remains below 160 KB.
 Reproduce with tests/keyword_sets_probe.py. This is bounded metadata performance,
 not a RAW processing or end-to-end UI speed claim.
+
+### Keyword shortcuts and Library Painter strokes
+
+Implemented a persistent multi-keyword shortcut, separate from nine-slot presets.
+It can be configured with existing IDs and explicit text paths, assigned from a
+Keyword List row, applied through photo context menus or Shift-K in a focused photo
+surface, and cleared without deleting vocabulary. A plus identifies shortcut
+members. All IDs remain complete; labels page at twenty, including maximal Unicode
+hierarchies. Rename preserves identity and subtree deletion prunes affected entries.
+
+Grid Painter supports keywords, ratings, flags and color labels. The native pointer
+adapter reports thumbnail intersections without selecting photos; segment tests
+cover fast/coalesced drags. Pending targets highlight and mouse-up submits one
+transaction. Option at the start of a keyword stroke removes only the shortcut's
+IDs. Other attributes clear with explicit None/Unflagged choices. Esc, changed
+source/page or invalidated layout discard unsubmitted work. Deferred layout
+cancellation carries a stroke identity so it cannot clear a newer gesture.
+All photo revisions and assignment capacity validate before writes; each target's
+metadata revision increments once. Active rating/flag display refreshes immediately
+without adopting a new Develop recipe revision. Recipes, originals and frozen
+exports remain unchanged; failures are never automatically replayed.
+
+This remains partial Painter parity. Shift's multi-set keyword chooser, inline
+keyword autocomplete, metadata/Develop-preset painting, rotation, target collection,
+cross-page dragging/autoscroll, precise reference eraser behavior outside keywords,
+metadata undo and rendered interaction remain open. Desktop pointer/keyboard
+dispatch, cursor geometry, VoiceOver, resizing and macOS 14 runtime were not
+verified. The geometry/state suites do not establish those observations.
+
+Validation: **352 Python tests passed with no skips**, using the pinned Nikon D3S
+NEF and required Metal dispatch. The Painter regressions cover all four attribute
+modes, identity-safe legacy paths, full hundred-keyword payloads, stale shortcut and
+photo revisions, missing targets, capacity and injected-SQL rollback, invalid
+options, frozen jobs/original bytes and genuine v13 migration/backup. The final
+source-native Painter suite passes **36 assertions**, including immediate culling
+readback, deferred-cancellation identity and zero redundant highlight publications
+for one thousand repeated hits. An initial test-only Swift async
+autoclosure compilation error was corrected before the passing suite.
+
+Warm service/SQLite measurements on macOS 26.6.2 arm64, 128 GB RAM. Each catalog
+contains equal photo/tag counts, sixty generated 8×8 originals and synthetic
+remaining photo rows. Each stroke targets sixty photos; no image worker runs.
+
+| Operation (median / p95, 30 samples except first add) | 10,000 photos/tags | 100,000 photos/tags |
+| --- | ---: | ---: |
+| Read two-keyword shortcut | 1.234 / 1.407 ms | 1.334 / 1.450 ms |
+| First add two keywords, one sample | 5.871 ms | 6.451 ms |
+| Reapply two keywords | 5.552 / 6.153 ms | 6.004 / 6.406 ms |
+| Erase + add two keywords, two transactions | 11.661 / 12.723 ms | 12.604 / 14.529 ms |
+| Read hundred-keyword shortcut | 1.342 / 1.588 ms | 1.444 / 1.656 ms |
+| First add one hundred keywords, one sample | 14.949 ms | 15.462 ms |
+| Reapply one hundred keywords | 11.094 / 12.255 ms | 12.045 / 15.128 ms |
+| Erase + add one hundred keywords, two transactions | 29.941 / 31.132 ms | 31.932 / 35.489 ms |
+| Set rating | 4.408 / 6.078 ms | 4.911 / 6.555 ms |
+| Peak process RSS | 40.72 MB | 54.12 MB |
+
+Measurements include captured shortcut/target-revision reads and commit. Reapply
+uses already-assigned tags; erase/add includes two actual assignment changes.
+First-add measurements create assignments to existing vocabulary, not new tags.
+Short-label shortcut responses are 248 / 1,244 bytes for two / one hundred IDs.
+The regression with one hundred maximal paths pages below 320 KB per response.
+Setup, IPC, pixels and desktop latency are excluded. Reproduce with
+tests/painter_probe.py; this is metadata performance, not RAW processing parity.
+
+The final Mac app builds for macOS 14 and passes local ad-hoc signature verification
+on macOS 26.6.2. Generation **15**, schema **14**, **86 tools**; manifest
+`8639705ebe31ebfd63b627550c12392dcdd98ee6324663eb35e2ccb97c91d274`
+matches source, and the bundled usage guide matches the current document. The
+initial packaged candidate passed six suites / **133 assertions** (Painter,
+keyword sets, keywords, complete photo-keyword details, library and connection).
+After suppressing repeated highlight publications, the final artifact passes the
+three affected suites / **74 assertions**: Painter 36, keywords 25 and library 13.
+The portable engine is unchanged by that last native-only improvement; the 352-test
+Python and earlier integration results remain applicable within their scope.
+Final source/build/native logs have no compiler warnings or errors. Public source
+checks cover **269 files** without findings, including the extracted source archive.
+Remote refresh again found no unmerged branches. No full-parity or desktop-runtime
+acceptance is claimed by these checks.

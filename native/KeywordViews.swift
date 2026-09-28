@@ -66,6 +66,7 @@ struct KeywordTreeRow: View {
             Button("Show Photos") { Task { await s.showKeywordPhotos(keyword) } }
             Button("Edit Keyword…") { Task { await s.editKeyword(keyword) } }
             Button("Create Keyword Inside…") { Task { await s.editKeyword(parent:keyword) } }
+            Button("Use This as Keyword Shortcut") { Task { await s.useKeywordShortcut(keyword) } }
             Divider()
             Button("Delete Keyword and Children…",role:.destructive) { deleting=true }
         }
@@ -81,6 +82,7 @@ struct KeywordTreeRow: View {
                 .disabled(s.keywordBusy || keyword.selection.isEmpty || keyword.selection != s.actionPhotoIDs)
                 .accessibilityLabel("\(keyword.name), \(keyword.selectedCount) of \(keyword.selection.count) selected photos tagged; \(allSelected ? "remove":"add") tag")
             Text(keyword.name).lineLimit(1).help(keyword.path + (keyword.detailsDeferred ? "\nComplete path and synonyms are available in Edit Keyword.":""))
+            if s.keywordShortcut?.ids.contains(keyword.id) == true { Text("+").help("Part of the current keyword shortcut").accessibilityLabel("Keyword shortcut") }
             Spacer(minLength:2)
             Text("\(keyword.photoCount)").font(.caption).monospacedDigit()
             Button { Task { await s.showKeywordPhotos(keyword) } } label: { Image(systemName:"arrow.right.circle") }

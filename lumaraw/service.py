@@ -187,6 +187,10 @@ class Service:
         if method=='queue_control':return self.control(p)
         with self.catalog() as c:
             if method=='prepare_folder_relocation':return Relocations(c).prepare(**p)
+            if method in ('get_keyword_shortcut','set_keyword_shortcut','paint_library'):
+                from .library_painter import LibraryPainter
+                painter=LibraryPainter(c)
+                return {'get_keyword_shortcut':painter.read,'set_keyword_shortcut':painter.save,'paint_library':painter.paint}[method](**p)
             if method=='get_folder_relocation':return Relocations(c).get(**p)
             if method=='photo_summaries':return {'photos':c.summaries(p['photo_ids']),'stack_revision':Stacks(c).revision(),'folder_revision':Folders(c).revision(),'keyword_revision':Keywords(c).revision()}
             if method=='library_state':return {'stack_revision':Stacks(c).revision(),'folder_revision':Folders(c).revision(),'keyword_revision':Keywords(c).revision()}

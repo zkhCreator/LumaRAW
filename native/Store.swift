@@ -62,6 +62,17 @@ import UniformTypeIdentifiers
     @Published var keywordSetDraft: [String]?
     var keywordSetDraftRevision: String?
     var keywordSetGeneration=0
+    @Published var keywordShortcut: KeywordShortcut?
+    @Published var shortcutEditor: KeywordShortcutEditorSource?
+    var shortcutReadGeneration=0
+    @Published var painterEnabled=false
+    @Published var painterKind="keywords"
+    @Published var painterRating=5
+    @Published var painterFlag=1
+    @Published var painterLabel="red"
+    @Published var painterBusy=false
+    @Published var painterTouched: Set<Int>=[]
+    var painterStroke: PainterStroke?
     @Published var showKeywordEditor=false
     @Published var keywordEditorLoading=false
     var keywordEditorGeneration=0

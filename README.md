@@ -17,7 +17,7 @@ LumaRAW references your originals without changing them. The SwiftUI app and you
 | Library | Folder tree/search/favorites/labels, ratings, flags, catalog metadata/keywords, regular/live smart collections, nested sets, Quick/target collections, SQL filters/sorting, manual/capture-time stacks, duplicate/missing indexing, virtual copies/shared snapshots, selective sync, and backup/restore |
 | Culling | Grid/Loupe/Compare/Survey, anchored page selections, active-photo review actions, linked or independent full-resolution comparison viewports |
 | Export | JPEG and 16-bit TIFF with embedded sRGB, Display P3, Adobe RGB, or ProPhoto RGB ICC profiles; frozen catalog XMP/keyword policies, persistent queue, pause/cancel/retry, and collision-safe filenames |
-| Agents | 83 MCP tools, equivalent JSON CLI commands, and a bundled skill; app and agent edits share conflict detection |
+| Agents | 86 MCP tools, equivalent JSON CLI commands, and a bundled skill; app and agent edits share conflict detection |
 
 ## Build and run
 
@@ -226,6 +226,24 @@ selection is isolated behind an adapter; `LUMARAW_PRESETS_ROOT` explicitly overr
 it for isolated tests or deployments. Built-in Adobe presets, `.lrtemplate` exchange,
 suggestions and Painter remain pending. Native shortcut dispatch and rendered
 interaction still require desktop acceptance.
+
+**Metadata → Set Keyword Shortcut** configures one or more keywords independently
+of the nine-slot presets. Choose existing tags by identity, or type comma-separated
+new paths. **Use This as Keyword Shortcut** is also available on a Keyword List
+row; a plus marks shortcut members. **Add Keyword Shortcut** and Shift-K in a
+focused photo view use the current selection/active-photo scope, even with Painter
+put away. Setting the shortcut does not tag photographs.
+
+In Grid view, enable **Painter** (Command-Option-K), choose Keywords, Rating, Flag
+or Color Label, then click/drag across thumbnails. Touched thumbnails highlight;
+mouse-up applies one transaction without changing the photo selection. Hold Option
+before a keyword stroke to remove only the shortcut's keywords. Choose None or
+Unflagged to clear the other attributes. Esc puts the tool away and discards an
+unsubmitted stroke. Changing the page/source cancels that stroke; a stale target
+rejects the whole batch. Strokes are bounded to the current sixty-photo page.
+Shift keyword-set selection, metadata/Develop presets, rotation and target-collection
+painting, scrolling between pages, and rendered pointer/keyboard acceptance remain
+pending. Originals and Develop recipes remain unchanged.
 
 Virtual copies share the original file while keeping independent adjustments,
 ratings and catalog metadata. Use **Photo → Create Virtual Copies**, rename with

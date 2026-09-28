@@ -95,7 +95,7 @@ small raster files and separate disposable catalogs, then runs the
 24-assertion folder, 25-assertion keyword, 17-assertion folder-relocation and
 24-assertion folder-synchronization, 16-assertion export-metadata, and
 21-assertion photo-keyword-detail, 24-assertion complete-vocabulary and 23-assertion
-dictionary-exchange suites, plus the keyword-set suite described below.
+dictionary-exchange suites, plus the keyword-set and Painter suites described below.
 Each suite has its own
 fresh image directory, so a relink test cannot move another suite's fixture. The library suite checks
 live smart membership, text search/sort, pagination, empty-filter selection,
@@ -133,6 +133,31 @@ The set probe uses sixty generated 8×8 photos and isolated preset storage. It
 measures warm service/SQL reads and repeat application of an already assigned tag,
 including state and photo-revision reads. Setup, IPC, pixels and desktop latency
 are excluded; peak process RSS and zero worker usage are recorded separately.
+
+`test_library_painter.py` validates shortcut configuration, identity-preserving
+legacy rename/delete, bounded maximum paths, revision-bound reads, all-target and
+capacity rollback, injected SQL abort, ratings/flags/labels and explicit clearing,
+unchanged recipes/originals/frozen jobs, and genuine v13 migration/backup.
+`NativePainterRegression` checks native shortcut/editor state, touched-ID dedup,
+mouse-up submission boundaries, cancellation/source changes, deferred cancellation
+identity, preserved selection, immediate culling readback and stale batch failure.
+One thousand repeated hits produce no redundant highlight publications.
+Its segment/rectangle tests cover coalesced drag geometry, stationary clicks and
+misses. They do not dispatch desktop events or verify rendered pointer placement.
+
+```sh
+.venv/bin/python tests/run_native.py --work work/native-painter-01 --suite NativePainterRegression
+.venv/bin/python tests/painter_probe.py --work work/painter-10k --rows 10000 --samples 30
+.venv/bin/python tests/painter_probe.py --work work/painter-100k --rows 100000 --samples 30
+```
+
+The Painter probe seeds equal photo/tag counts, sixty generated 8×8 originals and
+synthetic remaining photo rows. Warm measurements include state and target-revision
+reads. Two-/hundred-keyword strokes measure initial add, already-assigned reapply,
+and a two-transaction erase/add cycle; rating uses one sixty-photo transaction.
+No pixel worker is started. Setup, IPC, desktop dispatch and rendered latency are
+excluded. Unlocked-desktop mouse/keyboard/VoiceOver and macOS 14 runtime acceptance
+remain required independently of these state, geometry and service measurements.
 
 The vocabulary suite exercises maximal Unicode paths and synonyms through real
 IPC, complete editor/parent initialization, preserved export options, sixty-row

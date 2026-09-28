@@ -100,6 +100,8 @@ def migrate(db):
     migrate_keyword_exchange(db)
     from .keyword_sets import migrate as migrate_keyword_sets
     migrate_keyword_sets(db)
+    from .library_painter import migrate as migrate_painter
+    migrate_painter(db)
 
 
 def text_predicate(text):

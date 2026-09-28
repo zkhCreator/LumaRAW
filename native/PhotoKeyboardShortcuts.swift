@@ -8,7 +8,13 @@ struct PhotoKeyboardShortcuts: ViewModifier {
     @EnvironmentObject var s: Store
 
     func body(content: Content) -> some View {
-        content.onKeyPress(.delete) {
+        content.onKeyPress(.escape) {
+            guard s.painterEnabled else { return .ignored }
+            s.setPainting(false);return .handled
+        }.onKeyPress(characters:CharacterSet(charactersIn:"kK")) { press in
+            guard press.modifiers == .shift,s.keywordShortcut?.ids.isEmpty == false else { return .ignored }
+            s.applyKeywordShortcut();return .handled
+        }.onKeyPress(.delete) {
             guard !s.actionPhotoIDs.isEmpty else { return .ignored }
             if let collection=s.activeCollection,collection.id == s.collectionID,
                ["regular","quick"].contains(collection.kind) {
