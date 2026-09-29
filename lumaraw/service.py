@@ -22,7 +22,7 @@ import jsonschema
 import psutil
 from .api import TOOLS
 from .catalog import Catalog, walk_images
-from .model import Recipe, ExportOptions, LIMITS, PRESETS, SYNC_GROUPS
+from .model import Recipe, ExportOptions, LIMITS, PRESETS, SYNC_GROUPS, POINT_CURVE_PRESETS
 from .organization import Organization
 from .collections import Collections
 from .virtual_copies import VirtualCopies
@@ -140,7 +140,8 @@ class Service:
         if method=='status':
             with self.catalog() as c:
                 return {'version':'0.4.1','api_version':1,'catalog':str(self.root),'photos':c.count(),'counts':c.job_counts(),'paused':self.paused,'active':self.active,**self.memory_status(),'peak_mb':round(self.peak,1)}
-        if method=='recipe_schema':return {'defaults':Recipe().dict(),'limits':LIMITS,'presets':{k:v.dict() for k,v in PRESETS.items()},'groups':SYNC_GROUPS}
+        if method=='recipe_schema':return {'defaults':Recipe().dict(),'limits':LIMITS,'presets':{k:v.dict() for k,v in PRESETS.items()},'groups':SYNC_GROUPS,
+            'point_curve_presets':{k:[list(p) for p in v] for k,v in POINT_CURVE_PRESETS.items()}}
         if method in ('import_keywords','export_keywords'):
             from .keyword_exchange import import_file, export_file
             return (import_file if method=='import_keywords' else export_file)(self, **p)
@@ -188,7 +189,11 @@ class Service:
                             and self.active.get('operation') in ('preview','detail','thumbnail')):
                         self.cancelled=True
                         if self.process.poll() is None:self.process.kill()
-            with self.catalog() as c:row=self.require(c,p['photo_id'])
+            with self.catalog() as c:
+                row=self.check_revision(c,p['photo_id'],p['expected_revision']) if 'curve_patch' in p else self.require(c,p['photo_id'])
+                preview_recipe=json.loads(row['recipe'])
+                if 'curve_patch' in p:
+                    preview_recipe=Recipe.parse({**preview_recipe,**p['curve_patch']}).dict()
             if method=='thumbnail':
                 recipe=Recipe.parse(json.loads(row['recipe'])) if p.get('kind') == 'developed' else None
                 path=cached_thumbnail(row['path'],self.cache,recipe,row['orientation'])
@@ -196,12 +201,12 @@ class Service:
                     return {'thumbnail':path,'photo_id':row['id'],'revision':row['revision'],'kind':p.get('kind','source'),'source':row['path'],
                             'cache_hit':True,'worker_spawned':False}
             request={'operation':{'preview_photo':'preview','thumbnail':'thumbnail','calibrate_camera':'calibrate'}[method],
-                     'path':row['path'],'recipe':json.loads(row['recipe']),'orientation':row['orientation']}
-            request.update({k:v for k,v in p.items() if k!='photo_id'})
+                     'path':row['path'],'recipe':preview_recipe,'orientation':row['orientation']}
+            request.update({k:v for k,v in p.items() if k not in ('photo_id','curve_patch','expected_revision')})
             result=self.run_worker(request)
             if 'metadata' in result:
                 with self.catalog() as c:c.update_metadata(row['id'],result['metadata'])
-            return {**result,'photo_id':row['id'],'revision':row['revision'],'source':row['path']}
+            return {**result,'photo_id':row['id'],'revision':row['revision'],'source':row['path'],'curve_draft':'curve_patch' in p}
         if method=='queue_control':return self.control(p)
         with self.catalog() as c:
             if method in ('orientation_state','orient_photos','undo_orientation'):

@@ -31,6 +31,7 @@ def main():
     suites+=('NativeImportProcessingRegression',)
     suites+=('NativePreviousImportRegression',)
     suites+=('NativeColorMixerRegression',)
+    suites+=('NativePointCurveRegression',)
     parser.add_argument('--suite',choices=suites,action='append',help='Run selected suites; default: all')
     args=parser.parse_args()
     work=args.work.resolve()
@@ -65,6 +66,18 @@ def main():
         env={**os.environ,'LUMARAW_ENGINE':str(args.engine.resolve()),
             'LUMARAW_CATALOG':str(work/'catalogs'/suite),'LUMARAW_TEST_FIXTURES':'|'.join(suite_paths),
             'LUMARAW_PRESETS_ROOT':str(work/'presets'/suite)}
+        if suite=='NativePointCurveRegression':
+            import numpy as np
+            from lumaraw.curves import packed_curve,evaluate
+            cases=[[[0,0],[1,1]],[[.1,.2],[.4,.7],[.8,.9]],[[0,1],[.25,.1],[.5,.8],[1,0]],
+                   [[0,0],[.25,.3],[.2501,.9],[1,1]],[[0,.3],[.2,.3],[.7,.6],[1,.6]]]
+            references=[]
+            for points in cases:
+                values=np.unique(np.concatenate([np.linspace(0,1,257,dtype=np.float32),
+                    np.array([(a[0]+b[0])/2 for a,b in zip(points,points[1:])],np.float32)]))
+                references.append({'points':points,'samples':np.column_stack([values,evaluate(values,packed_curve(points))]).tolist()})
+            curve_path=fixtures/'curve-geometry.json';curve_path.write_text(json.dumps(references))
+            env['LUMARAW_TEST_CURVES']=str(curve_path)
         fixture=None
         try:
             if suite=='NativeConnectionRegression':

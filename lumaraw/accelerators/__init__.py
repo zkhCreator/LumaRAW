@@ -18,6 +18,7 @@ _mode=os.environ.get('LUMARAW_COMPUTE','auto')
 _limit=100*1024**2
 _stats={}
 _disabled=''
+PARAMETER_COUNT=640
 
 def configure(mode='auto',budget_mb=4096):
     global _mode,_limit,_stats,_disabled,_context
@@ -32,9 +33,16 @@ class Metal:
         root=Path(__file__).parent
         self.lib=C.CDLL(str(root/'libLumaMetal.dylib'))
         lib=self.lib
+        try:
+            parameter_count=lib.lr_metal_parameter_count
+        except AttributeError as error:
+            raise RuntimeError('Metal adapter is outdated; rebuild it for this engine') from error
+        parameter_count.argtypes=[];parameter_count.restype=C.c_uint
+        if parameter_count()!=PARAMETER_COUNT:
+            raise RuntimeError('Metal adapter parameter layout does not match this engine')
         lib.lr_metal_create.argtypes=[C.c_char_p,C.c_size_t,C.c_char_p,C.c_size_t];lib.lr_metal_create.restype=C.c_void_p
         lib.lr_metal_destroy.argtypes=[C.c_void_p];lib.lr_metal_destroy.restype=None
-        lib.lr_metal_run.argtypes=[C.c_void_p,C.c_void_p,C.c_void_p,C.c_void_p,C.c_uint,C.c_void_p,C.c_char_p,C.c_size_t];lib.lr_metal_run.restype=C.c_int
+        lib.lr_metal_run_v2.argtypes=[C.c_void_p,C.c_void_p,C.c_void_p,C.c_void_p,C.c_uint,C.c_void_p,C.c_uint,C.c_char_p,C.c_size_t];lib.lr_metal_run_v2.restype=C.c_int
         lib.lr_metal_device.argtypes=[C.c_void_p];lib.lr_metal_device.restype=C.c_char_p
         lib.lr_metal_allocated.argtypes=[C.c_void_p];lib.lr_metal_allocated.restype=C.c_size_t
         lib.lr_metal_seconds.argtypes=[C.c_void_p];lib.lr_metal_seconds.restype=C.c_double
@@ -45,17 +53,20 @@ class Metal:
     def close(self):
         if self.handle:self.lib.lr_metal_destroy(self.handle);self.handle=None
     def run(self,a,p):
+        if p.dtype!=np.float32 or p.shape!=(PARAMETER_COUNT,) or not p.flags.c_contiguous:
+            raise RuntimeError('Invalid Metal parameter buffer')
         a=np.ascontiguousarray(a,dtype=np.float32);out=np.empty_like(a);mask=np.empty(a.shape[:2],np.uint8)
         error=C.create_string_buffer(4096)
-        rc=self.lib.lr_metal_run(self.handle,a.ctypes.data,out.ctypes.data,mask.ctypes.data,mask.size,p.ctypes.data,error,len(error))
+        rc=self.lib.lr_metal_run_v2(self.handle,a.ctypes.data,out.ctypes.data,mask.ctypes.data,mask.size,p.ctypes.data,p.size,error,len(error))
         if rc:raise RuntimeError(error.value.decode(errors='replace') or f'Metal error {rc}')
         return out,mask.astype(bool)
 
 def packed(recipe,space,output_only=False):
     from ..imaging import LUMA
-    from ..model import MIXER_BANDS
+    from ..model import MIXER_BANDS,POINT_CURVE_FIELDS
+    from ..curves import is_identity,packed_curve
     from ..color import output_matrix,SRGB_FROM_WORK,WORK_FROM_SRGB
-    p=np.zeros(256,np.float32);r=recipe
+    p=np.zeros(PARAMETER_COUNT,np.float32);r=recipe
     p[:12]=[int(output_only),2**r.exposure,r.shadows/100,r.highlights/100,r.blacks/100,r.whites/100,r.contrast/200,1+r.saturation/100,r.vibrance/100,int(r.monochrome),int(any([r.curve_shadows,r.curve_midtones,r.curve_lights])),len(r.curve_points) if r.curve_points!=[[0.,0.],[1.,1.]] else 0]
     p[12:15]=LUMA;p[16:25]=np.asarray(r.camera_profile.get('matrix',np.eye(3)),np.float32).ravel()
     p[28:37]=output_matrix(space).ravel();p[38]=['srgb','adobe','p3','prophoto'].index(space)
@@ -64,6 +75,11 @@ def packed(recipe,space,output_only=False):
                             getattr(r,name+'_lum'),getattr(r,name+'_bw')]
     p[39]=int(np.any(p[176:208].reshape(8,4)[:,:3]))
     p[48]=int(r.monochrome and np.any(p[179:208:4]))
+    for i,name in enumerate(POINT_CURVE_FIELDS):
+        points=getattr(r,name)
+        if not is_identity(points):
+            block=packed_curve(points).ravel();start=208+i*96
+            p[49+i]=len(points);p[start:start+len(block)]=block
     values=np.maximum.accumulate(np.clip([0,.25+r.curve_shadows/100,.5+r.curve_midtones/100,.75+r.curve_lights/100,1],0,1))
     p[64:74]=np.column_stack(([0,.25,.5,.75,1],values)).ravel()
     points=np.asarray(r.curve_points,np.float32).ravel();p[80:80+len(points)]=points
@@ -78,6 +94,7 @@ def grade_output(a,recipe,space,x=0,y=0,total_w=None,total_h=None):
     global _context,_disabled
     from ..render import grade_tile
     from ..color import to_output
+    from ..curves import reference_required
     if not _stats:configure(_mode)
     def cpu():
         _stats['cpu_tiles']+=1
@@ -95,7 +112,9 @@ def grade_output(a,recipe,space,x=0,y=0,total_w=None,total_h=None):
             start=time.perf_counter()
             try:_context=Metal()
             finally:_stats['initialization_seconds']+=time.perf_counter()-start
-        complex_recipe=any(m.get('enabled',True) for m in recipe.masks) or (bool(recipe.lut) and recipe.lut_amount!=0)
+        sharp_curve=reference_required(recipe)
+        if sharp_curve:reason('steep_point_curve_uses_cpu_grade')
+        complex_recipe=sharp_curve or any(m.get('enabled',True) for m in recipe.masks) or (bool(recipe.lut) and recipe.lut_amount!=0)
         data=grade_tile(a,recipe,x,y,total_w,total_h) if complex_recipe else a
         params=packed(recipe,space,complex_recipe)
         start=time.perf_counter();out=_context.run(data,params)

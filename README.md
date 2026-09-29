@@ -12,7 +12,7 @@ LumaRAW references your originals without changing them. The SwiftUI app and you
 | --- | --- |
 | Import | Resumable Add review, thumbnail/Loupe inspection, checked selections, subfolder choice, suspected duplicates, embedded/sidecar descriptions, and captured Develop/metadata presets plus keywords |
 | RAW development | Nikon NEF/NRW and other LibRaw formats, as-shot white balance, exposure, highlights/shadows, relative temperature/tint, monochrome, and presets |
-| Color | Eight-band HSL and Black & White Mix, custom tone curves, camera-bound chart calibration, `.cube` LUTs, ICC soft proofing, and gamut warnings |
+| Color | Eight-band HSL and Black & White Mix, interactive RGB/channel point curves, camera-bound chart calibration, `.cube` LUTs, ICC soft proofing, and gamut warnings |
 | Detail and composition | Full-resolution 1:1 viewports, noise reduction, sharpening, defringing, rotation, crop, straighten, and perspective |
 | Local adjustments | Radial, gradient, luminance-range, and brush masks; manual lens distortion, vignette, and chromatic-aberration correction |
 | Library | Folder tree/search/favorites/labels, ratings, flags, catalog metadata/keywords, regular/live smart collections, nested sets, Quick/target collections, SQL filters/sorting, manual/capture-time stacks, duplicate/missing indexing, virtual copies/shared snapshots, selective sync, and backup/restore |
@@ -102,6 +102,16 @@ brightness controls; switching treatment retains both sets of adjustments.
 clears that treatment's mix. **Sync Selected Photos** offers a separate
 **Black & White Mix** group. These controls use LumaRAW processing; Adobe pixel
 matching, targeted adjustment and Point Color remain unverified or unimplemented.
+
+In **Tone Curve**, choose RGB, Red, Green or Blue. Click the graph to add a point,
+drag it, or edit its Input/Output values (0–255). Arrow keys adjust the selected
+point; Delete removes an interior point. A drag previews temporary changes and
+saves once on release; Escape cancels it. Linear, Medium Contrast and Strong
+Contrast are LumaRAW presets. Reset Channel affects only the selected curve;
+Reset RGB Curves clears all four. Existing luminance curves remain unchanged and
+appear as **Legacy Luminance** when active. The three older region sliders are
+retained. Adobe processing, full parametric controls and reference parity remain
+unfinished.
 
 Use **Photo → Stacking** to group, unstack, remove members, choose a cover or
 reorder photos. **⌘G / ⇧⌘G** group/unstack; with a photo surface focused, **S**

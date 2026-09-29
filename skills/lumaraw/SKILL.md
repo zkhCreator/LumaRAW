@@ -66,6 +66,21 @@ treatment; `Black & White Mix` separately copies the eight `_bw` values. Refresh
 `recipe_schema` for authoritative fields/limits. These are LumaRAW parameters,
 not interchangeable Adobe XMP values or a claim of calibrated Adobe color parity.
 
+RGB point curves use `curve_rgb_points`, `curve_red_points`, `curve_green_points`
+and `curve_blue_points`. Each takes 2–16 `[input, output]` pairs in 0–1; inputs
+ascend with a minimum gap of 1/65535. Outputs may invert, and endpoints may move.
+Identity is `[[0,0],[1,1]]`. Read `point_curve_presets` from `recipe_schema` for
+LumaRAW preset values. Tone Curve sync includes these fields. The older
+`curve_points` remains a separate linear luminance curve with its original rules;
+do not replace its meaning or copy Adobe parameters without conversion evidence.
+
+For temporary curve inspection, `preview_photo` accepts `curve_patch` containing
+only curve fields and requires `expected_revision`. It returns `curve_draft: true`
+without changing recipe/history or frozen exports. A normal preview restores the
+saved result. Persist an accepted draft with an ordinary revision-checked edit.
+Active RGB curves are SDR; identity leaves negative/HDR values untouched. Very
+steep curves use CPU grading with Metal output and report the hybrid reason.
+
 ## Reviewed Add import
 
 `prepare_import(paths, include_subfolders?, skip_duplicates?)` captures explicit

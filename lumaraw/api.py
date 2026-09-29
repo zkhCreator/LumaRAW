@@ -4,7 +4,7 @@ Inputs: bounded JSON objects. Outputs: JSON schemas and validated domain command
 No transport, pixels or UI dependencies. IDs refer only to the selected catalog.
 Tool annotations describe effects; they never substitute for user authorization.
 """
-from .model import LIMITS, Recipe, SYNC_GROUPS
+from .model import LIMITS, Recipe, SYNC_GROUPS, POINT_CURVE_FIELDS
 from .organization import COLORS, SORTS, FILTER_SCHEMA
 from .iptc import SCHEMA as IPTC_SCHEMA
 from .metadata_presets import PATCH_SCHEMA as METADATA_PRESET_PATCH
@@ -140,6 +140,12 @@ tool('undo_photo','Undo the last edit only if the revision is current.',{'photo_
 tool('rate_photo','Set rating 0–5 and/or pick flag (-1 reject, 0 neutral, 1 pick).',{'photo_id':ID,'rating':integer(0,5),'flag':{'enum':[-1,0,1]}},['photo_id'])
 tool('rate_photos','Atomically set ratings and/or pick flags on a bounded selection; leaves recipes and metadata revisions unchanged.',{'photo_ids':array(ID,60),'rating':integer(0,5),'flag':{'enum':[-1,0,1]}},['photo_ids'])
 tool('preview_photo','Render an sRGB preview or full-resolution viewport. Set include_before=false to skip baseline processing; max_edge bounds fitted previews only.',{'photo_id':ID,'client_id':string(128),'generation':integer(),'include_before':BOOL,'max_edge':integer(128,1680),'detail':obj({'cx':{'type':'number','minimum':0,'maximum':1},'cy':{'type':'number','minimum':0,'maximum':1},'width':integer(1,2048),'height':integer(1,1536)}),'display':obj({'gamut':BOOL,'proof_path':PATH,'proof_sha':string(64)})},['photo_id'],True)
+CURVE_POINT={'type':'array','items':{'type':'number','minimum':0,'maximum':1},'minItems':2,'maxItems':2}
+CURVE_PATCH=obj({key:{'type':'array','items':CURVE_POINT,'minItems':2,'maxItems':16} for key in (*POINT_CURVE_FIELDS,'curve_points')})
+CURVE_PATCH['minProperties']=1
+TOOLS['preview_photo']['inputSchema']['properties'].update(curve_patch=CURVE_PATCH,expected_revision=REV)
+TOOLS['preview_photo']['inputSchema']['dependentRequired']={'curve_patch':['expected_revision']}
+TOOLS['preview_photo']['description']+=' curve_patch previews temporary curve points at expected_revision without saving edits or history.'
 tool('cancel_preview','Invalidate older preview generations for one client and stop its older running preview/thumbnail. Never cancels exports or another client.',{'client_id':string(128),'generation':integer()},['client_id','generation'])
 tool('photo_summaries','Read existing photo summaries for at most 60 IDs without recipe or EXIF payloads.',{'photo_ids':array(ID,60)},['photo_ids'],True)
 tool('thumbnail','Create/read a source thumbnail (default) or a developed recipe-aware 320-pixel thumbnail.',{'photo_id':ID,'kind':{'enum':['source','developed']},'client_id':string(128),'generation':integer()},['photo_id'],True)

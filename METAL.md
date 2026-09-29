@@ -9,7 +9,7 @@ The optional backend plugs into `lumaraw.accelerators.grade_output`. A small Obj
 | NEF metadata, decompression, white balance, AHD demosaicing, camera matrix | LibRaw on CPU |
 | Crop/rotation/perspective/distortion sampling; denoise/sharpen/defringe | CPU with overlapping strips |
 | Exposure, tone, contrast, saturation/vibrance, curves, eight-band HSL/B&W mixer, camera profile matrix, monochrome | Fused Metal grading kernel, or CPU reference |
-| Masks and LUT | Complete CPU grading followed by Metal output conversion; reported as hybrid |
+| Masks, LUT and very steep point curves | Complete CPU grading followed by Metal output conversion; reported as hybrid |
 | Output matrix, sRGB/P3/Adobe/ProPhoto encoding, gamut flags | Metal, or CPU fallback |
 | ICC soft proof, histogram, PNG/JPEG/TIFF encoding | CPU; exported files retain ICC profiles |
 | Native display | sRGB-tagged NSImage; no custom MTKView canvas |
@@ -20,6 +20,18 @@ The eight mixer bands use 32 floats in the existing parameter buffer; ordinary
 HSL and B&W recipes remain fully fused. A compensated cube-root residual improves
 the Oklab input transform. Neutral protection, band weights and slider units match
 the CPU path. Masks/LUTs retain their documented hybrid boundary.
+
+RGB master and three channel curves share the CPU's normalized PCHIP coefficients.
+Ordinary curves stay in the fused kernel. A curve whose exact maximum segment
+derivative exceeds 32 uses CPU grading and Metal output, reported as hybrid with
+`steep_point_curve_uses_cpu_grade`; no curve points are changed to hide precision
+differences. Identity curves bypass encoding/clipping on both backends.
+
+The v2 C entry point (`lr_metal_run_v2`) takes an explicit parameter count. The
+adapter requires 640 floats (2560 bytes) and checks `lr_metal_parameter_count`
+before allocating. Both Python and C reject mismatched sizes before reading the
+buffer. Old libraries are rejected with rebuild guidance; auto mode retains CPU
+fallback. The payload stays below Metal's 4 KiB inline-byte limit.
 
 Synthetic regressions keep the encoded absolute/relative limits of 1e-4/2e-5,
 except Adobe RGB channels below 0.02 on both backends: its pure-gamma derivative

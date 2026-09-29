@@ -593,7 +593,7 @@ New fields default to zero, so old stored recipes need no SQL rewrite; sync pars
 the source before selecting fields. Native hue values display -100 to 100 and
 map to stored -30 to 30 degrees, preserving existing parameter meaning. Other
 mixer values use -100 to 100 directly. Partial presets, undo, bundles, snapshots
-and frozen exports use the same validated recipe. A full preset has 69 fields;
+and frozen exports use the same validated recipe. A full preset has 73 fields;
 the API patch/preset-field capacity is 128. Black & White Mix has a separate sync
 group; Color continues to include treatment and all color mixer components.
 
@@ -605,6 +605,25 @@ neutral inputs before smoothly enabling those gains. Both mixes remain stored
 when treatment switches. This ordering preserves legacy recipes and does not
 assert equivalence to Adobe's proprietary treatment/profile processing. The Mac
 panel owns display units and reset scopes; the portable renderer owns pixels.
+
+Four identity-default point curves (`curve_rgb_points`, `curve_red_points`,
+`curve_green_points`, `curve_blue_points`) follow the legacy luminance curve and
+precede color mixing. Master RGB applies before individual channels, in encoded
+working RGB using the existing sRGB-shaped tone encoding. Active curves are SDR;
+an identity curve is an exact no-op, preserving negative/HDR values. Curves accept
+2–16 normalized points, ascending X separated by at least 1/65535, arbitrary Y,
+movable endpoints and flat extension outside those endpoints. The portable core
+owns cached PCHIP coefficients; native PCHIP is presentation geometry only.
+Legacy `curve_points` keeps its original linear luminance equation and constraints.
+Tone Curve sync includes all four new curves and the older settings.
+
+Native gestures capture photo identity, revision and original points. Temporary
+`preview_photo.curve_patch` requires `expected_revision`, accepts only curve fields
+and never saves recipe/history. A drag coalesces one pending draft while one image
+is in flight; release saves one ordinary partial edit, and Escape restores the
+saved preview. Normal client generations invalidate stale image replies. An
+external edit or photo switch rejects the captured gesture instead of rebasing it.
+Preset values come from `recipe_schema.point_curve_presets` and are LumaRAW-owned.
 
 This does not establish monitor calibration, Nikon Picture Control equivalence, or per-camera color accuracy. Camera profiles are bound to a specific model. A synthetic chart fit is algorithm evidence, not independent camera acceptance.
 

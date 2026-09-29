@@ -58,7 +58,7 @@ struct InspectorView:View {
                     edit("Shadow Curve","curve_shadows",-30...30)
                     edit("Midtone Curve","curve_midtones",-30...30)
                     edit("Highlight Curve","curve_lights",-30...30)
-                    Button("Custom Curve Points…"){s.showRecipe=true}
+                    PointCurveControls()
                 }
                 section((s.recipe["monochrome"] as? Bool ?? false) ? "Black & White Mix":"Color Mixer") { ColorMixerControls() }
                 section("Detail"){

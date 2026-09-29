@@ -168,6 +168,7 @@ import UniformTypeIdentifiers
     @Published var availableMemory=0.0
     @Published var versions: [[String: Any]] = []
     @Published var defaults: [String: Any] = [:]
+    @Published var pointCurvePresets: [String:[[Double]]] = [:]
     @Published var presets: [String: [String: Any]] = [:]
     @Published var showExport=false
     @Published var showVersions=false
@@ -333,17 +334,25 @@ import UniformTypeIdentifiers
             render()
         } catch {if selected==id,token==generation{self.error=error.localizedDescription}}
     }
-    func render() {
-        updateThumbnails()
+    func render(curveDraft:(PointCurveCapture,[[Double]])?=nil,debounce:Bool=true) {
+        if curveDraft == nil { updateThumbnails() }
         if isMultiReview { updateReviewRequests();return }
         guard let p=photo,p.id==selected,!loading else{return}
+        if let (capture,_) = curveDraft {
+            guard p.id == capture.photoID,p.revision == capture.revision,!hasPendingEdits else {return}
+        }
         generation += 1;let token=generation
         previewTask?.cancel()
+        if !debounce {rendering=true}
         previewTask=Task {
-            try? await Task.sleep(nanoseconds:180_000_000)
+            if debounce {try? await Task.sleep(nanoseconds:180_000_000)}
             guard !Task.isCancelled,token==generation else{return}
             rendering=true
             var params:[String:Any]=["photo_id":p.id,"client_id":previewClient,"generation":token]
+            if let (capture,points) = curveDraft {
+                params["curve_patch"]=[capture.key:points];params["expected_revision"]=capture.revision
+                params["include_before"]=false
+            }
             if detail{params["detail"]=["cx":cx,"cy":cy,"width":1600,"height":1100]}
             var display:[String:Any]=["gamut":gamut]
             if let path=proof["path"],let sha=proof["sha256"]{display["proof_path"]=path;display["proof_sha"]=sha}
@@ -357,7 +366,7 @@ import UniformTypeIdentifiers
                 histogram=r["histogram"] as? [[Double]] ?? []
                 metadata=r["metadata"] as? [String:Any] ?? [:]
                 previewGeometry=PhotoPreviewGeometry(r)
-                message=detail ? "Full-resolution viewport · 1 image pixel = 1 screen pixel" : "Preview · Originals are read-only · Edits save automatically"
+                message=curveDraft != nil ? "Curve preview · Release to save, Escape to cancel" : (detail ? "Full-resolution viewport · 1 image pixel = 1 screen pixel" : "Preview · Originals are read-only · Edits save automatically")
                 rendering=false
             } catch {if token==generation {rendering=false;self.error=error.localizedDescription}}
         }

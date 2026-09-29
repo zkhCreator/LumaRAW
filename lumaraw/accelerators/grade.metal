@@ -15,6 +15,17 @@ float interpolate(float v,constant float *p,int start,int count){
     for(int i=1;i<count;i++){int j=start+2*i;if(v<=p[j]){float t=(v-p[j-2])/(p[j]-p[j-2]);return p[j-1]+t*(p[j+1]-p[j-1]);}}
     return p[start+2*count-1];
 }
+float point_curve(float v,constant float *p,int start,int count){
+    if(v<=p[start])return p[start+5];
+    for(int i=1;i<count;i++){
+        int next=start+6*i;
+        if(v<=p[next]){
+            int k=next-6;float t=clamp((v-p[k])/p[k+1],0.0f,1.0f);
+            return clamp(((p[k+2]*t+p[k+3])*t+p[k+4])*t+p[k+5],0.0f,1.0f);
+        }
+    }
+    return p[start+6*(count-1)+5];
+}
 float3 cuberoot(float3 x){
     float3 a=abs(x),root=pow(a,float3(1.0f/3.0f));
     // Compensated Newton residual corrects pow before subtractive Oklab matrices.
@@ -53,6 +64,13 @@ kernel void grade_output(device const float *input [[buffer(0)]],device float *o
             if(p[10]!=0)v=interpolate(v,p,64,5);
             if(p[11]!=0)v=interpolate(v,p,80,int(p[11]));
             a*=dec(v)/lum;
+        }
+        for(int channel=0;channel<3;channel++){
+            if(p[49]==0 && p[50+channel]==0)continue;
+            float value=enc(a[channel]);
+            if(p[49]!=0)value=point_curve(value,p,208,int(p[49]));
+            if(p[50+channel]!=0)value=point_curve(value,p,304+channel*96,int(p[50+channel]));
+            a[channel]=dec(value);
         }
         if(p[39]!=0){
             float3 lab=lab_from_work(a,p);

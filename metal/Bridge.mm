@@ -39,8 +39,10 @@ extern "C" void lr_metal_destroy(void *context){delete static_cast<Context *>(co
 extern "C" const char *lr_metal_device(void *context){return static_cast<Context *>(context)->device.name.UTF8String;}
 extern "C" size_t lr_metal_allocated(void *context){return static_cast<Context *>(context)->capacity*25;}
 extern "C" double lr_metal_seconds(void *context){return static_cast<Context *>(context)->seconds;}
-extern "C" int lr_metal_run(void *context,const float *input,float *output,unsigned char *gamut,
-                             unsigned int count,const float *params,char *error,size_t size) {
+extern "C" unsigned int lr_metal_parameter_count(){return 640;}
+extern "C" int lr_metal_run_v2(void *context,const float *input,float *output,unsigned char *gamut,
+                             unsigned int count,const float *params,unsigned int parameterCount,char *error,size_t size) {
+    if(parameterCount!=640){errorText(error,size,@"Metal parameter layout mismatch");return 1;}
     if(!context || !input || !output || !gamut || !params || count==0)return 1;
     Context *c=static_cast<Context *>(context);std::lock_guard<std::mutex> guard(c->lock);
     @autoreleasepool {
@@ -60,7 +62,7 @@ extern "C" int lr_metal_run(void *context,const float *input,float *output,unsig
         if(!command || !encoder){errorText(error,size,@"Metal command allocation failed");return 4;}
         [encoder setComputePipelineState:c->pipeline];
         [encoder setBuffer:c->input offset:0 atIndex:0];[encoder setBuffer:c->output offset:0 atIndex:1];
-        [encoder setBuffer:c->gamut offset:0 atIndex:2];[encoder setBytes:params length:256*sizeof(float) atIndex:3];
+        [encoder setBuffer:c->gamut offset:0 atIndex:2];[encoder setBytes:params length:640*sizeof(float) atIndex:3];
         [encoder setBytes:&count length:sizeof(count) atIndex:4];
         NSUInteger width=std::min(NSUInteger(256),c->pipeline.maxTotalThreadsPerThreadgroup);
         [encoder dispatchThreads:MTLSizeMake(count,1,1) threadsPerThreadgroup:MTLSizeMake(width,1,1)];

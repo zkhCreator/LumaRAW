@@ -145,7 +145,7 @@ struct DevelopPresetEditor: View {
                     ForEach(source.fieldGroups.keys.sorted(),id:\.self) { key in
                         DisclosureGroup(key) {
                             ForEach(source.fieldGroups[key] ?? [],id:\.self) { field in
-                                Toggle(MixerFields.label(field),isOn:Binding(get:{fields.contains(field)},set:{value in if value {fields.insert(field)} else {fields.remove(field)} }))
+                                Toggle(PointCurveFields.keys.contains(field) ? PointCurveFields.label(field)+" Point Curve":MixerFields.label(field),isOn:Binding(get:{fields.contains(field)},set:{value in if value {fields.insert(field)} else {fields.remove(field)} }))
                             }.padding(.leading,12)
                         }
                     }

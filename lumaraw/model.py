@@ -15,6 +15,13 @@ IMAGE_EXTENSIONS = RAW_EXTENSIONS | {'.jpg', '.jpeg', '.png', '.tif', '.tiff'}
 MIXER_BANDS = ('red','orange','yellow','green','aqua','blue','purple','magenta')
 MIXER_FIELDS = tuple(f'{band}_{kind}' for band in MIXER_BANDS for kind in ('hue','sat','lum'))
 BW_FIELDS = tuple(f'{band}_bw' for band in MIXER_BANDS)
+POINT_CURVE_FIELDS = tuple(f'curve_{channel}_points' for channel in ('rgb','red','green','blue'))
+POINT_CURVE_GAP = 1 / 65535
+POINT_CURVE_PRESETS = {
+    'Linear': ((0,0),(1,1)),
+    'Medium Contrast': ((0,0),(.25,.20),(.75,.80),(1,1)),
+    'Strong Contrast': ((0,0),(.25,.15),(.75,.85),(1,1)),
+}
 LIMITS = {
     'exposure': (-5, 5), 'temperature': (-100, 100), 'tint': (-100, 100),
     'contrast': (-100, 100), 'highlights': (-100, 100), 'shadows': (-100, 100),
@@ -101,6 +108,10 @@ class Recipe:
     sharpen_radius: float = 1
     detail_protect: float = 40
     curve_points: list = field(default_factory=lambda: [[0., 0.], [1., 1.]])
+    curve_rgb_points: list = field(default_factory=lambda: [[0., 0.], [1., 1.]])
+    curve_red_points: list = field(default_factory=lambda: [[0., 0.], [1., 1.]])
+    curve_green_points: list = field(default_factory=lambda: [[0., 0.], [1., 1.]])
+    curve_blue_points: list = field(default_factory=lambda: [[0., 0.], [1., 1.]])
     masks: list = field(default_factory=list)
     camera_profile: dict = field(default_factory=dict)
     lut: dict = field(default_factory=dict)
@@ -138,6 +149,15 @@ def number(value, lo, hi):
     return type(value) in (int, float) and math.isfinite(value) and lo <= value <= hi
 
 
+def validate_point_curve(points):
+    if not isinstance(points,list) or not 2 <= len(points) <= 16 or any(
+        not isinstance(p,list) or len(p)!=2 or not all(number(v,0,1) for v in p) for p in points
+    ):
+        raise ValueError('A point curve requires 2–16 finite points inside 0–1')
+    if any(b[0]-a[0] < POINT_CURVE_GAP for a,b in zip(points,points[1:])):
+        raise ValueError('Point curve inputs must increase by at least 1/65535')
+
+
 def validate_extras(r):
     box = r.crop_box
     if not isinstance(box, list) or len(box) != 4 or not all(number(x, 0, 1) for x in box) or box[2] - box[0] < .01 or box[3] - box[1] < .01:
@@ -147,6 +167,8 @@ def validate_extras(r):
         raise ValueError('A curve requires 2–16 valid control points')
     if points[0][0] != 0 or points[-1][0] != 1 or any(b[0] <= a[0] or b[1] < a[1] for a, b in zip(points, points[1:])):
         raise ValueError('Curve X must increase, Y must not decrease, and the curve must cover 0–1')
+    for key in POINT_CURVE_FIELDS:
+        validate_point_curve(getattr(r,key))
     if not isinstance(r.masks, list) or len(r.masks) > 12:
         raise ValueError('At most 12 local masks are allowed')
     for m in r.masks:
@@ -219,7 +241,7 @@ SYNC_GROUPS = {
     'Light': ['exposure','contrast','highlights','shadows','whites','blacks','highlight_recovery'],
     'Color': ['saturation','vibrance','monochrome',*MIXER_FIELDS],
     'Black & White Mix': list(BW_FIELDS),
-    'Tone Curve': ['curve_shadows','curve_midtones','curve_lights','curve_points'],
+    'Tone Curve': ['curve_shadows','curve_midtones','curve_lights','curve_points',*POINT_CURVE_FIELDS],
     'Detail': ['luma_noise','chroma_noise','sharpen','sharpen_radius','detail_protect','defringe'],
     'Lens': ['distortion','vignette','ca_red','ca_blue'],
     'Composition': ['rotation','crop','crop_box','straighten','perspective_h','perspective_v','geometry_scale'],

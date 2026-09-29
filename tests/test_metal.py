@@ -33,6 +33,9 @@ RECIPES=[Recipe(),Recipe(exposure=.8,shadows=32,highlights=-45,whites=12,blacks=
                 red_lum=-25,orange_lum=45,yellow_lum=-15,green_lum=30,aqua_lum=-35,blue_lum=55,purple_lum=-50,magenta_lum=40),
          Recipe(monochrome=True,red_bw=-70,orange_bw=40,yellow_bw=60,green_bw=-45,aqua_bw=35,blue_bw=-55,purple_bw=65,magenta_bw=-20),
          Recipe(monochrome=True,red_hue=15,aqua_sat=-35,yellow_lum=-25,purple_lum=50,red_bw=60,blue_bw=-65),
+         Recipe(curve_rgb_points=[[0,.05],[.3,.2],[.7,.8],[1,.98]],curve_red_points=[[0,0],[.4,.5],[1,1]],
+                curve_green_points=[[.03,0],[.85,1]],curve_blue_points=[[0,.08],[.6,.5],[1,.95]]),
+         Recipe(curve_rgb_points=[[0,1],[.25,.1],[.5,.8],[1,0]],curve_red_points=[[0,1],[1,0]],purple_lum=25,monochrome=True,red_bw=30),
          Recipe(camera_profile={'camera':'synthetic','matrix':[[1.05,-.02,.01],[.02,.98,-.01],[-.02,.04,1.02]],'space':'LibRaw-ProPhoto-D65-linear'})]
 
 @pytest.mark.parametrize('space',['srgb','p3','adobe','prophoto'])
@@ -107,3 +110,40 @@ def test_gpu_failure_after_initialization_recomputes_from_original(monkeypatch):
     actual,_=accel.grade_output(a,r,'srgb')
     np.testing.assert_array_equal(actual,to_output(grade_tile(a,r))[0])
     assert any('after dispatch' in s for s in accel.report()['fallback_reasons'])
+
+def test_old_adapter_layout_falls_back_before_allocating_or_dispatching(monkeypatch):
+    monkeypatch.setattr(accel.C,'CDLL',lambda path:object())
+    a=np.full((192,128,3),.3,np.float32)
+    r=Recipe(curve_red_points=[[0,0],[.5,.6],[1,1]])
+    accel.configure('auto')
+    actual,_=accel.grade_output(a,r,'srgb')
+    np.testing.assert_array_equal(actual,to_output(grade_tile(a,r))[0])
+    assert 'outdated' in accel.report()['fallback_reasons'][0]
+    assert accel.report()['shared_buffer_peak_mb']==0
+    accel.configure('metal')
+    with pytest.raises(RuntimeError,match='outdated'):accel.grade_output(a,r,'srgb')
+
+def test_parameter_buffer_capacity_is_checked_in_python_and_c_abi():
+    require_metal();ctx=accel.Metal()
+    try:
+        a=np.full((2,2,3),.3,np.float32)
+        with pytest.raises(RuntimeError,match='parameter buffer'):
+            ctx.run(a,np.zeros(256,np.float32))
+        error=accel.C.create_string_buffer(256)
+        # Capacity rejection precedes pointer reads, including a deliberately
+        # absent parameter pointer. No GPU buffers are allocated for this call.
+        result=ctx.lib.lr_metal_run_v2(ctx.handle,None,None,None,1,None,256,error,len(error))
+        assert result!=0 and b'layout mismatch' in error.value
+        assert ctx.lib.lr_metal_allocated(ctx.handle)==0
+    finally:ctx.close()
+
+def test_steep_curve_retains_exact_shape_through_reported_hybrid_path():
+    require_metal()
+    a=np.random.default_rng(54).uniform(.005,.6,(192,128,3)).astype(np.float32)
+    r=Recipe(curve_red_points=[[0,0],[.25,.1],[.2501,.9],[1,1]])
+    gpu,_=accel.grade_output(a,r,'prophoto')
+    cpu,_=to_output(grade_tile(a,r),'prophoto')
+    np.testing.assert_allclose(gpu,cpu,atol=2e-5)
+    report=accel.report()
+    assert report['backend']=='hybrid' and report['metal_output_tiles']==1
+    assert report['fallback_reasons']==['steep_point_curve_uses_cpu_grade']

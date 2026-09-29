@@ -18,7 +18,7 @@ saturation, luminance and B&W direction, neutral protection, hue wrapping,
 negative/HDR finiteness and input immutability. A frozen four-band output fixture
 checks pre-expansion CPU pixels independently of the new implementation. Other
 cases cover old stored JSON defaults, selective/all-group sync, atomic conflicts,
-undo, all 69 preset fields, frozen exports, portable recipes and catalog backup.
+undo, all preset fields, frozen exports, portable recipes and catalog backup.
 
 `test_metal.py` exercises the new HSL and B&W recipes in all four output spaces on
 real Metal. It also bounds decoded-linear error; the explicit near-black Adobe
@@ -47,6 +47,37 @@ CPU and Metal cold/warm fitted previews, a full-size ProPhoto 16-bit TIFF and a
 1280×900 detail viewport, with stage times, sampled RSS, actual dispatch and source
 hashes. Retain the one/eight-code preview/TIFF parity limits. Reference acceptance
 still needs Lightroom fixtures, desktop interaction and the minimum supported OS.
+
+## RGB and channel point curves
+
+`test_point_curves.py` compares the float32 evaluator to an independent SciPy
+PCHIP calculation, checks endpoint movement, inversion, segment bounds, identity
+negative/HDR preservation, untouched channels, and frozen legacy CPU pixels.
+Service coverage includes old JSON, presets, selective sync, conflicts, undo,
+portable recipes, backup, frozen jobs and real temporary-preview pixels without
+recipe/history mutation or cache contamination. Metal cases cover all four spaces,
+ordinary fused curves, sharp-curve hybrid fallback and Python/C ABI size guards.
+
+`NativePointCurveRegression` compiles the controls and exercises Store/IPC units,
+engine preset loading, insertion/movement/deletion bounds, captured gestures,
+temporary previews, one-step saves, cancellation state, resets, undo, stale writes,
+photo switching and sync. Native plot samples are compared with engine-generated
+fixtures, including narrow segments. This does not dispatch real pointer/key or
+VoiceOver events and does not verify rendered desktop layout.
+
+```sh
+.venv/bin/python tests/run_native.py --work work/native-point-curves-01 \
+  --engine /absolute/LumaRAW.app/Contents/Resources/Engine/LumaRAWEngine \
+  --suite NativePointCurveRegression
+.venv/bin/python tests/acceleration_probe.py --preset point_curves \
+  --engine /absolute/LumaRAW.app/Contents/Resources/Engine/LumaRAWEngine \
+  --fixture /absolute/nikon.NEF --work work/point-curves-nef-01
+```
+
+Run the RAW probe without concurrent builds/tests; its limits and timing scope
+match the mixer probe above. Steep curves are tested separately because this probe
+requires actual fused grading. Adobe pixel equivalence, full parametric controls,
+rendered interaction and macOS 14 runtime remain separate acceptance work.
 
 ## Reference RAW fixture
 

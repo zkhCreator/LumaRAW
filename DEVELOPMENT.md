@@ -209,6 +209,13 @@ Distinguish explicit user-control setters from programmatic navigation restores:
 changing a sort or source preference during photo location must not trigger a
 second UI callback that resets its computed page offset.
 
+Interactive drafts must not fill history with pointer events. Capture identity
+and revision at gesture start, coalesce temporary image requests with bounded
+in-flight work, and save one partial mutation on release. Cancellation restores
+the saved preview; another photo or a newer revision invalidates the gesture.
+Temporary preview contracts must restrict accepted fields and preserve frozen
+export jobs. Plot geometry may mirror the engine; pixel processing stays portable.
+
 ## Replaceable platform architecture
 
 The first migration choice is **retain the Python domain/service and replace the
