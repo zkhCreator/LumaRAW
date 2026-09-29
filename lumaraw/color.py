@@ -4,6 +4,8 @@ Inputs: linear LibRaw ProPhoto D65 float tiles. Outputs: encoded RGB plus an ICC
 that describes those exact output primaries/transfer curves. Creative LUTs are
 explicit SDR sRGB operations and clip to their declared domain. No Nikon vendor
 appearance is inferred. Soft proof simulates a supplied ICC, not printer hardware.
+The eight overlapping Oklab mixer bands retain legacy hue/saturation equations;
+new luminance and monochrome gains protect neutral pixels and use bounded tiles.
 """
 from functools import lru_cache
 import hashlib
@@ -13,6 +15,7 @@ from pathlib import Path
 import numpy as np
 from PIL import Image, ImageCms
 from scipy.ndimage import map_coordinates
+from .model import MIXER_BANDS
 
 WORK_FROM_SRGB = np.array([[.529317,.330092,.140588],[.098368,.873465,.028169],[.016879,.117663,.865457]],np.float32)
 SRGB_FROM_WORK = np.linalg.inv(WORK_FROM_SRGB).astype(np.float32)
@@ -84,20 +87,52 @@ def from_oklab(lab):
     return rgb @ WORK_FROM_SRGB.T
 
 
+MIXER_CENTERS = (29,65,109,142,195,264,305,342)
+
+
+def mixer_weight(h, center):
+    return np.maximum(0,1-np.abs((h-center+180)%360-180)/50)**2
+
+
+def mixer_neutral_weight(lab):
+    # Rounded working-space matrices leave tiny chroma on equal-RGB neutrals.
+    # Ignore that numerical residue before smoothly enabling selective gains.
+    lightness=np.abs(lab[:,:,0])
+    chroma=np.maximum(0,np.hypot(lab[:,:,1],lab[:,:,2])-lightness*1e-5)
+    return np.minimum(1,chroma/(lightness*.1+1e-7))
+
+
 def mix_hues(a,recipe):
-    bands=[('red',29),('orange',65),('green',142),('blue',264)]
-    if not any(getattr(recipe,key+'_hue') or getattr(recipe,key+'_sat') for key,_ in bands):
+    if not any(getattr(recipe,key+'_'+kind) for key in MIXER_BANDS for kind in ('hue','sat','lum')):
         return a
     lab=oklab(a);h=np.degrees(np.arctan2(lab[:,:,2],lab[:,:,1]))%360
     chroma=np.hypot(lab[:,:,1],lab[:,:,2]);dh=np.zeros_like(h);ds=np.zeros_like(h)
-    for key,center in bands:
-        dist=np.abs((h-center+180)%360-180)
-        weight=np.maximum(0,1-dist/50)**2
+    dl=np.zeros_like(h)
+    neutral=mixer_neutral_weight(lab)
+    for key,center in zip(MIXER_BANDS,MIXER_CENTERS):
+        if not any(getattr(recipe,key+'_'+kind) for kind in ('hue','sat','lum')):continue
+        weight=mixer_weight(h,center)
         dh += weight*getattr(recipe,key+'_hue')
         ds += weight*getattr(recipe,key+'_sat')/100
+        dl += weight*getattr(recipe,key+'_lum')/100
     angle=np.radians(h+dh);chroma *= np.maximum(0,1+ds)
     lab[:,:,1]=chroma*np.cos(angle);lab[:,:,2]=chroma*np.sin(angle)
-    return from_oklab(lab)
+    mixed=from_oklab(lab)
+    if np.any(dl):mixed *= np.exp2(dl*2*neutral)[:,:,None]
+    return mixed
+
+
+def mix_monochrome(a,recipe,luma):
+    gray=a@luma
+    if any(getattr(recipe,key+'_bw') for key in MIXER_BANDS):
+        lab=oklab(a);h=np.degrees(np.arctan2(lab[:,:,2],lab[:,:,1]))%360
+        neutral=mixer_neutral_weight(lab)
+        shift=np.zeros_like(h)
+        for key,center in zip(MIXER_BANDS,MIXER_CENTERS):
+            value=getattr(recipe,key+'_bw')
+            if value:shift += mixer_weight(h,center)*value/100
+        gray *= np.exp2(shift*2*neutral)
+    return np.repeat(gray[:,:,None],3,axis=2)
 
 
 @lru_cache(maxsize=2)

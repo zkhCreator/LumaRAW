@@ -52,15 +52,15 @@ struct InspectorView:View {
                     edit("Tint","tint",-100...100)
                     edit("Vibrance","vibrance",-100...100)
                     edit("Saturation","saturation",-100...100)
-                    Toggle("Monochrome",isOn:bool("monochrome")).font(.callout)
+                    Picker("Treatment",selection:bool("monochrome")) { Text("Color").tag(false);Text("Black & White").tag(true) }
                 }.padding(.top,12)}
-                section("Tone Curve and Color Mixer"){
+                section("Tone Curve"){
                     edit("Shadow Curve","curve_shadows",-30...30)
                     edit("Midtone Curve","curve_midtones",-30...30)
                     edit("Highlight Curve","curve_lights",-30...30)
-                    ForEach([("Red","red"),("Orange","orange"),("Green","green"),("Blue","blue")],id:\.1){name,key in edit("\(name) Hue",key+"_hue",-30...30);edit("\(name) Saturation",key+"_sat",-100...100)}
                     Button("Custom Curve Points…"){s.showRecipe=true}
                 }
+                section((s.recipe["monochrome"] as? Bool ?? false) ? "Black & White Mix":"Color Mixer") { ColorMixerControls() }
                 section("Detail"){
                     edit("Luminance Noise Reduction","luma_noise",0...100)
                     edit("Color Noise Reduction","chroma_noise",0...100)

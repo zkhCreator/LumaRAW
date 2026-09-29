@@ -11,7 +11,7 @@ import pytest
 from lumaraw import accelerators as accel
 from lumaraw.model import Recipe
 from lumaraw.render import grade_tile,RenderPlan,render_strip
-from lumaraw.color import to_output
+from lumaraw.color import to_output,decode
 
 @pytest.fixture(autouse=True)
 def reset_backend():
@@ -29,6 +29,10 @@ RECIPES=[Recipe(),Recipe(exposure=.8,shadows=32,highlights=-45,whites=12,blacks=
          Recipe(exposure=-3,contrast=-85,saturation=-60,curve_shadows=20,curve_midtones=-10,curve_lights=25),
          Recipe(curve_points=[[0,0],[.09,.02],[.3,.45],[.7,.8],[1,1]],monochrome=True),
          Recipe(red_hue=21,red_sat=-33,orange_hue=-12,orange_sat=18,green_hue=11,green_sat=-28,blue_hue=-24,blue_sat=38),
+         Recipe(yellow_hue=24,aqua_hue=-18,purple_hue=15,magenta_hue=-21,yellow_sat=-40,aqua_sat=35,purple_sat=60,magenta_sat=-30,
+                red_lum=-25,orange_lum=45,yellow_lum=-15,green_lum=30,aqua_lum=-35,blue_lum=55,purple_lum=-50,magenta_lum=40),
+         Recipe(monochrome=True,red_bw=-70,orange_bw=40,yellow_bw=60,green_bw=-45,aqua_bw=35,blue_bw=-55,purple_bw=65,magenta_bw=-20),
+         Recipe(monochrome=True,red_hue=15,aqua_sat=-35,yellow_lum=-25,purple_lum=50,red_bw=60,blue_bw=-65),
          Recipe(camera_profile={'camera':'synthetic','matrix':[[1.05,-.02,.01],[.02,.98,-.01],[-.02,.04,1.02]],'space':'LibRaw-ProPhoto-D65-linear'})]
 
 @pytest.mark.parametrize('space',['srgb','p3','adobe','prophoto'])
@@ -38,7 +42,17 @@ def test_real_metal_matches_cpu(recipe,space):
     a=np.random.default_rng(910).uniform(-.03,1.5,(192,321,3)).astype(np.float32)
     gpu,gamut=accel.grade_output(a,recipe,space)
     cpu,reference=to_output(grade_tile(a,recipe),space)
-    np.testing.assert_allclose(gpu,cpu,atol=1e-4,rtol=2e-5)
+    # Adobe RGB's pure gamma has an unbounded derivative at zero. Small
+    # FP32 cancellation in saturated RGB can exceed the ordinary encoded tolerance
+    # there. Bound both linear-light error and the exceptional dark code error;
+    # all other pixels retain the original encoded tolerance. Real RAW 16-bit
+    # export parity has its separate, stricter eight-code probe limit.
+    dark=(cpu<.02)&(gpu<.02) if space=='adobe' else np.zeros(cpu.shape,bool)
+    np.testing.assert_allclose(gpu[~dark],cpu[~dark],atol=1e-4,rtol=2e-5)
+    if dark.any():
+        assert np.max(np.abs(gpu[dark]-cpu[dark]))<=16/65535
+        np.testing.assert_allclose(decode(gpu[dark],space),decode(cpu[dark],space),atol=1e-6,rtol=0)
+    np.testing.assert_allclose(decode(gpu,space),decode(cpu,space),atol=1e-5,rtol=0)
     assert np.mean(np.abs(gpu-cpu))<2e-6
     assert np.count_nonzero(gamut!=reference)<=1
     assert accel.report()['metal_grade_tiles']==1

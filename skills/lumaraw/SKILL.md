@@ -56,6 +56,16 @@ Example edit arguments:
 {"photo_id": 12, "expected_revision": 3, "patch": {"exposure": 0.35, "highlights": -20, "shadows": 12}}
 ```
 
+Color mixer bands are `red`, `orange`, `yellow`, `green`, `aqua`, `blue`, `purple`
+and `magenta`. Each has `_hue` (-30 to 30 degrees), `_sat` and `_lum` (-100 to 100).
+The Mac hue slider displays -100 to 100, which is three and one third times the
+stored/API degree value. Each band's `_bw` is -100 to 100 and takes effect only
+when `monochrome` is true. Switching treatment retains all values; color mixing
+still precedes monochrome conversion. `Color` sync copies all HSL controls and
+treatment; `Black & White Mix` separately copies the eight `_bw` values. Refresh
+`recipe_schema` for authoritative fields/limits. These are LumaRAW parameters,
+not interchangeable Adobe XMP values or a claim of calibrated Adobe color parity.
+
 ## Reviewed Add import
 
 `prepare_import(paths, include_subfolders?, skip_duplicates?)` captures explicit

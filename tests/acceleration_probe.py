@@ -18,12 +18,17 @@ def digest(p):
     return h.hexdigest()
 
 def main():
-    parser=argparse.ArgumentParser();parser.add_argument('--engine',required=True,type=Path);parser.add_argument('--fixture',required=True,type=Path);parser.add_argument('--work',required=True,type=Path);parser.add_argument('--preset',choices=['creative','neutral'],default='creative');a=parser.parse_args()
+    parser=argparse.ArgumentParser();parser.add_argument('--engine',required=True,type=Path);parser.add_argument('--fixture',required=True,type=Path);parser.add_argument('--work',required=True,type=Path);parser.add_argument('--preset',choices=['creative','neutral','mixer','bw_mixer'],default='creative');a=parser.parse_args()
     if a.work.exists():raise SystemExit('Choose new work directory')
     a.work.mkdir(parents=True);a.work=a.work.resolve();a.engine=a.engine.resolve();a.fixture=a.fixture.resolve()
     before=digest(a.fixture);runs=[]
     recipe={'exposure':.35,'highlights':-25,'shadows':20,'contrast':12,'vibrance':18,'curve_midtones':4,'blue_hue':-9,'blue_sat':12}
     if a.preset=='neutral':recipe={}
+    if a.preset in ('mixer','bw_mixer'):
+        recipe.update(yellow_hue=12,aqua_hue=-9,purple_hue=15,magenta_hue=-12,yellow_sat=-20,aqua_sat=25,purple_sat=30,magenta_sat=-15,
+                      red_lum=-15,orange_lum=20,yellow_lum=-25,green_lum=15,aqua_lum=-30,blue_lum=35,purple_lum=-20,magenta_lum=25)
+    if a.preset=='bw_mixer':
+        recipe.update(monochrome=True,red_bw=30,orange_bw=15,yellow_bw=20,green_bw=-15,aqua_bw=-25,blue_bw=-35,purple_bw=25,magenta_bw=10)
     def run(mode,operation,label,cache):
         dest=a.work/f'{label}-{mode}';dest.mkdir()
         budget=min(4096,int(psutil.virtual_memory().available/1024**2*.7))

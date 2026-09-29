@@ -30,6 +30,7 @@ def main():
     suites+=('NativeImportRegression',)
     suites+=('NativeImportProcessingRegression',)
     suites+=('NativePreviousImportRegression',)
+    suites+=('NativeColorMixerRegression',)
     parser.add_argument('--suite',choices=suites,action='append',help='Run selected suites; default: all')
     args=parser.parse_args()
     work=args.work.resolve()

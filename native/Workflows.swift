@@ -88,8 +88,8 @@ struct RecipeSheet:View {
 struct SyncSheet:View {
     @EnvironmentObject var s:Store
     @Environment(\.dismiss) var dismiss
-    @State private var groups:Set<String>=["White Balance","Light","Color","Tone Curve","Detail"]
-    let all=["White Balance","Light","Color","Tone Curve","Detail","Lens","Composition","Local Masks","Camera Profile","LUT"]
+    @State private var groups:Set<String>=["White Balance","Light","Color","Black & White Mix","Tone Curve","Detail"]
+    let all=["White Balance","Light","Color","Black & White Mix","Tone Curve","Detail","Lens","Composition","Local Masks","Camera Profile","LUT"]
     var body:some View{VStack(alignment:.leading,spacing:18){Text("Sync Adjustments").font(.title2.weight(.semibold));Text("Copy selected adjustments from \(s.photo?.name ?? "the current photo") to \(max(0,s.selection.count-1)) other photos.").foregroundStyle(.secondary);ForEach(all,id:\.self){g in Toggle(g,isOn:Binding(get:{groups.contains(g)},set:{if $0{groups.insert(g)}else{groups.remove(g)}}))};HStack{Spacer();Button("Cancel"){dismiss()};Button("Sync"){Task{await s.sync(Array(groups).sorted())}}.buttonStyle(.borderedProminent).disabled(groups.isEmpty || s.selection.count<2)}}.padding(24).frame(width:480)}
 }
 struct CalibrationSheet:View {

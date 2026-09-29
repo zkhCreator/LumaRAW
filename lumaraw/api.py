@@ -16,7 +16,7 @@ def string(maximum=4096): return {'type':'string','minLength':1,'maxLength':maxi
 def array(items,maximum=1000): return {'type':'array','items':items,'maxItems':maximum,'minItems':1}
 ID=integer(1); REV=integer(); PATH=string(); BOOL={'type':'boolean'}
 OPTIONAL_ID={'anyOf':[ID,{'type':'null'}]}
-PATCH={'type':'object','maxProperties':64}
+PATCH={'type':'object','maxProperties':128}
 TOOLS={}
 def tool(name,description,properties=None,required=(),read=False):
     TOOLS[name]={'name':name,'description':description,'inputSchema':obj(properties,required),
@@ -30,7 +30,7 @@ PRESET_ID=string(80)
 PRESET_TOKEN=string(64)
 tool('list_develop_presets','Page partial Develop presets and groups without loading recipe payloads. Shared storage is default; hidden groups are excluded unless requested.',{'offset':integer(),'group_offset':integer(),'search':{'type':'string','maxLength':200},'group_id':PRESET_ID,'favorites':BOOL,'include_hidden':BOOL},read=True)
 tool('get_develop_preset','Read complete preset settings at the captured library revision.',{'preset_id':PRESET_ID,'expected_revision':PRESET_TOKEN},['preset_id','expected_revision'],read=True)
-tool('save_develop_preset','Create or update a preset from explicitly selected settings of a captured photo. Does not edit photos. LUT assets are retained independently.',{'photo_id':ID,'expected_photo_revision':REV,'fields':array({'enum':list(DEVELOP_FIELDS)},64),'name':string(120),'group_name':string(120),'preset_id':PRESET_ID,'expected_revision':PRESET_TOKEN,'duplicate_policy':{'enum':['error','replace','duplicate']}},['photo_id','expected_photo_revision','fields','name','group_name','expected_revision'])
+tool('save_develop_preset','Create or update a preset from explicitly selected settings of a captured photo. Does not edit photos. LUT assets are retained independently.',{'photo_id':ID,'expected_photo_revision':REV,'fields':array({'enum':list(DEVELOP_FIELDS)},128),'name':string(120),'group_name':string(120),'preset_id':PRESET_ID,'expected_revision':PRESET_TOKEN,'duplicate_policy':{'enum':['error','replace','duplicate']}},['photo_id','expected_photo_revision','fields','name','group_name','expected_revision'])
 tool('develop_preset_action','Explicit preset favorite, duplicate, rename, move, delete, group visibility/name or storage preference change. Switching storage never moves presets.',{'action':{'enum':['favorite','duplicate','rename','move','delete','group_visibility','group_rename','storage']},'preset_id':PRESET_ID,'group_id':PRESET_ID,'name':string(120),'group_name':string(120),'favorite':BOOL,'visible':BOOL,'store_with_catalog':BOOL,'expected_revision':PRESET_TOKEN},['action','expected_revision'])
 tool('apply_develop_preset','Apply only stored preset fields to up to sixty captured photo revisions in one transaction. Preserve metadata, catalog orientation, unchecked adjustments and queued exports.',{'preset_id':PRESET_ID,'expected_revision':PRESET_TOKEN,'targets':array(obj({'photo_id':ID,'expected_revision':REV},['photo_id','expected_revision']),60)},['preset_id','expected_revision','targets'])
 tool('import_photos','Reference explicit local photos or directories; never copy or modify originals.',{'paths':array(PATH)},['paths'])
@@ -152,7 +152,7 @@ tool('queue_control','Pause after the current export, resume, cancel, or retry f
 tool('save_version','Save a named recipe snapshot shared by all variants of this source.',{'photo_id':ID,'name':string(120)},['photo_id','name'])
 tool('list_versions','List up to 100 named snapshots shared by this photo family.',{'photo_id':ID},['photo_id'],True)
 tool('restore_version','Restore a version with conflict detection and undo history.',{'photo_id':ID,'version_id':ID,'expected_revision':REV},['photo_id','version_id','expected_revision'])
-tool('sync_photos','Copy selected parameter groups atomically; every target requires its current revision.',{'source_id':ID,'targets':array(obj({'photo_id':ID,'expected_revision':REV},['photo_id','expected_revision']),60),'groups':array({'enum':list(SYNC_GROUPS)},10)},['source_id','targets','groups'])
+tool('sync_photos','Copy selected parameter groups atomically; every target requires its current revision.',{'source_id':ID,'targets':array(obj({'photo_id':ID,'expected_revision':REV},['photo_id','expected_revision']),60),'groups':array({'enum':list(SYNC_GROUPS)},len(SYNC_GROUPS))},['source_id','targets','groups'])
 tool('index_library','Hash originals read-only, detect duplicates, missing files and EXIF bursts.')
 tool('relink_photo','Relink a missing original; checks a known content fingerprint.',{'photo_id':ID,'path':PATH},['photo_id','path'])
 tool('backup_catalog','Write a new SQLite backup and asset directory; never overwrite.',{'path':PATH},['path'])

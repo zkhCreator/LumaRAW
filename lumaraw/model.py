@@ -4,12 +4,17 @@ Purpose: validate non-destructive, versioned edits before any processing.
 Inputs: user controls or stored JSON. Outputs: a small serializable recipe.
 Non-goals: no image I/O, no absolute Kelvin calibration, no Nikon Picture Control.
 Temperature and tint are relative adjustments to the camera's as-shot balance.
+Mixer hue values retain their original degree units; the Mac panel maps them to
+its -100…100 scale. Added mixer fields default to zero for existing recipes.
 """
 from dataclasses import asdict, dataclass, fields, field
 import math
 
 RAW_EXTENSIONS = {'.nef', '.nrw', '.dng', '.arw', '.cr2', '.cr3', '.raf', '.rw2', '.orf'}
 IMAGE_EXTENSIONS = RAW_EXTENSIONS | {'.jpg', '.jpeg', '.png', '.tif', '.tiff'}
+MIXER_BANDS = ('red','orange','yellow','green','aqua','blue','purple','magenta')
+MIXER_FIELDS = tuple(f'{band}_{kind}' for band in MIXER_BANDS for kind in ('hue','sat','lum'))
+BW_FIELDS = tuple(f'{band}_bw' for band in MIXER_BANDS)
 LIMITS = {
     'exposure': (-5, 5), 'temperature': (-100, 100), 'tint': (-100, 100),
     'contrast': (-100, 100), 'highlights': (-100, 100), 'shadows': (-100, 100),
@@ -25,6 +30,8 @@ LIMITS = {
     'straighten': (-20, 20), 'perspective_v': (-50, 50), 'perspective_h': (-50, 50),
     'geometry_scale': (1, 2), 'lut_amount': (0, 100),
 }
+LIMITS.update({f'{band}_{kind}':(-30,30) if kind=='hue' else (-100,100)
+               for band in MIXER_BANDS for kind in ('hue','sat','lum','bw')})
 
 @dataclass(frozen=True)
 class Recipe:
@@ -50,6 +57,30 @@ class Recipe:
     green_sat: float = 0
     blue_hue: float = 0
     blue_sat: float = 0
+    yellow_hue: float = 0
+    yellow_sat: float = 0
+    aqua_hue: float = 0
+    aqua_sat: float = 0
+    purple_hue: float = 0
+    purple_sat: float = 0
+    magenta_hue: float = 0
+    magenta_sat: float = 0
+    red_lum: float = 0
+    orange_lum: float = 0
+    yellow_lum: float = 0
+    green_lum: float = 0
+    aqua_lum: float = 0
+    blue_lum: float = 0
+    purple_lum: float = 0
+    magenta_lum: float = 0
+    red_bw: float = 0
+    orange_bw: float = 0
+    yellow_bw: float = 0
+    green_bw: float = 0
+    aqua_bw: float = 0
+    blue_bw: float = 0
+    purple_bw: float = 0
+    magenta_bw: float = 0
     monochrome: bool = False
     highlight_recovery: bool = False
     rotation: int = 0
@@ -186,7 +217,8 @@ class ExportOptions:
 SYNC_GROUPS = {
     'White Balance': ['temperature','tint'],
     'Light': ['exposure','contrast','highlights','shadows','whites','blacks','highlight_recovery'],
-    'Color': ['saturation','vibrance','monochrome','red_hue','red_sat','orange_hue','orange_sat','green_hue','green_sat','blue_hue','blue_sat'],
+    'Color': ['saturation','vibrance','monochrome',*MIXER_FIELDS],
+    'Black & White Mix': list(BW_FIELDS),
     'Tone Curve': ['curve_shadows','curve_midtones','curve_lights','curve_points'],
     'Detail': ['luma_noise','chroma_noise','sharpen','sharpen_radius','detail_protect','defringe'],
     'Lens': ['distortion','vignette','ca_red','ca_blue'],

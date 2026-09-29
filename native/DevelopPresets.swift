@@ -99,7 +99,7 @@ extension Store {
         if developPresetPage == nil { await refreshDevelopPresets() }
         guard let page=developPresetPage else { return }
         let revision=selection?.revision ?? page.revision
-        var fields=Set(["White Balance","Light","Color","Tone Curve"].flatMap { page.fieldGroups[$0] ?? [] })
+        var fields=Set(["White Balance","Light","Color","Black & White Mix","Tone Curve"].flatMap { page.fieldGroups[$0] ?? [] })
         if let selection {
             do {
                 let result=try await Backend.call("get_develop_preset",["preset_id":selection.preset.id,"expected_revision":revision])

@@ -45,6 +45,12 @@ when a clear function is more maintainable. Avoid unrelated formatting churn.
 - Add JSON Schema inputs before wiring native controls. Reject unsupported keys,
   invalid ranges and overlarge arrays at the service boundary. Keep existing
   commands compatible; use explicit revisions for editable persisted objects.
+- Adding recipe fields must preserve old defaults and units. Normalize stored
+  JSON before group-based copying, and check full-recipe patches, all-field
+  presets and all-group sync against API collection limits. Keep display-unit
+  conversion in the native shell and processing equations in the portable core.
+  Numerical tolerance changes require a documented error model and independent
+  real-image checks; a synthetic threshold alone does not establish color parity.
 - Keep descriptive library metadata separate from decoder-derived EXIF and pixel
   recipes. Metadata edits must not invalidate pixel caches or adopt edit revisions.
 - Metadata presets preserve unchecked fields and append keyword assignments.

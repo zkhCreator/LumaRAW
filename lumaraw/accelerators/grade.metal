@@ -15,7 +15,22 @@ float interpolate(float v,constant float *p,int start,int count){
     for(int i=1;i<count;i++){int j=start+2*i;if(v<=p[j]){float t=(v-p[j-2])/(p[j]-p[j-2]);return p[j-1]+t*(p[j+1]-p[j-1]);}}
     return p[start+2*count-1];
 }
-float3 cuberoot(float3 x){return sign(x)*pow(abs(x),float3(1.0f/3.0f));}
+float3 cuberoot(float3 x){
+    float3 a=abs(x),root=pow(a,float3(1.0f/3.0f));
+    // Compensated Newton residual corrects pow before subtractive Oklab matrices.
+    // Include the rounded square's error and keep zero/negative inputs finite.
+    float3 square=root*root,error=fma(root,root,-square);
+    float3 residual=fma(-root,square,a)-root*error;
+    root+=residual/max(3.0f*square,float3(1e-30f));
+    return sign(x)*root;
+}
+float3 lab_from_work(float3 a,constant float *p){return mat(cuberoot(mat(mat(a,p,120),p,129)),p,138);}
+float hue(float3 lab){float h=atan2(lab.z,lab.y)*57.29577951308232f;return h<0?h+360.0f:h;}
+float mixer_weight(float h,float center){
+    float d=fmod(h-center+180.0f,360.0f);if(d<0)d+=360.0f;d-=180.0f;
+    float weight=max(0.0f,1.0f-abs(d)/50.0f);return weight*weight;
+}
+float mixer_neutral_weight(float3 lab){return min(1.0f,max(0.0f,length(lab.yz)-abs(lab.x)*1e-5f)/(abs(lab.x)*.1f+1e-7f));}
 kernel void grade_output(device const float *input [[buffer(0)]],device float *output [[buffer(1)]],
                          device uchar *gamut [[buffer(2)]],constant float *p [[buffer(3)]],
                          constant uint &count [[buffer(4)]],uint i [[thread_position_in_grid]]) {
@@ -23,6 +38,7 @@ kernel void grade_output(device const float *input [[buffer(0)]],device float *o
     float3 a=float3(input[3*i],input[3*i+1],input[3*i+2]);
     float3 L=float3(p[12],p[13],p[14]);
     if(p[0]==0){
+        const float centers[8]={29,65,109,142,195,264,305,342};
         a=mat(a,p,16)*p[1];
         float lum=max(dot(a,L),1e-7f),shadow=exp(-lum/.16f),light=lum/(lum+.35f);
         a*=exp2(p[2]*shadow*1.5f+p[3]*light*1.5f+p[4]*exp(-lum/.045f)+p[5]*pow(light,4.0f));
@@ -39,18 +55,29 @@ kernel void grade_output(device const float *input [[buffer(0)]],device float *o
             a*=dec(v)/lum;
         }
         if(p[39]!=0){
-            float3 rgb=mat(a,p,120);
-            float3 lms=mat(rgb,p,129);
-            float3 lab=mat(cuberoot(lms),p,138);
-            float h=atan2(lab.z,lab.y)*180.0f/M_PI_F;if(h<0)h+=360.0f;
-            float chroma=length(lab.yz),dh=0,ds=0;
-            const float centers[4]={29,65,142,264};
-            for(int b=0;b<4;b++){float delta=fmod(h-centers[b]+540.0f,360.0f)-180.0f;float w=pow(max(0.0f,1.0f-abs(delta)/50.0f),2.0f);dh+=w*p[40+b*2];ds+=w*p[41+b*2];}
-            float angle=(h+dh)*M_PI_F/180.0f;chroma*=max(0.0f,1.0f+ds);
+            float3 lab=lab_from_work(a,p);
+            float h=hue(lab),chroma=length(lab.yz),dh=0,ds=0,dl=0;
+            float neutral=mixer_neutral_weight(lab);
+            for(int b=0;b<8;b++){
+                int k=176+b*4;
+                if(p[k]==0 && p[k+1]==0 && p[k+2]==0)continue;
+                float w=mixer_weight(h,centers[b]);dh+=w*p[k];ds+=w*p[k+1]/100.0f;dl+=w*p[k+2]/100.0f;
+            }
+            float angle=(h+dh)*.017453292519943295f;chroma*=max(0.0f,1.0f+ds);
             lab.y=chroma*cos(angle);lab.z=chroma*sin(angle);
-            lms=mat(lab,p,147);rgb=mat(lms*lms*lms,p,156);a=mat(rgb,p,165);
+            float3 lms=mat(lab,p,147);float3 rgb=mat(lms*lms*lms,p,156);a=mat(rgb,p,165);
+            a*=exp2(dl*2.0f*neutral);
         }
-        if(p[9]!=0)a=float3(dot(a,L));
+        if(p[9]!=0){
+            float gray=dot(a,L);
+            if(p[48]!=0){
+                float3 lab=lab_from_work(a,p);float h=hue(lab),shift=0;
+                float neutral=mixer_neutral_weight(lab);
+                for(int b=0;b<8;b++){if(p[179+b*4]!=0)shift+=mixer_weight(h,centers[b])*p[179+b*4]/100.0f;}
+                gray*=exp2(shift*2.0f*neutral);
+            }
+            a=float3(gray);
+        }
     }
     float3 linear=mat(a,p,28);
     gamut[i]=any(linear<float3(-1e-5f)) || any(linear>float3(1.00001f));

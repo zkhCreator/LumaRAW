@@ -8,13 +8,27 @@ The optional backend plugs into `lumaraw.accelerators.grade_output`. A small Obj
 | --- | --- |
 | NEF metadata, decompression, white balance, AHD demosaicing, camera matrix | LibRaw on CPU |
 | Crop/rotation/perspective/distortion sampling; denoise/sharpen/defringe | CPU with overlapping strips |
-| Exposure, tone, contrast, saturation/vibrance, curves, OKLab mixer, camera profile matrix, monochrome | Fused Metal grading kernel, or CPU reference |
+| Exposure, tone, contrast, saturation/vibrance, curves, eight-band HSL/B&W mixer, camera profile matrix, monochrome | Fused Metal grading kernel, or CPU reference |
 | Masks and LUT | Complete CPU grading followed by Metal output conversion; reported as hybrid |
 | Output matrix, sRGB/P3/Adobe/ProPhoto encoding, gamut flags | Metal, or CPU fallback |
 | ICC soft proof, histogram, PNG/JPEG/TIFF encoding | CPU; exported files retain ICC profiles |
 | Native display | sRGB-tagged NSImage; no custom MTKView canvas |
 
 Metal accelerates decoded pixels. It does not parse or decompress NEF on the GPU. Original files, recipe semantics, cache space, and ICC definitions remain unchanged. FP32 CPU/GPU results are not guaranteed to be bit-identical.
+
+The eight mixer bands use 32 floats in the existing parameter buffer; ordinary
+HSL and B&W recipes remain fully fused. A compensated cube-root residual improves
+the Oklab input transform. Neutral protection, band weights and slider units match
+the CPU path. Masks/LUTs retain their documented hybrid boundary.
+
+Synthetic regressions keep the encoded absolute/relative limits of 1e-4/2e-5,
+except Adobe RGB channels below 0.02 on both backends: its pure-gamma derivative
+diverges at zero, magnifying FP32 cancellation. Those channels must satisfy both
+a 16/65535 encoded bound and a 1e-6 linear-light bound. All output spaces also
+require at most 1e-5 absolute decoded-linear error and mean encoded error below
+2e-6. This is an explicit numerical allowance, not bit identity. The real-RAW
+packaged probe independently retains its stricter maximum of eight 16-bit codes
+and one 8-bit preview code.
 
 ## Memory, lifetime, and fallback
 

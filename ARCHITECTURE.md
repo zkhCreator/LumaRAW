@@ -588,6 +588,24 @@ acknowledged setting, and a navigation change supersedes pending automatic focus
 
 The working space is linear LibRaw ProPhoto D65, not ICC ProPhoto D50. Output conversion uses the exact working-space matrix and the matching fixed ICC asset. ICC regression tests verify conversion after removing the Qt runtime dependency. The native preview uses an sRGB-tagged NSImage; soft proofing simulates an explicit ICC profile.
 
+Recipe v2 contains eight HSL bands and eight independent black-and-white weights.
+New fields default to zero, so old stored recipes need no SQL rewrite; sync parses
+the source before selecting fields. Native hue values display -100 to 100 and
+map to stored -30 to 30 degrees, preserving existing parameter meaning. Other
+mixer values use -100 to 100 directly. Partial presets, undo, bundles, snapshots
+and frozen exports use the same validated recipe. A full preset has 69 fields;
+the API patch/preset-field capacity is 128. Black & White Mix has a separate sync
+group; Color continues to include treatment and all color mixer components.
+
+CPU and Metal use overlapping Oklab hue bands. The original four-band hue and
+saturation equations stay intact; eight luminance controls add a bounded linear
+RGB gain. Black & White Mix applies the same weighted gain to luminance after the
+existing color stage. A tiny relative-chroma dead zone removes matrix roundoff on
+neutral inputs before smoothly enabling those gains. Both mixes remain stored
+when treatment switches. This ordering preserves legacy recipes and does not
+assert equivalence to Adobe's proprietary treatment/profile processing. The Mac
+panel owns display units and reset scopes; the portable renderer owns pixels.
+
 This does not establish monitor calibration, Nikon Picture Control equivalence, or per-camera color accuracy. Camera profiles are bound to a specific model. A synthetic chart fit is algorithm evidence, not independent camera acceptance.
 
 ## Language and contracts

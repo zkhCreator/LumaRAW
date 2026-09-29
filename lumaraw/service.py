@@ -332,7 +332,7 @@ class Service:
             if method=='list_versions':
                 row=self.require(c,p['photo_id']);return {'versions':[dict(r) for r in c.db.execute('SELECT id,photo_id,name,created FROM versions WHERE source_id=? ORDER BY id DESC LIMIT 100',(row['source_id'],))]}
             if method=='sync_photos':
-                source=json.loads(self.require(c,p['source_id'])['recipe']);changes=[]
+                source=Recipe.parse(json.loads(self.require(c,p['source_id'])['recipe'])).dict();changes=[]
                 for target in p['targets']:
                     row=self.check_revision(c,target['photo_id'],target['expected_revision']);values=json.loads(row['recipe'])
                     values.update({k:source[k] for g in p['groups'] for k in SYNC_GROUPS[g]});changes.append((row,Recipe.parse(values)))

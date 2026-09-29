@@ -11,6 +11,45 @@ LUMARAW_TEST_NEF=/absolute/nikon.NEF uv run --frozen pytest -q
 
 The two `test_core.py` real-RAW tests skip if that environment variable is absent. `test_service.py` verifies revision conflicts, invalid edit atomicity, all-target sync, immutable export snapshots, deduplication keys, bounded queue pages and specific receipts, memory stopping, cancellation while a worker slot is occupied, superseded UI previews, cold job recovery and newline MCP framing through real subprocesses.
 
+## Eight-band color and black-and-white mixer
+
+`test_color_mixer.py` uses a synthetic Oklab color ring to test every band's hue,
+saturation, luminance and B&W direction, neutral protection, hue wrapping,
+negative/HDR finiteness and input immutability. A frozen four-band output fixture
+checks pre-expansion CPU pixels independently of the new implementation. Other
+cases cover old stored JSON defaults, selective/all-group sync, atomic conflicts,
+undo, all 69 preset fields, frozen exports, portable recipes and catalog backup.
+
+`test_metal.py` exercises the new HSL and B&W recipes in all four output spaces on
+real Metal. It also bounds decoded-linear error; the explicit near-black Adobe
+RGB encoding allowance is documented in `METAL.md`. Synthetic fixtures establish
+numerical behavior, not photographic or Adobe calibration.
+
+`NativeColorMixerRegression` compiles the actual SwiftUI controls and exercises
+Store/IPC unit conversion, coalesced edits, component/color/panel resets, treatment
+retention, undo, invalid inputs, selective sync, full-preset creation and stale
+edits. It does not verify rendered controls, gestures, layout or VoiceOver.
+
+```sh
+.venv/bin/python tests/run_native.py --work work/native-color-mixer-01 \
+  --engine /absolute/LumaRAW.app/Contents/Resources/Engine/LumaRAWEngine \
+  --suite NativeColorMixerRegression
+.venv/bin/python tests/acceleration_probe.py --preset mixer \
+  --engine /absolute/LumaRAW.app/Contents/Resources/Engine/LumaRAWEngine \
+  --fixture /absolute/nikon.NEF --work work/color-mixer-nef-01
+.venv/bin/python tests/acceleration_probe.py --preset bw_mixer \
+  --engine /absolute/LumaRAW.app/Contents/Resources/Engine/LumaRAWEngine \
+  --fixture /absolute/nikon.NEF --work work/bw-mixer-nef-01
+```
+
+Run those RAW probes sequentially without concurrent builds/tests. Each compares
+CPU and Metal cold/warm fitted previews, a full-size ProPhoto 16-bit TIFF and a
+1280×900 detail viewport, with stage times, sampled RSS, actual dispatch and source
+hashes. Retain the one/eight-code preview/TIFF parity limits. Reference acceptance
+still needs Lightroom fixtures, desktop interaction and the minimum supported OS.
+
+## Reference RAW fixture
+
 The folder increment also ran the complete suite with rawpy's public
 [Nikon D3S regression fixture at a pinned commit](https://github.com/letmaik/rawpy/blob/5ab750e3044b55549bf2b21ada46df815a016103/test/iss030e122639.NEF).
 Its size is 10,656,312 bytes and SHA-256 is

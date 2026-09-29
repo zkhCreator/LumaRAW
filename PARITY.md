@@ -21,6 +21,7 @@ Official references checked September 2026:
 - [Collections, smart collections and collection sets](https://helpx.adobe.com/lightroom-classic/desktop/organize-photos-in-lightroom-classic/photo-collections.html)
 - [Smart collection criteria](https://helpx.adobe.com/lightroom-classic/desktop/organize-photos-in-lightroom-classic/smart-collections-criteria-in-lightroom-classic.html)
 - [Develop tools](https://helpx.adobe.com/lightroom-classic/desktop/process-and-develop-photos/develop-module-tools.html)
+- [Color Mixer](https://helpx.adobe.com/lightroom-classic/desktop/process-and-develop-photos/color-mixer.html) and [Black & White Mix](https://www.adobe.com/learn/lightroom-classic/web/convert-photo-black-white)
 - [Loupe, Compare and Survey](https://helpx.adobe.com/lightroom-classic/desktop/viewing-photos/browse-compare-photos.html)
 - [Keyboard shortcuts](https://helpx.adobe.com/lightroom-classic/desktop/introduction-to-lightroom-classic/keyboard-shortcuts.html)
 - [Photo stacks and source boundaries](https://helpx.adobe.com/lightroom-classic/desktop/organize-photos-in-lightroom-classic/grouping-photos-stacks.html)
@@ -55,7 +56,7 @@ gaps. Nothing below is full Lightroom parity merely because historical tests pas
 | Library navigation | Partial: bounded grid/filmstrip, folder tree/search/favorites/labels, durable missing-folder relocation and folder synchronization, direct/recursive sources, filters/sorting, regular/smart/Quick collections and nested sets | Multi-source selection, complete sync Import Dialog/duplicate policy, folder move/rename, relocation overlap/collision handling, collection drag/drop/color labels, full smart criteria/import-export, source-selection memory, desktop acceptance |
 | Organization | Partial: duplicate/missing detection, hierarchical keywords/synonyms/export flags/Will Export preview, text/CSV vocabulary exchange and manual person tags, custom nine-slot keyword sets/recent entries/shared or catalog storage, multi-keyword shortcuts and keyword/rating/flag/label/target-collection/rotation/Develop-preset/metadata-preset Painter strokes, independent catalog rotation/flips, title/caption/copyright plus thirty IPTC fields, selective metadata presets, labels, batch metadata, virtual copies, manual/split/capture-time scoped stacks | Keyword policy/file and preset reference acceptance, built-in sets/suggestions/undo, Painter desktop acceptance, IPTC Extension and complete metadata parity, stack interaction acceptance, rename and sidecars |
 | Culling | Partial: Loupe/Compare/Survey, linked detail, anchored page selection | Desktop acceptance, cross-page selection, Develop reference view, auto advance, persistent workspace state |
-| Basic development | Partial: light/WB/color | Calibrated absolute WB, eyedropper, texture/clarity/dehaze, complete HSL/B&W and color grading |
+| Basic development | Partial: light/WB/color, eight-band HSL and B&W Mix with selective resets/sync | Calibrated absolute WB, eyedropper, texture/clarity/dehaze, targeted adjustment, Point Color, Auto B&W mix, color grading and Adobe processing/reference acceptance |
 | Curves and profiles | Partial: custom composite curve, LUT/ICC | Interactive RGB curves, camera/profile browser, compatible preset import/export |
 | Detail and optics | Partial: noise/sharpen, manual lens | Complete manual detail controls, automatic lens profiles, bounded full-resolution acceptance |
 | Geometry | Partial: crop/straighten/perspective, independent rotation/flips with attached masks and displayed crop ratios | Interactive retained handles, guided transforms, full crop state and rendered/reference parity |
@@ -1893,3 +1894,88 @@ renaming/backup, preview policies, cards/tethering and catalog switching/merge
 remain. Source-family behavior and stack/filter combinations still require
 Lightroom Classic Mac reference acceptance. Rendered desktop interaction, actual
 keyboard/pointer dispatch, VoiceOver and macOS 14 runtime are unverified.
+
+## Eight-band HSL and Black & White Mix
+
+The Mac inspector now exposes red, orange, yellow, green, aqua, blue, purple and
+magenta in Hue, Saturation, Luminance and All views, plus selection by color. Each
+band has an independent black-and-white brightness control. Color/B&W treatment
+switches retain both mixes. Reset Shown clears one component or band; the panel
+reset clears only the current treatment's mix. Native edits share the ordinary
+revision barrier, coalesced history, undo and stale-write recovery.
+
+The portable recipe adds 24 zero-default fields while retaining v2 and the four
+existing bands' hue/saturation semantics. Mac hue sliders display -100 to 100 but
+continue to store -30 to 30 degrees. Old JSON is normalized before selective sync,
+including old recipes that lack every new key. Color sync includes all HSL fields
+and treatment; Black & White Mix independently copies eight brightness values.
+All eleven groups can be synchronized together. Full 69-field presets are accepted
+by the expanded bounded API and the native preset editor. Undo, snapshots, bundles,
+backups, import settings and frozen export jobs keep their shared recipe boundary.
+
+CPU and Metal use the same eight overlapping Oklab bands; luminance and B&W gains
+protect neutrals and operate within bounded strips. The legacy HSL-then-monochrome
+order is retained. Ordinary mixer recipes use fused GPU grading, without moving
+LibRaw decoding onto the GPU or introducing a full-frame mixer allocation.
+
+Synthetic tests verify every channel's direction, neutral protection, hue wrapping,
+negative/HDR finiteness, no input mutation, strip/detail identity and frozen legacy
+CPU pixels. Persistence cases cover all-field presets, selective/all-group sync,
+stale-target rollback, undo, frozen jobs and backup/recipe round trips. Required
+Metal tests cover all four output spaces; `METAL.md` states the near-black Adobe
+RGB numerical allowance and the additional decoded-linear bounds. These are
+CPU/GPU consistency checks, not Adobe color calibration.
+
+The final full Python run passes **501 tests without skips**, including the pinned
+Nikon D3S RAW and required actual Metal. The source-engine native mixer workflow
+passes **24 assertions**.
+
+The Mac app builds and passes local ad-hoc signature verification on macOS 26.6.2,
+targeting macOS 14. Engine generation **24**, schema **21**, **111 tools**, bundled
+guide and source digest
+`1632c0a0fb1977ee80a89c0391356dc4ad9b35aee70c961e49f9fd157465400c`
+match the package. PyInstaller reports an absent `scipy.special._cdflib`
+hidden import; the packaged RAW processing runs below pass. This is not runtime
+verification on macOS 14.
+
+The final packaged engine passes **118 assertions in six native suites**: Color
+Mixer (24), Develop presets (28), state conflicts (15), import settings (22),
+virtual copies (19) and connection handoff (10). Swift compilation has no warnings
+or errors. Current-source/index scanning covers **314 files with zero findings**;
+generated catalogs, photographs, outputs and raw receipts remain outside source.
+These checks do not inspect Git history or establish desktop interaction parity.
+
+Sequential packaged-worker measurements use the pinned 4284×2844 Nikon D3S NEF
+on an Apple M3 Max, 128 GB, arm64 macOS 26.6.2. Each treatment includes all eight
+HSL bands; the B&W recipe additionally enables all eight B&W controls. The probe
+records one empty-application-cache preview, two warm previews, one full-size
+ProPhoto 16-bit TIFF and one 1280×900 detail pair. Warm rows are medians of two,
+not p95 measurements. Empty application caches do not imply cold OS/shader caches.
+Wall times include worker startup, Metal initialization/copies and encoding;
+desktop drawing and IPC are excluded. No tests or builds ran concurrently.
+
+| Recipe / operation | CPU wall | Metal wall | CPU / Metal peak RSS |
+| --- | ---: | ---: | ---: |
+| HSL cold preview, 1680×1115 | 2.443 s | 1.090 s | 165.67 / 159.48 MB |
+| HSL warm preview | 1.640 s | 0.641 s | 164.00 / 145.69 MB |
+| HSL full-size TIFF | 5.493 s | 1.165 s | 300.56 / 245.86 MB |
+| HSL detail viewport | 1.183 s | 0.530 s | 150.08 / 140.25 MB |
+| B&W cold preview, 1680×1115 | 2.386 s | 0.933 s | 166.94 / 150.95 MB |
+| B&W warm preview | 2.002 s | 0.684 s | 168.25 / 146.58 MB |
+| B&W full-size TIFF | 7.224 s | 1.048 s | 297.28 / 215.61 MB |
+| B&W detail viewport | 1.402 s | 0.545 s | 150.09 / 141.83 MB |
+
+All Metal workers report actual grading with no fallback: 18 tiles per preview,
+23 per export and 16 per detail request; peak shared buffers are 19.61 MB.
+Each CPU/Metal pair differs by at most
+**one code value**, including the full 16-bit exports (eight-code limit). Export
+mean differences are 0.002296 HSL and 0.002797 B&W code values. Original hashes
+remain unchanged. The measured export speedups are **4.716×** and **6.892×**;
+one camera file and these recipes do not establish general throughput, slider
+latency, calibrated color or reference processing parity.
+
+This delivers eight-band controls and their persistent processing path, not full
+Color Mixer parity. Targeted adjustment, Point Color, Auto B&W mix, Color Grading,
+Adobe-compatible parameters and reference pixel/treatment acceptance remain.
+Rendered desktop interaction, keyboard/pointer dispatch, VoiceOver and macOS 14
+runtime are still unverified. No Adobe processing equivalence is claimed.

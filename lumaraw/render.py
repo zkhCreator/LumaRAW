@@ -29,7 +29,7 @@ import tifffile
 from .model import Recipe, ExportOptions
 from .performance import stage
 from .accelerators import grade_output
-from .color import to_output, output_matrix, encode, decode, icc_profile, mix_hues, apply_lut, soft_proof
+from .color import to_output, output_matrix, encode, decode, icc_profile, mix_hues, mix_monochrome, apply_lut, soft_proof
 from .imaging import load_source, fingerprint, cache_key, write_thumbnail, LUMA
 from .source_identity import thumbnail_path, cached_thumbnail
 from .orientation import validate as validate_orientation, inverse_rect, apply_array
@@ -229,7 +229,7 @@ def grade_tile(a,r,x=0,y=0,total_w=None,total_h=None):
         target=decode(encoded)
         a*=(target/luminance)[:,:,None]
     a=mix_hues(a,r)
-    if r.monochrome: a=np.repeat((a@LUMA)[:,:,None],3,axis=2)
+    if r.monochrome: a=mix_monochrome(a,r,LUMA)
     total_w=total_w or a.shape[1];total_h=total_h or a.shape[0]
     for m in r.masks:
         if not m.get('enabled',True): continue

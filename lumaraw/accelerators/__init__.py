@@ -53,13 +53,17 @@ class Metal:
 
 def packed(recipe,space,output_only=False):
     from ..imaging import LUMA
+    from ..model import MIXER_BANDS
     from ..color import output_matrix,SRGB_FROM_WORK,WORK_FROM_SRGB
     p=np.zeros(256,np.float32);r=recipe
     p[:12]=[int(output_only),2**r.exposure,r.shadows/100,r.highlights/100,r.blacks/100,r.whites/100,r.contrast/200,1+r.saturation/100,r.vibrance/100,int(r.monochrome),int(any([r.curve_shadows,r.curve_midtones,r.curve_lights])),len(r.curve_points) if r.curve_points!=[[0.,0.],[1.,1.]] else 0]
     p[12:15]=LUMA;p[16:25]=np.asarray(r.camera_profile.get('matrix',np.eye(3)),np.float32).ravel()
     p[28:37]=output_matrix(space).ravel();p[38]=['srgb','adobe','p3','prophoto'].index(space)
-    for i,name in enumerate(['red','orange','green','blue']):p[40+2*i:42+2*i]=[getattr(r,name+'_hue'),getattr(r,name+'_sat')/100]
-    p[39]=int(np.any(p[40:48]))
+    for i,name in enumerate(MIXER_BANDS):
+        p[176+4*i:180+4*i]=[getattr(r,name+'_hue'),getattr(r,name+'_sat'),
+                            getattr(r,name+'_lum'),getattr(r,name+'_bw')]
+    p[39]=int(np.any(p[176:208].reshape(8,4)[:,:3]))
+    p[48]=int(r.monochrome and np.any(p[179:208:4]))
     values=np.maximum.accumulate(np.clip([0,.25+r.curve_shadows/100,.5+r.curve_midtones/100,.75+r.curve_lights/100,1],0,1))
     p[64:74]=np.column_stack(([0,.25,.5,.75,1],values)).ravel()
     points=np.asarray(r.curve_points,np.float32).ravel();p[80:80+len(points)]=points

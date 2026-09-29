@@ -12,7 +12,7 @@ LumaRAW references your originals without changing them. The SwiftUI app and you
 | --- | --- |
 | Import | Resumable Add review, thumbnail/Loupe inspection, checked selections, subfolder choice, suspected duplicates, embedded/sidecar descriptions, and captured Develop/metadata presets plus keywords |
 | RAW development | Nikon NEF/NRW and other LibRaw formats, as-shot white balance, exposure, highlights/shadows, relative temperature/tint, monochrome, and presets |
-| Color | Custom tone curves, color mixer, camera-bound chart calibration, `.cube` LUTs, ICC soft proofing, and gamut warnings |
+| Color | Eight-band HSL and Black & White Mix, custom tone curves, camera-bound chart calibration, `.cube` LUTs, ICC soft proofing, and gamut warnings |
 | Detail and composition | Full-resolution 1:1 viewports, noise reduction, sharpening, defringing, rotation, crop, straighten, and perspective |
 | Local adjustments | Radial, gradient, luminance-range, and brush masks; manual lens distortion, vignette, and chromatic-aberration correction |
 | Library | Folder tree/search/favorites/labels, ratings, flags, catalog metadata/keywords, regular/live smart collections, nested sets, Quick/target collections, SQL filters/sorting, manual/capture-time stacks, duplicate/missing indexing, virtual copies/shared snapshots, selective sync, and backup/restore |
@@ -93,6 +93,15 @@ changed LUT assets or metadata limits reject the entire application. Originals
 and existing catalog photos stay unchanged.
 
 Adjustments save automatically. Each photo supports up to 50 undo steps, named snapshots shared by a source’s master and virtual copies, and portable recipe bundles. The full recipe editor supports precise curve points and brush paths. Submitted exports retain their original recipe snapshot even if you continue editing.
+
+In **Color Mixer**, use HSL to show Hue, Saturation, Luminance or all components,
+or Color to edit one color band. Red, orange, yellow, green, aqua, blue, purple and
+magenta have separate controls. **Treatment → Black & White** displays eight
+brightness controls; switching treatment retains both sets of adjustments.
+**Reset Shown** resets the selected component or color, while the panel reset
+clears that treatment's mix. **Sync Selected Photos** offers a separate
+**Black & White Mix** group. These controls use LumaRAW processing; Adobe pixel
+matching, targeted adjustment and Point Color remain unverified or unimplemented.
 
 Use **Photo → Stacking** to group, unstack, remove members, choose a cover or
 reorder photos. **⌘G / ⇧⌘G** group/unstack; with a photo surface focused, **S**
