@@ -104,6 +104,8 @@ class Catalog:
                 count += cur.rowcount
                 skipped += 1 - cur.rowcount
                 if cur.rowcount:
+                    from .previous_import import append
+                    append(self.db,cur.lastrowid,first=count == 1)
                     from .capture_time import read_capture_time
                     try:
                         clock=read_capture_time(p)
@@ -234,11 +236,14 @@ class Catalog:
     def filter_sql(self,mode='all',search='',filters=None,collection_id=None,folder_id=None,include_subfolders=True):
         if collection_id is not None and folder_id is not None:
             raise ValueError('Choose either a folder or collection source')
+        if mode=='previous_import' and (collection_id is not None or folder_id is not None):
+            raise ValueError('Previous Import cannot be combined with a folder or collection source')
         clauses=[];params=[]
         if mode=='stars': clauses.append('rating>=3')
         elif mode=='rejects': clauses.append('flag=-1')
         elif mode=='keepers': clauses.append('flag=1')
         elif mode=='missing': clauses.append('missing=1')
+        elif mode=='previous_import': clauses.append('source_id IN (SELECT source_id FROM previous_import_sources)')
         elif mode=='duplicates': clauses.append("sha256!='' AND sha256 IN (SELECT sha256 FROM photos WHERE sha256!='' GROUP BY sha256 HAVING count(DISTINCT source_id)>1)")
         elif mode.startswith('burst:'):
             clauses.append('burst=?');params.append(int(mode.split(':')[1]))

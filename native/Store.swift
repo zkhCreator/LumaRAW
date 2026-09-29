@@ -52,6 +52,10 @@ import UniformTypeIdentifiers
     @Published var total=0
     @Published var offset=0
     @Published var mode="all"
+    @Published var selectPreviousImport=true
+    @Published var importPreferenceBusy=false
+    var importPreferenceGeneration=0
+    var previousImportRevision = -1
     @Published var search=""
     @Published var libraryFilters: [String: Any] = [:]
     @Published var librarySort="imported"
@@ -247,6 +251,7 @@ import UniformTypeIdentifiers
             guard token==pageGeneration else{return}
             photos=(result["photos"] as? [[String:Any]] ?? []).compactMap(Photo.init)
             adoptStacks(result)
+            previousImportRevision=(result["previous_import"] as? [String:Any])?["revision"] as? Int ?? previousImportRevision
             photoFolderRevision=result["folder_revision"] as? Int ?? photoFolderRevision
             photoKeywordRevision=result["keyword_revision"] as? Int ?? photoKeywordRevision
             total=result["total"] as? Int ?? 0
@@ -471,10 +476,12 @@ import UniformTypeIdentifiers
     func importPanel() {let panel=NSOpenPanel();panel.canChooseDirectories=true;panel.canChooseFiles=true;panel.allowsMultipleSelection=true;panel.prompt="Review";panel.message="Choose photographs or folders to review before importing";if panel.runModal() == .OK{Task{await reviewImport(panel.urls.map(\.path))}}}
     func importPaths(_ paths:[String]) async {
         busy=true;defer{busy=false}
-        do{let r=try await Backend.call("import_photos",["paths":paths]);message="Imported \(r["imported"] ?? 0) photos";offset=0;await refresh()}catch{self.error=error.localizedDescription}
+        do{let r=try await Backend.call("import_photos",["paths":paths]);message="Imported \(r["imported"] ?? 0) photos";await finishImport(r["imported"] as? Int ?? 0)}catch{self.error=error.localizedDescription}
     }
     func refreshMemory() async {
+        let importPreferenceRead=importPreferenceGeneration
         if let value=try? await Backend.call("settings",[:]) {
+            if !importPreferenceBusy,importPreferenceRead == importPreferenceGeneration { selectPreviousImport=value["select_previous_import"] as? Bool ?? true }
             computeBackend=value["compute_backend"] as? String ?? "auto"
             if let processing=value["last_processing"] as? [String:Any],let backend=processing["backend"] as? String {
                 let device=processing["device"] as? String ?? "CPU"

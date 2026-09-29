@@ -37,6 +37,7 @@ from .folder_sync import FolderSync
 from .folder_sync_runner import FolderSyncRunner
 from .keyword_exports import KeywordExports
 from .keyword_details import KeywordDetails
+from .previous_import import state as previous_import_state
 
 class ConflictError(ValueError): pass
 
@@ -213,8 +214,8 @@ class Service:
                 painter=LibraryPainter(c)
                 return {'get_keyword_shortcut':painter.read,'set_keyword_shortcut':painter.save,'paint_library':painter.paint}[method](**p)
             if method=='get_folder_relocation':return Relocations(c).get(**p)
-            if method=='photo_summaries':return {'photos':c.summaries(p['photo_ids']),'stack_revision':Stacks(c).revision(),'folder_revision':Folders(c).revision(),'keyword_revision':Keywords(c).revision()}
-            if method=='library_state':return {'stack_revision':Stacks(c).revision(),'folder_revision':Folders(c).revision(),'keyword_revision':Keywords(c).revision()}
+            if method=='photo_summaries':return {'photos':c.summaries(p['photo_ids']),'stack_revision':Stacks(c).revision(),'folder_revision':Folders(c).revision(),'keyword_revision':Keywords(c).revision(),'previous_import':previous_import_state(c.db)}
+            if method=='library_state':return {'stack_revision':Stacks(c).revision(),'folder_revision':Folders(c).revision(),'keyword_revision':Keywords(c).revision(),'previous_import':previous_import_state(c.db)}
             if method=='list_keywords':return Keywords(c).list(**p)
             if method=='get_keyword':return Keywords(c).details(**p)
             if method=='save_keyword':return Keywords(c).save(**p)
@@ -238,7 +239,7 @@ class Service:
                 folder=p.get('folder_id');subfolders=p.get('include_subfolders',True)
                 total=c.filtered_count(mode,search,filters,collection,stacked,folder,subfolders)
                 offset=min(offset,max(0,((total-1)//60)*60))
-                return {'photos':c.filtered_page(offset,mode,search,filters,collection,p.get('sort','imported'),p.get('descending',True),stacked,folder,subfolders),'total':total,'offset':offset,'page_size':60,'stack_revision':Stacks(c).revision(),'folder_revision':Folders(c).revision(),'keyword_revision':Keywords(c).revision()}
+                return {'photos':c.filtered_page(offset,mode,search,filters,collection,p.get('sort','imported'),p.get('descending',True),stacked,folder,subfolders),'total':total,'offset':offset,'page_size':60,'stack_revision':Stacks(c).revision(),'folder_revision':Folders(c).revision(),'keyword_revision':Keywords(c).revision(),'previous_import':previous_import_state(c.db)}
             if method=='stack_state':return {'revision':Stacks(c).revision()}
             if method=='preview_export_metadata':return KeywordExports(c).preview(**p)
             if method=='stack_photos':return Stacks(c).change(**p)
@@ -344,10 +345,11 @@ class Service:
                         c.db.execute('DELETE FROM history WHERE photo_id=? AND id NOT IN (SELECT id FROM history WHERE photo_id=? ORDER BY id DESC LIMIT 50)',(row['id'],row['id']))
                 return {'synced':sum(r['id']!=p['source_id'] for r,_ in changes)}
             if method=='settings':
+                if 'select_previous_import' in p:c.set_setting('select_previous_import',p['select_previous_import'])
                 if 'budget_mb' in p:self.budget=p['budget_mb'];c.set_setting('budget_mb',self.budget)
                 if 'compute_backend' in p:self.compute_backend=p['compute_backend'];c.set_setting('compute_backend',self.compute_backend)
                 from .accelerators import availability
-                return {**self.memory_status(),'acceleration':availability()}
+                return {**self.memory_status(),'acceleration':availability(),'select_previous_import':c.setting('select_previous_import',True)}
             from . import library
             if method=='index_library':return library.index_library(c)
             if method=='relink_photo':self.require(c,p['photo_id']);c.relink(p['photo_id'],p['path']);return unpack(c.photo(p['photo_id']))

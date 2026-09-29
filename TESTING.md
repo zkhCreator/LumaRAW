@@ -674,6 +674,32 @@ are asserted. Warm pages use thirty samples; scan and both applications use one.
 No decoding, IPC or UI timings are included; synthetic bulk additionally excludes
 source verification. Run after tests/builds finish and report RSS and wire sizes.
 
+## Previous Import
+
+`test_previous_import.py` verifies reviewed/direct/folder-sync membership,
+checked scope, no-op/cancel/failure preservation, late transaction rollback,
+source-family copies/promotion/relinking, deletion cleanup, backup/restart,
+bounded filters/pages, source exclusivity, genuine schema-20 migration and legacy
+incremental import cancellation/failure. Legacy migration fixtures seed the old
+photo schema directly rather than calling the current importer on an old schema.
+
+`NativePreviousImportRegression` uses real IPC to verify automatic focus, persisted
+preferences, retained folder/filter state when disabled, pending-edit saving,
+selection clearing and external changes from populated/empty sources. It also
+checks folder synchronization uses the same preference without repeated focus.
+It does not drive the desktop or verify macOS 14 runtime and VoiceOver behavior.
+
+```sh
+.venv/bin/python -m pytest -q tests/test_previous_import.py
+.venv/bin/python tests/run_native.py --work work/new-previous-import-native --suite NativePreviousImportRegression
+.venv/bin/python tests/previous_import_probe.py --work work/new-previous-import-probe --photos 100000 --batch 10000
+```
+
+The performance probe creates synthetic catalog rows and replaces membership in
+one transaction. Repeated page/sort/filter/state queries use thirty warm samples;
+replacement uses one sample. Report median/p95, RSS, response size and indexed
+query plan. It excludes setup, file verification, decoding, IPC and desktop timing.
+
 ## Public source check
 
 ```sh

@@ -20,6 +20,7 @@ import Foundation
                 "clock":["taken":0,"taken_us":Int64(123456),"taken_submicro":"789","capture_clock":"camera"]])!
             try check(clockItem.value("taken")=="1970-01-01 00:00:00.123456789 (camera clock)","metadata_preview_preserves_camera_clock_and_fraction")
             let paths=ProcessInfo.processInfo.environment["LUMARAW_TEST_FIXTURES"]!.components(separatedBy:"|")
+            await s.setImportNavigation(false)
             await s.importPaths(paths)
             s.thumbnailRenderer.request([]);s.cancelMainPreview()
             let root=LibraryFolder(try await Backend.call("get_folder",["photo_id":1]))!

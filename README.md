@@ -70,6 +70,13 @@ time as a substitute. Turning duplicate exclusion off makes those candidates
 selectable. Already cataloged paths remain unavailable. Check/Uncheck All affects
 the current category across its pages; clicking a preview only changes focus.
 Closing preserves the review, while Cancel Import Review discards its staging.
+Completed imports open **Previous Import** in Library Grid. This source contains
+the latest batch and its virtual copies, remains available after restarting, and
+supports the normal filters and sorting. **Settings → Import → Select Previous
+Import After Importing** can preserve the current source and filters instead.
+Cancelled, empty and failed reviewed imports preserve the preceding batch.
+Upgrading an older catalog starts with an empty Previous Import source until the
+next import; it does not guess old batch membership from timestamps.
 Interrupted scans resume explicitly. Changed sources/sidecars or catalog conflicts
 reject application without a partial import. Copy, Move and Copy as DNG are not
 implemented yet.

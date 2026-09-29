@@ -169,7 +169,7 @@ def test_pages_unicode_literal_search_and_depth_cap(library):
 def test_schema_seven_migration_rollback_legacy_names_and_backup(tmp_path, monkeypatch):
     import lumaraw.keywords as module
     import lumaraw.catalog as catalog_module
-    from legacy_catalog import migrate_to
+    from legacy_catalog import migrate_to,seed_photo
     real = module.migrate
     current_chain = catalog_module.migrate
     monkeypatch.setattr(catalog_module, 'migrate', lambda db:migrate_to(db, 7))
@@ -177,7 +177,7 @@ def test_schema_seven_migration_rollback_legacy_names_and_backup(tmp_path, monke
     assert c.db.execute('PRAGMA user_version').fetchone()[0] == 7
     path = tmp_path / 'photo.png'
     Image.new('RGB', (8, 8)).save(path)
-    c.import_paths([path])
+    seed_photo(c.db,path)
     with c.db:
         c.db.execute("INSERT INTO photo_keywords VALUES(1,'legacy|literal','Legacy|literal')")
     c.db.set_authorizer(lambda action, name, *args:sqlite3.SQLITE_DENY

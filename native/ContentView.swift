@@ -12,6 +12,7 @@ struct ContentView: View {
             List {
                 Section("Library") {
                     side("All Photos","photo.on.rectangle","all")
+                    side("Previous Import","square.and.arrow.down","previous_import")
                     side("Picks","flag","keepers")
                     side("3 Stars and Up","star","stars")
                     side("Rejected","xmark.circle","rejects")

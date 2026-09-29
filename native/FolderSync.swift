@@ -149,7 +149,7 @@ struct FolderSyncItem: Identifiable {
         guard let plan,plan.state == "applied",!adopted.contains(plan.id) else { return }
         adopted.insert(plan.id)
         let selected=store.selected
-        await store.refreshCollections();await store.refreshFolders(reset:true);await store.refresh()
+        await store.refreshCollections();await store.refreshFolders(reset:true);await store.finishImport(plan.number("imported"))
         if let selected,store.selected == selected { await store.load(selected) }
         store.message="Synchronized folder · \(plan.number("imported")) imported · \(plan.number("removed")) catalog photos removed · \(plan.number("modified")) metadata updates"
     }

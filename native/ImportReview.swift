@@ -243,7 +243,7 @@ extension Store {
         model.onApplied={ [weak self] count in
             guard let self else { return }
             self.message="Imported \(count) photos"
-            Task { self.develop=false;self.libraryView = .grid;await self.openLibraryMode("all",clearFilters:true) }
+            Task { await self.finishImport(count) }
         }
         importReview=model
     }

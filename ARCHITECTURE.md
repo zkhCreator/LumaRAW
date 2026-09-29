@@ -566,6 +566,24 @@ plans discard full settings with staging. Native editors keep keyword drafts and
 captured revisions after conflicts, advance only acknowledged own mutations, and
 invalidate recipe-dependent review previews when the saved Develop choice changes.
 
+`previous_import.py` owns schema 21's indexed last-import source membership and
+compact revision receipt. Reviewed Add and synchronization capture newly imported
+source IDs inside their existing atomic transactions. The legacy direct importer
+captures membership alongside each committed hundred-entry subset, preserving
+actual partial progress after cancellation or failure. Empty/no-op imports retain
+the preceding batch. Migration starts empty rather than inferring lost history.
+Membership follows stable source IDs through virtual copies, master promotion and
+relinking; deleting a family's last photo removes its entry. Query predicates
+intersect bounded filters and sorts, and reject simultaneous folder/collection
+sources. Polling carries only the compact receipt, not all member IDs.
+
+The Mac shell controls post-import navigation through the persisted
+`select_previous_import` setting. Enabled local imports open Library Grid with
+filters cleared; disabled imports preserve the current source and filters.
+External imports refresh an already selected Previous Import source without
+changing the current navigation. Late preference reads cannot replace a newer
+acknowledged setting, and a navigation change supersedes pending automatic focus.
+
 ## Color
 
 The working space is linear LibRaw ProPhoto D65, not ICC ProPhoto D50. Output conversion uses the exact working-space matrix and the matching fixed ICC asset. ICC regression tests verify conversion after removing the Qt runtime dependency. The native preview uses an sRGB-tagged NSImage; soft proofing simulates an explicit ICC profile.

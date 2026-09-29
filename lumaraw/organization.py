@@ -114,6 +114,8 @@ def migrate(db):
     migrate_import_review(db)
     from .import_processing import migrate as migrate_import_processing
     migrate_import_processing(db)
+    from .previous_import import migrate as migrate_previous_import
+    migrate_previous_import(db)
 
 
 def text_predicate(text):

@@ -138,6 +138,12 @@ struct SettingsView:View {
     @EnvironmentObject var s:Store
     var body:some View {
         Form {
+            Section("Import") {
+                Toggle("Select Previous Import After Importing",isOn:Binding(get:{s.selectPreviousImport},set:{value in
+                    Task { await s.setImportNavigation(value) }
+                })).disabled(s.importPreferenceBusy)
+                Text("Show the completed import in Library Grid with filters cleared. Turn this off to keep the current source and filters. This preference is saved with the catalog.").font(.caption).foregroundStyle(.secondary)
+            }
             Section("Acceleration"){
                 Picker("Image Processing",selection:$s.computeBackend){Text("Auto (Prefer Metal)").tag("auto");Text("CPU").tag("cpu");Text("Metal (Report Failures)").tag("metal")}
                     .onChange(of:s.computeBackend){_,value in Task{do{_=try await Backend.call("settings",["compute_backend":value]);await s.refreshMemory()}catch{s.error=error.localizedDescription}}}

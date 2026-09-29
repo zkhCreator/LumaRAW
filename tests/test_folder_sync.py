@@ -327,10 +327,10 @@ def test_metadata_review_keeps_complete_capture_clock_and_updates_family(library
 
 def test_genuine_v9_migration_rolls_back_triggers_and_keeps_catalog(tmp_path,monkeypatch):
     import lumaraw.catalog as module
-    from legacy_catalog import migrate_to
+    from legacy_catalog import migrate_to,seed_photo
     with monkeypatch.context() as patch:
         patch.setattr(module,'migrate',lambda db:migrate_to(db,9));c=Catalog(tmp_path/'legacy')
-    path=tmp_path/'old.png';Image.new('RGB',(8,8)).save(path);c.import_paths([path])
+    path=tmp_path/'old.png';Image.new('RGB',(8,8)).save(path);seed_photo(c.db,path)
     before=[tuple(row) for row in c.db.execute('SELECT * FROM photos')]
     trigger=c.db.execute("SELECT sql FROM sqlite_master WHERE name='folder_member_added'").fetchone()[0]
     c.db.set_authorizer(lambda action,name,*rest:sqlite3.SQLITE_DENY

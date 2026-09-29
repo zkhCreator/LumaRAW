@@ -278,12 +278,12 @@ def test_interrupted_scan_is_recovered_and_resumed_explicitly(library):
 def test_v8_migration_preserves_tables_and_rolls_back_trigger_replacement(tmp_path, monkeypatch):
     import lumaraw.catalog as module
     from lumaraw.model import Recipe
-    from legacy_catalog import migrate_to
+    from legacy_catalog import migrate_to,seed_photo
     with monkeypatch.context() as patch:
         patch.setattr(module,'migrate',lambda db:migrate_to(db,8))
         c = Catalog(tmp_path/'legacy')
     path = tmp_path/'legacy-photo.png';Image.new('RGB',(8,8)).save(path)
-    c.import_paths([path]);c.edit(1,Recipe(exposure=1.25));c.save_version(1,'Keep')
+    seed_photo(c.db,path);c.edit(1,Recipe(exposure=1.25));c.save_version(1,'Keep')
     # Populate the actual v8 job shape without current export-snapshot methods.
     with c.db:
         c.db.execute('INSERT INTO jobs(photo_id,source,recipe,destination,format,created,source_id) '

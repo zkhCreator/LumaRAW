@@ -29,6 +29,15 @@ inspect jobs and retry only under the user's export authorization.
 
 ## Editing workflow
 
+`list_photos` with `mode: previous_import` reads the latest committed import and
+its virtual copies with normal paging, filters and sorting. Do not combine this
+mode with `folder_id` or `collection_id`. Read the compact `previous_import`
+receipt in `library_state`, `photo_summaries` or `list_photos`; it is not an import
+history. Failed reviewed imports and no-op imports retain the previous source.
+Legacy direct imports can commit partial progress. Older catalogs start with no
+batch history until another import. The catalog setting `select_previous_import`
+controls post-import navigation in the Mac app; it never alters batch membership.
+
 1. `lumaraw_status` identifies the active catalog; do not assume an unrelated catalog is the user's library.
 2. Use the reviewed Add import commands below for source inspection and checked selection. Legacy `lumaraw_import_photos` immediately imports explicit local paths without review. Imports reference originals; moving originals makes them offline. `lumaraw_list_photos` paginates in 60-photo pages and returns summaries. `lumaraw_get_photo` returns a full recipe and revision.
 3. Read `lumaraw_recipe_schema` for defaults, numeric limits and presets. Send a **partial** `patch` to `lumaraw_edit_photo` with `photo_id` and `expected_revision`. Preserve crop, masks, LUT and calibration unless the task asks to change them. On `ConflictError`, re-read and reconcile; do not blindly overwrite the newer edit.

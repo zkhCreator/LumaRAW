@@ -373,6 +373,9 @@ class FolderSync:
             self.db.execute('UPDATE catalog_folders SET is_root=1 WHERE path=? AND NOT EXISTS '
                 '(SELECT 1 FROM catalog_folders WHERE is_root=1 AND path IN ('+chain('?')+'))',(plan['path'],plan['path']))
             self.db.execute('UPDATE folder_state SET revision=revision+1')
+            from .previous_import import replace
+            replace(self.db,'SELECT p.source_id FROM folder_sync_files f JOIN photos p ON p.path=f.path AND p.is_virtual=0 '
+                    "WHERE f.plan_id=? AND f.state='new' AND f.selected=1 AND ?",new_params,'folder_sync',imported)
             self.db.execute("UPDATE folder_sync_plans SET state='applied',imported=?,removed=?,modified=?,revision=revision+1,error='' WHERE id=?",
                             (imported,removed,modified,plan_id))
             self.discard(plan_id)

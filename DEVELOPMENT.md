@@ -38,6 +38,10 @@ when a clear function is more maintainable. Avoid unrelated formatting churn.
   vocabulary during selection; a new XMP leaf must not retarget a captured root.
   Apply file metadata first, then selected preset fields and additive keywords
   within the same rollback boundary. Keep large patches off review/list replies.
+- Persist last-import membership in the same transaction as newly imported
+  sources. Empty imports and failed atomic imports retain the preceding batch;
+  legacy incremental import must retain only its committed subsets. Never infer
+  missing historical batches on migration or let polling steal native navigation.
 - Add JSON Schema inputs before wiring native controls. Reject unsupported keys,
   invalid ranges and overlarge arrays at the service boundary. Keep existing
   commands compatible; use explicit revisions for editable persisted objects.

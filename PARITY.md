@@ -15,6 +15,7 @@ Official references checked September 2026:
 
 - [Hard-drive Add/Copy/Move import, Grid/Loupe and checked selection](https://helpx.adobe.com/lightroom-classic/desktop/import-photos/import-photos-video-catalog.html)
 - [Duplicate criteria, preview choices and import-time options](https://helpx.adobe.com/lightroom-classic/desktop/import-photos/photo-video-import-options.html)
+- [Previous Import source](https://helpx.adobe.com/lightroom-classic/desktop/viewing-photos/view-photos.html) and [automatic source selection preference](https://helpx.adobe.com/uk/lightroom-classic/desktop/import-photos/file-import-formats-settings.html)
 - [Camera/card import workflow](https://helpx.adobe.com/lightroom-classic/desktop/import-photos/importing-photos-lightroom-basic-workflow.html)
 - [Workspace and module responsibilities](https://helpx.adobe.com/nz/lightroom-classic/help/workspace-basics.html)
 - [Collections, smart collections and collection sets](https://helpx.adobe.com/lightroom-classic/desktop/organize-photos-in-lightroom-classic/photo-collections.html)
@@ -50,7 +51,7 @@ gaps. Nothing below is full Lightroom parity merely because historical tests pas
 
 | Area | Current implementation | Remaining acceptance / work |
 | --- | --- | --- |
-| Import and catalogs | Partial: durable Add review with checked selection, Grid/Loupe source previews, subfolder choice, suspected duplicates, bounded sorting/filtering, XMP descriptions, captured import-time Develop/metadata presets and keyword additions, cancellation/restart, referenced originals and backup/restore | Copy/Move/Copy as DNG, destinations/rename/backup, saved import configurations, preview policies, cards/tethering, previous-import source, catalog switching/merge and desktop/reference acceptance |
+| Import and catalogs | Partial: durable Add review with checked selection, Grid/Loupe source previews, subfolder choice, suspected duplicates, bounded sorting/filtering, XMP descriptions, captured import-time Develop/metadata presets and keyword additions, cancellation/restart, durable Previous Import source with automatic navigation preference, referenced originals and backup/restore | Copy/Move/Copy as DNG, destinations/rename/backup, saved import configurations, preview policies, cards/tethering, progressive Current Import, catalog switching/merge and desktop/reference acceptance |
 | Library navigation | Partial: bounded grid/filmstrip, folder tree/search/favorites/labels, durable missing-folder relocation and folder synchronization, direct/recursive sources, filters/sorting, regular/smart/Quick collections and nested sets | Multi-source selection, complete sync Import Dialog/duplicate policy, folder move/rename, relocation overlap/collision handling, collection drag/drop/color labels, full smart criteria/import-export, source-selection memory, desktop acceptance |
 | Organization | Partial: duplicate/missing detection, hierarchical keywords/synonyms/export flags/Will Export preview, text/CSV vocabulary exchange and manual person tags, custom nine-slot keyword sets/recent entries/shared or catalog storage, multi-keyword shortcuts and keyword/rating/flag/label/target-collection/rotation/Develop-preset/metadata-preset Painter strokes, independent catalog rotation/flips, title/caption/copyright plus thirty IPTC fields, selective metadata presets, labels, batch metadata, virtual copies, manual/split/capture-time scoped stacks | Keyword policy/file and preset reference acceptance, built-in sets/suggestions/undo, Painter desktop acceptance, IPTC Extension and complete metadata parity, stack interaction acceptance, rename and sidecars |
 | Culling | Partial: Loupe/Compare/Survey, linked detail, anchored page selection | Desktop acceptance, cross-page selection, Develop reference view, auto advance, persistent workspace state |
@@ -73,8 +74,8 @@ gaps. Nothing below is full Lightroom parity merely because historical tests pas
 
 ## Active increment
 
-Import-time Develop/metadata presets and additional keywords, followed by further
-import, Library and Develop workflows. Rendered Mac/reference acceptance,
+Previous Import membership and navigation preference, followed by further import,
+Library and Develop workflows. Rendered Mac/reference acceptance,
 Copy/Move/DNG, complete IPTC, Adobe exchange, unified Undo/Redo and the full inventory
 stay in scope. This does not complete product parity.
 
@@ -1824,3 +1825,71 @@ complete camera profiles and IPTC, sidecar writes and unified Undo also remain i
 the full objective. Rendered desktop interaction, actual keyboard/pointer dispatch,
 VoiceOver, macOS 14 runtime and Lightroom Classic Mac reference acceptance are
 unverified; this increment does not establish complete import or product parity.
+
+### Previous Import source and navigation
+
+Schema 21 records the latest committed batch by stable source identity. Reviewed
+Add, direct import and folder synchronization share the same membership; choosing
+Previous Import filters the normal paginated Library query. Virtual copies and
+master-role changes retain family membership, and relinking does not depend on
+the old path. Removing the final family member removes its entry. No-op imports,
+cancelled reviews and failed atomic applications preserve the prior batch. Legacy
+direct import retains its actual committed hundred-entry subsets after a later
+failure. Upgrades do not guess lost import history from photo timestamps.
+
+The Mac sidebar and toolbar expose Previous Import. Completed local imports open
+Library Grid with cleared filters by default. A catalog-persisted Settings toggle
+keeps the current source and filters when disabled. External-client imports refresh
+an already viewed source without stealing navigation, including empty filtered
+pages. Source changes supersede pending automatic focus; stale settings reads do
+not overwrite newer acknowledged preference changes.
+
+Nine new Python regressions cover checked membership, rollback after capture,
+folder sync/import-versus-metadata semantics, cleanup, copies/promotion/relinking,
+backup/restart, filtering/paging/source exclusivity, partial commits and genuine
+schema-20 migration failure/retry. Targeted regressions pass **92 tests**; the full
+fixed-RAW/required-Metal suite passes **473 tests with no skips**. Initial
+source-native coverage passes **17 assertions**.
+
+The final Mac package builds with macOS 14 as its minimum and passes local ad-hoc
+signature verification on macOS 26.6.2. Engine generation **23**, catalog schema
+**21**, **111 tools**, bundled guide and source digest
+`06304e1c322ae24575f5d5a0ef4d6d47981fcb6ace98bdce2e8c9931c53ab682`
+match the package. This does not establish runtime compatibility on macOS 14.
+
+The final packaged engine passes **207 native assertions** across Previous Import
+(19), import review (22), import settings (22), synchronization (24), folders (24),
+relocation (17), Library (13), state conflicts (15), virtual copies (19), stacks
+(22) and connection handoff (10). Build and native compilation logs contain no
+compiler warnings or errors. The current-source/index check and extracted
+source-only archive each pass **311 files with zero findings**; these checks do
+not scan Git history or prove rendered desktop behavior.
+
+Warm synthetic measurements run sequentially without concurrent builds/tests on
+the arm64 macOS 26.6.2, 128 GB Mac. Page/sort/filter/state queries use thirty
+samples; replacement is one atomic SQL membership transaction. Setup, filesystem
+verification, image decoding, IPC and desktop time are excluded.
+
+| Operation (median / p95) | 10,000 photos / 1,000 imported sources | 100,000 photos / 10,000 imported sources |
+| --- | ---: | ---: |
+| First page | 4.490 / 4.789 ms | 6.942 / 7.205 ms |
+| Last page | 5.563 / 5.683 ms | 17.617 / 19.168 ms |
+| Filename sort | 5.765 / 6.118 ms | 18.441 / 22.003 ms |
+| Capture-time sort | 5.675 / 5.973 ms | 18.586 / 19.694 ms |
+| Rating filter | 4.936 / 5.199 ms | 11.364 / 12.636 ms |
+| Source-state poll | 1.178 / 1.498 ms | 1.173 / 1.275 ms |
+| Replace membership (one sample) | 2.252 ms | 6.071 ms |
+| Peak process RSS | 43.42 MB | 62.19 MB |
+
+First-page replies are 32,573 / 32,876 bytes; no image workers run. Query plans use
+the covering photo-source index and the membership primary key. Probes assert
+bounded pages, exact batch scope and absent recipe/decoder payloads. These figures
+do not measure image-processing throughput or complete import latency.
+
+This completes the current persisted-source implementation, not import parity.
+Progressive Current Import, application-wide import preferences, saved configurations,
+Copy/Move/DNG, destinations,
+renaming/backup, preview policies, cards/tethering and catalog switching/merge
+remain. Source-family behavior and stack/filter combinations still require
+Lightroom Classic Mac reference acceptance. Rendered desktop interaction, actual
+keyboard/pointer dispatch, VoiceOver and macOS 14 runtime are unverified.

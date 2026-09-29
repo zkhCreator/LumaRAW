@@ -22,10 +22,22 @@ from lumaraw.develop_presets import migrate as develop_presets
 from lumaraw.iptc import migrate as iptc
 from lumaraw.metadata_presets import migrate as metadata_presets
 from lumaraw.import_review import migrate as import_review
+from lumaraw.import_processing import migrate as import_processing
+import json
+from pathlib import Path
+from lumaraw.model import Recipe
+
+
+def seed_photo(db, path):
+    """Insert a fixture using the original schema, without current import behavior."""
+    path=Path(path).resolve();stat=path.stat()
+    with db:
+        return db.execute('INSERT INTO photos(path,name,bytes,mtime,recipe,created) VALUES(?,?,?,?,?,?)',
+                          (str(path),path.name,stat.st_size,stat.st_mtime_ns,json.dumps(Recipe().dict()),0)).lastrowid
 
 
 def migrate_to(db, version):
-    migrations = (migrate_metadata, collections, copies, stacks, migrate_identities, capture, folders, keywords, relocations, folder_sync, keyword_exports, keyword_exchange, keyword_sets, painter, orientation, develop_presets, iptc, metadata_presets, import_review)
+    migrations = (migrate_metadata, collections, copies, stacks, migrate_identities, capture, folders, keywords, relocations, folder_sync, keyword_exports, keyword_exchange, keyword_sets, painter, orientation, develop_presets, iptc, metadata_presets, import_review, import_processing)
     if not 0 <= version <= len(migrations):
         raise ValueError('Unsupported legacy fixture version')
     for migration in migrations[:version]:

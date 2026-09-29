@@ -299,6 +299,9 @@ class ImportReview:
                         '(SELECT 1 FROM catalog_folders a WHERE a.is_root=1 AND a.path IN ('+chain('target.path')+'))',args)
                 self.db.execute('UPDATE folder_state SET revision=revision+1')
                 if cancelled():raise InterruptedError('Import cancelled')
+                from .previous_import import replace
+                replace(self.db,'SELECT p.source_id FROM import_files f JOIN photos p ON p.path=f.path AND p.is_virtual=0 WHERE '+where,
+                        (plan_id,),'reviewed',imported)
                 self.db.execute("UPDATE import_plans SET state='applied',imported=?,revision=revision+1 WHERE id=?",(imported,plan_id))
                 self.discard(plan_id)
                 self.db.execute('DROP TABLE import_deltas')

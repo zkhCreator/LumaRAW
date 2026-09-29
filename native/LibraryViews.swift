@@ -7,6 +7,9 @@ struct LibraryToolbar: View {
     @EnvironmentObject var s: Store
     var body: some View {
         HStack(spacing:12) {
+            if s.mode == "previous_import" {
+                Label("Previous Import",systemImage:"square.and.arrow.down").lineLimit(1)
+            }
             if let folder=s.activeFolder,folder.id == s.folderID {
                 Label(folder.name,systemImage:"folder").lineLimit(1).help(folder.path)
             }

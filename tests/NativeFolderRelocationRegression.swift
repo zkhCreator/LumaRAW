@@ -40,7 +40,7 @@ import Foundation
             try check((before["path"] as? String) == paths[1],"scan_keeps_original_catalog_paths")
             try check(model.items.count == 1 && model.total == 1,"bounded_issue_page_contains_missing_file")
             // Set a source without triggering a preview against its missing path.
-            s.folderID=child.id;s.activeFolder=child;s.selected=nil;s.photo=nil
+            s.folderID=child.id;s.activeFolder=child;s.mode="all";s.selected=nil;s.photo=nil
             await model.apply(using:s)
             try check(model.plan?.state == "applied" && model.error == nil,"explicit_apply_completes")
             try check(s.folderID == child.id && s.activeFolder?.path == new.appendingPathComponent("child").path,"active_child_identity_and_path_adopted")
