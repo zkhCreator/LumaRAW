@@ -494,9 +494,53 @@ summary polling detects external edit revisions without loading all recipes.
 
 Each image worker exits after one operation, releasing native allocations. The parent samples RSS every 50 ms and stops work above the effective budget or after five minutes. The effective budget is the lower of the configured limit and 70% of available memory; this is not a system hard limit. When available memory falls below 384 MB, the queue pauses job acquisition. Independent catalogs can start separate brokers, so budgets are not a global quota.
 
-Superseded UI previews are skipped or cancelled by client generation. Cancelling a UI preview does not cancel an unrelated agent preview or export. Large imports and indexing still hold the catalog service lock and may delay other commands; persistent metadata jobs remain future work.
+Superseded UI previews are skipped or cancelled by client generation. Cancelling a
+UI preview does not cancel an unrelated agent preview or export. Reviewed Add
+scanning releases the catalog lock between bounded pages and during file I/O;
+its atomic SQL application still holds the lock. Legacy immediate imports and
+indexing can hold it for longer; persistent metadata jobs remain future work.
 
 Status and settings expose `budget_mb`, `available_mb`, `effective_budget_mb`, and `limited_by_available_memory`. Failed workers retain observed RSS peaks. Metal reports bounded shared buffers and actual dispatch/fallback information; see [METAL.md](METAL.md).
+
+## Reviewed Add imports
+
+`import_review.py` owns schema 19: durable plans, discovered directories, staged
+file observations/checks and original filenames on physical catalog photos.
+`import_runner.py` owns source validation, a resumable directory iterator, bounded
+capture/XMP reads, cancellation and source previews. The Mac source panel, drop
+and file-open routes create `ImportReviewModel` rather than immediately importing.
+The legacy `import_photos` command remains compatible for explicit immediate use.
+
+Only one review is active per catalog. A scan call reads up to 256 directory entries
+or 60 files outside the catalog lock. Restart can replay a partially read directory
+into unique staging paths without duplicate candidates. Active catalog/cache paths
+are excluded; symlinks are not followed during discovery. Selected counts/bytes and
+classification totals advance with scan pages, so progress reads do not recount
+the entire plan. Compact sixty-item pages omit XMP patches and fingerprints.
+
+Duplicate classification compares original filename, byte size and known capture
+clock/instant including submicrosecond precision, against physical masters and
+earlier staged candidates. Unknown clocks never use modification time. Manual
+checks and eligibility are separate; disabling duplicate exclusion retains the
+user's checks. Exact existing catalog paths are always unavailable.
+
+Application first verifies scanned directory and selected original/sidecar
+fingerprints outside the catalog lock. A final SQL transaction checks for new
+catalog collisions, bulk-inserts only eligible checked photos, applies supported
+descriptions only to those new photos, restores aggregate folder counts and saves
+the completion receipt. Image workers are unnecessary. A SQL progress handler
+allows cancellation during bulk statements; failures roll back photos, metadata,
+vocabulary, folder memberships/counts and the maintenance flag together. Staging
+is discarded after completion/cancellation/failure; 32 compact receipts remain.
+Backup/restore includes pending reviews; interrupted operations require explicit
+resumption. An uncertain native apply response is read back without replay.
+
+Thumbnail and fitted Loupe requests use the existing bounded worker/cache with
+separate client generations and no catalog-photo requirement. The native model
+retains one page of images and rejects late replies. This Add contract never
+copies/moves originals. Filesystem stat checks cannot provide an OS-wide snapshot;
+Copy/Move/DNG, destination/collision recovery, import-time presets and offline
+preview policy need their own explicit adapters and acceptance evidence.
 
 ## Color
 

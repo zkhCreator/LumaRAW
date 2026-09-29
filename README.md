@@ -10,6 +10,7 @@ LumaRAW references your originals without changing them. The SwiftUI app and you
 
 | Area | Capabilities |
 | --- | --- |
+| Import | Resumable Add review, thumbnail/Loupe inspection, checked selections, subfolder choice, suspected duplicates, and embedded/sidecar descriptions |
 | RAW development | Nikon NEF/NRW and other LibRaw formats, as-shot white balance, exposure, highlights/shadows, relative temperature/tint, monochrome, and presets |
 | Color | Custom tone curves, color mixer, camera-bound chart calibration, `.cube` LUTs, ICC soft proofing, and gamut warnings |
 | Detail and composition | Full-resolution 1:1 viewports, noise reduction, sharpening, defringing, rotation, crop, straighten, and perspective |
@@ -17,7 +18,7 @@ LumaRAW references your originals without changing them. The SwiftUI app and you
 | Library | Folder tree/search/favorites/labels, ratings, flags, catalog metadata/keywords, regular/live smart collections, nested sets, Quick/target collections, SQL filters/sorting, manual/capture-time stacks, duplicate/missing indexing, virtual copies/shared snapshots, selective sync, and backup/restore |
 | Culling | Grid/Loupe/Compare/Survey, anchored page selections, active-photo review actions, linked or independent full-resolution comparison viewports |
 | Export | JPEG and 16-bit TIFF with embedded sRGB, Display P3, Adobe RGB, or ProPhoto RGB ICC profiles; frozen catalog XMP/keyword policies, persistent queue, pause/cancel/retry, and collision-safe filenames |
-| Agents | 101 MCP tools, equivalent JSON CLI commands, and a bundled skill; app and agent edits share conflict detection |
+| Agents | 109 MCP tools, equivalent JSON CLI commands, and a bundled skill; app and agent edits share conflict detection |
 
 ## Build and run
 
@@ -46,7 +47,7 @@ or uncertain exports still require explicit review/retry.
 
 ## Editing workflow
 
-1. Press **⌘I** to import photos or folders. Drag-and-drop and Finder file-open events are also supported.
+1. Press **⌘I** to choose photos or folders, then **Scan Photos**. Review Grid/Loupe previews, check the desired photos and choose **Import Checked**. Drag-and-drop and Finder file-open events open the same review. **File → Review Pending Import** reopens an unfinished review.
 2. Double-click a photo to open Library Loupe. Press **D** or choose **Develop** to edit light, color, detail, composition, lens, and local adjustments.
 3. Use **Tools** to draw a crop or mask, or enable the split before/after view. In Develop, press **\\** to toggle the original preview; in Library it opens filters.
 4. Choose **1:1 Detail** to inspect a full-resolution viewport. Inspector sliders move the viewport horizontally and vertically.
@@ -61,6 +62,17 @@ can be unlocked and synchronized. Survey fits the selected page photos together;
 its remove button only deselects a photo. Click a selected photo to make it active
 without losing the group. Full-resolution comparison and fitted Survey use separate
 preview requests; unchanged comparison frames are retained.
+
+Import uses **Add**: originals stay in their current locations. Scanning and
+previewing do not add photos to the library. Suspected duplicates share an original
+filename, file size and known capture time; an unknown date never uses modification
+time as a substitute. Turning duplicate exclusion off makes those candidates
+selectable. Already cataloged paths remain unavailable. Check/Uncheck All affects
+the current category across its pages; clicking a preview only changes focus.
+Closing preserves the review, while Cancel Import Review discards its staging.
+Interrupted scans resume explicitly. Changed sources/sidecars or catalog conflicts
+reject application without a partial import. Copy, Move, Copy as DNG and import-time
+presets are not implemented yet.
 
 Adjustments save automatically. Each photo supports up to 50 undo steps, named snapshots shared by a source’s master and virtual copies, and portable recipe bundles. The full recipe editor supports precise curve points and brush paths. Submitted exports retain their original recipe snapshot even if you continue editing.
 

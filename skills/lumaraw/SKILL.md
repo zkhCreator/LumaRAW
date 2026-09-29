@@ -30,7 +30,7 @@ inspect jobs and retry only under the user's export authorization.
 ## Editing workflow
 
 1. `lumaraw_status` identifies the active catalog; do not assume an unrelated catalog is the user's library.
-2. `lumaraw_import_photos` takes explicit local file or directory paths. Imports reference originals; moving originals makes them offline. `lumaraw_list_photos` paginates in 60-photo pages and returns summaries. `lumaraw_get_photo` returns a full recipe and revision.
+2. Use the reviewed Add import commands below for source inspection and checked selection. Legacy `lumaraw_import_photos` immediately imports explicit local paths without review. Imports reference originals; moving originals makes them offline. `lumaraw_list_photos` paginates in 60-photo pages and returns summaries. `lumaraw_get_photo` returns a full recipe and revision.
 3. Read `lumaraw_recipe_schema` for defaults, numeric limits and presets. Send a **partial** `patch` to `lumaraw_edit_photo` with `photo_id` and `expected_revision`. Preserve crop, masks, LUT and calibration unless the task asks to change them. On `ConflictError`, re-read and reconcile; do not blindly overwrite the newer edit.
 4. Inspect `lumaraw_preview_photo`'s local `preview` and `before` image paths. Add `detail: {cx: 0.5, cy: 0.5, width: 1024, height: 768}` for a true full-resolution viewport. The normal preview is reduced resolution. Do not claim Nikon color accuracy from appearance alone.
    Use `include_before: false` when no baseline is needed. `max_edge` (128–1680)
@@ -46,6 +46,42 @@ Example edit arguments:
 ```json
 {"photo_id": 12, "expected_revision": 3, "patch": {"exposure": 0.35, "highlights": -20, "shadows": 12}}
 ```
+
+## Reviewed Add import
+
+`prepare_import(paths, include_subfolders?, skip_duplicates?)` captures explicit
+files/folders in one durable review. Both options default to true. Repeatedly call
+`scan_import(plan_id, expected_revision)` with each returned revision while the
+state is planning or interrupted. A call reads at most 256 directory entries or
+60 file headers/sidecars; it never imports photos. Resume after interruption only
+when requested. Finish or cancel an existing review before creating another.
+
+`get_import` reads the latest review by default, or a specific `plan_id`. Pages
+contain sixty compact items; `kind` is all/new/duplicate/existing/error/selected,
+`sort` is name/captured/checked/type, with offset and descending options.
+`select_import_items(plan_id, expected_revision, selected, item_ids?, kind?)`
+changes check state when ready. Explicit IDs are limited to sixty; omitting IDs
+applies to all eligible rows, optionally restricted to new or duplicate. Never
+translate an existing/error/checked filtered Check All into an unfiltered mutation.
+`set_import_options` takes the captured revision and `skip_duplicates`; changing
+eligibility preserves manual checks. Suspected duplicates require equal original
+filename, byte size and a known precise capture clock. Existing catalog paths are
+always excluded. Unknown capture metadata never falls back to modification time.
+
+`preview_import_item` takes plan/item IDs, captured `expected_revision`, your own
+`client_id` and monotonically increasing `generation`. It returns a file-backed
+thumbnail or, with `detail: true`, a fitted 1600-pixel preview. Previewing does not
+create a photo. Cancel only your own preview generations through `cancel_preview`.
+
+`apply_import(plan_id, expected_revision)` verifies selected originals/sidecars
+and scanned directories, then imports the checked eligible rows atomically. Read
+the returned plan state/error: changed sources or catalog conflicts fail without
+partial catalog changes. Use `get_import` to inspect an uncertain response; never
+retry application blindly. `cancel_import(plan_id)` interrupts pending work and
+discards staging, preserving originals and any completed import. Up to 32 compact
+receipts are retained. Review state is included in catalog backup/restore.
+This is Add only; copying, moving, DNG conversion and import-time presets are not
+supported by this command family.
 
 ## Library organization
 

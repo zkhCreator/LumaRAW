@@ -13,6 +13,9 @@ to merge. Development continues on `codex/lightroom-classic-mac`.
 
 Official references checked September 2026:
 
+- [Hard-drive Add/Copy/Move import, Grid/Loupe and checked selection](https://helpx.adobe.com/lightroom-classic/desktop/import-photos/import-photos-video-catalog.html)
+- [Duplicate criteria, preview choices and import-time options](https://helpx.adobe.com/lightroom-classic/desktop/import-photos/photo-video-import-options.html)
+- [Camera/card import workflow](https://helpx.adobe.com/lightroom-classic/desktop/import-photos/importing-photos-lightroom-basic-workflow.html)
 - [Workspace and module responsibilities](https://helpx.adobe.com/nz/lightroom-classic/help/workspace-basics.html)
 - [Collections, smart collections and collection sets](https://helpx.adobe.com/lightroom-classic/desktop/organize-photos-in-lightroom-classic/photo-collections.html)
 - [Smart collection criteria](https://helpx.adobe.com/lightroom-classic/desktop/organize-photos-in-lightroom-classic/smart-collections-criteria-in-lightroom-classic.html)
@@ -47,7 +50,7 @@ gaps. Nothing below is full Lightroom parity merely because historical tests pas
 
 | Area | Current implementation | Remaining acceptance / work |
 | --- | --- | --- |
-| Import and catalogs | Partial: referenced originals, backup/restore | Import preview/selection, copy workflows, import-time metadata/develop presets, tethered capture, catalog switching/merge |
+| Import and catalogs | Partial: durable Add review with checked selection, Grid/Loupe source previews, subfolder choice, suspected duplicates, bounded sorting/filtering, XMP descriptions, cancellation/restart, referenced originals and backup/restore | Copy/Move/Copy as DNG, destinations/rename/backup, import-time metadata/develop presets, preview policies, cards/tethering, previous-import source, catalog switching/merge and desktop/reference acceptance |
 | Library navigation | Partial: bounded grid/filmstrip, folder tree/search/favorites/labels, durable missing-folder relocation and folder synchronization, direct/recursive sources, filters/sorting, regular/smart/Quick collections and nested sets | Multi-source selection, complete sync Import Dialog/duplicate policy, folder move/rename, relocation overlap/collision handling, collection drag/drop/color labels, full smart criteria/import-export, source-selection memory, desktop acceptance |
 | Organization | Partial: duplicate/missing detection, hierarchical keywords/synonyms/export flags/Will Export preview, text/CSV vocabulary exchange and manual person tags, custom nine-slot keyword sets/recent entries/shared or catalog storage, multi-keyword shortcuts and keyword/rating/flag/label/target-collection/rotation/Develop-preset/metadata-preset Painter strokes, independent catalog rotation/flips, title/caption/copyright plus thirty IPTC fields, selective metadata presets, labels, batch metadata, virtual copies, manual/split/capture-time scoped stacks | Keyword policy/file and preset reference acceptance, built-in sets/suggestions/undo, Painter desktop acceptance, IPTC Extension and complete metadata parity, stack interaction acceptance, rename and sidecars |
 | Culling | Partial: Loupe/Compare/Survey, linked detail, anchored page selection | Desktop acceptance, cross-page selection, Develop reference view, auto advance, persistent workspace state |
@@ -70,9 +73,9 @@ gaps. Nothing below is full Lightroom parity merely because historical tests pas
 
 ## Active increment
 
-Selective metadata presets, common descriptive IPTC, native forms and captured
-Painter application. Rendered Mac/reference acceptance, complete IPTC Extension,
-Adobe exchange, import-time application, unified Undo/Redo and the full inventory
+Durable Add import review and bounded catalog application, followed by import-time
+presets and further Library/Develop workflows. Rendered Mac/reference acceptance,
+Copy/Move/DNG, complete IPTC, Adobe exchange, unified Undo/Redo and the full inventory
 stay in scope. This does not complete product parity.
 
 ## Evidence log
@@ -1657,3 +1660,79 @@ The public source audit covers **294 files**, with no findings. Generated images
 catalogs, app bundles and raw receipts remain outside publication. Module commits
 must be pushed to the authorized remote and the remote revision verified before
 describing them as remotely backed up.
+
+### Durable Add import review
+
+Mac Import, drag/drop and Finder file-open now stage a review before adding photos.
+Users choose subfolder inclusion, scan, inspect thumbnail/Grid or fitted Loupe,
+filter/sort bounded pages, check individual photos or a category across pages,
+change suspected-duplicate exclusion, and explicitly apply. Focus and check state
+are separate. Existing catalog paths cannot be reimported. Duplicate classification
+uses original filename, byte size and known precise capture time; unknown dates
+never substitute file modification time. Original names persist through schema 19.
+No claim is made about Adobe's undocumented case/clock/container edge cases.
+
+Scanning reads at most 256 directory entries or 60 file observations per command,
+outside catalog locks. Restart replays directory entries into unique staging paths
+and retains checked choices. Active catalog/cache directories are excluded.
+Previews use the existing bounded image worker with separate client generations,
+without creating a catalog photo. Application rechecks selected originals,
+sidecars and scanned directories, then creates the checked references and supported
+XMP descriptions in one transaction. Bulk SQL and aggregate folder counts avoid
+per-photo ancestor work; cancellation inside SQL rolls the whole transaction back.
+Completed receipts cannot be cancelled or applied again. Closing/reopening, backup
+and restore retain pending reviews; uncertain native responses are read back.
+
+The full Python suite passes **451 tests with no skips**, including the fixed
+Nikon D3S fixture and required Metal checks. Nineteen import cases cover precise
+duplicate rules, XMP, unchanged originals, changed sources/catalogs, late duplicate
+conflicts, 601-entry directory restart, cache exclusion, checked selection, rollback
+of folder counts/maintenance during cancellation, backup/restore and genuine
+schema-18 migration rollback/retry. Fresh remote references still contain only
+`origin/main`; it and local `main` are already ancestors of this development branch.
+
+Eight native suites against the packaged engine pass **159 assertions**: import
+22, library 13, state races 15, folders 24, folder synchronization 24, virtual copies
+19, metadata presets 32 and service connection/handoff 10. The Mac app targets
+macOS 14, builds and passes local ad-hoc signature verification on macOS 26.6.2.
+Build and native logs contain no compiler warnings/errors. Engine generation
+**21**, catalog schema **19**, **109 tools** and digest
+`51695ad3db91cde29d84b239fb5c887d6e6f32797ea0d625b3c33bd1d00bcb5e`
+match final source, as does the bundled usage guide. The source publication check
+covers **301 files** with no findings; generated photographs, catalogs, application
+bundles and raw receipts are excluded. These checks do not scan Git history or
+establish remote backup.
+
+Performance on the same arm64 macOS 26.6.2, 128 GB Mac uses a synthetic existing
+catalog and candidate review, plus sixty generated 8×8 PNG originals. Warm SQLite
+page queries have thirty samples; scan, real-file application and synthetic bulk
+application each have one. Setup, image decoding, IPC and UI are excluded. The
+synthetic bulk figure additionally excludes filesystem verification and measures
+only the final SQL transaction; it is not end-to-end photographic import speed.
+
+| Operation (median / p95 for repeated pages) | 10,000 photos / candidates | 100,000 photos / candidates |
+| --- | ---: | ---: |
+| First page | 2.268 / 2.627 ms | 1.864 / 1.995 ms |
+| Last page | 2.474 / 2.668 ms | 4.822 / 5.286 ms |
+| Checked page | 2.206 / 2.422 ms | 1.900 / 2.227 ms |
+| Capture-time sort | 2.188 / 2.554 ms | 1.905 / 2.237 ms |
+| File-type sort | 2.203 / 2.395 ms | 1.892 / 2.126 ms |
+| Scan sixty real files (one sample) | 12.693 ms | 11.238 ms |
+| Apply sixty real files / discard review (one sample) | 47.435 ms | 352.858 ms |
+| Synthetic bulk SQL application (one sample) | 205.240 ms | 1,892.811 ms |
+| Peak process RSS | 48.64 MB | 76.67 MB |
+
+Workers consumed zero memory in this metadata/SQL probe; original hashes, catalog
+counts, folder aggregates and enabled maintenance are asserted. First-page replies
+were 20,866 / 20,928 bytes. A same-size 10k pre-optimization transaction took
+1,612.452 ms; the optimized transaction is about 7.9 times faster for this synthetic
+single-sample comparison. Reproduce with `tests/import_review_probe.py` after other
+tests/builds finish. The 100k transaction still holds the catalog lock for about
+1.9 seconds, with cancellation checks; further throughput work remains.
+
+This completes the reviewed Add implementation increment, not import parity.
+Copy/Move/Copy as DNG, destination naming/backup, import presets and import-time
+metadata/Develop application, preview policies, cards/tethering, previous-import
+source and catalog switching/merge remain. Desktop automation was not performed:
+rendered interaction, actual pointer/keyboard dispatch, VoiceOver, macOS 14 runtime
+and Lightroom Classic Mac reference acceptance remain unverified.

@@ -20,6 +20,17 @@ when a clear function is more maintainable. Avoid unrelated formatting churn.
 
 ## Contracts and persistence
 
+- Keep reviewed imports separate from catalog photos until explicit application.
+  Read directory entries, capture headers, XMP and pixels outside catalog locks;
+  stage bounded pages and revalidate sources before one atomic Add transaction.
+  Duplicate classification uses the original filename, size and known precise
+  capture clock; never substitute modification time. Preserve manual check state
+  when duplicate eligibility changes. Cancellation must roll back photo inserts,
+  metadata, folder counts and maintenance flags, including inside bulk SQL.
+  A completed import receipt is immutable; an uncertain response is read back,
+  never automatically replayed. Resumption retains captured selection and source
+  identity, and must not silently accept changed files. Future Copy/Move adapters
+  require explicit destination/collision/recovery contracts beyond Add.
 - Add JSON Schema inputs before wiring native controls. Reject unsupported keys,
   invalid ranges and overlarge arrays at the service boundary. Keep existing
   commands compatible; use explicit revisions for editable persisted objects.

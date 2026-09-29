@@ -11,12 +11,13 @@ import AppKit
             ContentView().environmentObject(store)
                 .frame(minWidth:1000,minHeight:660)
                 .task {await store.start()}
-                .onOpenURL {url in Task{await store.importPaths([url.path])}}
+                .onOpenURL {url in Task{await store.reviewImport([url.path])}}
         }
         .defaultSize(width:1440,height:920)
         .commands {
             CommandGroup(replacing:.newItem) {
                 Button("Import Photos…"){store.importPanel()}.keyboardShortcut("i")
+                Button("Review Pending Import…") { Task { await store.reviewImport() } }
                 Button("Export Selected Photos…"){store.showExport=true}.keyboardShortcut("e",modifiers:[.command,.shift]).disabled(store.selected==nil)
             }
             CommandGroup(replacing:.undoRedo) {

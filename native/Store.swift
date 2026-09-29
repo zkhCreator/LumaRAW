@@ -39,6 +39,7 @@ import UniformTypeIdentifiers
     @Published var before: NSImage?
     @Published var histogram: [[Double]] = []
     @Published var metadata: [String: Any] = [:]
+    @Published var importReview: ImportReviewModel?
     @Published var iptcFields: [MetadataField]=[]
     @Published var metadataPresetPage: MetadataPresetPage?
     @Published var metadataPresetQuery: [String:Any]=[:]
@@ -193,7 +194,7 @@ import UniformTypeIdentifiers
             await refreshCollections()
             await refresh()
             let args=CommandLine.arguments
-            if let i=args.firstIndex(of:"--import"),args.count>i+1 { await importPaths([args[i+1]]) }
+            if let i=args.firstIndex(of:"--import"),args.count>i+1 { await reviewImport([args[i+1]]) }
             polling=Task { [weak self] in
                 while !Task.isCancelled {
                     try? await Task.sleep(nanoseconds:2_000_000_000)
@@ -467,7 +468,7 @@ import UniformTypeIdentifiers
         }
         catch{self.error=error.localizedDescription}
     }
-    func importPanel() {let panel=NSOpenPanel();panel.canChooseDirectories=true;panel.canChooseFiles=true;panel.allowsMultipleSelection=true;panel.prompt="Import";panel.message="Reference original files without copying or modifying them";if panel.runModal() == .OK{Task{await importPaths(panel.urls.map(\.path))}}}
+    func importPanel() {let panel=NSOpenPanel();panel.canChooseDirectories=true;panel.canChooseFiles=true;panel.allowsMultipleSelection=true;panel.prompt="Review";panel.message="Choose photographs or folders to review before importing";if panel.runModal() == .OK{Task{await reviewImport(panel.urls.map(\.path))}}}
     func importPaths(_ paths:[String]) async {
         busy=true;defer{busy=false}
         do{let r=try await Backend.call("import_photos",["paths":paths]);message="Imported \(r["imported"] ?? 0) photos";offset=0;await refresh()}catch{self.error=error.localizedDescription}

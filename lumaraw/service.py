@@ -67,10 +67,14 @@ class Service:
         self.develop_presets=DevelopPresets(self,presets_root)
         from .metadata_presets import MetadataPresets
         self.metadata_presets=MetadataPresets(self,presets_root)
+        from .import_runner import ImportRunner
+        from .import_review import ImportReview
+        self.import_review=ImportRunner(self)
         self.last_activity=time.monotonic()
         with self.catalog() as c:
             Relocations(c).recover()
             FolderSync(c).recover()
+            ImportReview(c).recover()
             handoff=c.setting('clean_handoff')
             clean=(identity is not None and handoff == {'target':identity}
                    and c.job_counts().get('running',0)==0)
@@ -130,6 +134,8 @@ class Service:
             return self.keyword_sets.dispatch(method,p)
         if method in ('prepare_folder_sync','get_folder_sync','get_folder_sync_metadata','scan_folder_sync','select_folder_sync_items','apply_folder_sync','cancel_folder_sync'):
             return self.folder_sync.dispatch(method,p)
+        if method in ('prepare_import','get_import','scan_import','select_import_items','set_import_options','apply_import','cancel_import','preview_import_item'):
+            return self.import_review.dispatch(method,p)
         if method=='status':
             with self.catalog() as c:
                 return {'version':'0.4.1','api_version':1,'catalog':str(self.root),'photos':c.count(),'counts':c.job_counts(),'paused':self.paused,'active':self.active,**self.memory_status(),'peak_mb':round(self.peak,1)}
@@ -503,3 +509,4 @@ class Service:
     def close(self):
         self.stopping.set();self.wake.set();self.thread.join(timeout=6)
         self.folder_sync.close()
+        self.import_review.close()

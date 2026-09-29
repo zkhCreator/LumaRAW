@@ -110,6 +110,8 @@ def migrate(db):
     migrate_iptc(db)
     from .metadata_presets import migrate as migrate_metadata_presets
     migrate_metadata_presets(db)
+    from .import_review import migrate as migrate_import_review
+    migrate_import_review(db)
 
 
 def text_predicate(text):

@@ -606,6 +606,40 @@ per batch through a bounded exact-value cache; distinct per-photo values still
 receive individual validation. Originals, recipes, history and orientation are
 asserted unchanged. Timings are observations, not hardware-specific test gates.
 
+## Reviewed Add imports
+
+`test_import_review.py` covers checked-only atomic imports, original-name/precise
+capture duplicate classification, unknown dates, include-subfolder/overlapping
+sources, XMP descriptions, source/sidecar/directory/catalog changes, late duplicate
+conflicts, injected SQL rollback, cancellation during I/O and bulk SQL, maintenance
+flag/count/root restoration, and previews rejecting changed originals before work.
+It checks 601-entry directory restart/replay without duplicates, compact pages,
+active-catalog cache exclusion, persistent checks, backup/restore and genuine
+schema-18 migration failure/retry. Source files remain byte-identical.
+
+`NativeImportRegression` checks real IPC and file-backed previews before catalog
+import, per-item/filter check scope, stale option conflicts, immutable completed
+receipts, closing/reopening a pending review, cancellation and coalesced Finder
+sources. The suite uses five generated 160×100 raster files. It is native state
+evidence; rendered sheets, pointer/keyboard dispatch, VoiceOver, macOS 14 and
+Lightroom Mac reference acceptance remain separate.
+
+```sh
+.venv/bin/python -m pytest -q tests/test_import_review.py
+.venv/bin/python tests/run_native.py --work work/new-import-native --suite NativeImportRegression
+.venv/bin/python tests/import_review_probe.py --work work/new-import-probe --photos 100000 --candidates 100000 --samples 30
+```
+
+Run the probe with no concurrent tests/builds. It seeds a synthetic existing catalog
+and candidate review, scans sixty generated 8×8 PNG originals once, samples bounded
+first/last/checked/capture/type pages thirty times, and applies those sixty real
+files once. A separate one-sample bulk transaction inserts the candidate count
+from explicitly synthetic, already-verified rows, excluding filesystem checks.
+The latter isolates SQL lock duration and is not end-to-end import throughput.
+Report warm-cache timings, sample counts, RSS, response bytes and zero image
+workers. Setup, RAW/JPEG decoding, IPC and desktop latency are excluded. Assert
+original hashes, photo totals, folder counts and maintenance state after apply.
+
 ## Public source check
 
 ```sh

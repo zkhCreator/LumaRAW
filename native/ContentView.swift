@@ -63,6 +63,7 @@ struct ContentView: View {
             Button("OK",role:.cancel){s.error=nil}
         } message:{Text(s.error ?? "")}
         .sheet(isPresented:$s.showExport){ExportSheet()}
+        .sheet(item:$s.importReview){ImportReviewSheet(model:$0)}
         .sheet(isPresented:$s.showVersions){VersionsSheet()}
         .sheet(isPresented:$s.showRecipe){RecipeSheet()}
         .sheet(isPresented:$s.showSync){SyncSheet()}
@@ -84,9 +85,7 @@ struct ContentView: View {
         .onChange(of:s.develop) { _,value in if value {s.reviewRenderer.stop()} }
         .onChange(of:s.painterSource) { _,_ in s.cancelPainterStroke();if !s.painterInGrid { s.setPainting(false) } }
         .onDrop(of:[UTType.fileURL],isTargeted:nil){providers in
-            for provider in providers {provider.loadItem(forTypeIdentifier:UTType.fileURL.identifier,options:nil){item,_ in
-                if let data=item as? Data,let url=URL(dataRepresentation:data,relativeTo:nil){Task{@MainActor in await s.importPaths([url.path])}}
-            }};return true
+            Task { await s.reviewImportProviders(providers) };return true
         }
     }
     func side(_ title:String,_ symbol:String,_ mode:String)->some View {
