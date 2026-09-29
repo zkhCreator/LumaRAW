@@ -640,6 +640,40 @@ Report warm-cache timings, sample counts, RSS, response bytes and zero image
 workers. Setup, RAW/JPEG decoding, IPC and desktop latency are excluded. Assert
 original hashes, photo totals, folder counts and maintenance state after apply.
 
+## Apply During Import
+
+`test_import_processing.py` checks captured Develop/metadata presets, independent
+None/omission/keyword clearing, file/preset keyword unions, preset deletion after
+capture, stale plan/library tokens, exact root/leaf identity, ambiguous keyword
+rejection, vocabulary edits between preset capture and plan persistence,
+additional-text limits, camera revalidation after check changes, merged
+capacity and SQL rollback, LUT staging conflicts/corruption, backup rebinding and
+genuine schema-19 upgrade rollback/retry. Large metadata stays out of wire replies.
+A generated gray PNG goes through real image workers to verify a chosen Develop
+exposure changes the import thumbnail before a catalog photo exists; clearing the
+choice reuses the original thumbnail. This is algorithm evidence, not Adobe pixels.
+
+`NativeImportProcessingRegression` uses real IPC and five generated originals to
+exercise paged preset choices, New/None, unsaved keyword drafts, explicit saves,
+captured revision conflicts, close/reopen, preset deletion, preview identity and
+the applied photo values. It does not drive the desktop or establish macOS 14,
+VoiceOver, actual keyboard dispatch or Lightroom reference acceptance.
+
+```sh
+.venv/bin/python -m pytest -q tests/test_import_processing.py
+.venv/bin/python tests/run_native.py --work work/new-import-processing-native --suite NativeImportProcessingRegression
+.venv/bin/python tests/import_review_probe.py --work work/new-import-processing-probe --photos 100000 --candidates 10000 --processing
+```
+
+The optional probe mode captures exposure/contrast and a metadata preset containing
+31,560 UTF-8 bytes of descriptive IPTC, title/rating and three keyword paths. It
+measures the same bounded pages and sixty real-file application as the Add probe,
+then seeds a separate synthetic bulk transaction with those settings. All changed
+recipes, photo/keyword totals, folder counts, maintenance state and original hashes
+are asserted. Warm pages use thirty samples; scan and both applications use one.
+No decoding, IPC or UI timings are included; synthetic bulk additionally excludes
+source verification. Run after tests/builds finish and report RSS and wire sizes.
+
 ## Public source check
 
 ```sh

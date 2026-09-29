@@ -539,8 +539,32 @@ Thumbnail and fitted Loupe requests use the existing bounded worker/cache with
 separate client generations and no catalog-photo requirement. The native model
 retains one page of images and rejects late replies. This Add contract never
 copies/moves originals. Filesystem stat checks cannot provide an OS-wide snapshot;
-Copy/Move/DNG, destination/collision recovery, import-time presets and offline
+Copy/Move/DNG, destination/collision recovery, saved import configurations and offline
 preview policy need their own explicit adapters and acceptance evidence.
+
+`import_processing.py` owns schema 20's per-plan Develop/metadata snapshots and
+additional keyword choices. Preset libraries are read with captured revision
+tokens before a catalog mutation; LUT assets stage outside SQL locks and the
+Develop library is rechecked after staging. The final plan write checks its original
+revision. A chosen preset becomes a value snapshot, so later library edits/deletion
+do not retarget it. Clearing a preset and clearing additional keywords are separate
+operations. Full metadata patches stay out of review pages and settings replies.
+
+Metadata preset reads and keyword resolution share one library/catalog transaction,
+so concurrent vocabulary edits cannot reinterpret a preset between those steps.
+Keyword text resolves inside a rollback-only savepoint, recording exact hierarchy
+segments without persisting new vocabulary. This preserves root/leaf identity even
+when imported XMP later introduces a same-named child. Application resolves those
+segments once, with a bounded prefix cache, and unions assignments with file tags.
+Checked metadata fields replace only their own values; merged IPTC/keyword limits
+are validated per photo in sixty-target batches inside the existing Add transaction.
+The imported Develop recipe initializes from defaults plus captured fields, without
+creating an artificial prior edit. Camera compatibility is checked both when
+choosing the preset and before application. LUT content is verified outside the
+catalog lock; backup restore rebinds the captured LUT by content address. Terminal
+plans discard full settings with staging. Native editors keep keyword drafts and
+captured revisions after conflicts, advance only acknowledged own mutations, and
+invalidate recipe-dependent review previews when the saved Develop choice changes.
 
 ## Color
 

@@ -31,6 +31,13 @@ when a clear function is more maintainable. Avoid unrelated formatting churn.
   never automatically replayed. Resumption retains captured selection and source
   identity, and must not silently accept changed files. Future Copy/Move adapters
   require explicit destination/collision/recovery contracts beyond Add.
+- Import-time presets are captured values. Validate preset and plan revisions
+  when choosing them; do not reinterpret a saved choice after library edits or
+  deletion. Stage LUT assets outside catalog locks, verify before applying and
+  rebind them during restore. Freeze keyword hierarchy segments without creating
+  vocabulary during selection; a new XMP leaf must not retarget a captured root.
+  Apply file metadata first, then selected preset fields and additive keywords
+  within the same rollback boundary. Keep large patches off review/list replies.
 - Add JSON Schema inputs before wiring native controls. Reject unsupported keys,
   invalid ranges and overlarge arrays at the service boundary. Keep existing
   commands compatible; use explicit revisions for editable persisted objects.

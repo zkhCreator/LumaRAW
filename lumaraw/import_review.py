@@ -2,7 +2,8 @@
 
 Inputs: explicit source snapshots, bounded observations and captured plan revisions.
 Outputs: review pages, duplicate eligibility and one atomic catalog import. Existing
-photos, copies, recipes and exports are never changed. Filesystem reads and pixels
+photos, copies, recipes and exports are never changed. Captured import presets
+initialize only new photos. Filesystem reads and pixels
 belong to the runner; no original writes, copy/move, DNG conversion or AI selection.
 Unknown capture time never falls back to mtime for suspected-duplicate matching.
 """
@@ -89,6 +90,8 @@ class ImportReview:
             if row is None:return {'plan':None,'items':[],'total':0,'offset':0,'page_size':60}
             plan_id=row[0]
         plan=self.row(plan_id);plan['counts']=json.loads(plan['counts'])
+        from .import_processing import brief
+        plan['processing']=brief(self.catalog,plan_id)
         if kind not in KINDS:raise ValueError('Unsupported import filter')
         clause='plan_id=?';args=[plan_id]
         if kind=='selected':clause+=' AND selected=1 AND '+self.eligible(plan)
@@ -234,6 +237,7 @@ class ImportReview:
 
     def discard(self,plan_id):
         for table in ('import_directories','import_files'):self.db.execute('DELETE FROM '+table+' WHERE plan_id=?',(plan_id,))
+        self.db.execute('DELETE FROM import_processing WHERE plan_id=?',(plan_id,))
 
     def terminal(self,plan_id,state,error=''):
         with self.db:
@@ -245,11 +249,18 @@ class ImportReview:
     def apply(self,plan_id,revision,cancelled=lambda:False):
         from .folder_sync import FolderSync
         from .folders import chain
+        from . import import_processing
         with self.db:
             self.db.execute('BEGIN IMMEDIATE');plan=self.check(plan_id,revision,('verifying',))
             where='f.plan_id=? AND f.selected=1 AND '+self.eligible(plan).replace('state','f.state')
+            processing=import_processing.settings(self.catalog,plan_id)
+            recipe=Recipe.parse(processing['develop_patch']).dict()
             self.db.set_progress_handler(lambda:int(cancelled()),2000)
             try:
+                if profile:=recipe.get('camera_profile'):
+                    if self.db.execute("SELECT 1 FROM import_files f WHERE "+where+
+                        " AND COALESCE(json_extract(f.clock,'$.camera'),'')!=? LIMIT 1",(plan_id,profile['camera'])).fetchone():
+                        raise ValueError('Import Develop preset camera profile is incompatible with a checked photo')
                 if self.db.execute('SELECT 1 FROM import_files f JOIN photos p ON p.path=f.path AND p.is_virtual=0 WHERE '+where+' LIMIT 1',(plan_id,)).fetchone():
                     raise ValueError('A selected photo was imported elsewhere; create a fresh review')
                 if plan['skip_duplicates'] and self.db.execute('SELECT 1 FROM import_files f JOIN photos p ON p.is_virtual=0 '
@@ -266,7 +277,7 @@ class ImportReview:
                 self.db.execute('INSERT INTO photos(path,name,original_name,bytes,mtime,recipe,created,taken,taken_us,taken_submicro,capture_clock,camera) '
                     'SELECT f.path,f.name,f.name,f.bytes,f.mtime,?,?,COALESCE(json_extract(f.clock,\'$.taken\'),0),'
                     'f.taken_us,f.taken_submicro,f.capture_clock,COALESCE(json_extract(f.clock,\'$.camera\'),\'\') FROM import_files f WHERE '+where,
-                    (json.dumps(Recipe().dict()),time.time(),plan_id))
+                    (json.dumps(recipe),time.time(),plan_id))
                 after=0
                 while True:
                     rows=self.db.execute('SELECT f.id,f.patch,p.id AS photo_id FROM import_files f JOIN photos p ON p.path=f.path AND p.is_virtual=0 '
@@ -276,6 +287,7 @@ class ImportReview:
                         if cancelled():raise InterruptedError('Import cancelled')
                         FolderSync(self.catalog).apply_metadata(row['photo_id'],json.loads(row['patch']))
                     after=rows[-1]['id']
+                import_processing.apply_metadata(self.catalog,processing,where,(plan_id,),cancelled)
                 self.db.execute('UPDATE catalog_folders SET direct_count=direct_count+d.delta FROM import_deltas d WHERE catalog_folders.path=d.path')
                 self.db.execute('WITH RECURSIVE changes(path,delta) AS (SELECT path,delta FROM import_deltas UNION ALL '
                     'SELECT f.parent_path,c.delta FROM changes c JOIN catalog_folders f ON f.path=c.path WHERE f.parent_path IS NOT NULL),'

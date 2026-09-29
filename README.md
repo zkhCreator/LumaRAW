@@ -10,7 +10,7 @@ LumaRAW references your originals without changing them. The SwiftUI app and you
 
 | Area | Capabilities |
 | --- | --- |
-| Import | Resumable Add review, thumbnail/Loupe inspection, checked selections, subfolder choice, suspected duplicates, and embedded/sidecar descriptions |
+| Import | Resumable Add review, thumbnail/Loupe inspection, checked selections, subfolder choice, suspected duplicates, embedded/sidecar descriptions, and captured Develop/metadata presets plus keywords |
 | RAW development | Nikon NEF/NRW and other LibRaw formats, as-shot white balance, exposure, highlights/shadows, relative temperature/tint, monochrome, and presets |
 | Color | Custom tone curves, color mixer, camera-bound chart calibration, `.cube` LUTs, ICC soft proofing, and gamut warnings |
 | Detail and composition | Full-resolution 1:1 viewports, noise reduction, sharpening, defringing, rotation, crop, straighten, and perspective |
@@ -18,7 +18,7 @@ LumaRAW references your originals without changing them. The SwiftUI app and you
 | Library | Folder tree/search/favorites/labels, ratings, flags, catalog metadata/keywords, regular/live smart collections, nested sets, Quick/target collections, SQL filters/sorting, manual/capture-time stacks, duplicate/missing indexing, virtual copies/shared snapshots, selective sync, and backup/restore |
 | Culling | Grid/Loupe/Compare/Survey, anchored page selections, active-photo review actions, linked or independent full-resolution comparison viewports |
 | Export | JPEG and 16-bit TIFF with embedded sRGB, Display P3, Adobe RGB, or ProPhoto RGB ICC profiles; frozen catalog XMP/keyword policies, persistent queue, pause/cancel/retry, and collision-safe filenames |
-| Agents | 109 MCP tools, equivalent JSON CLI commands, and a bundled skill; app and agent edits share conflict detection |
+| Agents | 111 MCP tools, equivalent JSON CLI commands, and a bundled skill; app and agent edits share conflict detection |
 
 ## Build and run
 
@@ -71,8 +71,19 @@ selectable. Already cataloged paths remain unavailable. Check/Uncheck All affect
 the current category across its pages; clicking a preview only changes focus.
 Closing preserves the review, while Cancel Import Review discards its staging.
 Interrupted scans resume explicitly. Changed sources/sidecars or catalog conflicts
-reject application without a partial import. Copy, Move, Copy as DNG and import-time
-presets are not implemented yet.
+reject application without a partial import. Copy, Move and Copy as DNG are not
+implemented yet.
+
+After scanning, choose **Apply During Import…** to select a Develop preset,
+metadata preset or None. Search and page the preset lists, or use **New…** to
+create a metadata preset. Preset values are saved with this review; later edits or
+deletion of the original preset do not change this import. Develop choices update
+the review preview. Additional keywords accept comma-separated names and
+`Parent | Child` paths; **Save Keywords** explicitly saves the draft. Keywords
+append to file metadata and preset tags. Checked metadata fields replace only
+their own values, including explicit empty text. Incompatible camera profiles,
+changed LUT assets or metadata limits reject the entire application. Originals
+and existing catalog photos stay unchanged.
 
 Adjustments save automatically. Each photo supports up to 50 undo steps, named snapshots shared by a source’s master and virtual copies, and portable recipe bundles. The full recipe editor supports precise curve points and brush paths. Submitted exports retain their original recipe snapshot even if you continue editing.
 
@@ -331,7 +342,8 @@ with This Catalog**, in the library or Settings, switches to catalog-local prese
 without moving existing ones. LUT assets are retained with their preset and copied
 into a target catalog on application; local presets and assets are backed up with
 the catalog. Hover previews, Amount, ISO-adaptive presets, Adobe XMP/`.lrtemplate`
-exchange and import-time application remain pending.
+exchange remain pending. Reviewed Add imports can capture these presets through
+**Apply During Import…**.
 
 Virtual copies share the original file while keeping independent adjustments,
 ratings and catalog metadata. Use **Photo → Create Virtual Copies**, rename with

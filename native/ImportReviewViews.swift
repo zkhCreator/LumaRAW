@@ -40,6 +40,15 @@ struct ImportReviewSheet: View {
                 if !plan.text("error").isEmpty { Text(plan.text("error")).foregroundStyle(.red).textSelection(.enabled) }
                 if plan.active {
                     HStack {
+                        Button("Apply During Import…") { model.openProcessing() }.disabled(model.busy || model.loading || !plan.ready)
+                        if let settings=plan.values["processing"] as? [String:Any] {
+                            let names=[settings["develop_name"] as? String ?? "",settings["metadata_name"] as? String ?? ""].filter{!$0.isEmpty}
+                            Text((names+[(settings["keyword_count"] as? Int ?? 0)>0 ? "Additional keywords":""]).filter{!$0.isEmpty}.joined(separator:" · "))
+                                .font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                        }
+                        Spacer()
+                    }
+                    HStack {
                         Picker("Show",selection:Binding(get:{model.kind},set:{value in Task { await model.browse(kind:value) }})) {
                             Text("All Photos").tag("all");Text("New Photos").tag("new");Text("Suspected Duplicates").tag("duplicate")
                             Text("Already Imported").tag("existing");Text("Errors").tag("error");Text("Checked Photos").tag("selected")
@@ -91,6 +100,7 @@ struct ImportReviewSheet: View {
         }.padding(22).frame(minWidth:900,idealWidth:1060,minHeight:650,idealHeight:760)
             .task { await model.load(initial:true) }.onDisappear { model.invalidate() }
             .interactiveDismissDisabled(model.busy)
+            .sheet(item:$model.processingEditor) { ImportProcessingSheet(model:$0) }
     }
     var grid: some View {
         ScrollView {

@@ -156,7 +156,8 @@ class MetadataPresets:
         self.bump(db)
         return id_
 
-    def apply(self,catalog,patch,targets):
+    @staticmethod
+    def apply(catalog,patch,targets,keyword_ids=None):
         tags=Keywords(catalog)
         ids=tags.check_targets(targets)
         if not 1<=len(ids)<=60:
@@ -164,7 +165,9 @@ class MetadataPresets:
         columns=set(patch)-{'keywords','iptc'}
         # Resolve at the captured vocabulary revision, then validate every target
         # before writing any photo. Newly created vocabulary rolls back on failure.
-        additions=list(dict.fromkeys(tags.resolve(value) for value in patch.get('keywords',[])))
+        # Import resolves its captured additions once for the whole transaction.
+        additions=(list(dict.fromkeys(tags.resolve(value) for value in patch.get('keywords',[])))
+                   if keyword_ids is None else keyword_ids)
         changes=[]
         # One bounded batch can contain repeated large IPTC values. Validate each
         # distinct merged value once, retaining at most sixty exact JSON keys.

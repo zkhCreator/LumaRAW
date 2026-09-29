@@ -62,6 +62,7 @@ struct ImportItem: Identifiable {
     @Published var detail: NSImage?
     @Published var detailLoading=false
     @Published var detailError: String?
+    @Published var processingEditor: ImportProcessingEditor?
     private let previewClient=UUID().uuidString
     private let detailClient=UUID().uuidString
     private var previewGeneration=0
@@ -82,6 +83,9 @@ struct ImportItem: Identifiable {
         if let previous=plan,previous.id == next.id {
             guard next.revision>=previous.revision else { return }
             if next.revision == previous.revision && next.number("checked")<previous.number("checked") { return }
+            let oldKey=(previous.values["processing"] as? [String:Any])?["develop_key"] as? String
+            let newKey=(next.values["processing"] as? [String:Any])?["develop_key"] as? String
+            if oldKey != newKey { images=[:];detail=nil }
         }
         plan=next;items=(result["items"] as? [[String:Any]] ?? []).compactMap(ImportItem.init)
         total=result["total"] as? Int ?? 0;offset=result["offset"] as? Int ?? 0

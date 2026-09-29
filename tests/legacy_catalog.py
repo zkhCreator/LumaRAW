@@ -21,10 +21,11 @@ from lumaraw.orientation import migrate as orientation
 from lumaraw.develop_presets import migrate as develop_presets
 from lumaraw.iptc import migrate as iptc
 from lumaraw.metadata_presets import migrate as metadata_presets
+from lumaraw.import_review import migrate as import_review
 
 
 def migrate_to(db, version):
-    migrations = (migrate_metadata, collections, copies, stacks, migrate_identities, capture, folders, keywords, relocations, folder_sync, keyword_exports, keyword_exchange, keyword_sets, painter, orientation, develop_presets, iptc, metadata_presets)
+    migrations = (migrate_metadata, collections, copies, stacks, migrate_identities, capture, folders, keywords, relocations, folder_sync, keyword_exports, keyword_exchange, keyword_sets, painter, orientation, develop_presets, iptc, metadata_presets, import_review)
     if not 0 <= version <= len(migrations):
         raise ValueError('Unsupported legacy fixture version')
     for migration in migrations[:version]:

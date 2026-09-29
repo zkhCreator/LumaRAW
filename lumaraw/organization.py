@@ -112,6 +112,8 @@ def migrate(db):
     migrate_metadata_presets(db)
     from .import_review import migrate as migrate_import_review
     migrate_import_review(db)
+    from .import_processing import migrate as migrate_import_processing
+    migrate_import_processing(db)
 
 
 def text_predicate(text):

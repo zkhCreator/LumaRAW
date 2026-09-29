@@ -80,8 +80,29 @@ partial catalog changes. Use `get_import` to inspect an uncertain response; neve
 retry application blindly. `cancel_import(plan_id)` interrupts pending work and
 discards staging, preserving originals and any completed import. Up to 32 compact
 receipts are retained. Review state is included in catalog backup/restore.
-This is Add only; copying, moving, DNG conversion and import-time presets are not
-supported by this command family.
+This is Add only; copying, moving and DNG conversion are not supported by this
+command family.
+
+For a ready review, `set_import_processing(plan_id, expected_revision, ...)` changes
+one or more of `develop_preset`, `metadata_preset` and `keywords`. A preset choice
+is `{preset_id, expected_revision}` from its own current preset-library page;
+null clears that choice. Omitted settings stay unchanged. `keywords` is an array
+of up to 100 additional names/paths; an empty array clears only those additions.
+Resolved additional text is limited to 128 KiB of serialized JSON. Capture does
+not create tags or photos. Preset settings and exact keyword hierarchy segments
+persist with the plan, independently of later preset edits/deletion. `get_import_processing`
+returns chosen names/IDs, additional keywords and the plan revision, without large
+preset patches. Do not infer an empty metadata preset from omitted payload fields.
+
+File descriptions are imported first. Captured metadata fields then replace only
+their selected values; preset and additional keywords append. Merged IPTC/keyword
+capacity, camera-profile mismatches and changed LUTs reject the complete import.
+Develop settings initialize the new recipe and affect review previews. Backups
+retain pending choices and LUT assets. Settings replies can advance only the same
+acknowledged editor revision; stale/uncertain writes are never automatically retried.
+Create a named metadata preset with the existing `save_metadata_preset` contract
+before choosing it for import. Saving an entire import configuration is not yet
+implemented.
 
 ## Library organization
 
@@ -316,7 +337,8 @@ photo receives Develop history, and equal recipes do not increment revisions.
 Metadata, independent orientation, originals and queued jobs survive. LUTs are
 checksum-verified and retained in the target catalog. Neither failed nor uncertain
 applications may be retried automatically with fresh revisions. Adobe preset
-file exchange, Amount, ISO adaptation and import-time application are not supported.
+file exchange, Amount and ISO adaptation are not supported. Reviewed Add imports
+can capture a partial Develop preset through `set_import_processing`.
 
 ## Photo orientation
 

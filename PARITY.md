@@ -50,7 +50,7 @@ gaps. Nothing below is full Lightroom parity merely because historical tests pas
 
 | Area | Current implementation | Remaining acceptance / work |
 | --- | --- | --- |
-| Import and catalogs | Partial: durable Add review with checked selection, Grid/Loupe source previews, subfolder choice, suspected duplicates, bounded sorting/filtering, XMP descriptions, cancellation/restart, referenced originals and backup/restore | Copy/Move/Copy as DNG, destinations/rename/backup, import-time metadata/develop presets, preview policies, cards/tethering, previous-import source, catalog switching/merge and desktop/reference acceptance |
+| Import and catalogs | Partial: durable Add review with checked selection, Grid/Loupe source previews, subfolder choice, suspected duplicates, bounded sorting/filtering, XMP descriptions, captured import-time Develop/metadata presets and keyword additions, cancellation/restart, referenced originals and backup/restore | Copy/Move/Copy as DNG, destinations/rename/backup, saved import configurations, preview policies, cards/tethering, previous-import source, catalog switching/merge and desktop/reference acceptance |
 | Library navigation | Partial: bounded grid/filmstrip, folder tree/search/favorites/labels, durable missing-folder relocation and folder synchronization, direct/recursive sources, filters/sorting, regular/smart/Quick collections and nested sets | Multi-source selection, complete sync Import Dialog/duplicate policy, folder move/rename, relocation overlap/collision handling, collection drag/drop/color labels, full smart criteria/import-export, source-selection memory, desktop acceptance |
 | Organization | Partial: duplicate/missing detection, hierarchical keywords/synonyms/export flags/Will Export preview, text/CSV vocabulary exchange and manual person tags, custom nine-slot keyword sets/recent entries/shared or catalog storage, multi-keyword shortcuts and keyword/rating/flag/label/target-collection/rotation/Develop-preset/metadata-preset Painter strokes, independent catalog rotation/flips, title/caption/copyright plus thirty IPTC fields, selective metadata presets, labels, batch metadata, virtual copies, manual/split/capture-time scoped stacks | Keyword policy/file and preset reference acceptance, built-in sets/suggestions/undo, Painter desktop acceptance, IPTC Extension and complete metadata parity, stack interaction acceptance, rename and sidecars |
 | Culling | Partial: Loupe/Compare/Survey, linked detail, anchored page selection | Desktop acceptance, cross-page selection, Develop reference view, auto advance, persistent workspace state |
@@ -59,7 +59,7 @@ gaps. Nothing below is full Lightroom parity merely because historical tests pas
 | Detail and optics | Partial: noise/sharpen, manual lens | Complete manual detail controls, automatic lens profiles, bounded full-resolution acceptance |
 | Geometry | Partial: crop/straighten/perspective, independent rotation/flips with attached masks and displayed crop ratios | Interactive retained handles, guided transforms, full crop state and rendered/reference parity |
 | Local editing | Partial: radial/gradient/brush/luma | Mask list/edit/reorder/intersection, range masks, clone/heal, red-eye (non-AI) |
-| History and presets | Partial: 50-step Develop undo, separate 50-batch orientation undo, shared named snapshots, partial Develop presets/groups/favorites/shared or local storage, batch/Painter application | Unified Undo/Redo, navigable history, preset hover preview/Amount/ISO adaptation/Adobe exchange, import-time application and reference acceptance |
+| History and presets | Partial: 50-step Develop undo, separate 50-batch orientation undo, shared named snapshots, partial Develop presets/groups/favorites/shared or local storage, batch/Painter and reviewed-import application | Unified Undo/Redo, navigable history, preset hover preview/Amount/ISO adaptation/Adobe exchange and reference acceptance |
 | Preview/performance | Partial: Metal, proxies, 1:1 viewport, developed thumbnail fast path | Real-RAW catalog/slider latency, offline previews, cache controls and desktop acceptance |
 | Export | Partial: JPEG/16-bit TIFF, ICC, durable jobs with frozen catalog/rights IPTC XMP and keyword hierarchy options | Presets, complete EXIF/IPTC Extension/GPS metadata policies, watermark, additional formats, publish workflows |
 | External editing and video | Missing | External-editor setup and derivative round trips; supported video import/playback, frame capture, trimming and export |
@@ -73,8 +73,8 @@ gaps. Nothing below is full Lightroom parity merely because historical tests pas
 
 ## Active increment
 
-Durable Add import review and bounded catalog application, followed by import-time
-presets and further Library/Develop workflows. Rendered Mac/reference acceptance,
+Import-time Develop/metadata presets and additional keywords, followed by further
+import, Library and Develop workflows. Rendered Mac/reference acceptance,
 Copy/Move/DNG, complete IPTC, Adobe exchange, unified Undo/Redo and the full inventory
 stay in scope. This does not complete product parity.
 
@@ -1736,3 +1736,91 @@ metadata/Develop application, preview policies, cards/tethering, previous-import
 source and catalog switching/merge remain. Desktop automation was not performed:
 rendered interaction, actual pointer/keyboard dispatch, VoiceOver, macOS 14 runtime
 and Lightroom Classic Mac reference acceptance remain unverified.
+
+### Apply During Import
+
+Schema 20 adds per-review captured Develop/metadata presets and additional keyword
+choices. The Mac panel supports None, search and thirty-item pages, new metadata
+presets with selected fields, comma-separated keywords and explicit draft saving.
+Choosing settings creates neither photos nor vocabulary. Local drafts survive
+conflicts; only acknowledged own writes advance an editor's plan revision.
+Refreshing preset lists never substitutes newer contents for an existing choice.
+Closing/reopening and catalog backup retain pending settings independently of
+later preset edits/deletion. Full presets stay off list/review wire responses.
+
+Metadata presets and their keyword meanings are read in one shared/catalog
+transaction. A rollback-only resolution records exact hierarchy segments, so a
+new XMP leaf or concurrent keyword edit cannot retarget a captured root/branch.
+Application imports file descriptions, replaces only the preset's checked fields,
+then unions keyword assignments. Empty checked scalars clear only those fields;
+empty additions do not remove file tags. Merged IPTC and keyword capacity failures
+roll back all new photos, vocabulary, folder counts and maintenance state.
+
+Captured Develop fields initialize the new recipe over defaults and update the
+review thumbnail/Loupe through the existing worker/cache. Camera profiles must
+match checked source metadata both at choice and application. LUTs stage outside
+SQL locks, are revalidated before import and rebind by content address on restore.
+No artificial pre-import edit history is created. Existing catalog photos, virtual
+copies, original bytes and frozen export jobs are outside the import mutation.
+
+Thirteen new Python cases cover snapshot/None/omission semantics, checked scope,
+file/preset/additional keyword unions, deletion after capture, stale plan/preset
+tokens, ambiguous and oversized keyword input, concurrent vocabulary changes,
+root/leaf preservation, camera selection changes, SQL/capacity rollback, LUT
+corruption/staging races, backup rebinding and genuine schema-19 rollback/retry.
+A real worker test verifies a generated gray image's import thumbnail changes
+under exposure and returns to its cached source version after clearing the preset.
+Source-native checks pass **22 assertions**, covering drafts, New/None, conflicts,
+list refresh, closing/reopening, chosen photo values and unchanged originals.
+
+The final full Python suite passes **464 tests with no skips**, including the fixed
+Nikon D3S NEF and required Metal checks. The Mac app builds for macOS 14 and passes
+local ad-hoc signature verification on macOS 26.6.2. Engine generation **22**,
+catalog schema **20**, **111 tools**, bundled usage guide and source digest
+`8a1bb3ea082c9831fb75b0bb734e9a39a267c2e554b1d1ecdd3d8d9e5542f2e5`
+match the final application package.
+
+The final packaged application passes **189 native assertions** across import
+settings (22), import review (22), metadata presets (32), Develop presets (28),
+folder synchronization (24), Painter (36), state conflicts (15) and connection
+handoff (10). Both build and native compilation logs contain no compiler warnings
+or errors. These are native state/service checks; they do not establish desktop
+interaction acceptance.
+
+The current-source/index publication check and the extracted source-only archive
+each pass with **306 files and zero findings**. This check excludes Git history
+and is not a historical secret audit or desktop validation.
+
+Warm performance was measured sequentially with no concurrent tests/builds on
+the arm64 macOS 26.6.2, 128 GB Mac. Each imported photo receives exposure/contrast,
+title/rating, **31,560 UTF-8 bytes** of IPTC and three keyword paths. Sixty originals
+are generated 8×8 PNGs; remaining catalog/candidate rows are synthetic. Setup,
+pixels, IPC and UI are excluded; synthetic bulk also excludes file verification.
+Pages have thirty samples, and scan/application figures each have one.
+
+| Operation (median / p95 for repeated pages) | 10,000 catalog / 1,000 candidates | 100,000 catalog / 10,000 candidates |
+| --- | ---: | ---: |
+| First page | 1.794 / 1.858 ms | 2.118 / 2.579 ms |
+| Last page | 1.738 / 1.794 ms | 2.297 / 2.545 ms |
+| Checked page | 1.840 / 2.122 ms | 2.102 / 2.280 ms |
+| Capture-time sort | 1.769 / 1.830 ms | 2.067 / 2.236 ms |
+| File-type sort | 1.768 / 1.876 ms | 2.082 / 2.624 ms |
+| Scan sixty real files (one sample) | 10.019 ms | 11.799 ms |
+| Apply sixty real files (one sample) | 29.038 ms | 66.147 ms |
+| Synthetic bulk transaction (one sample) | 168.969 ms | 2,474.835 ms |
+| Peak process RSS | 42.64 MB | 62.30 MB |
+
+First-page replies are 21,357 / 21,420 bytes, independent of preset metadata size;
+image-worker memory is zero. Probes assert original hashes, recipes, keyword totals,
+folder aggregates and maintenance state. Metadata applies in sixty-target batches,
+and exact keyword paths resolve once per transaction with a bounded prefix cache.
+The later vocabulary-capture race fix changes setup only, outside these timings.
+The bulk figure measures an atomic SQL lock period, not complete RAW import speed.
+
+Remaining import work includes saved/remembered import configurations, Copy/Move/
+DNG, renaming/destinations/second-copy backup, preview policies, cards/tethering,
+previous-import source and catalog switching/merge. Adobe preset-file translation,
+complete camera profiles and IPTC, sidecar writes and unified Undo also remain in
+the full objective. Rendered desktop interaction, actual keyboard/pointer dispatch,
+VoiceOver, macOS 14 runtime and Lightroom Classic Mac reference acceptance are
+unverified; this increment does not establish complete import or product parity.

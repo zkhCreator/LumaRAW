@@ -13,6 +13,7 @@ from .folder_sync_io import DirectoryReader,directory_identity,inspect_file
 from .import_review import ImportReview,ACTIVE
 from .model import IMAGE_EXTENSIONS
 from .relocations import identity
+from . import import_processing
 
 
 def sources(paths):
@@ -38,6 +39,10 @@ class ImportRunner:
         self.reader=DirectoryReader();self.reader_plan=None
 
     def dispatch(self,method,params):
+        if method=='get_import_processing':
+            return import_processing.ImportProcessing(self.service).get(**params)
+        if method=='set_import_processing':
+            return import_processing.ImportProcessing(self.service).set(**params)
         if method=='prepare_import':
             captured=sources(params['paths'])
             if any(Path(item['path'])==self.service.root or self.service.root in Path(item['path']).parents for item in captured):
@@ -66,16 +71,21 @@ class ImportRunner:
         if admitted.get('superseded'):raise InterruptedError('Preview is superseded')
         with self.service.catalog() as catalog:
             row=ImportReview(catalog).item(plan_id,item_id,expected_revision)
+            patch=import_processing.develop_patch(catalog,plan_id)
+        import_processing.check_camera(patch,json.loads(row['clock']).get('camera',''))
         if row['state'] in ('pending','error'):raise ValueError('Finish scanning this item before previewing')
         expected=json.loads(row['fingerprints']).get(row['path'])
         if expected is None or identity(row['path'])!=expected:
             raise ValueError('The import source changed; create a fresh review')
-        from .imaging import cached_thumbnail
-        path=None if detail else cached_thumbnail(row['path'],self.service.cache)
+        from .source_identity import cached_thumbnail
+        from .model import Recipe
+        recipe=Recipe.parse(patch) if patch else None
+        path=None if detail else cached_thumbnail(row['path'],self.service.cache,recipe=recipe)
         if path:result={'thumbnail':path,'cache_hit':True,'worker_spawned':False}
         else:
             result=self.service.run_worker({'operation':'preview' if detail else 'thumbnail','path':row['path'],
-                'recipe':{},'max_edge':1600,'include_before':False,'client_id':client_id,'generation':generation})
+                'recipe':patch,'kind':'developed' if patch else 'source','max_edge':1600,
+                'include_before':False,'client_id':client_id,'generation':generation})
         if identity(row['path'])!=expected:raise ValueError('The import source changed during preview')
         with self.service.catalog() as catalog:
             ImportReview(catalog).item(plan_id,item_id,expected_revision)
@@ -100,6 +110,8 @@ class ImportRunner:
                 with self.service.catalog() as catalog:
                     return ImportReview(catalog).finish_files(plan_id,plan['revision'],observations)
             with self.service.catalog() as catalog:plan=ImportReview(catalog).start_apply(**params)
+            with self.service.catalog() as catalog:processing=import_processing.settings(catalog,plan_id)
+            import_processing.verify_asset(processing)
             for kind in ('directories','files'):
                 after=0
                 while True:
