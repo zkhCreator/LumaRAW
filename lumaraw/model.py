@@ -6,6 +6,7 @@ Non-goals: no image I/O, no absolute Kelvin calibration, no Nikon Picture Contro
 Temperature and tint are relative adjustments to the camera's as-shot balance.
 Mixer hue values retain their original degree units; the Mac panel maps them to
 its -100…100 scale. Added mixer fields default to zero for existing recipes.
+Parametric regions are independent of older luminance and RGB point curves.
 """
 from dataclasses import asdict, dataclass, fields, field
 import math
@@ -17,6 +18,9 @@ MIXER_FIELDS = tuple(f'{band}_{kind}' for band in MIXER_BANDS for kind in ('hue'
 BW_FIELDS = tuple(f'{band}_bw' for band in MIXER_BANDS)
 POINT_CURVE_FIELDS = tuple(f'curve_{channel}_points' for channel in ('rgb','red','green','blue'))
 POINT_CURVE_GAP = 1 / 65535
+PARAMETRIC_FIELDS = tuple(f'parametric_{region}' for region in ('shadows','darks','lights','highlights'))
+PARAMETRIC_SPLITS = (.25,.5,.75)
+PARAMETRIC_GAP = .01
 POINT_CURVE_PRESETS = {
     'Linear': ((0,0),(1,1)),
     'Medium Contrast': ((0,0),(.25,.20),(.75,.80),(1,1)),
@@ -39,6 +43,7 @@ LIMITS = {
 }
 LIMITS.update({f'{band}_{kind}':(-30,30) if kind=='hue' else (-100,100)
                for band in MIXER_BANDS for kind in ('hue','sat','lum','bw')})
+LIMITS.update({key:(-100,100) for key in PARAMETRIC_FIELDS})
 
 @dataclass(frozen=True)
 class Recipe:
@@ -56,6 +61,11 @@ class Recipe:
     curve_shadows: float = 0
     curve_midtones: float = 0
     curve_lights: float = 0
+    parametric_shadows: float = 0
+    parametric_darks: float = 0
+    parametric_lights: float = 0
+    parametric_highlights: float = 0
+    parametric_splits: list = field(default_factory=lambda: list(PARAMETRIC_SPLITS))
     red_hue: float = 0
     red_sat: float = 0
     orange_hue: float = 0
@@ -159,6 +169,12 @@ def validate_point_curve(points):
 
 
 def validate_extras(r):
+    splits=r.parametric_splits
+    if not isinstance(splits,list) or len(splits)!=3 or not all(number(v,PARAMETRIC_GAP,1-PARAMETRIC_GAP) for v in splits):
+        raise ValueError('Parametric curves require three region splits inside 0.01–0.99')
+    edges=[0,*splits,1]
+    if any(b-a < PARAMETRIC_GAP-1e-12 for a,b in zip(edges,edges[1:])):
+        raise ValueError('Parametric regions must be at least one percent wide')
     box = r.crop_box
     if not isinstance(box, list) or len(box) != 4 or not all(number(x, 0, 1) for x in box) or box[2] - box[0] < .01 or box[3] - box[1] < .01:
         raise ValueError('Crop bounds must be inside the photo with width and height of at least 1%')
@@ -241,7 +257,7 @@ SYNC_GROUPS = {
     'Light': ['exposure','contrast','highlights','shadows','whites','blacks','highlight_recovery'],
     'Color': ['saturation','vibrance','monochrome',*MIXER_FIELDS],
     'Black & White Mix': list(BW_FIELDS),
-    'Tone Curve': ['curve_shadows','curve_midtones','curve_lights','curve_points',*POINT_CURVE_FIELDS],
+    'Tone Curve': ['curve_shadows','curve_midtones','curve_lights','curve_points',*POINT_CURVE_FIELDS,*PARAMETRIC_FIELDS,'parametric_splits'],
     'Detail': ['luma_noise','chroma_noise','sharpen','sharpen_radius','detail_protect','defringe'],
     'Lens': ['distortion','vignette','ca_red','ca_blue'],
     'Composition': ['rotation','crop','crop_box','straighten','perspective_h','perspective_v','geometry_scale'],

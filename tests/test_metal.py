@@ -11,7 +11,7 @@ import pytest
 from lumaraw import accelerators as accel
 from lumaraw.model import Recipe
 from lumaraw.render import grade_tile,RenderPlan,render_strip
-from lumaraw.color import to_output,decode
+from lumaraw.color import to_output,decode,output_matrix
 
 @pytest.fixture(autouse=True)
 def reset_backend():
@@ -36,6 +36,9 @@ RECIPES=[Recipe(),Recipe(exposure=.8,shadows=32,highlights=-45,whites=12,blacks=
          Recipe(curve_rgb_points=[[0,.05],[.3,.2],[.7,.8],[1,.98]],curve_red_points=[[0,0],[.4,.5],[1,1]],
                 curve_green_points=[[.03,0],[.85,1]],curve_blue_points=[[0,.08],[.6,.5],[1,.95]]),
          Recipe(curve_rgb_points=[[0,1],[.25,.1],[.5,.8],[1,0]],curve_red_points=[[0,1],[1,0]],purple_lum=25,monochrome=True,red_bw=30),
+         Recipe(parametric_shadows=100,parametric_darks=-100,parametric_lights=100,parametric_highlights=-100,parametric_splits=[.01,.02,.99]),
+         Recipe(parametric_shadows=70,parametric_darks=55,parametric_lights=-40,parametric_highlights=-80,parametric_splits=[.15,.6,.83],
+                curve_rgb_points=[[0,.02],[.4,.32],[1,1]],curve_blue_points=[[0,0],[.5,.55],[1,1]],purple_lum=30),
          Recipe(camera_profile={'camera':'synthetic','matrix':[[1.05,-.02,.01],[.02,.98,-.01],[-.02,.04,1.02]],'space':'LibRaw-ProPhoto-D65-linear'})]
 
 @pytest.mark.parametrize('space',['srgb','p3','adobe','prophoto'])
@@ -44,7 +47,8 @@ def test_real_metal_matches_cpu(recipe,space):
     require_metal()
     a=np.random.default_rng(910).uniform(-.03,1.5,(192,321,3)).astype(np.float32)
     gpu,gamut=accel.grade_output(a,recipe,space)
-    cpu,reference=to_output(grade_tile(a,recipe),space)
+    graded=grade_tile(a,recipe)
+    cpu,reference=to_output(graded,space)
     # Adobe RGB's pure gamma has an unbounded derivative at zero. Small
     # FP32 cancellation in saturated RGB can exceed the ordinary encoded tolerance
     # there. Bound both linear-light error and the exceptional dark code error;
@@ -57,7 +61,14 @@ def test_real_metal_matches_cpu(recipe,space):
         np.testing.assert_allclose(decode(gpu[dark],space),decode(cpu[dark],space),atol=1e-6,rtol=0)
     np.testing.assert_allclose(decode(gpu,space),decode(cpu,space),atol=1e-5,rtol=0)
     assert np.mean(np.abs(gpu-cpu))<2e-6
-    assert np.count_nonzero(gamut!=reference)<=1
+    if np.any(gamut!=reference):
+        # Binary markers are discontinuous at the existing -1e-5 / 1.00001
+        # thresholds. Curves can place many pixels on that boundary. Require
+        # every disagreement to be within 1e-6 linear units of it, rather than
+        # allowing an arbitrary number of wrong markers anywhere in the image.
+        linear=graded@output_matrix(space).T
+        boundary=np.min(np.minimum(abs(linear+np.float32(1e-5)),abs(linear-np.float32(1.00001))),axis=2)
+        assert boundary[gamut!=reference].max()<=1e-6
     assert accel.report()['metal_grade_tiles']==1
 
 def test_masks_and_lut_preserve_cpu_grade_and_use_gpu_output(tmp_path):

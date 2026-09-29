@@ -65,6 +65,7 @@ def packed(recipe,space,output_only=False):
     from ..imaging import LUMA
     from ..model import MIXER_BANDS,POINT_CURVE_FIELDS
     from ..curves import is_identity,packed_curve
+    from ..parametric import active,packed as parametric_packed
     from ..color import output_matrix,SRGB_FROM_WORK,WORK_FROM_SRGB
     p=np.zeros(PARAMETER_COUNT,np.float32);r=recipe
     p[:12]=[int(output_only),2**r.exposure,r.shadows/100,r.highlights/100,r.blacks/100,r.whites/100,r.contrast/200,1+r.saturation/100,r.vibrance/100,int(r.monochrome),int(any([r.curve_shadows,r.curve_midtones,r.curve_lights])),len(r.curve_points) if r.curve_points!=[[0.,0.],[1.,1.]] else 0]
@@ -75,6 +76,8 @@ def packed(recipe,space,output_only=False):
                             getattr(r,name+'_lum'),getattr(r,name+'_bw')]
     p[39]=int(np.any(p[176:208].reshape(8,4)[:,:3]))
     p[48]=int(r.monochrome and np.any(p[179:208:4]))
+    p[53]=int(active(r))
+    if p[53]:p[592:608]=parametric_packed(r).ravel()
     for i,name in enumerate(POINT_CURVE_FIELDS):
         points=getattr(r,name)
         if not is_identity(points):

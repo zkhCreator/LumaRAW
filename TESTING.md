@@ -76,8 +76,42 @@ VoiceOver events and does not verify rendered desktop layout.
 
 Run the RAW probe without concurrent builds/tests; its limits and timing scope
 match the mixer probe above. Steep curves are tested separately because this probe
-requires actual fused grading. Adobe pixel equivalence, full parametric controls,
-rendered interaction and macOS 14 runtime remain separate acceptance work.
+requires actual fused grading. Adobe pixel equivalence, rendered interaction and
+macOS 14 runtime remain separate acceptance work.
+
+## Four-region parametric curves
+
+`test_parametric.py` tests every region's sign and support, known center outputs,
+all sixteen extreme amount combinations with ordinary and one-percent-wide
+regions, monotonicity, smooth joins and bounded derivatives. It verifies exact
+identity/unused-region pixels, color-ratio preservation, unchanged black/white and
+out-of-SDR luminance, strip/viewport identity with point curves, old JSON, full
+presets, partial sync, atomic conflicts, undo, bundles/backups, frozen jobs and
+temporary-preview restoration. Required Metal tests combine parametric, point and
+HSL curves in all four spaces. Gamut-marker boundary uncertainty is stated in
+`METAL.md`; encoded and decoded color tolerances remain unchanged.
+
+`NativeParametricCurveRegression` checks drawing geometry against engine fixtures,
+region selection and split bounds, draft-only previews, one pending request behind
+an in-flight image, latest-draft coalescing, cancellation, one-step saves, reset
+independence, undo, revision conflicts, selection/pending-edit barriers and sync.
+Rerun `NativePointCurveRegression` after changing their shared scheduler. These are
+Store/IPC tests; real slider, pointer, keyboard, focus and VoiceOver acceptance
+still require a rendered desktop session.
+
+```sh
+.venv/bin/python tests/run_native.py --work work/native-parametric-01 \
+  --engine /absolute/LumaRAW.app/Contents/Resources/Engine/LumaRAWEngine \
+  --suite NativeParametricCurveRegression --suite NativePointCurveRegression
+.venv/bin/python tests/acceleration_probe.py --preset parametric \
+  --engine /absolute/LumaRAW.app/Contents/Resources/Engine/LumaRAWEngine \
+  --fixture /absolute/nikon.NEF --work work/parametric-nef-01
+```
+
+This RAW preset exercises all four regions with moved splits, all RGB point
+curves, legacy tone and color controls. Run it alone after builds and regressions,
+retaining the same dimensions, cache states, peak RSS and CPU/Metal parity limits
+as the other acceleration probes. It measures workers, not desktop drag latency.
 
 ## Reference RAW fixture
 

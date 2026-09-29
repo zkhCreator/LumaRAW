@@ -19,8 +19,7 @@ struct PointCurveControls: View {
     @State private var selectedPoint=0
     @State private var drag:CurveDrag?
     @State private var cancelled=false
-    @State private var draftPreviewTask:Task<Void,Never>?
-    @State private var draftPreviewGeneration=0
+    @StateObject private var previews=CurvePreviewScheduler()
     @FocusState private var plotFocused:Bool
     var legacy:Bool { channel == PointCurveFields.legacy }
     var points:[[Double]] { drag?.points ?? s.pointCurve(channel) }
@@ -83,7 +82,7 @@ struct PointCurveControls: View {
         .onChange(of:channel) { _,_ in selectedPoint=0;drag=nil }
         .onChange(of:s.selected) { _,_ in
             if drag != nil {cancelled=true}
-            draftPreviewGeneration+=1;draftPreviewTask?.cancel();draftPreviewTask=nil;drag=nil;selectedPoint=0
+            previews.cancel();drag=nil;selectedPoint=0
         }
         .onChange(of:s.photo?.revision) { _,revision in
             if let current=drag,let revision,revision != current.capture.revision {
@@ -162,7 +161,7 @@ struct PointCurveControls: View {
                 requestDraftPreview()
             }
         }.onEnded { _ in
-            draftPreviewGeneration+=1;draftPreviewTask?.cancel();draftPreviewTask=nil
+            previews.cancel()
             if let current=drag,!cancelled,!s.commitPointCurve(current.capture,current.points) {s.render()}
             drag=nil;cancelled=false
         })
@@ -209,23 +208,14 @@ struct PointCurveControls: View {
         s.setPointCurve(channel,result);selectedPoint=min(index,result.count-1)
     }
     func requestDraftPreview() {
-        guard draftPreviewTask == nil else {return}
-        draftPreviewGeneration+=1;let token=draftPreviewGeneration
-        draftPreviewTask=Task { @MainActor in
-            defer {if token == draftPreviewGeneration {draftPreviewTask=nil}}
-            try? await Task.sleep(nanoseconds:180_000_000)
-            // Keep one in-flight image and one coalesced latest draft. Continuous
-            // pointer movement must not repeatedly kill an unfinished worker.
-            while s.rendering && !Task.isCancelled {
-                try? await Task.sleep(nanoseconds:40_000_000)
-            }
-            guard !Task.isCancelled,token == draftPreviewGeneration,let current=drag else {return}
-            s.render(curveDraft:(current.capture,current.points),debounce:false)
+        previews.request(store:s) {
+            guard let current=drag else {return nil}
+            return current.capture.preview(current.points)
         }
     }
     func cancelDrag() {
         let wasDragging=drag != nil
-        draftPreviewGeneration+=1;draftPreviewTask?.cancel();draftPreviewTask=nil;drag=nil;cancelled=true
+        previews.cancel();drag=nil;cancelled=true
         if wasDragging {s.cancelMainPreview();s.render()}
     }
 }

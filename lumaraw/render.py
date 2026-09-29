@@ -31,6 +31,7 @@ from .performance import stage
 from .accelerators import grade_output
 from .color import to_output, output_matrix, encode, decode, icc_profile, mix_hues, mix_monochrome, apply_lut, soft_proof
 from .curves import apply_rgb_curves
+from .parametric import apply as apply_parametric
 from .imaging import load_source, fingerprint, cache_key, write_thumbnail, LUMA
 from .source_identity import thumbnail_path, cached_thumbnail
 from .orientation import validate as validate_orientation, inverse_rect, apply_array
@@ -229,6 +230,7 @@ def grade_tile(a,r,x=0,y=0,total_w=None,total_h=None):
             points=np.asarray(r.curve_points);encoded=np.interp(encoded,points[:,0],points[:,1]).astype(np.float32)
         target=decode(encoded)
         a*=(target/luminance)[:,:,None]
+    a=apply_parametric(a,r)
     a=apply_rgb_curves(a,r)
     a=mix_hues(a,r)
     if r.monochrome: a=mix_monochrome(a,r,LUMA)

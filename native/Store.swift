@@ -334,11 +334,11 @@ import UniformTypeIdentifiers
             render()
         } catch {if selected==id,token==generation{self.error=error.localizedDescription}}
     }
-    func render(curveDraft:(PointCurveCapture,[[Double]])?=nil,debounce:Bool=true) {
+    func render(curveDraft:CurvePreviewDraft?=nil,debounce:Bool=true) {
         if curveDraft == nil { updateThumbnails() }
         if isMultiReview { updateReviewRequests();return }
         guard let p=photo,p.id==selected,!loading else{return}
-        if let (capture,_) = curveDraft {
+        if let capture=curveDraft {
             guard p.id == capture.photoID,p.revision == capture.revision,!hasPendingEdits else {return}
         }
         generation += 1;let token=generation
@@ -349,8 +349,8 @@ import UniformTypeIdentifiers
             guard !Task.isCancelled,token==generation else{return}
             rendering=true
             var params:[String:Any]=["photo_id":p.id,"client_id":previewClient,"generation":token]
-            if let (capture,points) = curveDraft {
-                params["curve_patch"]=[capture.key:points];params["expected_revision"]=capture.revision
+            if let capture=curveDraft {
+                params["curve_patch"]=capture.patch;params["expected_revision"]=capture.revision
                 params["include_before"]=false
             }
             if detail{params["detail"]=["cx":cx,"cy":cy,"width":1600,"height":1100]}

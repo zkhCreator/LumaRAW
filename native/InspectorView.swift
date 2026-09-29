@@ -54,12 +54,7 @@ struct InspectorView:View {
                     edit("Saturation","saturation",-100...100)
                     Picker("Treatment",selection:bool("monochrome")) { Text("Color").tag(false);Text("Black & White").tag(true) }
                 }.padding(.top,12)}
-                section("Tone Curve"){
-                    edit("Shadow Curve","curve_shadows",-30...30)
-                    edit("Midtone Curve","curve_midtones",-30...30)
-                    edit("Highlight Curve","curve_lights",-30...30)
-                    PointCurveControls()
-                }
+                section("Tone Curve"){ToneCurveControls()}
                 section((s.recipe["monochrome"] as? Bool ?? false) ? "Black & White Mix":"Color Mixer") { ColorMixerControls() }
                 section("Detail"){
                     edit("Luminance Noise Reduction","luma_noise",0...100)

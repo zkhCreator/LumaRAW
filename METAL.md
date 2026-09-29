@@ -33,6 +33,12 @@ before allocating. Both Python and C reject mismatched sizes before reading the
 buffer. Old libraries are rejected with rebuild guidance; auto mode retains CPU
 fallback. The payload stays below Metal's 4 KiB inline-byte limit.
 
+Four parametric regions use sixteen previously unused floats in that same buffer;
+its v2 ABI and 640-float capacity remain unchanged. The shader composes the same
+smooth monotone warps as the CPU, then applies a shared RGB gain before point
+curves. Ordinary parametric/point/HSL combinations remain fused. Zero amounts and
+unchanged tones bypass unnecessary encoding round trips.
+
 Synthetic regressions keep the encoded absolute/relative limits of 1e-4/2e-5,
 except Adobe RGB channels below 0.02 on both backends: its pure-gamma derivative
 diverges at zero, magnifying FP32 cancellation. Those channels must satisfy both
@@ -41,6 +47,14 @@ require at most 1e-5 absolute decoded-linear error and mean encoded error below
 2e-6. This is an explicit numerical allowance, not bit identity. The real-RAW
 packaged probe independently retains its stricter maximum of eight 16-bit codes
 and one 8-bit preview code.
+
+Binary gamut markers retain their -1e-5 / 1.00001 linear thresholds. CPU/Metal
+roundoff can put a pixel on different sides of those thresholds, especially after
+curves place many channels at the same endpoint. Regression requires every marker
+disagreement to lie within **1e-6 linear units** of a reference threshold; markers
+away from this boundary must agree. This replaces the arbitrary maximum of one
+disagreeing pixel with a bound on the actual classification uncertainty. Encoded
+and decoded color-error limits above are unchanged.
 
 ## Memory, lifetime, and fallback
 

@@ -63,7 +63,7 @@ import Foundation
             var draft=PointCurveFields.inserted(capture.points,x:0.35,y:0.22)!.points
             draft=PointCurveFields.moved(draft,index:1,x:0.4,y:0.3)
             try check(try await photo(1).revision == before.revision && s.pointCurve("curve_rgb_points") == capture.points,"drag_draft_does_not_write_before_release")
-            s.render(curveDraft:(capture,draft),debounce:false);try await waitForPreview()
+            s.render(curveDraft:capture.preview(draft),debounce:false);try await waitForPreview()
             let previewed=try await photo(1)
             try check(s.message.hasPrefix("Curve preview") && previewed.revision == before.revision && s.pointCurve("curve_rgb_points") == capture.points,"temporary_native_preview_does_not_save_the_draft")
             let accepted=s.commitPointCurve(capture,draft),flushed=await s.flushEdits()

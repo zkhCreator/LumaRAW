@@ -103,15 +103,23 @@ clears that treatment's mix. **Sync Selected Photos** offers a separate
 **Black & White Mix** group. These controls use LumaRAW processing; Adobe pixel
 matching, targeted adjustment and Point Color remain unverified or unimplemented.
 
-In **Tone Curve**, choose RGB, Red, Green or Blue. Click the graph to add a point,
+In **Tone Curve → Parametric**, adjust Highlights, Lights, Darks and Shadows.
+Drag the graph vertically to adjust its highlighted region, or move the three
+dividers below it to change the tonal ranges. Numeric split values use percent;
+each region remains at least 1% wide. Double-click a region name to reset its
+amount. Reset Splits restores the boundaries; Reset Parametric Curve restores
+both amounts and splits while preserving point curves. Sliders and graph drags
+preview temporary changes and save once on release; Escape cancels a gesture.
+
+In **Tone Curve → Point**, choose RGB, Red, Green or Blue. Click the graph to add a point,
 drag it, or edit its Input/Output values (0–255). Arrow keys adjust the selected
 point; Delete removes an interior point. A drag previews temporary changes and
 saves once on release; Escape cancels it. Linear, Medium Contrast and Strong
 Contrast are LumaRAW presets. Reset Channel affects only the selected curve;
 Reset RGB Curves clears all four. Existing luminance curves remain unchanged and
-appear as **Legacy Luminance** when active. The three older region sliders are
-retained. Adobe processing, full parametric controls and reference parity remain
-unfinished.
+appear as **Legacy Luminance** when active. The three older region sliders remain
+under **Legacy Region Adjustments**. Adobe processing equivalence, targeted
+adjustment on the photograph and rendered/reference parity remain unfinished.
 
 Use **Photo → Stacking** to group, unstack, remove members, choose a cover or
 reorder photos. **⌘G / ⇧⌘G** group/unstack; with a photo surface focused, **S**

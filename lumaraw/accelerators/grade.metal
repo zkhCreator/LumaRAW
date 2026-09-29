@@ -26,6 +26,16 @@ float point_curve(float v,constant float *p,int start,int count){
     }
     return p[start+6*(count-1)+5];
 }
+float parametric_curve(float value,constant float *p){
+    for(int region=0;region<4;region++){
+        int k=592+4*region;
+        if(p[k+3]==0)continue;
+        float t=value<=p[k+1]?(value-p[k])/(p[k+1]-p[k]):(p[k+2]-value)/(p[k+2]-p[k+1]);
+        t=clamp(t,0.0f,1.0f);
+        value+=p[k+3]*t*t*(3.0f-2.0f*t);
+    }
+    return value;
+}
 float3 cuberoot(float3 x){
     float3 a=abs(x),root=pow(a,float3(1.0f/3.0f));
     // Compensated Newton residual corrects pow before subtractive Oklab matrices.
@@ -64,6 +74,13 @@ kernel void grade_output(device const float *input [[buffer(0)]],device float *o
             if(p[10]!=0)v=interpolate(v,p,64,5);
             if(p[11]!=0)v=interpolate(v,p,80,int(p[11]));
             a*=dec(v)/lum;
+        }
+        if(p[53]!=0){
+            float curveLum=dot(a,L);
+            if(curveLum>0 && curveLum<1){
+                float encoded=enc(curveLum),mapped=parametric_curve(encoded,p);
+                if(mapped!=encoded)a*=dec(mapped)/curveLum;
+            }
         }
         for(int channel=0;channel<3;channel++){
             if(p[49]==0 && p[50+channel]==0)continue;

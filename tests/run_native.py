@@ -32,6 +32,7 @@ def main():
     suites+=('NativePreviousImportRegression',)
     suites+=('NativeColorMixerRegression',)
     suites+=('NativePointCurveRegression',)
+    suites+=('NativeParametricCurveRegression',)
     parser.add_argument('--suite',choices=suites,action='append',help='Run selected suites; default: all')
     args=parser.parse_args()
     work=args.work.resolve()
@@ -76,6 +77,19 @@ def main():
                 values=np.unique(np.concatenate([np.linspace(0,1,257,dtype=np.float32),
                     np.array([(a[0]+b[0])/2 for a,b in zip(points,points[1:])],np.float32)]))
                 references.append({'points':points,'samples':np.column_stack([values,evaluate(values,packed_curve(points))]).tolist()})
+            curve_path=fixtures/'curve-geometry.json';curve_path.write_text(json.dumps(references))
+            env['LUMARAW_TEST_CURVES']=str(curve_path)
+        if suite=='NativeParametricCurveRegression':
+            import numpy as np
+            from lumaraw.model import Recipe,PARAMETRIC_FIELDS
+            from lumaraw.parametric import packed,evaluate
+            references=[]
+            values=np.linspace(0,1,4097,dtype=np.float32)
+            for amounts,splits in [([0,0,0,0],[.25,.5,.75]),([100,100,100,100],[.25,.5,.75]),
+                                   ([-100,-100,-100,-100],[.01,.02,.03]),([100,-100,100,-100],[.01,.5,.99]),
+                                   ([65,-45,35,-60],[.18,.52,.83])]:
+                recipe=Recipe(**dict(zip(PARAMETRIC_FIELDS,amounts)),parametric_splits=splits)
+                references.append({'recipe':recipe.dict(),'samples':np.column_stack([values,evaluate(values,packed(recipe))]).tolist()})
             curve_path=fixtures/'curve-geometry.json';curve_path.write_text(json.dumps(references))
             env['LUMARAW_TEST_CURVES']=str(curve_path)
         fixture=None

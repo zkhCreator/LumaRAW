@@ -81,6 +81,17 @@ saved result. Persist an accepted draft with an ordinary revision-checked edit.
 Active RGB curves are SDR; identity leaves negative/HDR values untouched. Very
 steep curves use CPU grading with Metal output and report the hybrid reason.
 
+Parametric curves have `parametric_shadows`, `parametric_darks`,
+`parametric_lights` and `parametric_highlights`, each -100 to 100. The separate
+`parametric_splits` array has three ascending normalized boundaries, default
+`[0.25,0.5,0.75]`; all four regions must be at least 0.01 wide. Changing splits
+preserves amounts. These five fields are included in Tone Curve sync, selected
+preset fields and temporary `curve_patch` previews. Reset only these fields when
+resetting a parametric curve; preserve legacy/RGB point curves unless requested.
+The smooth monotone transform changes encoded luminance before RGB point curves,
+preserving channel ratios and out-of-SDR luminance. It is not an Adobe parameter
+translation. Old recipes default to neutral amounts without a catalog rewrite.
+
 ## Reviewed Add import
 
 `prepare_import(paths, include_subfolders?, skip_duplicates?)` captures explicit

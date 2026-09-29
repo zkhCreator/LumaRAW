@@ -593,7 +593,7 @@ New fields default to zero, so old stored recipes need no SQL rewrite; sync pars
 the source before selecting fields. Native hue values display -100 to 100 and
 map to stored -30 to 30 degrees, preserving existing parameter meaning. Other
 mixer values use -100 to 100 directly. Partial presets, undo, bundles, snapshots
-and frozen exports use the same validated recipe. A full preset has 73 fields;
+and frozen exports use the same validated recipe. A full preset has 78 fields;
 the API patch/preset-field capacity is 128. Black & White Mix has a separate sync
 group; Color continues to include treatment and all color mixer components.
 
@@ -615,15 +615,35 @@ an identity curve is an exact no-op, preserving negative/HDR values. Curves acce
 movable endpoints and flat extension outside those endpoints. The portable core
 owns cached PCHIP coefficients; native PCHIP is presentation geometry only.
 Legacy `curve_points` keeps its original linear luminance equation and constraints.
-Tone Curve sync includes all four new curves and the older settings.
+Tone Curve sync includes point curves, parametric values/splits and older settings.
 
-Native gestures capture photo identity, revision and original points. Temporary
+Four `parametric_*` amounts (-100 to 100) and `parametric_splits` (three normalized
+boundaries, default 0.25/0.5/0.75, minimum region width 0.01) form an independent
+parametric curve. The portable implementation composes four C1 smoothstep bumps
+in shadow-to-highlight order. Each bump is centered on its region and supported
+between adjacent region centers; its bounded amplitude keeps its derivative
+positive, so even extreme combinations cannot reverse tone order. Split edits
+change these supports without modifying amounts. Sixteen cached floats describe
+the complete transform. This is an explicit LumaRAW algorithm, not Adobe's formula.
+
+Parametric curves map encoded luminance after legacy curves and before RGB point
+curves. A shared linear RGB gain preserves channel ratios. Black, white and
+out-of-SDR luminance are preserved, as are pixels in unchanged curve regions;
+zero amounts bypass all processing even with custom splits. No new full-frame
+buffer or SQL migration is needed. Native geometry mirrors this small transform
+only for drawing and is checked against engine samples; image math stays portable.
+
+Native gestures capture photo identity, revision and original curve values. Temporary
 `preview_photo.curve_patch` requires `expected_revision`, accepts only curve fields
 and never saves recipe/history. A drag coalesces one pending draft while one image
 is in flight; release saves one ordinary partial edit, and Escape restores the
 saved preview. Normal client generations invalidate stale image replies. An
 external edit or photo switch rejects the captured gesture instead of rebasing it.
 Preset values come from `recipe_schema.point_curve_presets` and are LumaRAW-owned.
+Point and parametric editors share `CurvePreviewScheduler`; a pending callback
+reads the latest draft only after existing image work finishes. Changing editor,
+photo or revision cancels that draft. Sliders capture the same transaction boundary
+as graph/divider gestures; typed edits use ordinary coalesced partial changes.
 
 This does not establish monitor calibration, Nikon Picture Control equivalence, or per-camera color accuracy. Camera profiles are bound to a specific model. A synthetic chart fit is algorithm evidence, not independent camera acceptance.
 
