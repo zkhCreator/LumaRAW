@@ -89,6 +89,9 @@ def test_frozen_presets_apply_only_to_checked_new_photos_with_additive_keywords(
     s.dispatch('edit_photo',{'photo_id':2,'expected_revision':0,'patch':{'exposure':-1}})
     undone=s.dispatch('undo_photo',{'photo_id':2,'expected_revision':1})
     assert undone['recipe']==p['recipe']  # Import presets, not neutral defaults, are the baseline.
+    from lumaraw.before_after import BeforeAfter
+    with s.catalog() as c:
+        assert BeforeAfter(c.db).read(2)[0].dict()==p['recipe']
 
 
 def test_omission_none_and_keyword_clearing_are_independent(library):

@@ -102,7 +102,7 @@ class DevelopHistory:
         self.db.execute('UPDATE photos SET recipe=?,revision=revision+1,history_cursor=? WHERE id=?', (data, step, photo_id))
         return True
 
-    def select(self, photo_id, step_id):
+    def value(self, photo_id, step_id):
         row = self.photo(photo_id)
         if step_id == 0:
             data = row['history_base_recipe'] or row['recipe']
@@ -111,7 +111,11 @@ class DevelopHistory:
             if step is None:
                 raise ValueError('History step does not exist for this photo')
             data = step['recipe']
-        recipe = Recipe.parse(json.loads(data))
+        return Recipe.parse(json.loads(data))
+
+    def select(self, photo_id, step_id):
+        row = self.photo(photo_id, recipes=False)
+        recipe = self.value(photo_id, step_id)
         if row['history_cursor'] != step_id:
             self.db.execute('UPDATE photos SET recipe=?,revision=revision+1,history_cursor=? WHERE id=?',
                             (json.dumps(recipe.dict()), step_id, photo_id))

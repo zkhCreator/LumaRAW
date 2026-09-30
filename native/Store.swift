@@ -46,6 +46,8 @@ import UniformTypeIdentifiers
     var developPresetEditorGeneration=0
     var orientationReadGeneration=0
     @Published var before: NSImage?
+    @Published var beforeLabel="Before"
+    var beforePreviewContext:BeforePreviewContext?
     @Published var histogram: [[Double]] = []
     @Published var metadata: [String: Any] = [:]
     @Published var importReview: ImportReviewModel?
@@ -290,6 +292,7 @@ import UniformTypeIdentifiers
         } catch {self.error=error.localizedDescription}
     }
     func clearPhoto() {
+        beforeLabel="Before";beforePreviewContext=nil
         historyRequest+=1;historyPage=nil;historyBefore=nil;historyError=nil;historyLoading=false
         cancelCurveTarget(restore:false);curveTargetFrame=nil
         cancelMixerTarget(restore:false);mixerTargetFrame=nil
@@ -380,6 +383,8 @@ import UniformTypeIdentifiers
             guard !Task.isCancelled,token==generation else{return}
             rendering=true
             var params:[String:Any]=["photo_id":p.id,"client_id":previewClient,"generation":token]
+            params["include_before"]=needsBeforePreview && !isDraft
+            let beforeContext=currentBeforeContext
             let toneContext=curveTargetActive ? curveTargetContext:nil
             if toneContext != nil {params["include_curve_tones"]=true}
             let mixerContext=mixerTargetActive ? curveTargetContext:nil,mixerMode=mixerTargetMode
@@ -401,7 +406,10 @@ import UniformTypeIdentifiers
                 guard token==generation,selected==p.id else{return}
                 guard r["revision"] as? Int == p.revision else { rendering=false;return }
                 if let path=r["preview"] as? String{preview=NSImage(contentsOfFile:path)}
-                if let path=r["before"] as? String{before=NSImage(contentsOfFile:path)}
+                if let path=r["before"] as? String {
+                    before=NSImage(contentsOfFile:path);beforePreviewContext=beforeContext
+                    beforeLabel=r["before_label"] as? String ?? "Before"
+                } else if !isDraft {before=nil;beforePreviewContext=nil}
                 histogram=r["histogram"] as? [[Double]] ?? []
                 metadata=r["metadata"] as? [String:Any] ?? [:]
                 previewGeometry=PhotoPreviewGeometry(r)

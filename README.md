@@ -18,7 +18,7 @@ LumaRAW references your originals without changing them. The SwiftUI app and you
 | Library | Folder tree/search/favorites/labels, ratings, flags, catalog metadata/keywords, regular/live smart collections, nested sets, Quick/target collections, SQL filters/sorting, manual/capture-time stacks, duplicate/missing indexing, virtual copies/shared snapshots, selective sync, and backup/restore |
 | Culling | Grid/Loupe/Compare/Survey, anchored page selections, active-photo review actions, linked or independent full-resolution comparison viewports |
 | Export | JPEG and 16-bit TIFF with embedded sRGB, Display P3, Adobe RGB, or ProPhoto RGB ICC profiles; frozen catalog XMP/keyword policies, persistent queue, pause/cancel/retry, and collision-safe filenames |
-| Agents | 116 MCP tools, equivalent JSON CLI commands, and a bundled skill; app and agent edits share conflict detection |
+| Agents | 117 MCP tools, equivalent JSON CLI commands, and a bundled skill; app and agent edits share conflict detection |
 
 ## Build and run
 
@@ -49,7 +49,7 @@ or uncertain exports still require explicit review/retry.
 
 1. Press **⌘I** to choose photos or folders, then **Scan Photos**. Review Grid/Loupe previews, check the desired photos and choose **Import Checked**. Drag-and-drop and Finder file-open events open the same review. **File → Review Pending Import** reopens an unfinished review.
 2. Double-click a photo to open Library Loupe. Press **D** or choose **Develop** to edit light, color, detail, composition, lens, and local adjustments.
-3. Use **Tools** to draw a crop or mask, or enable the split before/after view. In Develop, press **\\** to toggle the original preview; in Library it opens filters.
+3. Use **Tools** to draw a crop or mask, or enable the split before/after view. In Develop, press **\\** to toggle the saved Before preview; in Library it opens filters.
 4. Choose **1:1 Detail** to inspect a full-resolution viewport. Inspector sliders move the viewport horizontally and vertically.
 5. Press **1–5** to rate, **0** to clear the rating, **P** to pick, **X** to reject, or **U** to clear the flag. With the gallery focused, arrow keys select photos and Return opens Loupe.
 6. Command-click to toggle selection; Shift-click selects a contiguous range on the current page. **⌘A** in the focused grid selects the visible page. Grid rating/flag/metadata actions apply to the selection; Loupe, Compare, Survey and Develop actions apply to the active photo. **Photo → Sync Selected Photos** copies selected adjustment groups; composition, masks, and camera profiles are excluded by default.
@@ -106,8 +106,19 @@ the full recipe editor retain precise curve points and brush paths. Submitted
 exports keep their original recipe snapshot even if you continue editing.
 Upgrading preserves all remaining legacy steps, but cannot recover steps already
 discarded by older releases. Develop undo is separate from rotation/flip undo;
-global application undo, history hover previews and a custom Before state remain
-unimplemented.
+global application undo and history hover previews remain unimplemented.
+
+**Before / After** offers After Only, Before Only and Left/Right Split. Before
+starts with imported settings, including import presets; virtual copies start
+with their inherited settings. Copy After Settings to Before, Copy Before Settings
+to After, or Swap Before and After Settings from this menu or the Photo menu.
+Right-click a History step to copy its settings to Before without selecting it.
+The saved Before survives restart, history branching and Clear History. Copy/swap
+transfers the full recipe; the comparison preview uses current After geometry
+on both sides to keep corresponding pixels aligned. Develop undo affects After;
+it does not undo changes to Before. Older catalogs use their earliest retained
+history baseline when original import settings are unavailable. Whole-image pairs
+and top/bottom layouts remain unimplemented.
 
 In **Color Mixer**, use HSL to show Hue, Saturation, Luminance or all components,
 or Color to edit one color band. Red, orange, yellow, green, aqua, blue, purple and

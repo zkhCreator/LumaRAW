@@ -118,6 +118,8 @@ def migrate(db):
     migrate_previous_import(db)
     from .develop_history import migrate as migrate_develop_history
     migrate_develop_history(db)
+    from .before_after import migrate as migrate_before_after
+    migrate_before_after(db)
 
 
 def text_predicate(text):

@@ -46,7 +46,7 @@ struct ContentView: View {
                 ToolbarItem(placement:.principal){if s.workspace=="library"{Picker("Module",selection:Binding(get:{s.develop},set:{value in Task {if value {await s.startDevelop()} else {await s.switchLibraryView(s.libraryView)}}})){Image(systemName:"square.grid.2x2").tag(false);Image(systemName:"slider.horizontal.3").tag(true)}.pickerStyle(.segmented).frame(width:100)}}
                 ToolbarItemGroup(placement:.primaryAction){
                     if s.workspace=="library" {
-                        if s.develop {Button{s.compare.toggle()}label:{Label("Before and After",systemImage:"rectangle.lefthalf.inset.filled")}.disabled(s.photo==nil).help("Before / After \\")}
+                        if s.develop {BeforeAfterMenu()}
                         Button{s.showInspector.toggle()}label:{Label("Inspector",systemImage:"sidebar.right")}
                         Button{s.showExport=true}label:{Label("Export",systemImage:"square.and.arrow.up")}.disabled(s.selected==nil)
                     }
@@ -123,7 +123,7 @@ struct ContentView: View {
                                 Button("Luminance") {s.setMixerTargeting("lum")}
                             }
                         }.disabled(!s.canEditPointCurves || s.hasPendingEdits)
-                        Button("Split Before and After"){s.splitCompare.toggle();s.compare=false;s.canvasTool="view";s.detail=false}
+                        Button("Split Before and After"){s.setComparisonMode(s.splitCompare ? "after":"split")}
                         Button("Draw Freeform Crop"){s.canvasTool="crop";s.detail=false;s.compare=false;s.splitCompare=false}
                         Button("Draw Radial Mask"){s.canvasTool="radial";s.detail=false;s.compare=false;s.splitCompare=false}
                         Button("Draw Gradient Mask"){s.canvasTool="linear";s.detail=false;s.compare=false;s.splitCompare=false}
@@ -265,7 +265,7 @@ struct PhotoCanvas:View {
                     }
                 } else if s.rendering {ProgressView("Developing…").tint(.white).foregroundStyle(.white)}
                 else {Text("Select a photo to start editing").foregroundStyle(.gray)}
-                VStack {HStack{if s.compare{Text("Before").font(.caption.weight(.medium)).padding(8).background(.ultraThinMaterial,in:Capsule())};Spacer();if s.rendering && s.preview != nil{ProgressView().controlSize(.small).padding(8).background(.ultraThinMaterial,in:Circle())}};Spacer()}.padding(16)
+                VStack {HStack{if s.compare{Text("Before · \(s.beforeLabel)").font(.caption.weight(.medium)).padding(8).background(.ultraThinMaterial,in:Capsule())};Spacer();if s.rendering && s.preview != nil{ProgressView().controlSize(.small).padding(8).background(.ultraThinMaterial,in:Circle())}};Spacer()}.padding(16)
             }
             .accessibilityLabel(s.compare ? "Photo before editing":"Photo after editing")
             .accessibilityValue(s.photo?.displayName ?? "No photo selected")

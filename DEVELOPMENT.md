@@ -20,6 +20,14 @@ when a clear function is more maintainable. Avoid unrelated formatting churn.
 
 ## Contracts and persistence
 
+- Before snapshots are independent of the Develop timeline. Preserve imported
+  presets and inherited virtual-copy settings, and never retarget Before when
+  history is cleared or branched. Validate revisions for copy/swap/history
+  assignment; swap both recipes atomically and advance the visual revision once.
+  Before-only actions preserve redo. Keep complete copied recipes distinct from
+  the geometry-aligned preview recipe. Bound and validate the independent cache;
+  omit Before work when hidden and reject sources changed during comparison.
+
 - Keep reviewed imports separate from catalog photos until explicit application.
   Read directory entries, capture headers, XMP and pixels outside catalog locks;
   stage bounded pages and revalidate sources before one atomic Add transaction.

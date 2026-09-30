@@ -7,6 +7,8 @@ encoded for the GUI. LibRaw itself still decodes a full frame in one child proce
 Manual lens coefficients are user corrections, not an auto-selected lens database.
 Review callers can omit the before image and request a smaller fitted preview;
 full-resolution detail coordinates and export pixels retain the same pipeline.
+Persistent Before snapshots retain their own adjustments, with current After
+geometry for aligned comparison. Their independent cache avoids repeated grading.
 Export metadata is a frozen catalog snapshot encoded separately from pixels;
 internal recipes, source names and asset paths are never embedded as descriptions.
 Independent catalog orientation maps output strips back to canonical Develop
@@ -335,8 +337,8 @@ def make_thumbnail(path, recipe, cache, budget_mb, orientation=0):
             'cache_keep':[base,str(Path(base).with_suffix('.json')),str(target)]}
 
 
-def make_preview(path,recipe,cache,budget_mb,detail=None,display=None,include_before=True,max_edge=None,orientation=0,include_curve_tones=False,mixer_target=None):
-    source_identity=fingerprint(path) if include_curve_tones or mixer_target else None
+def make_preview(path,recipe,cache,budget_mb,detail=None,display=None,include_before=True,max_edge=None,orientation=0,include_curve_tones=False,mixer_target=None,before_recipe=None):
+    source_identity=fingerprint(path) if include_before or include_curve_tones or mixer_target else None
     if detail and max_edge is not None:
         raise ValueError('A detail viewport cannot also request a fitted preview size')
     if max_edge is not None and (isinstance(max_edge,bool) or not isinstance(max_edge,int) or not 128 <= max_edge <= 1680):
@@ -380,6 +382,8 @@ def make_preview(path,recipe,cache,budget_mb,detail=None,display=None,include_be
             raise ValueError('Source changed during curve sampling; reload the photograph')
         if tones is not None:
             curve_tones.write(tone_target,tones)
+    if source_identity is not None and fingerprint(path) != source_identity:
+        raise ValueError('Source changed during preview; reload the photograph')
     key=hashlib.sha256((cache_key(path,recipe,'render-v5')+json.dumps([detail,display,include_before,max_edge,orientation],sort_keys=True)).encode()).hexdigest()
     target=cache/(key+'.png');Image.fromarray(pixels).save(target,icc_profile=icc_profile('srgb'))
     h,w=pixels.shape[:2]
@@ -397,17 +401,44 @@ def make_preview(path,recipe,cache,budget_mb,detail=None,display=None,include_be
         (canonical.x0+canonical.crop_w)/canonical.sw,(canonical.y0+canonical.crop_h)/canonical.sh]}
     if not include_before:
         return result
-    before_path=cache/(key+'-before.png')
-    # A baseline keeps the same geometric corrections so split comparison aligns.
+    # Preserve the documented alignment boundary: copying settings transfers the
+    # full stored recipe, while previewing Before uses After's geometry.
     keep=('rotation','crop','crop_box','straighten','perspective_h','perspective_v','geometry_scale','distortion','ca_red','ca_blue')
-    baseline=Recipe(**{k:getattr(recipe,k) for k in keep})
+    baseline=replace(Recipe.parse(before_recipe) if before_recipe is not None else Recipe(),
+                     **{k:getattr(recipe,k) for k in keep})
+    before_key=hashlib.sha256((cache_key(path,baseline,'before-v1')+json.dumps([detail,display,max_edge,orientation],sort_keys=True)).encode()).hexdigest()
+    before_path=cache/(before_key+'-before.png')
+    hit=False
+    try:
+        with Image.open(before_path) as cached:
+            hit=cached.format=='PNG' and cached.size==(w,h)
+            cached.verify()
+    except (OSError,ValueError,SyntaxError):
+        hit=False
+    if hit:
+        if fingerprint(path) != source_identity:
+            raise ValueError('Source changed during comparison; reload the photograph')
+        result.update(before=str(before_path),before_cache_hit=True)
+        result['cache_keep'].append(str(before_path))
+        return result
     base_source,_,base_before=base_image(path,baseline,cache,budget_mb,full=full)
+    validate_camera(baseline,meta)
     before_plan=OrientedPlan(RenderPlan(base_source,baseline,max_edge or 0),orientation)
     if not full:
         before_plan.pixel_scale *= max(base_source.shape[:2])/max(meta['width'],meta['height'])
-    before,_,_=render_u8(before_plan,rect,display)
-    Image.fromarray(before).save(before_path,icc_profile=icc_profile('srgb'))
+    with stage('before_render'):
+        before,_,_=render_u8(before_plan,rect,display)
+    if fingerprint(path) != source_identity:
+        raise ValueError('Source changed during comparison; reload the photograph')
+    with tempfile.NamedTemporaryFile(dir=cache,prefix='.before-',suffix='.png',delete=False) as temporary:
+        temporary_path=Path(temporary.name)
+    try:
+        Image.fromarray(before).save(temporary_path,icc_profile=icc_profile('srgb'))
+        os.replace(temporary_path,before_path)
+    finally:
+        temporary_path.unlink(missing_ok=True)
     result['before']=str(before_path)
+    result['before_cache_hit']=False
     result['cache_keep'].extend([base_before,str(Path(base_before).with_suffix('.json')),str(before_path)])
     return result
 

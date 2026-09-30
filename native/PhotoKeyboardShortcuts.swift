@@ -50,7 +50,7 @@ struct PhotoKeyboardShortcuts: ViewModifier {
             case "p": s.flag(1)
             case "x": s.flag(-1)
             case "u": s.flag(0)
-            case "\\": if s.develop {s.compare.toggle()} else {s.showLibraryFilters=true}
+            case "\\": if s.develop {s.setComparisonMode(s.compare ? "after":"before")} else {s.showLibraryFilters=true}
             case "g": Task { await s.switchLibraryView(.grid) }
             case "e": Task { await s.switchLibraryView(.loupe) }
             case "c": Task { await s.switchLibraryView(.compare) }

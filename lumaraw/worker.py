@@ -38,7 +38,7 @@ def main():
         recipe = Recipe.parse(request.get('recipe', {}))
         operation = request['operation']
         if operation in ('preview','detail','reference'):
-            result = make_preview(request['path'], recipe, request['cache'], request['budget_mb'],detail=request.get('detail'),display=request.get('display'),include_before=request.get('include_before',True),max_edge=request.get('max_edge'),orientation=request.get('orientation',0),include_curve_tones=request.get('include_curve_tones',False),mixer_target=request.get('mixer_target'))
+            result = make_preview(request['path'], recipe, request['cache'], request['budget_mb'],detail=request.get('detail'),display=request.get('display'),include_before=request.get('include_before',True),max_edge=request.get('max_edge'),orientation=request.get('orientation',0),include_curve_tones=request.get('include_curve_tones',False),mixer_target=request.get('mixer_target'),before_recipe=request.get('before_recipe'))
         elif operation == 'calibrate':
             from .calibration import calibrate
             result = calibrate(request['path'],request['reference'],request['source_rect'],request['reference_rect'],request['cache'],request['budget_mb'],request['name'],request['lighting'])

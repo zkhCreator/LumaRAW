@@ -63,8 +63,8 @@ gaps. Nothing below is full Lightroom parity merely because historical tests pas
 | Detail and optics | Partial: noise/sharpen, manual lens | Complete manual detail controls, automatic lens profiles, bounded full-resolution acceptance |
 | Geometry | Partial: crop/straighten/perspective, independent rotation/flips with attached masks and displayed crop ratios | Interactive retained handles, guided transforms, full crop state and rendered/reference parity |
 | Local editing | Partial: radial/gradient/brush/luma | Mask list/edit/reorder/intersection, range masks, clone/heal, red-eye (non-AI) |
-| History and presets | Partial: durable paged Develop history with undo/redo, state selection/rename/clear, separate 50-batch orientation undo, shared named snapshots, partial Develop presets/groups/favorites/shared or local storage, batch/Painter and reviewed-import application | Unified application Undo/Redo, history hover/Before assignment, preset hover preview/Amount/ISO adaptation/Adobe exchange and rendered reference acceptance |
-| Preview/performance | Partial: Metal, proxies, 1:1 viewport, developed thumbnail fast path | Real-RAW catalog/slider latency, offline previews, cache controls and desktop acceptance |
+| History and presets | Partial: durable paged Develop history with undo/redo, state selection/rename/clear, persistent Before assignment/copy/swap, separate 50-batch orientation undo, shared named snapshots, partial Develop presets/groups/favorites/shared or local storage, batch/Painter and reviewed-import application | Unified application Undo/Redo, history hover, preset hover preview/Amount/ISO adaptation/Adobe exchange and rendered reference acceptance |
+| Preview/performance | Partial: Metal, proxies, 1:1 viewport, developed thumbnail fast path, on-demand Before with independent cache and aligned Before-only/left-right split comparison | Whole-pair/top-bottom comparison, real-RAW catalog/slider latency, offline previews, cache controls and desktop acceptance |
 | Export | Partial: JPEG/16-bit TIFF, ICC, durable jobs with frozen catalog/rights IPTC XMP and keyword hierarchy options | Presets, complete EXIF/IPTC Extension/GPS metadata policies, watermark, additional formats, publish workflows |
 | External editing and video | Missing | External-editor setup and derivative round trips; supported video import/playback, frame capture, trimming and export |
 | Merge | Missing | Non-AI HDR merge and panorama with bounded resources and reference acceptance |
@@ -77,7 +77,7 @@ gaps. Nothing below is full Lightroom parity merely because historical tests pas
 
 ## Active increment
 
-Durable Develop history and redo, followed by further import, Library and Develop
+Persistent Before/After snapshots and cache reuse, followed by further import, Library and Develop
 workflows. The full feature inventory above remains the acceptance scope.
 Rendered Mac/reference acceptance,
 Copy/Move/DNG, complete IPTC, Adobe exchange, unified Undo/Redo and the full inventory
@@ -2444,3 +2444,97 @@ The final package additionally passes History (23) and Connection (10) again:
 extracted-archive publication checks cover **340 files with zero findings**.
 Generated originals, catalogs, builds, timing receipts and process logs remain
 private and excluded from the source checkpoint.
+
+## Persistent Before / After and independent cache (September 29, 2026)
+
+A refreshed remote inspection found no unmerged branches before implementation.
+The Apple Silicon app builds for macOS 14 and passes ad-hoc signature verification
+on macOS 26.6.2. Engine generation **30**, schema **23**, **117 tools**, 78 editable
+recipe fields, bundled guide and source digest
+`a861d2b98054ddd4a0f43e0eb51bb0c2799ed82eca6bbd01bbb28946fee782ef`
+agree. The packaged executable SHA-256 is
+`3b551a961280b90ccfb0dec79a0e82ed0ceec7a4fa0604780d821ed5a9dc2f94`.
+The actual packaged MCP handshake/list verifies the new action schema. Swift
+compilation has no diagnostics; the existing optional PyInstaller
+`scipy.special._cdflib` hidden-import warning remains.
+
+Before now stores its own per-photo recipe, initially the imported settings
+including presets, or a virtual copy's inherited settings. The native Before /
+After menu provides After Only, Before Only, Left/Right Split and complete-recipe
+copy/swap actions. A History context action copies any retained step to Before
+without selecting it. Restart, history branching and Clear History retain the
+chosen Before. Copying to After and swapping produce ordinary Develop edits;
+Before-only assignments preserve the cursor and redo branch. Develop undo affects
+After only. Swap writes both sides atomically, and stale actions fail without replay.
+
+Schema 23 seeds existing photos from their earliest retained history baseline;
+it cannot reconstruct discarded import settings. Transactional insert/delete
+triggers keep imported photos and virtual copies independent. Backup restore
+rebinds assets referenced only by Before. The portable service captures both
+recipes under its catalog lock before starting image work. No public preview
+parameter can replace the stored baseline.
+
+Before keeps its own light/color/detail settings but previews through current
+After geometry, preserving the existing aligned-comparison boundary. The full
+stored recipe is still transferred by copy/swap. Hidden Before omits its image
+work; unchanged Before uses an independent source/recipe/viewport/orientation/
+display cache. After light changes therefore avoid grading Before again, while
+geometry changes invalidate it. Cache hits validate the entire PNG; misses use
+atomic replacement. Source identity changes during rendering fail visibly.
+The native shell captures photo/revision/view context before reusing a loaded
+Before image. Processing equations and numerical tolerances remain unchanged.
+
+The final Python suite passes **649 tests without skips**, including the fixed
+Nikon D3S NEF and required Metal execution. New coverage includes all four actions,
+full copied geometry/masks, no-op behavior, persistent labels, history independence,
+virtual copies, frozen jobs/originals, stale/invalid actions, swap rollback,
+Before-only LUT restoration and genuine schema-22 migration failure/retry.
+Generated reference pixels cover cache hit/repair/skip behavior, source replacement
+and all eight orientation mappings in full-resolution viewports. A real-worker
+case verifies persisted Before pixels and cache receipt. Initial targeted failures
+were two test cleanup calls using an unsupported Catalog context manager; those
+fixtures now use explicit closing and all targeted/full runs pass afterward.
+
+The final package passes **221 native assertions across eight suites**:
+Before/After (19), History (23), Import Processing (22), Orientation (51), Curve
+Targeting (33), Mixer Targeting (48), State (15) and Connection (10). New state
+coverage exercises on-demand Before, loaded-image reuse, fit split/detail state,
+copy/swap/history actions, photo switching, pending edits, stale writes and
+original bytes. These probes compile the real native controls and use the broker
+and packaged workers; they do not dispatch desktop input.
+
+The sequential RAW probe uses the fixed public Nikon D3S NEF (4284×2844,
+10,656,312 bytes, SHA-256
+`5922721d13f11795557d97fdeb0a60b900086c402bc82a848ff280d15b99ffd4`)
+on Apple M3 Max / 128 GiB, arm64 macOS 26.6.2. Fitted outputs are 1680×1115;
+detail outputs are 1280×900. Each row is one observation, except warm fit, which
+shows two samples. All builds/tests had finished. Times include worker launch,
+decode/cache, processing and PNG encoding; they exclude IPC/native interaction.
+An empty application cache is not a cold OS/GPU cache.
+
+| Request | CPU wall | Metal wall | Before cache |
+| --- | ---: | ---: | --- |
+| Empty-cache fit | 1.905 s | 0.961 s | Miss |
+| Warm fit, two observations | 1.280 / 1.276 s | 0.572 / 0.567 s | Hit |
+| After exposure change | 1.275 s | 0.574 s | Hit |
+| After straighten change | 2.064 s | 1.134 s | Miss |
+| First full-resolution detail | 1.952 s | 1.191 s | Miss |
+| Warm detail | 0.998 s | 0.526 s | Hit |
+| After only | 1.370 s | 0.594 s | Omitted |
+
+The first fitted Metal request dispatches eighteen grade tiles; warm fit and
+changed exposure dispatch nine, with no Before-render stage. Detail drops from
+sixteen to eight. Geometry changes dispatch both sides again. These stage/cache
+receipts establish avoided work; the noisy single After-only wall observation is
+not a comparative speed claim. Maximum sampled process RSS across all cases is
+483.67 MiB CPU / 367.19 MiB Metal (20 ms sampling). Both sides differ by at most
+one 8-bit code between CPU and Metal. After-only pixels equal the corresponding
+comparison After, and exposure changes retain the same Before PNG. Original
+hashes are unchanged. Generated fitted Before/After images were inspected; this
+is output-image inspection, not a desktop screenshot or Adobe accuracy check.
+
+Whole-image pairs, top/bottom layouts, history hover previews, global undo of
+Before assignments and complete snapshot management remain gaps. Rendered Mac
+controls, actual pointer/key dispatch, VoiceOver, macOS 14 runtime and Adobe
+reference/pixel acceptance remain unverified. These limitations are not replaced
+by state probes or build success; full Lightroom parity is not complete.

@@ -39,6 +39,7 @@ from .keyword_exports import KeywordExports
 from .keyword_details import KeywordDetails
 from .previous_import import state as previous_import_state
 from .develop_history import DevelopHistory, adjustment_label
+from .before_after import BeforeAfter
 
 class ConflictError(ValueError): pass
 
@@ -198,6 +199,7 @@ class Service:
                 preview_recipe=json.loads(row['recipe'])
                 if draft_key:
                     preview_recipe=Recipe.parse({**preview_recipe,**p[draft_key]}).dict()
+                before_state = BeforeAfter(c.db).read(row['id']) if method=='preview_photo' and p.get('include_before',True) else None
             if method=='thumbnail':
                 recipe=Recipe.parse(json.loads(row['recipe'])) if p.get('kind') == 'developed' else None
                 path=cached_thumbnail(row['path'],self.cache,recipe,row['orientation'])
@@ -207,10 +209,13 @@ class Service:
             request={'operation':{'preview_photo':'preview','thumbnail':'thumbnail','calibrate_camera':'calibrate'}[method],
                      'path':row['path'],'recipe':preview_recipe,'orientation':row['orientation']}
             request.update({k:v for k,v in p.items() if k not in ('photo_id','curve_patch','mixer_patch','expected_revision')})
+            if before_state:
+                request['before_recipe']=before_state[0].dict()
             result=self.run_worker(request)
             if 'metadata' in result:
                 with self.catalog() as c:c.update_metadata(row['id'],result['metadata'])
             return {**result,'photo_id':row['id'],'revision':row['revision'],'source':row['path'],
+                    **({'before_label':before_state[1]} if before_state else {}),
                     'curve_draft':'curve_patch' in p,'mixer_draft':'mixer_patch' in p}
         if method=='queue_control':return self.control(p)
         with self.catalog() as c:
@@ -298,6 +303,11 @@ class Service:
                 if page['revision']!=p['expected_revision']:
                     raise ConflictError('Edit conflict: history changed. Read the photo again.')
                 return page
+            if method=='before_after':
+                row=self.check_revision(c,p['photo_id'],p['expected_revision'])
+                with c.db:
+                    result=BeforeAfter(c.db).apply(row['id'],p['action'],p.get('step_id'))
+                return {**unpack(c.photo(row['id'])),**result,'before_label':BeforeAfter(c.db).read(row['id'])[1]}
             if method in ('redo_photo','select_history','rename_history','clear_history'):
                 row=self.check_revision(c,p['photo_id'],p['expected_revision'])
                 history=DevelopHistory(c.db)

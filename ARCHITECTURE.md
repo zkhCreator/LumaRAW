@@ -58,6 +58,23 @@ the manifest; binaries remain subject to release signing/notarization controls.
 
 ## Consistency and recovery
 
+Before/After comparison owns a separate `photo_before` recipe per photo (schema
+23), initialized transactionally by import/copy triggers and removed with its
+photo. Migration uses the earliest retained history baseline; it cannot recover
+discarded import settings. `before_after` validates the photo revision and applies
+both sides of a swap in one transaction. Before-only actions keep the history
+cursor and redo branch; After edits use the shared history writer. The visual
+revision advances once per changed action. Backup restore rebinds Before LUT
+assets even when no other recipe references them.
+
+Preview requests capture Before under the catalog lock, then release that lock
+before image work. The renderer aligns Before with current After geometry and
+keys its independent PNG cache by source identity, effective Before recipe,
+orientation, viewport and display/proof options. Complete PNG validation and
+atomic replacement protect cache reuse; source-identity changes during rendering
+fail visibly. Hidden Before skips its processing. Native reuse also captures
+photo/revision/view context. These states are separate from global application undo.
+
 - `get_photo` returns a revision. Edits, undo, version restore, recipe import, and sync require the expected revision. Stale writes fail; the caller must read again and reconcile.
 - Service database access is serialized. Sync validates every target before one transaction writes all changes. Ratings and flags are separate explicit operations.
 - Export submission freezes the recipe, source, destination, output options and resolved descriptive metadata. The request key, normalized argument digest, and job IDs are stored atomically. The same key and arguments return the original result; different arguments with that key fail.

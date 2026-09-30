@@ -68,7 +68,7 @@ extension Store {
         }
     }
     func redo() { moveDevelopHistory("redo_photo") }
-    func moveDevelopHistory(_ method:String,step:Int?=nil,name:String?=nil,captured:DevelopHistoryPage?=nil) {
+    func moveDevelopHistory(_ method:String,step:Int?=nil,name:String?=nil,action:String?=nil,captured:DevelopHistoryPage?=nil) {
         guard let p=photo,p.id==selected,!loading,!browsing,!hasPendingEdits,
               !orientationBusy,!developPresetBusy,!historyBusy else {return}
         if let captured {
@@ -79,6 +79,7 @@ extension Store {
         var params:[String:Any]=["photo_id":p.id,"expected_revision":p.revision]
         if let step {params["step_id"]=step}
         if let name {params["name"]=name}
+        if let action {params["action"]=action}
         historyBusy=true;editing=true
         cancelCurveTarget(restore:false);cancelMixerTarget(restore:false)
         Task {
@@ -124,6 +125,8 @@ struct DevelopHistoryPanel:View {
                                 }.buttonStyle(.plain).disabled(!s.historyReady)
                                     .accessibilityLabel("\(step.label)\(step.current ? ", current state":"")")
                                     .contextMenu {
+                                        Button("Copy History Step Settings to Before"){s.beforeAfter("history_to_before",step:step.id,captured:page)}
+                                            .disabled(!s.historyReady)
                                         Button("Rename…"){captured=page;renameStep=step;name=step.label}
                                             .disabled(!s.historyReady)
                                     }

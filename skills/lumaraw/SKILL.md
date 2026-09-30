@@ -23,6 +23,23 @@ intent for this irreversible deletion. Snapshots, orientation and submitted
 exports remain unchanged. Never retry stale or uncertain mutation responses.
 These commands cover per-photo Develop history, not global application undo.
 
+## Before / After
+
+`before_after` requires `photo_id`, `expected_revision` and an `action`:
+`after_to_before`, `before_to_after`, `swap`, or `history_to_before` with a
+`step_id` (zero selects the retained history baseline). Copying history does not
+move its cursor. Before is a separate persistent recipe, initially the imported
+or inherited virtual-copy settings. Branching and clearing history leave it
+intact. Before-only changes advance the photo revision without truncating redo;
+copying to After and swapping create ordinary Develop edits. Develop undo only
+changes After. Never retry stale or uncertain mutation replies.
+
+`preview_photo` returns `before_label` and `before_cache_hit` when Before is
+requested. Its Before preview uses current After geometry to align both sides,
+while copy/swap always transfers the complete stored recipe. Set `include_before:
+false` when only After is needed. The service captures the stored Before; clients
+cannot inject another baseline into the preview contract.
+
 Use the LumaRAW MCP tools when connected. The native app's **Agent Connection** page shows the exact command and catalog path. App, CLI and MCP use the same service. No login, API key or network service is needed.
 
 If MCP is unavailable, call the packaged engine at `<LumaRAW.app>/Contents/Resources/Engine/LumaRAWEngine`. Pass `--catalog <catalog-path> <method>` and a JSON object on stdin. `status` and `recipe_schema` need no input. Source checkout fallback: `uv run --frozen lumaraw --catalog <path> <method>` from the project directory. The CLI wraps results in `{ok,result}` or `{ok,error,type}`; stdout of `--mcp` is JSON-RPC only.

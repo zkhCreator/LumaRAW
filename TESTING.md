@@ -11,6 +11,41 @@ LUMARAW_TEST_NEF=/absolute/nikon.NEF uv run --frozen pytest -q
 
 The two `test_core.py` real-RAW tests skip if that environment variable is absent. `test_service.py` verifies revision conflicts, invalid edit atomicity, all-target sync, immutable export snapshots, deduplication keys, bounded queue pages and specific receipts, memory stopping, cancellation while a worker slot is occupied, superseded UI previews, cold job recovery and newline MCP framing through real subprocesses.
 
+## Persistent Before / After
+
+`test_before_after.py` checks full-recipe copy/swap, history assignment without
+cursor movement, retained redo, clear/branch/restart isolation, virtual-copy
+initialization, import presets, stale/invalid actions, transactional rollback,
+Before-only LUT restoration and genuine schema-22 migration failure/retry.
+Generated pixels check effective geometry and all eight orientations at 1:1,
+independent cache hits/invalidation, corrupt PNG repair, omitted Before work and
+source replacement rejection. Real workers verify stored baseline pixels/labels.
+
+`NativeBeforeAfterRegression` checks actual Store/IPC state, on-demand loading,
+unchanged-view reuse, split/detail transitions, full-recipe actions, captured
+history/selection guards, pending edits, stale writes and read-only originals.
+It does not establish rendered controls, actual pointer/key events or VoiceOver.
+
+```sh
+.venv/bin/python -m pytest -q tests/test_before_after.py
+.venv/bin/python tests/run_native.py --work work/new-before-native \
+  --engine /absolute/LumaRAW.app/Contents/Resources/Engine/LumaRAWEngine \
+  --suite NativeBeforeAfterRegression
+.venv/bin/python tests/before_after_probe.py --work work/new-before-nef \
+  --engine /absolute/LumaRAW.app/Contents/Resources/Engine/LumaRAWEngine \
+  --fixture /absolute/nikon.NEF
+```
+
+Run the RAW probe after builds/tests finish. Separate CPU/Metal caches and
+sequential workers cover empty-cache fit, two warm fits, After light/geometry
+changes, cold/warm 1280×900 detail and After-only requests. Preserve each image
+before reusing paths, record actual Metal dispatch, stage times, 20 ms sampled RSS
+and unchanged original hashes. Both sides retain a maximum one-code 8-bit CPU/
+Metal difference; After-only pixels must equal the matching comparison request.
+Wall times include worker launch and encoding, not desktop latency. Empty app
+caches do not imply cold OS/GPU caches. Single-fixture results are not a camera
+accuracy or Lightroom processing claim.
+
 ## Eight-band color and black-and-white mixer
 
 `test_color_mixer.py` uses a synthetic Oklab color ring to test every band's hue,

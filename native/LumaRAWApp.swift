@@ -26,6 +26,7 @@ import AppKit
             }
             CommandMenu("Photo") {
                 Button("Develop Presets…") { store.showDevelopPresets=true }
+                Menu("Before / After") {BeforeAfterActions().environmentObject(store)}.disabled(!store.historyReady)
                 Divider()
                 PhotoOrientationActions().environmentObject(store)
                 Divider()
