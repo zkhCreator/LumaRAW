@@ -21,6 +21,7 @@ Official references checked September 2026:
 - [Collections, smart collections and collection sets](https://helpx.adobe.com/lightroom-classic/desktop/organize-photos-in-lightroom-classic/photo-collections.html)
 - [Smart collection criteria](https://helpx.adobe.com/lightroom-classic/desktop/organize-photos-in-lightroom-classic/smart-collections-criteria-in-lightroom-classic.html)
 - [Develop tools](https://helpx.adobe.com/lightroom-classic/desktop/process-and-develop-photos/develop-module-tools.html)
+- [Reference View selection, locking and crop exit, Adobe's Julieanne Kost](https://jkost.com/blog/2024/08/reference-view-in-lightroom-classic.html)
 - [History state selection, naming, clearing and snapshots](https://helpx.adobe.com/uk/lightroom-classic/desktop/process-and-develop-photos/develop-module-options.html)
 - [Snapshot creation, update, sharing and Before assignment, Adobe's Julieanne Kost](https://jkost.com/blog/2024/08/working-with-snapshots-in-lightroom-classic-and-photoshop.html)
 - [Tone Curve controls and channels](https://helpx.adobe.com/lightroom-classic/desktop/process-and-develop-photos/image-tone-color.html)
@@ -58,7 +59,7 @@ gaps. Nothing below is full Lightroom parity merely because historical tests pas
 | Import and catalogs | Partial: durable Add review with checked selection, Grid/Loupe source previews, subfolder choice, suspected duplicates, bounded sorting/filtering, XMP descriptions, captured import-time Develop/metadata presets and keyword additions, cancellation/restart, durable Previous Import source with automatic navigation preference, referenced originals and backup/restore | Copy/Move/Copy as DNG, destinations/rename/backup, saved import configurations, preview policies, cards/tethering, progressive Current Import, catalog switching/merge and desktop/reference acceptance |
 | Library navigation | Partial: bounded grid/filmstrip, folder tree/search/favorites/labels, durable missing-folder relocation and folder synchronization, direct/recursive sources, filters/sorting including live snapshot status, regular/smart/Quick collections and nested sets | Multi-source selection, complete sync Import Dialog/duplicate policy, folder move/rename, relocation overlap/collision handling, collection drag/drop/color labels, full smart criteria/import-export, source-selection memory, desktop acceptance |
 | Organization | Partial: duplicate/missing detection, hierarchical keywords/synonyms/export flags/Will Export preview, text/CSV vocabulary exchange and manual person tags, custom nine-slot keyword sets/recent entries/shared or catalog storage, multi-keyword shortcuts and keyword/rating/flag/label/target-collection/rotation/Develop-preset/metadata-preset Painter strokes, independent catalog rotation/flips, title/caption/copyright plus thirty IPTC fields, selective metadata presets, labels, batch metadata, virtual copies, manual/split/capture-time scoped stacks | Keyword policy/file and preset reference acceptance, built-in sets/suggestions/undo, Painter desktop acceptance, IPTC Extension and complete metadata parity, stack interaction acceptance, rename and sidecars |
-| Culling | Partial: Loupe/Compare/Survey, linked detail, anchored page selection | Desktop acceptance, cross-page selection, Develop reference view, auto advance, persistent workspace state |
+| Culling | Partial: Loupe/Compare/Survey, linked detail, anchored page selection, Develop Reference/Active pairs with independent Fit/1:1 viewports and session lock | Desktop acceptance, reference RGB/LAB readouts and scrubby/box zoom, cross-page selection, auto advance, persistent workspace state |
 | Basic development | Partial: light/WB/color, eight-band HSL and B&W Mix with photo-targeted adjustment and selective resets/sync | Calibrated absolute WB, eyedropper, texture/clarity/dehaze, Point Color, Auto B&W mix, color grading and Adobe processing/reference acceptance |
 | Curves and profiles | Partial: four-region parametric curves with movable splits and photo-targeted adjustment, interactive RGB/channel point curves, shared temporary previews, legacy luminance curve, LUT/ICC | Point/channel targeting, curve exchange, camera/profile browser, Adobe processing and rendered/reference acceptance |
 | Detail and optics | Partial: noise/sharpen, manual lens | Complete manual detail controls, automatic lens profiles, bounded full-resolution acceptance |
@@ -78,9 +79,8 @@ gaps. Nothing below is full Lightroom parity merely because historical tests pas
 
 ## Active increment
 
-Continue import, Library and Develop workflows after the implemented
-snapshot-status filters and live smart collections. The full feature inventory
-above remains the acceptance scope.
+Develop Reference/Active comparison, followed by further import, Library and
+Develop workflows. The full feature inventory above remains the acceptance scope.
 Rendered Mac/reference acceptance,
 Copy/Move/DNG, complete IPTC, Adobe exchange, unified Undo/Redo and the full inventory
 stay in scope. This does not complete product parity.
@@ -2797,3 +2797,124 @@ runtime remain **not verified**. Native state/IPC tests and a macOS 14 deploymen
 target do not establish desktop or older-OS acceptance. Complete metadata filter
 facets, all smart criteria, snapshot hover and the full non-AI inventory remain
 open; this increment does not complete Lightroom Classic parity.
+
+## Develop Reference/Active comparison (September 29, 2026)
+
+The Mac shell now exposes Photo > Open in Reference View, a Develop toolbar
+entry and focused Shift-R routing. Assign a reference from Grid/filmstrip menus
+or an in-app photo drag; select or drop another active photo without changing
+reference identity. Left/Right and Top/Bottom pairs have independent Fit/1:1
+controls, click-to-zoom and ROI-based panning. Letterbox clicks are ignored.
+The active pane retains the inspector, local drawing and targeted curve/mixer
+overlays, and can show its saved Before. Paired Before/After exits Reference View.
+
+The session lock retains reference identity when leaving Develop; an unlocked
+reference clears. D/Done returns to ordinary Develop without clearing assignment.
+Crop selection offers a captured Continue/Cancel exit, rejecting a confirmation
+after the active photo changes. Custom drag values contain only a session token
+and one visible catalog ID; foreign sessions, unknown IDs and multiple items are
+rejected. The app declares its custom data type in Info.plist as required by
+Apple's Transferable contract. File URL drops keep their existing import workflow.
+
+Reference identity is independent of the visible page and source-family roles.
+Virtual copies can be references with their own saved edits. A removed reference
+reports an error instead of silently choosing a replacement. Locking does not
+freeze a recipe: bounded summary polling follows saved edits, including when
+Reference and Active show the same photo. Ordinary multi-selection edits still
+target Active, while explicit Sync retains its existing multi-photo behavior.
+
+One independently cancellable reference frame is retained. Unchanged active
+edits and fitted layout changes reuse it; hiding the view releases it. Detail
+requests are bounded to 2048 by 1536 physical pixels and pans start from the
+returned ROI, including at image edges. The reference omits Before work and uses
+the same display/proof parameters as Active. The optional existing
+`preview_photo.expected_revision` now checks ordinary previews before and after
+processing, and compares path/size/mtime source fingerprints. Conflicts never
+return the obsolete result or write its metadata receipt. These checks do not
+hash the entire source or freeze files against subsequent external modification.
+
+Engine generation **33**, catalog schema **25**, **120 tools**. Reference roles
+are session presentation state, so no catalog migration or recipe changes are
+introduced. App, CLI and MCP share the preview contract and bounded worker
+pipeline; the portable engine gains no SwiftUI/AppKit dependency.
+
+### Reference regression evidence
+
+The full required-Metal Python suite passes **677 tests in 68.58 s, no skips**,
+including the fixed public Nikon D3S NEF. Six new preview cases cover stale
+revisions before work, edits and source changes during work, metadata-only
+changes, Fit/detail geometry, ICC output, legacy commands and preservation of
+recipes/history/originals. Related processing checks pass **84 tests**.
+
+The final source-level Reference probe passes **51 assertions** with generated
+2400 by 1800 originals. It covers roles, active-only edits, retained reference
+pixels, independent zoom/pan, physical-scale bounds, edge reversal, stale drags,
+Before toggling, drop validation, crop confirmation, module lock, source filtering,
+virtual-copy removal, same-photo roles and late/mismatched preview replies.
+Initial compilation exposed an ambiguous NaN in a test; it now uses CGFloat.
+The first running probe exposed that Fit replies intentionally have no ROI;
+native frames now use the whole proxy for Fit and require a real ROI for detail.
+No assertion was removed to accommodate either correction.
+
+Against the final packaged engine, nine native state/IPC suites pass **257
+assertions**: Reference 51, Library Review 20, Comparison Layout 42, Before/After
+19, Curve Target 33, Mixer Target 48, State 15, Connection 10 and Previous Import
+19. These compile the final native source with the probe entry points, then use
+the bundled engine; they do not drive the app executable's desktop controls.
+
+### Reference processing evidence
+
+The final packaged engine was measured on Apple M3 Max, 128 GiB, macOS 26.6.2,
+using the public Nikon D3S NEF (4284 by 2844, 10,656,312 bytes, SHA-256
+`5922721d13f11795557d97fdeb0a60b900086c402bc82a848ff280d15b99ffd4`).
+Reference retains the original recipe; Active is a virtual copy with exposure,
+shadows and blue-hue edits. Each backend has a fresh catalog/cache. Times below
+are one sample per case, including CLI startup, IPC and worker processing; they
+are not median or tail latency, and do not include native display. Cold means
+application cache, not cold filesystem or GPU state. RSS is the sampled worker
+peak, not total app memory.
+
+| Preview | Output pixels | CPU ms / RSS MiB | Metal ms / RSS MiB | Actual Metal tiles |
+| --- | --- | --- | --- | --- |
+| Reference cold Fit | 1680 × 1115 | 991.1 / 334.8 | 832.0 / 292.6 | 9 |
+| Active Fit | 1680 × 1115 | 1090.5 / 358.1 | 554.2 / 176.2 | 9 |
+| Reference warm Fit | 1680 × 1115 | 724.3 / 237.1 | 561.8 / 176.0 | 9 |
+| Reference cold detail | 800 × 600 | 1265.9 / 334.0 | 1138.6 / 333.0 | 5 |
+| Reference warm detail | 800 × 600 | 451.9 / 125.3 | 449.6 / 95.8 | 5 |
+| Active detail | 800 × 600 | 557.3 / 103.0 | 458.2 / 100.8 | 5 |
+
+CPU/Metal output differs by at most one 8-bit code value per channel in every
+case. Same-backend cold/warm pixels are identical; all outputs carry ICC data,
+and the original hash is unchanged. Reference/Active Fit outputs were inspected
+as generated images. This is not camera-color accuracy, Lightroom pixel matching
+or desktop interaction evidence. The benchmark deliberately requests frames;
+the separate native assertions establish that active edits reuse the retained
+reference frame without another reference request.
+
+### Reference package verification
+
+The final macOS 14-targeted arm64 app builds without Swift diagnostics and passes
+deep/strict local code-signature verification. Its exported internal photo data
+type conforms to public.data. Packaged MCP initialization and all **120 complete
+tool schemas** match source; the bundled guide is byte-identical. The source
+identity matches the packaged generation-33 manifest:
+
+- Source digest: `6571f57651dab7285f502bcccec1170c0136f35f5ecbf8e9f286d67e534597f0`
+- Engine SHA-256: `ba35829d4ebef2801d46f6da30ef9680a66d8e68d0333899d69e5058dfe42671`
+- Native executable SHA-256: `464858adf46dc228569d8e4c88177cc4bd090f6b1cdc8349ab75e8061e7fa695`
+
+PyInstaller retains the previously documented optional `scipy.special._cdflib`
+collection warning. The packaged RAW processing checks above pass; this does
+not establish functionality of that optional SciPy submodule.
+
+Reference RGB/LAB paired readouts, box/scrubby zoom and Lightroom-specific visual
+or pixel matching remain open. Actual Mac drag/drop, keyboard dispatch, rendered
+target/drawing overlay alignment, crop alert behavior, VoiceOver and macOS 14
+runtime behavior remain **not verified**. State/IPC checks and generated image
+inspection do not replace desktop acceptance. Reference comparison is a partial
+vertical workflow in the full non-AI inventory, not completed product parity.
+
+Current source/index and the extracted strict source archive cover **363 public
+files with zero findings**. A remote refresh found no unmerged local or remote
+branches; main remains an ancestor. Generated photographs, catalogs, packaged
+binaries and private receipts stay ignored and excluded from the module commit.

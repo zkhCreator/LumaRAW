@@ -46,7 +46,10 @@ struct ContentView: View {
                 ToolbarItem(placement:.principal){if s.workspace=="library"{Picker("Module",selection:Binding(get:{s.develop},set:{value in Task {if value {await s.startDevelop()} else {await s.switchLibraryView(s.libraryView)}}})){Image(systemName:"square.grid.2x2").tag(false);Image(systemName:"slider.horizontal.3").tag(true)}.pickerStyle(.segmented).frame(width:100)}}
                 ToolbarItemGroup(placement:.primaryAction){
                     if s.workspace=="library" {
-                        if s.develop {BeforeAfterMenu()}
+                        if s.develop {
+                            Button("Reference View") {Task {await s.startReferenceView()}}.help("Reference View · Shift-R")
+                            BeforeAfterMenu()
+                        }
                         Button{s.showInspector.toggle()}label:{Label("Inspector",systemImage:"sidebar.right")}
                         Button{s.showExport=true}label:{Label("Export",systemImage:"square.and.arrow.up")}.disabled(s.selected==nil)
                     }
@@ -63,6 +66,10 @@ struct ContentView: View {
             }
             Button("OK",role:.cancel){s.error=nil}
         } message:{Text(s.error ?? "")}
+        .alert("Exit Reference View to Crop?",isPresented:Binding(get:{s.referenceCropPhotoID != nil},set:{if !$0 {s.referenceCropPhotoID=nil}})) {
+            Button("Continue") {s.confirmReferenceCrop()}
+            Button("Cancel",role:.cancel) {s.referenceCropPhotoID=nil}
+        } message:{Text("The Crop tool uses the full Develop view. Your reference photo remains available when you return.")}
         .sheet(isPresented:$s.showExport){ExportSheet()}
         .sheet(item:$s.importReview){ImportReviewSheet(model:$0)}
         .sheet(isPresented:$s.showVersions){VersionsSheet()}
@@ -125,12 +132,12 @@ struct ContentView: View {
                             }
                         }.disabled(!s.canEditPointCurves || s.hasPendingEdits)
                         Button("Split Before and After"){s.setComparisonMode(s.comparisonMode == .leftRightSplit ? .after:.leftRightSplit)}
-                        Button("Draw Freeform Crop"){s.canvasTool="crop";s.detail=false;s.compare=false;s.splitCompare=false}
+                        Button("Draw Freeform Crop"){s.requestCropTool()}
                         Button("Draw Radial Mask"){s.canvasTool="radial";s.detail=false;s.compare=false;s.splitCompare=false}
                         Button("Draw Gradient Mask"){s.canvasTool="linear";s.detail=false;s.compare=false;s.splitCompare=false}
                         Button("Draw Brush Mask"){s.canvasTool="brush";s.detail=false;s.compare=false;s.splitCompare=false}
                     } label:{Label(s.canvasTool=="view" ? "Tools":(s.canvasTool=="curve" ? "Tone Curve":(s.canvasTool=="mixer" ? "Color Mixer":"Drawing")),systemImage:["curve","mixer"].contains(s.canvasTool) ? "scope":(s.canvasTool=="crop" ? "crop":"paintbrush.pointed"))}
-                    Picker("Zoom",selection:$s.detail){Text("Fit").tag(false);Text("1:1 Detail").tag(true)}.frame(width:155).onChange(of:s.detail){_,_ in s.render()}
+                    Picker(s.isReferenceView ? "Active zoom":"Zoom",selection:$s.detail){Text("Fit").tag(false);Text("1:1 Detail").tag(true)}.frame(width:155).onChange(of:s.detail){_,_ in s.render()}
                 } else {
                     if s.libraryView == .loupe {
                         Picker("Zoom",selection:$s.detail){Text("Fit").tag(false);Text("1:1 Detail").tag(true)}.frame(width:155).onChange(of:s.detail){_,_ in s.render()}
@@ -149,7 +156,10 @@ struct ContentView: View {
                 Divider()
             }
             if s.total==0 {empty}
-            else if s.develop {PhotoCanvas();filmstrip}
+            else if s.develop {
+                if s.isReferenceView {ReferenceCanvas(renderer:s.referenceRenderer)} else {PhotoCanvas()}
+                filmstrip
+            }
             else if s.isMultiReview {ReviewWorkspace(renderer:s.reviewRenderer);filmstrip}
             else if s.libraryView == .loupe {PhotoCanvas();filmstrip}
             else {gallery}
@@ -197,7 +207,8 @@ struct ContentView: View {
                     .help(s.thumbnailErrors[p.id] ?? p.displayName)
                     .accessibilityElement(children:.combine).accessibilityLabel("\(p.displayName), \(p.rating) \(p.rating == 1 ? "star" : "stars")")
                     .accessibilityAddTraits(.isButton).accessibilityAction{s.choose(p.id);Task {await s.switchLibraryView(.loupe)}}
-                    .contextMenu {StackActions(photoID:p.id);VirtualCopyActions(photo:p);PhotoFolderAction(photo:p);PhotoKeywordShortcutActions(photoID:p.id);Divider();Button("Develop"){s.choose(p.id);Task {await s.startDevelop()}};Button("Show in Finder"){NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath:p.path)])}}
+                    .draggable(s.referenceDrag(p.id))
+                    .contextMenu {ReferencePhotoAction(photoID:p.id);StackActions(photoID:p.id);VirtualCopyActions(photo:p);PhotoFolderAction(photo:p);PhotoKeywordShortcutActions(photoID:p.id);Divider();Button("Develop"){s.choose(p.id);Task {await s.startDevelop()}};Button("Show in Finder"){NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath:p.path)])}}
                 }
             }.padding(24).overlayPreferenceValue(PainterThumbnailAnchors.self) { anchors in
                 GeometryReader { geometry in
@@ -224,7 +235,7 @@ struct ContentView: View {
     var filmstrip:some View {
         ScrollView(.horizontal){HStack(spacing:10){ForEach(s.photos){p in Button{s.choose(p.id,extend:NSEvent.modifierFlags.contains(.command),range:NSEvent.modifierFlags.contains(.shift))}label:{
             VStack(spacing:4){Group{if let im=s.thumbnails[p.id]{Image(nsImage:im).resizable().aspectRatio(contentMode:.fit)}else{Image(systemName:s.thumbnailErrors[p.id] == nil ? "photo":"exclamationmark.triangle")}}.frame(width:88,height:62).overlay(alignment:.topLeading){StackBadge(photoID:p.id).padding(4)}.overlay(alignment:.bottomLeading){VirtualCopyBadge(photo:p)}.overlay(alignment:.topTrailing){TargetCollectionBadge(photoID:p.id).font(.caption2)}.background(.black.opacity(0.8)).clipShape(RoundedRectangle(cornerRadius:4)).overlay(RoundedRectangle(cornerRadius:4).stroke(s.selection.contains(p.id) ? Color.accentColor:.clear,lineWidth:2));Text(p.displayName).font(.system(size:9)).lineLimit(1).frame(width:88)}
-        }.buttonStyle(.plain).help(s.thumbnailErrors[p.id] ?? p.displayName).accessibilityLabel(p.displayName).contextMenu{StackActions(photoID:p.id);VirtualCopyActions(photo:p);PhotoFolderAction(photo:p);PhotoKeywordShortcutActions(photoID:p.id)}}}.padding(12)}.frame(height:109).background(.bar).modifier(PhotoKeyboardShortcuts())
+        }.buttonStyle(.plain).help(s.thumbnailErrors[p.id] ?? p.displayName).accessibilityLabel(p.displayName).draggable(s.referenceDrag(p.id)).contextMenu{ReferencePhotoAction(photoID:p.id);StackActions(photoID:p.id);VirtualCopyActions(photo:p);PhotoFolderAction(photo:p);PhotoKeywordShortcutActions(photoID:p.id)}}}.padding(12)}.frame(height:109).background(.bar).modifier(PhotoKeyboardShortcuts())
     }
 }
 

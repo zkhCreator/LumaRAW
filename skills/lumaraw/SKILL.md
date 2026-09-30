@@ -25,6 +25,14 @@ These commands cover per-photo Develop history, not global application undo.
 
 ## Before / After
 
+Ordinary `preview_photo` calls may supply `expected_revision` captured from
+`get_photo` or bounded `photo_summaries`. The service verifies it before and after
+processing. If it changes, discard the preview and explicitly refresh the read;
+never rebase a pending mutation. Reference photos need `include_before: false`
+and a separate `client_id`/generation from the editable active photo. A changed
+active photo does not change reference assignment. This UI role/lock is local
+session state; it does not create snapshots or edit catalog recipes.
+
 `before_after` requires `photo_id`, `expected_revision` and an `action`:
 `after_to_before`, `before_to_after`, `swap`, `snapshot_to_before` with captured
 `version_id` and `expected_version_revision`, or `history_to_before` with a

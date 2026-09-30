@@ -20,6 +20,15 @@ when a clear function is more maintainable. Avoid unrelated formatting churn.
 
 ## Contracts and persistence
 
+- Reference and active roles are independent. Keep inspector edits scoped to
+  active selection, retain reference identity across source/filter changes, and
+  clear an unlocked reference only when leaving the module. The lock is session
+  state, not a frozen recipe or persistent catalog preference. Use separate
+  cancellation generations; active edits and fitted layout changes must not
+  restart unchanged reference processing. Validate ordinary preview revisions
+  both before and after workers. Discard stale pane/photo/viewport drags and
+  request only bounded physical-pixel ROIs. Cropping requires a captured exit
+  confirmation; local drawing and targeting stay attached to the active image.
 - Snapshot names and recipes are shared by original/virtual-copy families. Keep
   stable non-reused IDs, independent snapshot revisions and a family list token.
   Read summaries through indexed alphabetical pages; never load all recipes for

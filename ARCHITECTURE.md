@@ -58,6 +58,32 @@ the manifest; binaries remain subject to release signing/notarization controls.
 
 ## Consistency and recovery
 
+Develop Reference View keeps two distinct roles in the Mac presentation layer.
+Only the active photo owns inspector commands; reference assignment retains a
+stable catalog photo ID independently of selection, filters and virtual-copy
+family membership. The session lock preserves that assignment across module
+changes, not application restarts. It does not freeze a historical recipe:
+bounded summary polling refreshes saved edits to the referenced photo, and an
+absent photo produces a visible error without choosing a replacement.
+
+Reference rendering uses its own client generation and one retained frame.
+Fit/layout changes and active edits reuse unchanged reference pixels; hidden
+reference views cancel that client's work and release its frame. Independent
+physical-pixel viewports are bounded to 2048 by 1536 and pan from returned ROI
+centers. Same-photo roles remain separate because render clients and frames are
+not keyed by a shared native photo-ID dictionary. Custom in-app drag values carry
+only a session token and visible photo ID, never a path or an implicit import.
+
+`preview_photo(expected_revision)` now binds ordinary as well as draft previews.
+The service checks before releasing the catalog lock for image work, then checks
+again before returning the result. Conflicts never return stale pixels or write
+the obsolete metadata receipt; callers retain separate mutation revision rules.
+The same bound read compares source stat fingerprints around processing. This
+detects path/size/mtime changes, not adversarial byte replacement preserving stat.
+Legacy previews without the optional revision retain their existing behavior.
+Reference View introduces no catalog schema or recipe change; an alternate shell
+can use the same summaries, revision-bound previews and cancellation contracts.
+
 Named snapshots (schema 24) belong to the shared source family. Stable monotonic
 IDs survive deletion and restart. Each snapshot has a revision, creation/update
 time and a normalized alphabetical key; the source has a separate list revision.

@@ -142,8 +142,27 @@ import UniformTypeIdentifiers
     @Published var copyRemovalTargets: [Photo] = []
     @Published var showMetadataEditor=false
     @Published var metadataTargets: [Photo] = []
-    @Published var workspace="library"
-    @Published var develop=false
+    @Published var workspace="library" {
+        didSet {if oldValue=="library" && workspace != "library" {leaveReferenceModule()}}
+    }
+    @Published var develop=false {
+        didSet {if oldValue && !develop {leaveReferenceModule()}}
+    }
+    @Published var referenceEnabled=false
+    @Published var referencePhoto:Photo?
+    @Published var referenceLocked=false
+    @Published var referenceVertical=false
+    @Published var referenceDetail=false
+    @Published var referenceCX=0.5
+    @Published var referenceCY=0.5
+    @Published var referenceError:String?
+    @Published var referenceCropPhotoID:Int?
+    let referenceRenderer=ReferenceRenderer()
+    let referenceDragSession=UUID().uuidString
+    var referenceReadGeneration=0
+    var referencePixelWidth=800
+    var referencePixelHeight=900
+    var activeViewportFrame:BeforeAfterFrame?
     @Published var libraryView: LibraryViewMode = .grid
     @Published var review=ReviewSession()
     let reviewRenderer=ReviewRenderer()
@@ -244,6 +263,7 @@ import UniformTypeIdentifiers
                     guard let self else { return }
                     await self.refreshJobs()
                     await self.refreshVisibleSummaries()
+                    await self.refreshReferencePhoto()
                     self.refreshSnapshotsIfVisible()
                     if let current=self.photo, !self.editing, self.pendingPatch.isEmpty {
                         if let row=try? await Backend.call("get_photo",["photo_id":current.id]),let updated=Photo(row) {
@@ -314,7 +334,7 @@ import UniformTypeIdentifiers
     }
     func clearPhoto() {
         snapshotRequest+=1;snapshotPage=nil;snapshotAfter=nil;snapshotLoading=false;snapshotError=nil
-        beforeLabel="Before";beforePreviewContext=nil;comparisonFrame=nil
+        beforeLabel="Before";beforePreviewContext=nil;comparisonFrame=nil;activeViewportFrame=nil
         historyRequest+=1;historyPage=nil;historyBefore=nil;historyError=nil;historyLoading=false
         cancelCurveTarget(restore:false);curveTargetFrame=nil
         cancelMixerTarget(restore:false);mixerTargetFrame=nil
@@ -389,6 +409,7 @@ import UniformTypeIdentifiers
             mixerTargetFrame=nil
         }
         if !isDraft { updateThumbnails();refreshHistoryIfNeeded();refreshSnapshotsIfVisible() }
+        updateReferenceRequest()
         if isMultiReview { updateReviewRequests();return }
         guard let p=photo,p.id==selected,!loading else{return}
         if let capture=curveDraft {
@@ -436,6 +457,7 @@ import UniformTypeIdentifiers
                 histogram=r["histogram"] as? [[Double]] ?? []
                 metadata=r["metadata"] as? [String:Any] ?? [:]
                 previewGeometry=PhotoPreviewGeometry(r)
+                activeViewportFrame=beforeContext.flatMap {BeforeAfterFrame(r,context:$0)}
                 if let toneContext {acceptCurveTones(r,context:toneContext)} else {curveTargetFrame=nil}
                 if let mixerContext {acceptMixerTarget(r,context:mixerContext,mode:mixerMode)} else {mixerTargetFrame=nil}
                 message=isDraft ? (mixerDraft != nil ? "Mixer preview · Release to save, Escape to cancel":"Curve preview · Release to save, Escape to cancel") : (detail ? "Full-resolution viewport · 1 image pixel = 1 screen pixel" : "Preview · Originals are read-only · Edits save automatically")

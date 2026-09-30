@@ -47,6 +47,8 @@ def main():
         'CFBundlePackageType':'APPL','CFBundleIconFile':'LumaRAW.icns','LSMinimumSystemVersion':'14.0',
         'NSHighResolutionCapable':True,'NSPrincipalClass':'NSApplication',
         'LSApplicationCategoryType':'public.app-category.photography',
+        'UTExportedTypeDeclarations':[{'UTTypeIdentifier':'local.lumaraw.catalog-photo',
+            'UTTypeDescription':'LumaRAW Catalog Photo','UTTypeConformsTo':['public.data']}],
         'CFBundleDocumentTypes':[{'CFBundleTypeName':'Photographs','CFBundleTypeRole':'Viewer','LSHandlerRank':'Alternate',
             'CFBundleTypeExtensions':['nef','nrw','dng','arw','cr2','cr3','raf','orf','rw2','jpg','jpeg','png','tif','tiff']}]
     }))

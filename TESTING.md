@@ -11,6 +11,41 @@ LUMARAW_TEST_NEF=/absolute/nikon.NEF uv run --frozen pytest -q
 
 The two `test_core.py` real-RAW tests skip if that environment variable is absent. `test_service.py` verifies revision conflicts, invalid edit atomicity, all-target sync, immutable export snapshots, deduplication keys, bounded queue pages and specific receipts, memory stopping, cancellation while a worker slot is occupied, superseded UI previews, cold job recovery and newline MCP framing through real subprocesses.
 
+## Develop Reference View
+
+`test_reference_preview.py` checks revision-bound ordinary previews, rejection
+before and after worker execution, metadata-only changes, bounded geometry,
+legacy reads, ICC-tagged output and preserved recipes/history/original bytes.
+`NativeReferenceRegression` covers active-only edits, independent viewports,
+reference frame reuse, lock and module transitions, crop confirmation, custom
+drop validation, virtual copies, off-page references, removed-photo errors and
+same-photo roles. A controlled late-reply transport proves cancellation and
+revision receipt rejection separately from actual engine renders.
+
+```sh
+.venv/bin/python -m pytest -q tests/test_reference_preview.py tests/test_review.py
+.venv/bin/python tests/run_native.py --work work/new-reference-native \
+  --engine /absolute/LumaRAW.app/Contents/Resources/Engine/LumaRAWEngine \
+  --suite NativeReferenceRegression --suite NativeReviewRegression \
+  --suite NativeComparisonLayoutRegression --suite NativeBeforeAfterRegression
+.venv/bin/python tests/reference_probe.py --work work/new-reference-raw \
+  --engine /absolute/LumaRAW.app/Contents/Resources/Engine/LumaRAWEngine \
+  --fixture /absolute/nikon.NEF
+```
+
+Native state probes do not establish actual drag/drop, keyboard dispatch, alert
+presentation, rendered overlay alignment, VoiceOver or macOS 14 runtime behavior.
+Keep those explicit acceptance gaps. Reference readouts and expanded zoom tools
+remain part of the full parity scope.
+
+Run the RAW probe with other builds/tests stopped. It includes packaged CLI/IPC,
+captured ordinary-preview revisions and sequential CPU/Metal workers for two
+variants of one physical source. Empty application caches do not imply cold OS
+or GPU caches. Record per-case dimensions, wall time, actual Metal dispatch and
+sampled worker RSS; compare CPU/Metal pixels without inferring camera accuracy.
+Unchanged reference frames are retained by native state instead of submitting
+these repeated probe requests during ordinary active-photo edits.
+
 ## Shared named snapshots
 
 `test_snapshot_status.py` covers shared first/last presence, live all/any and

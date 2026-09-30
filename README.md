@@ -129,6 +129,19 @@ pages and collection sources on the next background poll, including empty views
 and nested collection sets. Pending adjustments and open snapshot name forms
 defer that refresh until they finish; unrelated navigation stays selected.
 
+Use **Photo → Open in Reference View** or Shift-R on a photo surface to compare
+a reference with the editable active photo. Assign the reference from a Grid or
+filmstrip context menu, or drag a filmstrip photo into the Reference pane. Drag
+into Active or select another filmstrip photo to change the editing target.
+Reference and Active support independent Fit/1:1 zoom and pan, Left/Right or
+Top/Bottom layouts, and Before switching for Active. Click either image to toggle
+Fit/1:1 around that point, or use its zoom control. The lock preserves the
+reference when switching modules; it does not survive quitting or freeze edits
+made elsewhere. Without the lock, leaving Develop clears the reference.
+Choosing Crop offers Continue/Cancel before leaving Reference View. D or Done
+returns to ordinary Develop without discarding the assignment. Reference RGB/LAB
+readouts, scrubby/box zoom and rendered desktop acceptance remain open.
+
 **Before / After** offers After Only, Before Only, whole-image Left/Right and
 Top/Bottom pairs, and Left/Right or Top/Bottom splits. Before
 starts with imported settings, including import presets; virtual copies start

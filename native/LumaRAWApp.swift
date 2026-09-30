@@ -27,6 +27,9 @@ import AppKit
                 Button("Redo Develop Adjustment"){store.redo()}.keyboardShortcut("z",modifiers:[.command,.shift]).disabled(!store.canRedoDevelop)
             }
             CommandMenu("Photo") {
+                Button("Open in Reference View") {Task {await store.startReferenceView()}}.disabled(store.selected==nil)
+                if let id=store.selected {ReferencePhotoAction(photoID:id).environmentObject(store)}
+                Divider()
                 Button("Develop Presets…") { store.showDevelopPresets=true }
                 Menu("Before / After") {BeforeAfterActions().environmentObject(store)}.disabled(!store.historyReady)
                 Divider()

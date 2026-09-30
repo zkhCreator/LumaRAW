@@ -34,7 +34,11 @@ struct BeforeAfterFrame {
     let roi:CGRect
     init?(_ result:[String:Any],context:BeforePreviewContext) {
         guard let width=result["full_width"] as? Int,let height=result["full_height"] as? Int,
-              width>0,height>0,let rect=result["roi"] as? [Int],rect.count==4,
+              width>0,height>0 else {return nil}
+        // Fit receipts have no ROI; their complete proxy is the displayed frame.
+        // Detail receipts must provide the real, clamped full-resolution ROI.
+        let region=context.detail ? result["roi"] as? [Int]:[0,0,width,height]
+        guard let rect=region,rect.count==4,
               rect[0]>=0,rect[1]>=0,rect[2]>0,rect[3]>0,
               rect[0]+rect[2]<=width,rect[1]+rect[3]<=height else {return nil}
         self.context=context;fullWidth=width;fullHeight=height
@@ -50,8 +54,8 @@ struct BeforeAfterFrame {
 }
 
 extension Store {
-    var detailPixelWidth:Int {comparisonMode.isPaired ? comparisonPixelWidth:1600}
-    var detailPixelHeight:Int {comparisonMode.isPaired ? comparisonPixelHeight:1100}
+    var detailPixelWidth:Int {isReferenceView ? referencePixelWidth:(comparisonMode.isPaired ? comparisonPixelWidth:1600)}
+    var detailPixelHeight:Int {isReferenceView ? referencePixelHeight:(comparisonMode.isPaired ? comparisonPixelHeight:1100)}
     var currentBeforeContext:BeforePreviewContext? {
         guard let p=photo,p.id==selected else {return nil}
         return BeforePreviewContext(photoID:p.id,revision:p.revision,orientation:p.orientation,
@@ -68,6 +72,7 @@ extension Store {
         guard photo != nil,!loading,!browsing else {return}
         let hadDraft=curveTargetGesture != nil || mixerTargetGesture != nil
         let oldDetailSize=(detailPixelWidth,detailPixelHeight)
+        if mode.isPaired {endReferenceView()}
         cancelCurveTarget(restore:false);cancelMixerTarget(restore:false);canvasTool="view"
         comparisonMode=mode
         if hadDraft || detail && oldDetailSize != (detailPixelWidth,detailPixelHeight) ||

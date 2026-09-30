@@ -32,6 +32,7 @@ extension Store {
     func startDevelop() async {
         reviewSwitchGeneration+=1;let token=reviewSwitchGeneration
         guard await flushEdits(),token == reviewSwitchGeneration else { return }
+        endReferenceView()
         reviewRenderer.stop();workspace="library";develop=true
         comparisonMode = .after;canvasTool="view";render()
     }

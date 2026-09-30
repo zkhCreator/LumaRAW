@@ -31,7 +31,7 @@ from .auto_stacks import AutoStacks
 from .folders import Folders
 from .keywords import Keywords
 from .relocations import Relocations, RelocationBusy, identity as relocation_identity, inspect_file
-from .source_identity import cached_thumbnail
+from .source_identity import cached_thumbnail, fingerprint
 from .runtime import engine_identity, EngineChangedError
 from .folder_sync import FolderSync
 from .folder_sync_runner import FolderSyncRunner
@@ -197,7 +197,7 @@ class Service:
                         if self.process.poll() is None:self.process.kill()
             with self.catalog() as c:
                 draft_key='curve_patch' if 'curve_patch' in p else ('mixer_patch' if 'mixer_patch' in p else None)
-                row=self.check_revision(c,p['photo_id'],p['expected_revision']) if draft_key else self.require(c,p['photo_id'])
+                row=self.check_revision(c,p['photo_id'],p['expected_revision']) if 'expected_revision' in p else self.require(c,p['photo_id'])
                 preview_recipe=json.loads(row['recipe'])
                 if draft_key:
                     preview_recipe=Recipe.parse({**preview_recipe,**p[draft_key]}).dict()
@@ -213,7 +213,12 @@ class Service:
             request.update({k:v for k,v in p.items() if k not in ('photo_id','curve_patch','mixer_patch','expected_revision')})
             if before_state:
                 request['before_recipe']=before_state[0].dict()
+            source_fingerprint=fingerprint(row['path']) if 'expected_revision' in p else None
             result=self.run_worker(request)
+            if 'expected_revision' in p:
+                if fingerprint(row['path']) != source_fingerprint:
+                    raise ValueError('Source changed during preview; reload the photograph')
+                with self.catalog() as c:self.check_revision(c,p['photo_id'],p['expected_revision'])
             if 'metadata' in result:
                 with self.catalog() as c:c.update_metadata(row['id'],result['metadata'])
             return {**result,'photo_id':row['id'],'revision':row['revision'],'source':row['path'],
