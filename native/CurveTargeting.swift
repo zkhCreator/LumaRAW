@@ -77,6 +77,7 @@ extension Store {
         curveTargetFrame != nil && curveTargetFrame?.context == curveTargetContext
     }
     func setCurveTargeting(_ enabled:Bool) {
+        cancelMixerTarget(restore:false);mixerTargetFrame=nil
         cancelCurveTarget(restore:false)
         curveTargetFrame=nil;curveTargetSample=nil
         if enabled {

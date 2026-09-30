@@ -101,7 +101,15 @@ brightness controls; switching treatment retains both sets of adjustments.
 **Reset Shown** resets the selected component or color, while the panel reset
 clears that treatment's mix. **Sync Selected Photos** offers a separate
 **Black & White Mix** group. These controls use LumaRAW processing; Adobe pixel
-matching, targeted adjustment and Point Color remain unverified or unimplemented.
+matching and Point Color remain unverified or unimplemented.
+
+Use **Color Mixer → Adjust in Photo** to choose Hue, Saturation or Luminance;
+Black & White Mix offers its own target. Select a colored area and drag up/down
+to adjust the contributing bands together. The selected bands appear above the
+controls and their sliders follow the temporary preview. Release saves one edit;
+Escape cancels. Up/Down adjust the retained target after its preview is ready.
+Neutral pixels are excluded from color targeting. Fit and 1:1 use matching
+geometry; black-and-white targets sample color after the stored HSL adjustments.
 
 In **Tone Curve → Parametric**, adjust Highlights, Lights, Darks and Shadows.
 Drag the graph vertically to adjust its highlighted region, or move the three

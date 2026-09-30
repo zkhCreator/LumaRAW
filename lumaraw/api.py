@@ -4,7 +4,7 @@ Inputs: bounded JSON objects. Outputs: JSON schemas and validated domain command
 No transport, pixels or UI dependencies. IDs refer only to the selected catalog.
 Tool annotations describe effects; they never substitute for user authorization.
 """
-from .model import LIMITS, Recipe, SYNC_GROUPS, POINT_CURVE_FIELDS, PARAMETRIC_FIELDS
+from .model import LIMITS, Recipe, SYNC_GROUPS, POINT_CURVE_FIELDS, PARAMETRIC_FIELDS, MIXER_FIELDS, BW_FIELDS
 from .organization import COLORS, SORTS, FILTER_SCHEMA
 from .iptc import SCHEMA as IPTC_SCHEMA
 from .metadata_presets import PATCH_SCHEMA as METADATA_PRESET_PATCH
@@ -150,6 +150,12 @@ TOOLS['preview_photo']['inputSchema']['properties']['include_curve_tones']=BOOL
 TOOLS['preview_photo']['description']+=' include_curve_tones returns a bounded, geometry-aligned pre-parametric input-tone map for targeted adjustment.'
 TOOLS['preview_photo']['inputSchema']['dependentRequired']={'curve_patch':['expected_revision']}
 TOOLS['preview_photo']['description']+=' curve_patch previews temporary point or parametric curves at expected_revision without saving edits or history.'
+MIXER_PATCH=obj({key:{'type':'number','minimum':LIMITS[key][0],'maximum':LIMITS[key][1]} for key in (*MIXER_FIELDS,*BW_FIELDS)})
+MIXER_PATCH['minProperties']=1
+TOOLS['preview_photo']['inputSchema']['properties'].update(mixer_patch=MIXER_PATCH,mixer_target={'enum':['hsl','bw']})
+TOOLS['preview_photo']['inputSchema']['dependentRequired']['mixer_patch']=['expected_revision']
+TOOLS['preview_photo']['inputSchema']['not']={'required':['curve_patch','mixer_patch']}
+TOOLS['preview_photo']['description']+=' mixer_patch previews temporary HSL/B&W values at expected_revision, separately from curve_patch. mixer_target returns aligned sparse band weights before HSL or B&W mixing.'
 tool('cancel_preview','Invalidate older preview generations for one client and stop its older running preview/thumbnail. Never cancels exports or another client.',{'client_id':string(128),'generation':integer()},['client_id','generation'])
 tool('photo_summaries','Read existing photo summaries for at most 60 IDs without recipe or EXIF payloads.',{'photo_ids':array(ID,60)},['photo_ids'],True)
 tool('thumbnail','Create/read a source thumbnail (default) or a developed recipe-aware 320-pixel thumbnail.',{'photo_id':ID,'kind':{'enum':['source','developed']},'client_id':string(128),'generation':integer()},['photo_id'],True)

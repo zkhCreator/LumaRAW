@@ -190,10 +190,11 @@ class Service:
                         self.cancelled=True
                         if self.process.poll() is None:self.process.kill()
             with self.catalog() as c:
-                row=self.check_revision(c,p['photo_id'],p['expected_revision']) if 'curve_patch' in p else self.require(c,p['photo_id'])
+                draft_key='curve_patch' if 'curve_patch' in p else ('mixer_patch' if 'mixer_patch' in p else None)
+                row=self.check_revision(c,p['photo_id'],p['expected_revision']) if draft_key else self.require(c,p['photo_id'])
                 preview_recipe=json.loads(row['recipe'])
-                if 'curve_patch' in p:
-                    preview_recipe=Recipe.parse({**preview_recipe,**p['curve_patch']}).dict()
+                if draft_key:
+                    preview_recipe=Recipe.parse({**preview_recipe,**p[draft_key]}).dict()
             if method=='thumbnail':
                 recipe=Recipe.parse(json.loads(row['recipe'])) if p.get('kind') == 'developed' else None
                 path=cached_thumbnail(row['path'],self.cache,recipe,row['orientation'])
@@ -202,11 +203,12 @@ class Service:
                             'cache_hit':True,'worker_spawned':False}
             request={'operation':{'preview_photo':'preview','thumbnail':'thumbnail','calibrate_camera':'calibrate'}[method],
                      'path':row['path'],'recipe':preview_recipe,'orientation':row['orientation']}
-            request.update({k:v for k,v in p.items() if k not in ('photo_id','curve_patch','expected_revision')})
+            request.update({k:v for k,v in p.items() if k not in ('photo_id','curve_patch','mixer_patch','expected_revision')})
             result=self.run_worker(request)
             if 'metadata' in result:
                 with self.catalog() as c:c.update_metadata(row['id'],result['metadata'])
-            return {**result,'photo_id':row['id'],'revision':row['revision'],'source':row['path'],'curve_draft':'curve_patch' in p}
+            return {**result,'photo_id':row['id'],'revision':row['revision'],'source':row['path'],
+                    'curve_draft':'curve_patch' in p,'mixer_draft':'mixer_patch' in p}
         if method=='queue_control':return self.control(p)
         with self.catalog() as c:
             if method in ('orientation_state','orient_photos','undo_orientation'):

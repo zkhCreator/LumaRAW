@@ -29,6 +29,11 @@ import UniformTypeIdentifiers
     @Published var curveTargetSample:CurveTargetSample?
     @Published var curveTargetGesture:CurveTargetGesture?
     let curveTargetPreviews=CurvePreviewScheduler()
+    @Published var mixerTargetComponent="hue"
+    @Published var mixerTargetFrame:MixerTargetFrame?
+    @Published var mixerTargetSample:MixerTargetSample?
+    @Published var mixerTargetGesture:MixerTargetGesture?
+    let mixerTargetPreviews=CurvePreviewScheduler()
     @Published var orientationState: PhotoOrientationState?
     @Published var orientationBusy=false
     @Published var developPresetPage: DevelopPresetPage?
@@ -278,6 +283,7 @@ import UniformTypeIdentifiers
     }
     func clearPhoto() {
         cancelCurveTarget(restore:false);curveTargetFrame=nil
+        cancelMixerTarget(restore:false);mixerTargetFrame=nil
         generation += 1;previewTask?.cancel();photo=nil;recipe=[:]
         preview=nil;previewGeometry=nil;before=nil;metadata=[:];histogram=[];rendering=false;loading=false
     }
@@ -339,15 +345,22 @@ import UniformTypeIdentifiers
             render()
         } catch {if selected==id,token==generation{self.error=error.localizedDescription}}
     }
-    func render(curveDraft:CurvePreviewDraft?=nil,debounce:Bool=true) {
-        if curveDraft == nil {
+    func render(curveDraft:CurvePreviewDraft?=nil,mixerDraft:MixerPreviewDraft?=nil,debounce:Bool=true) {
+        guard curveDraft == nil || mixerDraft == nil else {return}
+        let isDraft=curveDraft != nil || mixerDraft != nil
+        if !isDraft {
             if curveTargetGesture != nil {cancelCurveTarget(restore:false)} else {curveTargetPreviews.cancel()}
             curveTargetFrame=nil
+            if mixerTargetGesture != nil {cancelMixerTarget(restore:false)} else {mixerTargetPreviews.cancel()}
+            mixerTargetFrame=nil
         }
-        if curveDraft == nil { updateThumbnails() }
+        if !isDraft { updateThumbnails() }
         if isMultiReview { updateReviewRequests();return }
         guard let p=photo,p.id==selected,!loading else{return}
         if let capture=curveDraft {
+            guard p.id == capture.photoID,p.revision == capture.revision,!hasPendingEdits else {return}
+        }
+        if let capture=mixerDraft {
             guard p.id == capture.photoID,p.revision == capture.revision,!hasPendingEdits else {return}
         }
         generation += 1;let token=generation
@@ -360,8 +373,14 @@ import UniformTypeIdentifiers
             var params:[String:Any]=["photo_id":p.id,"client_id":previewClient,"generation":token]
             let toneContext=curveTargetActive ? curveTargetContext:nil
             if toneContext != nil {params["include_curve_tones"]=true}
+            let mixerContext=mixerTargetActive ? curveTargetContext:nil,mixerMode=mixerTargetMode
+            if mixerContext != nil {params["mixer_target"]=mixerMode}
             if let capture=curveDraft {
                 params["curve_patch"]=capture.patch;params["expected_revision"]=capture.revision
+                params["include_before"]=false
+            }
+            if let capture=mixerDraft {
+                params["mixer_patch"]=capture.patch;params["expected_revision"]=capture.revision
                 params["include_before"]=false
             }
             if detail{params["detail"]=["cx":cx,"cy":cy,"width":1600,"height":1100]}
@@ -378,7 +397,8 @@ import UniformTypeIdentifiers
                 metadata=r["metadata"] as? [String:Any] ?? [:]
                 previewGeometry=PhotoPreviewGeometry(r)
                 if let toneContext {acceptCurveTones(r,context:toneContext)} else {curveTargetFrame=nil}
-                message=curveDraft != nil ? "Curve preview · Release to save, Escape to cancel" : (detail ? "Full-resolution viewport · 1 image pixel = 1 screen pixel" : "Preview · Originals are read-only · Edits save automatically")
+                if let mixerContext {acceptMixerTarget(r,context:mixerContext,mode:mixerMode)} else {mixerTargetFrame=nil}
+                message=isDraft ? (mixerDraft != nil ? "Mixer preview · Release to save, Escape to cancel":"Curve preview · Release to save, Escape to cancel") : (detail ? "Full-resolution viewport · 1 image pixel = 1 screen pixel" : "Preview · Originals are read-only · Edits save automatically")
                 rendering=false
             } catch {if token==generation {rendering=false;self.error=error.localizedDescription}}
         }

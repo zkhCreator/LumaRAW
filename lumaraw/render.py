@@ -35,7 +35,7 @@ from .parametric import apply as apply_parametric
 from .imaging import load_source, fingerprint, cache_key, write_thumbnail, LUMA
 from .source_identity import thumbnail_path, cached_thumbnail
 from .orientation import validate as validate_orientation, inverse_rect, apply_array
-from . import curve_tones
+from . import curve_tones, mixer_targets
 
 ROWS=128
 HALO=32
@@ -259,16 +259,17 @@ def validate_camera(recipe,meta):
 
 
 def render_strip(plan,x,y,w,h,space='srgb',output_sharpen=0):
-    pixels,gamut,_=_render_strip(plan,x,y,w,h,space,output_sharpen)
+    pixels,gamut,_,_=_render_strip(plan,x,y,w,h,space,output_sharpen)
     return pixels,gamut
 
 
-def _render_strip(plan,x,y,w,h,space='srgb',output_sharpen=0,capture_tones=False):
+def _render_strip(plan,x,y,w,h,space='srgb',output_sharpen=0,capture_tones=False,mixer_mode=None):
     if isinstance(plan,OrientedPlan):
         rect=inverse_rect(x,y,w,h,plan.base.width,plan.base.height,plan.orientation)
-        pixels,gamut,tones=_render_strip(plan.base,*rect,space,output_sharpen,capture_tones)
+        pixels,gamut,tones,mixer=_render_strip(plan.base,*rect,space,output_sharpen,capture_tones,mixer_mode)
         return (apply_array(pixels,plan.orientation),apply_array(gamut,plan.orientation),
-                apply_array(tones,plan.orientation) if tones is not None else None)
+                apply_array(tones,plan.orientation) if tones is not None else None,
+                apply_array(mixer,plan.orientation) if mixer is not None else None)
     start=max(0,y-HALO);end=min(plan.height,y+h+HALO)
     left=max(0,x-HALO);right=min(plan.width,x+w+HALO)
     with stage("geometry"):
@@ -283,17 +284,27 @@ def _render_strip(plan,x,y,w,h,space='srgb',output_sharpen=0,capture_tones=False
         with stage("curve_input_tones"):
             # Grading is pointwise here; halos are only needed by the filters.
             tones=np.clip(encode(grade_before_parametric(a[region],plan.recipe)@LUMA),0,1)
-    return pixels[region],gamut[region],tones
+    mixer=None
+    if mixer_mode:
+        with stage("mixer_target_weights"):
+            inputs=apply_rgb_curves(apply_parametric(grade_before_parametric(a[region],plan.recipe),plan.recipe),plan.recipe)
+            if mixer_mode=='bw':
+                inputs=mix_hues(inputs,plan.recipe)
+            mixer=mixer_targets.packed_weights(inputs)
+    return pixels[region],gamut[region],tones,mixer
 
 
-def render_u8(plan,rect=None,display=None,tones=None):
+def render_u8(plan,rect=None,display=None,tones=None,mixer=None,mixer_mode=None):
     display=display or {}
     x,y,w,h=rect or (0,0,plan.width,plan.height)
     pixels=np.empty((h,w,3),np.uint8);hist=np.zeros((3,64),np.int64);out_count=0
     for row in range(0,h,ROWS):
-        data,gamut,input_tones=_render_strip(plan,x,y+row,w,min(ROWS,h-row),'srgb',capture_tones=tones is not None)
+        data,gamut,input_tones,input_mixer=_render_strip(plan,x,y+row,w,min(ROWS,h-row),'srgb',capture_tones=tones is not None,
+            mixer_mode=mixer_mode if mixer is not None else None)
         if tones is not None:
             tones[row:row+len(data)]=input_tones
+        if mixer is not None:
+            mixer[row:row+len(data)]=input_mixer
         out_count+=int(gamut.sum())
         data=np.rint(data*255).astype(np.uint8)
         for c in range(3): hist[c]+=np.histogram(data[:,:,c],64,(0,256))[0]
@@ -324,8 +335,8 @@ def make_thumbnail(path, recipe, cache, budget_mb, orientation=0):
             'cache_keep':[base,str(Path(base).with_suffix('.json')),str(target)]}
 
 
-def make_preview(path,recipe,cache,budget_mb,detail=None,display=None,include_before=True,max_edge=None,orientation=0,include_curve_tones=False):
-    source_identity=fingerprint(path) if include_curve_tones else None
+def make_preview(path,recipe,cache,budget_mb,detail=None,display=None,include_before=True,max_edge=None,orientation=0,include_curve_tones=False,mixer_target=None):
+    source_identity=fingerprint(path) if include_curve_tones or mixer_target else None
     if detail and max_edge is not None:
         raise ValueError('A detail viewport cannot also request a fitted preview size')
     if max_edge is not None and (isinstance(max_edge,bool) or not isinstance(max_edge,int) or not 128 <= max_edge <= 1680):
@@ -344,15 +355,26 @@ def make_preview(path,recipe,cache,budget_mb,detail=None,display=None,include_be
         if not math.isfinite(cx+cy): raise ValueError('Invalid viewport')
         x=max(0,min(plan.width-w,round(cx*plan.width-w/2)));y=max(0,min(plan.height-h,round(cy*plan.height-h/2)))
         rect=(x,y,w,h)
+    width,height=(rect[2],rect[3]) if rect else (plan.width,plan.height)
+    geometry=[full,rect,plan.width,plan.height,plan.pixel_scale,orientation]
+    mixer_path=None;mixer=None;mixer_hit=False
+    if mixer_target:
+        mixer_path=mixer_targets.target_path(path,recipe,cache,geometry,mixer_target)
+        mixer_hit=mixer_targets.cached(mixer_path,width,height)
+        if not mixer_hit:
+            mixer=np.empty((height,width,4),np.uint32)
     tone_target=None;tones=None;tone_hit=False
     if include_curve_tones:
-        width,height=(rect[2],rect[3]) if rect else (plan.width,plan.height)
-        geometry=[full,rect,plan.width,plan.height,plan.pixel_scale,orientation]
         tone_target=curve_tones.target_path(path,recipe,cache,geometry)
         tone_hit=curve_tones.cached(tone_target,width,height)
         if not tone_hit:
             tones=np.empty((height,width),np.float32)
-    pixels,hist,gamut=render_u8(plan,rect,display,tones)
+    pixels,hist,gamut=render_u8(plan,rect,display,tones,mixer,mixer_target)
+    if mixer_path is not None:
+        if fingerprint(path) != source_identity or mixer_targets.target_path(path,recipe,cache,geometry,mixer_target) != mixer_path:
+            raise ValueError('Source changed during color sampling; reload the photograph')
+        if mixer is not None:
+            mixer_targets.write(mixer_path,mixer)
     if tone_target is not None:
         if fingerprint(path) != source_identity or curve_tones.target_path(path,recipe,cache,geometry) != tone_target:
             raise ValueError('Source changed during curve sampling; reload the photograph')
@@ -367,6 +389,9 @@ def make_preview(path,recipe,cache,budget_mb,detail=None,display=None,include_be
     if tone_target is not None:
         result['curve_tones']=curve_tones.receipt(tone_target,w,h,tone_hit)
         result['cache_keep'].append(str(tone_target))
+    if mixer_path is not None:
+        result['mixer_target']=mixer_targets.receipt(mixer_path,w,h,mixer_hit,mixer_target)
+        result['cache_keep'].append(str(mixer_path))
     canonical=plan.base
     result['geometry']={'orientation':orientation,'crop_box':[canonical.x0/canonical.sw,canonical.y0/canonical.sh,
         (canonical.x0+canonical.crop_w)/canonical.sw,(canonical.y0+canonical.crop_h)/canonical.sh]}

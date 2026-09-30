@@ -1,6 +1,6 @@
 // Purpose: eight-band HSL and Black & White Mix controls over shared recipes.
-// Inputs: native slider/text actions and current recipe values. Outputs: ordinary
-// partial edits and panel resets using Store's existing revision/conflict boundary.
+// Inputs: native slider/text actions, targeted drafts and current recipe values.
+// Outputs: partial edits, target selection and scoped resets through Store.
 // Hue is displayed on a -100…100 scale while stored degree values stay compatible.
 // No pixel algorithms, inferred colors, SQL or Adobe parameter-file translation.
 import SwiftUI
@@ -62,6 +62,24 @@ struct ColorMixerControls: View {
     var monochrome: Bool { s.recipe["monochrome"] as? Bool ?? false }
     var body: some View {
         VStack(spacing:12) {
+            HStack {
+                if s.canvasTool == "mixer" {
+                    Button("Done Targeting") {s.setMixerTargeting(nil)}
+                } else if monochrome {
+                    Button {s.setMixerTargeting("bw")} label:{Label("Adjust in Photo",systemImage:"scope")}
+                } else {
+                    Menu {
+                        Button("Hue") {component="hue";s.setMixerTargeting("hue")}
+                        Button("Saturation") {component="sat";s.setMixerTargeting("sat")}
+                        Button("Luminance") {component="lum";s.setMixerTargeting("lum")}
+                    } label:{Label("Adjust in Photo",systemImage:"scope")}
+                }
+                Spacer()
+            }.disabled(!s.canEditPointCurves || s.hasPendingEdits)
+            if s.mixerTargetActive,let sample=s.mixerTargetSample {
+                Text(sample.weights.isEmpty ? "Select an area with color to adjust the mix.":sample.label)
+                    .font(.caption).foregroundStyle(.secondary).frame(maxWidth:.infinity,alignment:.leading)
+            }
             if !monochrome {
                 Picker("Adjust",selection:$mode) { Text("HSL").tag("HSL");Text("Color").tag("Color") }.pickerStyle(.segmented)
                 if mode == "HSL" {
@@ -104,9 +122,15 @@ struct ColorMixerControls: View {
                 Button(monochrome ? "Reset Black & White Mix":"Reset Color Mixer") { s.resetMixer(monochrome:monochrome) }
             }.controlSize(.small)
         }
+        .onChange(of:s.mixerTargetComponent) {_,value in if s.canvasTool == "mixer" {mode="HSL";component=value}}
+        .onChange(of:s.canvasTool) {_,value in if value == "mixer" {mode="HSL";component=s.mixerTargetComponent}}
+        .onAppear {if s.canvasTool == "mixer" {mode="HSL";component=s.mixerTargetComponent}}
+        .onChange(of:component) {_,value in
+            if s.canvasTool == "mixer",value != "all",value != s.mixerTargetComponent {s.setMixerTargeting(value)}
+        }
     }
     func row(_ band: String,_ component: String) -> some View {
         let key=band+"_"+component
-        return ParameterRow(label:MixerFields.label(key),value:Binding(get:{s.mixerValue(key)},set:{s.setMixer(key,$0)}),range:-100...100)
+        return ParameterRow(label:MixerFields.label(key),value:Binding(get:{s.displayedMixerValue(key)},set:{s.setMixer(key,$0)}),range:-100...100)
     }
 }

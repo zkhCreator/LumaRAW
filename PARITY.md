@@ -57,7 +57,7 @@ gaps. Nothing below is full Lightroom parity merely because historical tests pas
 | Library navigation | Partial: bounded grid/filmstrip, folder tree/search/favorites/labels, durable missing-folder relocation and folder synchronization, direct/recursive sources, filters/sorting, regular/smart/Quick collections and nested sets | Multi-source selection, complete sync Import Dialog/duplicate policy, folder move/rename, relocation overlap/collision handling, collection drag/drop/color labels, full smart criteria/import-export, source-selection memory, desktop acceptance |
 | Organization | Partial: duplicate/missing detection, hierarchical keywords/synonyms/export flags/Will Export preview, text/CSV vocabulary exchange and manual person tags, custom nine-slot keyword sets/recent entries/shared or catalog storage, multi-keyword shortcuts and keyword/rating/flag/label/target-collection/rotation/Develop-preset/metadata-preset Painter strokes, independent catalog rotation/flips, title/caption/copyright plus thirty IPTC fields, selective metadata presets, labels, batch metadata, virtual copies, manual/split/capture-time scoped stacks | Keyword policy/file and preset reference acceptance, built-in sets/suggestions/undo, Painter desktop acceptance, IPTC Extension and complete metadata parity, stack interaction acceptance, rename and sidecars |
 | Culling | Partial: Loupe/Compare/Survey, linked detail, anchored page selection | Desktop acceptance, cross-page selection, Develop reference view, auto advance, persistent workspace state |
-| Basic development | Partial: light/WB/color, eight-band HSL and B&W Mix with selective resets/sync | Calibrated absolute WB, eyedropper, texture/clarity/dehaze, targeted adjustment, Point Color, Auto B&W mix, color grading and Adobe processing/reference acceptance |
+| Basic development | Partial: light/WB/color, eight-band HSL and B&W Mix with photo-targeted adjustment and selective resets/sync | Calibrated absolute WB, eyedropper, texture/clarity/dehaze, Point Color, Auto B&W mix, color grading and Adobe processing/reference acceptance |
 | Curves and profiles | Partial: four-region parametric curves with movable splits and photo-targeted adjustment, interactive RGB/channel point curves, shared temporary previews, legacy luminance curve, LUT/ICC | Point/channel targeting, curve exchange, camera/profile browser, Adobe processing and rendered/reference acceptance |
 | Detail and optics | Partial: noise/sharpen, manual lens | Complete manual detail controls, automatic lens profiles, bounded full-resolution acceptance |
 | Geometry | Partial: crop/straighten/perspective, independent rotation/flips with attached masks and displayed crop ratios | Interactive retained handles, guided transforms, full crop state and rendered/reference parity |
@@ -76,7 +76,7 @@ gaps. Nothing below is full Lightroom parity merely because historical tests pas
 
 ## Active increment
 
-Photograph-targeted parametric curves, followed by further
+Photograph-targeted HSL and Black & White Mix, followed by further
 import, Library and Develop workflows.
 Rendered Mac/reference acceptance,
 Copy/Move/DNG, complete IPTC, Adobe exchange, unified Undo/Redo and the full inventory
@@ -2262,3 +2262,96 @@ pointer/keyboard/VoiceOver dispatch or macOS 14 runtime behavior. Desktop
 automation was unavailable for this increment. Point/channel targeting, curve
 exchange, Adobe processing/reference acceptance and the wider feature inventory
 remain open. This workflow does not complete Lightroom parity.
+
+### Photograph-targeted Color Mixer and Black & White Mix
+
+The Mac Color Mixer now offers photo-targeted Hue, Saturation and Luminance;
+Black & White Mix has its own target. A sampled color can move up to three
+contributing bands together, preserving stored hue-degree units and displaying
+temporary slider values. Dragging previews without changing the recipe; release
+saves one multi-band revision. Escape, tool/photo/viewport changes and conflicts
+discard or reject stale captures. Click-only gestures produce no edit. Up/Down
+adjust the retained target after its preview is ready. Neutral areas are excluded.
+Both fitted and 1:1 views reuse the photograph-aligned coordinate model.
+
+The portable engine captures existing circular band supports before HSL or, for
+B&W targeting, after HSL and before monochrome conversion. It divides weights by
+the strongest band and retains the existing neutral protection. This is LumaRAW
+control behavior, not a recovered Adobe transform. At most three bands overlap;
+a 16-byte record retains IDs/count and three float32 weights without quantization.
+The maximum map payload is 48 MiB, half a dense eight-weight map. Strip processing
+and direct buffer writes avoid a second full byte copy. Cached input maps survive
+downstream edits; HSL edits invalidate B&W input maps. Normal rendering does not
+request these maps. Native pointer events read the map without image-worker IPC.
+
+`mixer_patch` previews only the 32 existing mixer fields at a captured revision;
+it is mutually exclusive with `curve_patch`. It does not write history, recipes
+or originals. The shared coalescing scheduler now serves both draft types.
+No new recipe fields or catalog migration are added. Engine generation **28**,
+schema **21**, **111 tools**, 78 editable recipe fields and bundled guide agree.
+The source digest is
+`f1441c0f7c81c7309f8dc156d435de3e737d69d5195df8abda7d8d2892ab59d0`.
+Mac compilation and ad-hoc signature verification pass; the existing PyInstaller
+`scipy.special._cdflib` hidden-import warning remains. The pre-increment remote
+refresh found no unmerged branches.
+
+The complete Python suite passes **612 tests, no skips**, including required
+Metal and the pinned Nikon D3S NEF. New tests compare sparse weights with an
+independent dense color-circle reference, exercise three-way support/neutral
+protection and all four adjustment directions, and check pipeline-stage order,
+all orientations, crop/detail coordinates, cache boundaries, binary limits and
+real-worker draft/history/source safety. Circular float32 versus float64 arithmetic
+differs by up to 1.413e-6 in the dense fixture. Whole-image versus SIMD strip-edge
+color evaluation initially exposed up to 2.349e-5 weight differences. Acceptance
+now explicitly bounds the resulting 200-unit gesture error below 0.01 control
+units, rather than requiring packed-integer equality. Transport preserves the
+float32 values; production processing and its existing pixel tolerances are unchanged.
+
+The final packaged engine passes **188 assertions in seven native suites**:
+mixer targeting (48), existing Color Mixer (24), curve targeting (33), parametric
+curves (30), point curves (28), shared state (15) and connection compatibility
+(10). New checks cover exact sparse decoding, neutral/invalid samples, neighboring
+band contributions, hue display/storage conversion, transient sliders/previews,
+one multi-band history step, keyboard weights, cancellation, treatment-aware
+sampling, undo, stale zoom/pan, external conflicts, photo/tool switches and source
+bytes. The packaged guide and manifest match the source used by these checks.
+
+Sequential packaged-worker probes use the pinned 4284×2844 Nikon D3S NEF on Apple
+M3 Max, 128 GB, arm64 macOS 26.6.2, after all tests/builds finish. HSL uses the
+combined parametric/RGB/legacy/color recipe; B&W uses the existing eight-band
+color-and-monochrome recipe. Each has one empty-application-cache preview, two
+warm previews, one full-size ProPhoto 16-bit TIFF and one 1280×900 detail pair.
+Preview requests include maps and omit baseline images. Warm times are medians
+of two; RSS is the maximum sampled per row.
+
+| Target / operation | CPU wall | Metal wall | CPU / Metal peak RSS |
+| --- | ---: | ---: | ---: |
+| HSL first preview, 1680×1115 | 2.592 s | 1.664 s | 215.16 / 206.89 MiB |
+| HSL warm preview | 1.557 s | 0.618 s | 177.19 / 137.34 MiB |
+| HSL recipe full-size TIFF | 7.273 s | 1.291 s | 405.44 / 229.72 MiB |
+| HSL detail with first map | 1.752 s | 1.107 s | 184.66 / 179.47 MiB |
+| B&W first preview, 1680×1115 | 2.692 s | 1.692 s | 168.58 / 175.31 MiB |
+| B&W warm preview | 1.489 s | 0.484 s | 129.56 / 119.56 MiB |
+| B&W recipe full-size TIFF | 7.151 s | 1.148 s | 283.45 / 213.25 MiB |
+| B&W detail with first map | 1.641 s | 0.956 s | 146.28 / 147.53 MiB |
+
+Maps including headers occupy 29,971,216 bytes fitted and 18,432,016 bytes detail.
+First Metal-worker capture stages take 0.778/0.888 s fitted (HSL/B&W) and
+0.493/0.512 s detail. This remains a CPU capture cost on a new input/viewport;
+warm receipts reuse the map and execute no capture stage. CPU/Metal map hashes
+match exactly, including three-band overlaps. All output pairs differ by at most
+one code value, including full 16-bit exports. GPU grading stays fused with no
+fallback (9 fitted, 23 export, 8 detail tiles), and source hashes are unchanged.
+Worker timing includes startup/encoding but excludes broker IPC and display;
+it is not mouse-drag latency or a general speed guarantee. Empty application
+cache does not imply cold OS/shader caches. The monochrome output was inspected
+as a generated image, not as desktop or Adobe-reference evidence.
+
+Public source/index and strict extracted-archive checks cover **335 files with
+zero findings**. Private photographs, catalogs, process logs and raw receipts
+remain excluded from publication.
+
+Rendered Mac target controls, actual mouse/key dispatch, VoiceOver and macOS 14
+runtime remain unverified; desktop automation was unavailable. Adobe color,
+interaction/reference acceptance, Point Color and the wider inventory remain
+open. These additions do not complete Lightroom parity.

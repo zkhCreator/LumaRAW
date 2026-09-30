@@ -828,6 +828,35 @@ receipts, and absence of capture work on warm runs. Record map sizes, per-stage
 time, wall time and RSS. Run sequentially with no tests/builds in progress. Worker
 timing excludes broker IPC, pointer dispatch and display; it is not drag latency.
 
+## Photograph-targeted HSL and Black & White Mix
+
+`test_mixer_targeting.py` checks dense-reference versus sparse supports around the
+entire color circle, three-way overlaps, neutral protection, directional changes,
+pre-HSL/pre-B&W ordering, all orientations, crop/detail geometry, cache boundaries
+and real-worker draft contracts. For whole-frame versus strip comparisons, the
+float32 color-transform error must produce less than 0.01 display-control units
+over a 200-unit gesture. Map transport itself preserves exact float32 bits.
+`NativeMixerTargetRegression` verifies malformed maps, neighboring-band edits,
+stored hue units, previews, one-step history, cancellation, treatment changes,
+undo, zoom/pan, conflicts, selection changes and mutual exclusion with curve tools.
+These are domain/native-state checks, not rendered desktop acceptance.
+
+```sh
+.venv/bin/python -m pytest -q tests/test_mixer_targeting.py
+.venv/bin/python tests/run_native.py --work work/new-mixer-target-native --suite NativeMixerTargetRegression
+.venv/bin/python tests/acceleration_probe.py --preset parametric --mixer-target hsl \
+  --engine /absolute/LumaRAW.app/Contents/Resources/Engine/LumaRAWEngine \
+  --fixture /absolute/nikon.NEF --work work/new-hsl-target-nef
+.venv/bin/python tests/acceleration_probe.py --preset bw_mixer --mixer-target bw \
+  --engine /absolute/LumaRAW.app/Contents/Resources/Engine/LumaRAWEngine \
+  --fixture /absolute/nikon.NEF --work work/new-bw-target-nef
+```
+
+Run the probes sequentially after builds/tests finish. They assert dimensions,
+finite bounded weights, counts/IDs, matching CPU/Metal map hashes, output parity,
+cold capture and warm reuse without a capture stage. Report worker wall time,
+capture time, RSS and map size; these exclude broker/desktop interaction latency.
+
 ## Public source check
 
 ```sh

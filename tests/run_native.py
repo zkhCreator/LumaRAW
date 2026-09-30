@@ -34,6 +34,7 @@ def main():
     suites+=('NativePointCurveRegression',)
     suites+=('NativeParametricCurveRegression',)
     suites+=('NativeCurveTargetRegression',)
+    suites+=('NativeMixerTargetRegression',)
     parser.add_argument('--suite',choices=suites,action='append',help='Run selected suites; default: all')
     args=parser.parse_args()
     work=args.work.resolve()

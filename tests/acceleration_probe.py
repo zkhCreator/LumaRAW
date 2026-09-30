@@ -20,6 +20,7 @@ def digest(p):
 def main():
     parser=argparse.ArgumentParser();parser.add_argument('--engine',required=True,type=Path);parser.add_argument('--fixture',required=True,type=Path);parser.add_argument('--work',required=True,type=Path);parser.add_argument('--preset',choices=['creative','neutral','mixer','bw_mixer','point_curves','parametric'],default='creative')
     parser.add_argument('--curve-tones',action='store_true',help='Include targeted input maps; omit the baseline image as during interactive drafts')
+    parser.add_argument('--mixer-target',choices=['hsl','bw'],help='Include sparse color target maps; omit before images')
     a=parser.parse_args()
     if a.work.exists():raise SystemExit('Choose new work directory')
     a.work.mkdir(parents=True);a.work=a.work.resolve();a.engine=a.engine.resolve();a.fixture=a.fixture.resolve()
@@ -45,6 +46,8 @@ def main():
         if operation=='detail':request['detail']={'width':1280,'height':900}
         if a.curve_tones and operation!='export':
             request.update(include_curve_tones=True,include_before=False)
+        if a.mixer_target and operation!='export':
+            request.update(mixer_target=a.mixer_target,include_before=False)
         start=time.perf_counter()
         p=subprocess.Popen([str(a.engine),'--worker'],stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=subprocess.PIPE,env={**os.environ,'OMP_NUM_THREADS':'2','OPENBLAS_NUM_THREADS':'1','VECLIB_MAXIMUM_THREADS':'2'})
         peak=[0.];done=threading.Event()
@@ -70,6 +73,20 @@ def main():
             assert np.isfinite(values).all() and values.min()>=0 and values.max()<=1
             item['curve_tones']={**receipt,'sha256':digest(tone_path),'bytes':tone_path.stat().st_size}
             if receipt['cache_hit']:assert 'curve_input_tones' not in result['processing']['stages']
+        if a.mixer_target and operation!='export':
+            receipt=result['mixer_target'];map_path=Path(receipt['path'])
+            assert receipt['stage']=='mixer-target-v1' and receipt['mode']==a.mixer_target
+            assert (receipt['width'],receipt['height'])==(result['width'],result['height'])
+            assert map_path.stat().st_size==16+receipt['width']*receipt['height']*16
+            assert receipt['cache_hit']==label.startswith('warm-preview')
+            packed=np.frombuffer(map_path.read_bytes()[16:],'<u4').reshape(-1,4)
+            counts=packed[:,0]>>24;assert counts.max()<=3
+            for slot in range(3):
+                used=counts>slot;weights=packed[used,slot+1].copy().view('<f4')
+                assert np.all(((packed[used,0]>>(8*slot))&255)<8)
+                assert np.isfinite(weights).all() and np.all((weights>0)&(weights<=1))
+            item['mixer_target']={**receipt,'sha256':digest(map_path),'bytes':map_path.stat().st_size,'max_bands':int(counts.max())}
+            if receipt['cache_hit']:assert 'mixer_target_weights' not in result['processing']['stages']
         return item
     pairs=[]
     # Alternate order between passes. The source cache is private per backend.
@@ -87,6 +104,8 @@ def main():
         assert diff.max()<=limit,differences[-1]
         if a.curve_tones and pair['cpu']['operation']!='export':
             assert pair['cpu']['curve_tones']['sha256']==pair['metal']['curve_tones']['sha256']
+        if a.mixer_target and pair['cpu']['operation']!='export':
+            assert pair['cpu']['mixer_target']['sha256']==pair['metal']['mixer_target']['sha256']
     assert digest(a.fixture)==before
     summary=[]
     for pair in pairs:

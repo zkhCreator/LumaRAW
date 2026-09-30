@@ -89,6 +89,12 @@ struct ContentView: View {
             else if s.curveTargetFrame == nil {s.render()}
         }
         .onChange(of:s.curveTargetContext) {_,_ in if s.curveTargetGesture != nil {s.cancelCurveTarget()}}
+        .onChange(of:s.mixerTargetActive) {_,active in
+            if !active {s.cancelMixerTarget();s.mixerTargetFrame=nil}
+            else if s.mixerTargetFrame == nil {s.render()}
+        }
+        .onChange(of:s.curveTargetContext) {_,_ in if s.mixerTargetGesture != nil {s.cancelMixerTarget()}}
+        .onChange(of:s.activeMixerComponent) {_,_ in if s.mixerTargetGesture != nil {s.cancelMixerTarget()}}
         .onChange(of:s.painterSource) { _,_ in s.cancelPainterStroke();if !s.painterInGrid { s.setPainting(false) } }
         .onDrop(of:[UTType.fileURL],isTargeted:nil){providers in
             Task { await s.reviewImportProviders(providers) };return true
@@ -108,12 +114,21 @@ struct ContentView: View {
                     Menu {
                         Button("Browse"){s.canvasTool="view"}
                         Button("Targeted Tone Curve"){s.setCurveTargeting(true)}.disabled(!s.canEditPointCurves || s.hasPendingEdits)
+                        Menu("Targeted Color Mixer") {
+                            if s.recipe["monochrome"] as? Bool ?? false {
+                                Button("Black & White Mix") {s.setMixerTargeting("bw")}
+                            } else {
+                                Button("Hue") {s.setMixerTargeting("hue")}
+                                Button("Saturation") {s.setMixerTargeting("sat")}
+                                Button("Luminance") {s.setMixerTargeting("lum")}
+                            }
+                        }.disabled(!s.canEditPointCurves || s.hasPendingEdits)
                         Button("Split Before and After"){s.splitCompare.toggle();s.compare=false;s.canvasTool="view";s.detail=false}
                         Button("Draw Freeform Crop"){s.canvasTool="crop";s.detail=false;s.compare=false;s.splitCompare=false}
                         Button("Draw Radial Mask"){s.canvasTool="radial";s.detail=false;s.compare=false;s.splitCompare=false}
                         Button("Draw Gradient Mask"){s.canvasTool="linear";s.detail=false;s.compare=false;s.splitCompare=false}
                         Button("Draw Brush Mask"){s.canvasTool="brush";s.detail=false;s.compare=false;s.splitCompare=false}
-                    } label:{Label(s.canvasTool=="view" ? "Tools":(s.canvasTool=="curve" ? "Tone Curve":"Drawing"),systemImage:s.canvasTool=="curve" ? "scope":(s.canvasTool=="crop" ? "crop":"paintbrush.pointed"))}
+                    } label:{Label(s.canvasTool=="view" ? "Tools":(s.canvasTool=="curve" ? "Tone Curve":(s.canvasTool=="mixer" ? "Color Mixer":"Drawing")),systemImage:["curve","mixer"].contains(s.canvasTool) ? "scope":(s.canvasTool=="crop" ? "crop":"paintbrush.pointed"))}
                     Picker("Zoom",selection:$s.detail){Text("Fit").tag(false);Text("1:1 Detail").tag(true)}.frame(width:155).onChange(of:s.detail){_,_ in s.render()}
                 } else {
                     if s.libraryView == .loupe {
@@ -230,6 +245,9 @@ struct PhotoCanvas:View {
                                     if s.curveTargetActive {
                                         GeometryReader {frame in CurveTargetOverlay(imageSize:image.size,available:frame.size,fitted:false)}
                                     }
+                                    if s.mixerTargetActive {
+                                        GeometryReader {frame in MixerTargetOverlay(imageSize:image.size,available:frame.size,fitted:false)}
+                                    }
                                 }
                                 .frame(minWidth:geo.size.width,minHeight:geo.size.height)
                         }
@@ -242,7 +260,8 @@ struct PhotoCanvas:View {
                             VStack{Spacer();HStack{Text("Before");Slider(value:$s.splitPosition,in:0...1).accessibilityLabel("Before and after divider");Text("After")}.font(.caption).padding(9).background(.ultraThinMaterial,in:Capsule()).frame(width:280).padding(.bottom,14)}
                         }
                         if s.curveTargetActive {CurveTargetOverlay(imageSize:image.size,available:geo.size)}
-                        if s.develop,!["view","curve"].contains(s.canvasTool),!s.compare {DrawingOverlay(image:image,available:geo.size)}
+                        if s.mixerTargetActive {MixerTargetOverlay(imageSize:image.size,available:geo.size)}
+                        if s.develop,!["view","curve","mixer"].contains(s.canvasTool),!s.compare {DrawingOverlay(image:image,available:geo.size)}
                     }
                 } else if s.rendering {ProgressView("Developing…").tint(.white).foregroundStyle(.white)}
                 else {Text("Select a photo to start editing").foregroundStyle(.gray)}
@@ -255,12 +274,22 @@ struct PhotoCanvas:View {
         .onTapGesture { keyboardFocus=true }
         .modifier(PhotoKeyboardShortcuts())
         .onKeyPress(.escape) {
+            if s.mixerTargetActive {
+                if s.mixerTargetGesture != nil {s.cancelMixerTarget()} else {s.setMixerTargeting(nil)}
+                return .handled
+            }
             guard s.curveTargetActive else {return .ignored}
             if s.curveTargetGesture != nil {s.cancelCurveTarget()} else {s.setCurveTargeting(false)}
             return .handled
         }
-        .onKeyPress(.upArrow) {guard s.curveTargetActive else {return .ignored};s.nudgeCurveTarget(1);return .handled}
-        .onKeyPress(.downArrow) {guard s.curveTargetActive else {return .ignored};s.nudgeCurveTarget(-1);return .handled}
+        .onKeyPress(.upArrow) {
+            if s.mixerTargetActive {s.nudgeMixerTarget(1);return .handled}
+            guard s.curveTargetActive else {return .ignored};s.nudgeCurveTarget(1);return .handled
+        }
+        .onKeyPress(.downArrow) {
+            if s.mixerTargetActive {s.nudgeMixerTarget(-1);return .handled}
+            guard s.curveTargetActive else {return .ignored};s.nudgeCurveTarget(-1);return .handled
+        }
         .onKeyPress(.leftArrow) { s.navigateLoupe(-1);return .handled }
         .onKeyPress(.rightArrow) { s.navigateLoupe(1);return .handled }
     }

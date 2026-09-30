@@ -101,6 +101,17 @@ Downstream curve/color/mask/LUT edits reuse it; upstream settings and geometry
 invalidate it. Display proofing never changes these inputs. Map requests and
 temporary previews do not save recipes. Normal clients can omit the option.
 
+For HSL or Black & White Mix targeting, request `mixer_target: hsl` or `bw` on a
+preview. The result's sparse map contains `LRMIX1\0\0`, little-endian uint32
+dimensions and 16 bytes per pixel: one uint32 with up to three byte-sized band IDs
+and a count in its high byte, then three float32 weights. Band order is supplied
+in `bands`. Weight the selected component's control delta by these engine values;
+native hue display units still convert to stored degrees by multiplying by 0.3.
+HSL samples precede color mixing; B&W samples follow it. Neutral samples have no
+bands. `mixer_patch` previews only mixer fields at `expected_revision`, with
+`mixer_draft: true`; it cannot accompany `curve_patch`. Persist accepted results
+with ordinary revision-checked partial edits. Map/draft reads never save history.
+
 ## Reviewed Add import
 
 `prepare_import(paths, include_subfolders?, skip_duplicates?)` captures explicit

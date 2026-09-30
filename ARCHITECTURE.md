@@ -667,6 +667,24 @@ capture is still current. Escape and context changes discard it. Keyboard action
 use the retained input position after the saved preview is refreshed. The map
 format and service contract can be reused by a future platform adapter.
 
+Color targeting uses `preview_photo(mixer_target: hsl|bw)` at the appropriate
+pipeline cut: after all curves but before HSL, or after HSL but before monochrome.
+The engine derives the existing eight circular supports and neutral protection.
+At most three bands overlap; normalized weights move the strongest slider by the
+requested amount and neighbors proportionally. The file stores three band IDs,
+a count and three exact float32 weights per pixel (16 bytes, up to 48 MiB payload).
+No hue quantization or native color-analysis formula is introduced. Tile capture
+and direct buffer writes avoid a full eight-weight image or duplicate byte buffer.
+Stage/mode, upstream recipe, source stat identity and viewport define cache keys;
+HSL drafts reuse pre-HSL maps, while changes to HSL invalidate pre-B&W maps.
+
+`mixer_patch` is a separate, revision-bound read-only preview contract restricted
+to the 32 mixer fields. It cannot be combined with `curve_patch`. The shared
+preview scheduler coalesces drafts; a native gesture captures treatment/component,
+photo, revision, viewport and sparse map identity. Release applies the changed
+bands as one pending partial patch. The normal service revision check still rejects
+unseen external edits. Tool switches, cancellation and stale captures never rebase.
+
 This does not establish monitor calibration, Nikon Picture Control equivalence, or per-camera color accuracy. Camera profiles are bound to a specific model. A synthetic chart fit is algorithm evidence, not independent camera acceptance.
 
 ## Language and contracts

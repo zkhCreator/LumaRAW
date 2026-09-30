@@ -1,5 +1,5 @@
-// Purpose: bounded temporary previews shared by point and parametric curve controls.
-// Inputs: revision-bound, curve-only drafts supplied by native editors.
+// Purpose: bounded temporary previews shared by curve and color mixer controls.
+// Inputs: revision-bound, field-scoped drafts supplied by native editors.
 // Outputs: one in-flight Store render and one coalesced latest draft. No persistence
 // or pixel algorithms; committing/cancelling a gesture remains the editor's job.
 import SwiftUI
@@ -20,6 +20,18 @@ extension PointCurveCapture {
     private var task:Task<Void,Never>?
     private var generation=0
     func request(store:Store,current:@escaping () -> CurvePreviewDraft?) {
+        enqueue(store:store) {
+            guard let draft=current() else {return}
+            store.render(curveDraft:draft,debounce:false)
+        }
+    }
+    func requestMixer(store:Store,current:@escaping () -> MixerPreviewDraft?) {
+        enqueue(store:store) {
+            guard let draft=current() else {return}
+            store.render(mixerDraft:draft,debounce:false)
+        }
+    }
+    private func enqueue(store:Store,action:@escaping () -> Void) {
         guard task == nil else {return}
         generation+=1;let token=generation
         task=Task { @MainActor in
@@ -28,8 +40,8 @@ extension PointCurveCapture {
             while store.rendering && !Task.isCancelled {
                 try? await Task.sleep(nanoseconds:40_000_000)
             }
-            guard !Task.isCancelled,token == generation,let draft=current() else {return}
-            store.render(curveDraft:draft,debounce:false)
+            guard !Task.isCancelled,token == generation else {return}
+            action()
         }
     }
     func cancel() {generation+=1;task?.cancel();task=nil}
