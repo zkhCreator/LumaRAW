@@ -21,7 +21,8 @@ import AppKit
                 Button("Export Selected Photos…"){store.showExport=true}.keyboardShortcut("e",modifiers:[.command,.shift]).disabled(store.selected==nil)
             }
             CommandGroup(replacing:.undoRedo) {
-                Button("Undo Last Adjustment"){store.undo()}.keyboardShortcut("z").disabled(store.photo==nil || store.editing || store.orientationBusy || store.developPresetBusy)
+                Button("Undo Develop Adjustment"){store.undo()}.keyboardShortcut("z").disabled(!store.canUndoDevelop)
+                Button("Redo Develop Adjustment"){store.redo()}.keyboardShortcut("z",modifiers:[.command,.shift]).disabled(!store.canRedoDevelop)
             }
             CommandMenu("Photo") {
                 Button("Develop Presets…") { store.showDevelopPresets=true }

@@ -21,6 +21,7 @@ Official references checked September 2026:
 - [Collections, smart collections and collection sets](https://helpx.adobe.com/lightroom-classic/desktop/organize-photos-in-lightroom-classic/photo-collections.html)
 - [Smart collection criteria](https://helpx.adobe.com/lightroom-classic/desktop/organize-photos-in-lightroom-classic/smart-collections-criteria-in-lightroom-classic.html)
 - [Develop tools](https://helpx.adobe.com/lightroom-classic/desktop/process-and-develop-photos/develop-module-tools.html)
+- [History state selection, naming, clearing and snapshots](https://helpx.adobe.com/uk/lightroom-classic/desktop/process-and-develop-photos/develop-module-options.html)
 - [Tone Curve controls and channels](https://helpx.adobe.com/lightroom-classic/desktop/process-and-develop-photos/image-tone-color.html)
 - [Color Mixer](https://helpx.adobe.com/lightroom-classic/desktop/process-and-develop-photos/color-mixer.html) and [Black & White Mix](https://www.adobe.com/learn/lightroom-classic/web/convert-photo-black-white)
 - [Loupe, Compare and Survey](https://helpx.adobe.com/lightroom-classic/desktop/viewing-photos/browse-compare-photos.html)
@@ -62,7 +63,7 @@ gaps. Nothing below is full Lightroom parity merely because historical tests pas
 | Detail and optics | Partial: noise/sharpen, manual lens | Complete manual detail controls, automatic lens profiles, bounded full-resolution acceptance |
 | Geometry | Partial: crop/straighten/perspective, independent rotation/flips with attached masks and displayed crop ratios | Interactive retained handles, guided transforms, full crop state and rendered/reference parity |
 | Local editing | Partial: radial/gradient/brush/luma | Mask list/edit/reorder/intersection, range masks, clone/heal, red-eye (non-AI) |
-| History and presets | Partial: 50-step Develop undo, separate 50-batch orientation undo, shared named snapshots, partial Develop presets/groups/favorites/shared or local storage, batch/Painter and reviewed-import application | Unified Undo/Redo, navigable history, preset hover preview/Amount/ISO adaptation/Adobe exchange and reference acceptance |
+| History and presets | Partial: durable paged Develop history with undo/redo, state selection/rename/clear, separate 50-batch orientation undo, shared named snapshots, partial Develop presets/groups/favorites/shared or local storage, batch/Painter and reviewed-import application | Unified application Undo/Redo, history hover/Before assignment, preset hover preview/Amount/ISO adaptation/Adobe exchange and rendered reference acceptance |
 | Preview/performance | Partial: Metal, proxies, 1:1 viewport, developed thumbnail fast path | Real-RAW catalog/slider latency, offline previews, cache controls and desktop acceptance |
 | Export | Partial: JPEG/16-bit TIFF, ICC, durable jobs with frozen catalog/rights IPTC XMP and keyword hierarchy options | Presets, complete EXIF/IPTC Extension/GPS metadata policies, watermark, additional formats, publish workflows |
 | External editing and video | Missing | External-editor setup and derivative round trips; supported video import/playback, frame capture, trimming and export |
@@ -76,8 +77,8 @@ gaps. Nothing below is full Lightroom parity merely because historical tests pas
 
 ## Active increment
 
-Photograph-targeted HSL and Black & White Mix, followed by further
-import, Library and Develop workflows.
+Durable Develop history and redo, followed by further import, Library and Develop
+workflows. The full feature inventory above remains the acceptance scope.
 Rendered Mac/reference acceptance,
 Copy/Move/DNG, complete IPTC, Adobe exchange, unified Undo/Redo and the full inventory
 stay in scope. This does not complete product parity.
@@ -2355,3 +2356,91 @@ Rendered Mac target controls, actual mouse/key dispatch, VoiceOver and macOS 14
 runtime remain unverified; desktop automation was unavailable. Adobe color,
 interaction/reference acceptance, Point Color and the wider inventory remain
 open. These additions do not complete Lightroom parity.
+
+## Durable Develop history and redo (September 29, 2026)
+
+This increment replaces the destructive fifty-step undo stack with a persistent
+per-photo timeline. The Develop inspector lists sixty summaries at a time with
+Older Steps/Latest navigation, a current-state marker, action labels/values and
+timestamps. Selecting an earlier state preserves later states; an actual new edit
+replaces only that future branch. Command-Z and Shift-Command-Z navigate Develop
+states. Right-click rename and confirmed Clear History preserve current pixels;
+clear establishes a new baseline and cannot itself be undone. Named snapshots,
+orientation history and frozen export jobs remain independent.
+
+The baseline includes import presets or a virtual copy's inherited recipe.
+Schema 22 preserves every legacy history ID, action label, timestamp and remaining
+recipe through an atomic conversion; steps discarded by older versions cannot be
+recovered. Step identities are not reused after branching or clear. Normalized
+no-op edits/preset applications preserve redo. Direct edits, selective sync,
+recipe/snapshot restoration and preset application share one transaction-aware
+writer. History summaries avoid full recipes and photo/keyword payloads, using
+indexed keyset pages. Backup restore rebinds LUT assets in both states and the
+initial recipe. The portable service owns these rules; the Mac shell only presents
+captured revisions and rejects stale actions without replay.
+
+A refreshed remote inspection found no unmerged branches before implementation.
+The isolated Apple Silicon app builds for macOS 14 and passes ad-hoc signature
+verification on macOS 26.6.2. Engine generation **29**, schema **22**, **116 tools**,
+78 editable recipe fields, bundled usage guide and source digest
+`63e292635ac9972604bf64907d85d5f6999f5062683fe2c932cb04fa72ea022c`
+agree. The packaged engine executable SHA-256 is
+`75d599fcdc8eed62a1a04a9412e76f24e8dad9450f062448abf501cf0da13b24`.
+No image-processing equation or tolerance changed in this increment.
+
+The full Python suite passes **627 tests without skips**, including the
+fixed Nikon D3S NEF and required Metal execution. New cases cover retained redo,
+branching/no-ops, all revision barriers, complete bounded pagination, payload-free
+reads, rename/clear, copy isolation, import-preset baselines, snapshots/jobs/source
+safety, transactional rollback and backup assets. Genuine schema-21 migration
+failure injection rolls back both payload conversion and added schema; retry and
+idempotence preserve all surviving steps.
+
+Initial verification exposed two issues, retained in private receipts: a legacy
+schema-8 fixture invoked the current editor instead of seeding its published SQL
+shape, and a queued automatic native refresh could supersede an explicit history
+read. The fixture now uses the actual old history representation. Native refresh
+coalesces the same photo/revision and leaves active explicit reads intact. The
+new native source probe then passed 23 state assertions. Before the final MCP
+effects-only annotation, the packaged engine passed **192 native assertions across
+eight suites**: History (23), Develop
+Presets (28), Virtual Copies (19), Import Processing (22), Orientation (51), Color
+Mixer (24), State (15) and Connection (10). The final metadata-only change marks
+`clear_history` as destructive for MCP clients; **35 targeted Python history and
+service tests** pass afterward, including the new annotation check. The final
+packaged MCP handshake/tools listing confirms all 116 tools and that declaration.
+Catalog/native behavior and the measured processing paths are unchanged by it.
+
+Isolated catalog measurements use generated 64×48 PNG originals, one synthetic
+photo timeline, and sequential service processes on Apple M3 Max / 128 GiB,
+arm64 macOS 26.6.2. Each repeated operation has 30 warm samples. Timings include
+schema/connection checks, service validation and SQLite commits, excluding setup,
+broker IPC, image work and the desktop. These are not slider-to-preview timings.
+
+| Operation, median / p95 | 1,000 steps | 100,000 steps |
+| --- | ---: | ---: |
+| Newest 60 summaries | 1.494 / 1.646 ms | 1.476 / 1.664 ms |
+| Deep 60-summary page | 1.542 / 1.806 ms | 1.470 / 1.537 ms |
+| Undo then redo | 3.683 / 4.219 ms | 3.512 / 4.045 ms |
+| Jump to baseline then latest | 3.793 / 4.494 ms | 3.643 / 4.291 ms |
+| Append one changed edit | 2.230 / 2.337 ms | 2.079 / 2.164 ms |
+
+The page responses are 4,364 / 4,730 bytes and peak process RSS is 40.17 / 40.47
+MiB. A single replacement of the future half took 2.676 / 38.827 ms; a subsequent
+single clear took 2.157 / 42.389 ms. Those deletion observations are not percentile
+distributions; deletion cost grows with affected steps. Both runs started zero
+image workers and retained identical original hashes. No per-machine timing limit
+is embedded in the regression suite.
+
+Rendered desktop History controls, actual menu/key dispatch, VoiceOver, and the
+macOS 14 runtime remain unverified. Global application undo, hover previews,
+copying a History state to Before, and full snapshot management remain gaps.
+The module retains the existing PyInstaller warning about optional
+`scipy.special._cdflib`; no Swift compiler diagnostics occurred. This increment
+and these synthetic catalog results do not complete Lightroom parity.
+
+The final package additionally passes History (23) and Connection (10) again:
+**33 assertions revalidated after the annotation change**. Source/index and strict
+extracted-archive publication checks cover **340 files with zero findings**.
+Generated originals, catalogs, builds, timing receipts and process logs remain
+private and excluded from the source checkpoint.

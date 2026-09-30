@@ -116,6 +116,8 @@ def migrate(db):
     migrate_import_processing(db)
     from .previous_import import migrate as migrate_previous_import
     migrate_previous_import(db)
+    from .develop_history import migrate as migrate_develop_history
+    migrate_develop_history(db)
 
 
 def text_predicate(text):

@@ -142,23 +142,14 @@ class Catalog:
         return Recipe.parse(json.loads(self.photo(photo_id)['recipe']))
 
     def edit(self, photo_id, recipe, label='Adjustments'):
-        previous = self.photo(photo_id)
-        data = json.dumps(recipe.dict())
-        if data == previous['recipe']:
-            return
+        from .develop_history import DevelopHistory
         with self.db:
-            self.db.execute('INSERT INTO history(photo_id,recipe,label,created) VALUES(?,?,?,?)',
-                            (photo_id, previous['recipe'], label, time.time()))
-            self.db.execute('UPDATE photos SET recipe=?,revision=revision+1 WHERE id=?', (data, photo_id))
-            self.db.execute('DELETE FROM history WHERE photo_id=? AND id NOT IN (SELECT id FROM history WHERE photo_id=? ORDER BY id DESC LIMIT 50)', (photo_id, photo_id))
+            DevelopHistory(self.db).edit(photo_id, recipe, label)
 
     def undo(self, photo_id):
-        row = self.db.execute('SELECT * FROM history WHERE photo_id=? ORDER BY id DESC LIMIT 1', (photo_id,)).fetchone()
-        if row:
-            with self.db:
-                self.db.execute('UPDATE photos SET recipe=?,revision=revision+1 WHERE id=?', (row['recipe'], photo_id))
-                self.db.execute('DELETE FROM history WHERE id=?', (row['id'],))
-        return self.recipe(photo_id)
+        from .develop_history import DevelopHistory
+        with self.db:
+            return DevelopHistory(self.db).move(photo_id)
 
     def update_metadata(self, photo_id, metadata):
         with self.db:

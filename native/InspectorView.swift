@@ -35,6 +35,7 @@ struct InspectorView:View {
                         .buttonStyle(.plain).help("1–5 to rate, P to flag as a pick")
                 }
                 Button { s.showDevelopPresets=true } label: { Label("Develop Presets…",systemImage:"camera.filters") }.frame(maxWidth:.infinity)
+                DevelopHistoryPanel()
                 Divider()
                 DisclosureGroup("Light",isExpanded:$light){VStack(spacing:12){
                     edit("Exposure","exposure",-5...5,0.05,"EV")

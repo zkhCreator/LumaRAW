@@ -5,6 +5,24 @@ description: Develop and organize local RAW photographs with LumaRAW through MCP
 
 # LumaRAW local darkroom
 
+## Develop history
+
+Read `get_photo` and capture its revision before calling `list_history`. Every
+history command requires `photo_id` and `expected_revision`. List replies contain
+at most sixty summaries, newest first, plus the current cursor and undo/redo
+availability. Pass `next_before` as `before_id` for the next older page; do not
+interpret missing page entries as deleted states. Step `0` is the initial retained
+state, which can include import presets or inherited virtual-copy settings.
+
+`undo_photo`, `redo_photo` and `select_history(step_id)` move through retained
+states without deleting future steps. A subsequent real edit replaces the future
+branch; a no-op edit preserves it. `rename_history(step_id,name)` changes only its
+label, but invalidates captured photo revisions. `clear_history` discards the
+timeline and keeps current adjustments as a new baseline; require explicit user
+intent for this irreversible deletion. Snapshots, orientation and submitted
+exports remain unchanged. Never retry stale or uncertain mutation responses.
+These commands cover per-photo Develop history, not global application undo.
+
 Use the LumaRAW MCP tools when connected. The native app's **Agent Connection** page shows the exact command and catalog path. App, CLI and MCP use the same service. No login, API key or network service is needed.
 
 If MCP is unavailable, call the packaged engine at `<LumaRAW.app>/Contents/Resources/Engine/LumaRAWEngine`. Pass `--catalog <catalog-path> <method>` and a JSON object on stdin. `status` and `recipe_schema` need no input. Source checkout fallback: `uv run --frozen lumaraw --catalog <path> <method>` from the project directory. The CLI wraps results in `{ok,result}` or `{ok,error,type}`; stdout of `--mcp` is JSON-RPC only.

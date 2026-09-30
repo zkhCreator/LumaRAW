@@ -21,6 +21,7 @@ import uuid
 from .model import Recipe, PRESETS, SYNC_GROUPS
 from .organization import folded
 from .preset_paths import preset_root
+from .develop_history import DevelopHistory
 
 FIELDS = tuple(k for k in Recipe().dict() if k != 'version')
 BASIC_FIELDS = ('exposure','temperature','tint','contrast','highlights','shadows','whites','blacks',
@@ -264,15 +265,8 @@ class DevelopPresets:
                 changes=self.targets(catalog,params,staged)
                 updated=[]
                 for photo,recipe in changes:
-                    if json.loads(photo['recipe'])==recipe:
-                        continue
-                    catalog.db.execute('INSERT INTO history(photo_id,recipe,label,created) VALUES(?,?,?,?)',
-                        (photo['id'],photo['recipe'],'Preset: '+row['name'],time.time()))
-                    catalog.db.execute('UPDATE photos SET recipe=?,revision=revision+1 WHERE id=?',
-                        (json.dumps(recipe),photo['id']))
-                    catalog.db.execute('DELETE FROM history WHERE photo_id=? AND id NOT IN '
-                        '(SELECT id FROM history WHERE photo_id=? ORDER BY id DESC LIMIT 50)',(photo['id'],photo['id']))
-                    updated.append(photo['id'])
+                    if DevelopHistory(catalog.db).edit(photo['id'],Recipe.parse(recipe),'Preset: '+row['name']):
+                        updated.append(photo['id'])
                 return {'updated':updated,'targeted':len(changes),'preset_id':row['id'],'preset_name':row['name'],
                         'revision':self.token(shared,catalog)}
             if method=='develop_preset_action':

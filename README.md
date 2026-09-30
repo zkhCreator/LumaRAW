@@ -18,7 +18,7 @@ LumaRAW references your originals without changing them. The SwiftUI app and you
 | Library | Folder tree/search/favorites/labels, ratings, flags, catalog metadata/keywords, regular/live smart collections, nested sets, Quick/target collections, SQL filters/sorting, manual/capture-time stacks, duplicate/missing indexing, virtual copies/shared snapshots, selective sync, and backup/restore |
 | Culling | Grid/Loupe/Compare/Survey, anchored page selections, active-photo review actions, linked or independent full-resolution comparison viewports |
 | Export | JPEG and 16-bit TIFF with embedded sRGB, Display P3, Adobe RGB, or ProPhoto RGB ICC profiles; frozen catalog XMP/keyword policies, persistent queue, pause/cancel/retry, and collision-safe filenames |
-| Agents | 111 MCP tools, equivalent JSON CLI commands, and a bundled skill; app and agent edits share conflict detection |
+| Agents | 116 MCP tools, equivalent JSON CLI commands, and a bundled skill; app and agent edits share conflict detection |
 
 ## Build and run
 
@@ -92,7 +92,22 @@ their own values, including explicit empty text. Incompatible camera profiles,
 changed LUT assets or metadata limits reject the entire application. Originals
 and existing catalog photos stay unchanged.
 
-Adjustments save automatically. Each photo supports up to 50 undo steps, named snapshots shared by a source’s master and virtual copies, and portable recipe bundles. The full recipe editor supports precise curve points and brush paths. Submitted exports retain their original recipe snapshot even if you continue editing.
+Adjustments save automatically. **History** in the Develop inspector lists saved
+states, with **Older Steps** and **Latest** for long histories. Click a state to
+return to it; **⌘Z / ⇧⌘Z** undo and redo Develop adjustments. Navigation retains
+later steps until you make a new edit from an older state. History and its current
+position survive restarting; new histories have no fifty-step retention cap.
+Right-click a step to rename it. **Clear History** requires confirmation and keeps
+current adjustments as the new baseline; removed steps cannot be undone.
+
+Each virtual copy has its own history starting with its inherited settings.
+Named snapshots remain shared by a source’s master and copies. Recipe bundles and
+the full recipe editor retain precise curve points and brush paths. Submitted
+exports keep their original recipe snapshot even if you continue editing.
+Upgrading preserves all remaining legacy steps, but cannot recover steps already
+discarded by older releases. Develop undo is separate from rotation/flip undo;
+global application undo, history hover previews and a custom Before state remain
+unimplemented.
 
 In **Color Mixer**, use HSL to show Hue, Saturation, Luminance or all components,
 or Color to edit one color band. Red, orange, yellow, green, aqua, blue, purple and

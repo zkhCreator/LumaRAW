@@ -865,3 +865,32 @@ uv run --frozen pytest -q tests/test_public_release.py
 ```
 
 `--strict` additionally rejects untracked build artifacts, environments and caches; use it on the clean extracted source archive. Never upload raw probe output without review: it can contain absolute photo/catalog paths and EXIF. The package script does not include those receipts.
+
+## Durable Develop history
+
+`test_develop_history.py` exercises restart-visible undo/redo, selection and
+branching, no-op retention, all command revision barriers, payload-free keyset
+pages, stable step IDs, rename/clear, source/job/snapshot safety, private copy
+baselines, transaction rollback and LUT backup rebinding. The migration fixture
+runs the genuine schema-21 chain and injects a failure after recipe conversion;
+rollback must restore both schema and original payloads before a successful retry.
+
+`NativeHistoryRegression` uses the actual broker to verify menu availability,
+state selection, redo, coalesced edits, pending-action exclusion, stale forms,
+external conflicts, photo switches, paging, clear and reload. It does not verify
+rendered controls, mouse/key dispatch or VoiceOver. macOS 14 runtime acceptance
+remains separate from compiling for its deployment target.
+
+```sh
+.venv/bin/python -m pytest -q tests/test_develop_history.py
+.venv/bin/python tests/run_native.py --work work/new-history-native --suite NativeHistoryRegression
+.venv/bin/python tests/history_probe.py --steps 100000 --samples 30 --work work/new-history-probe
+```
+
+Run the probe after builds/tests finish. It creates a synthetic long timeline and
+measures warm service reads and committed writes, reporting median/p95, response
+size and process RSS. It also times one replacement of half the future branch and
+one clear of the remaining timeline; those single observations are not latency
+distributions. Setup, IPC, image workers and desktop latency are excluded;
+assert no image work and unchanged original bytes. Do not use it to claim preview
+or full interaction performance.

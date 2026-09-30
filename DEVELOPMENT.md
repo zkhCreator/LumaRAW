@@ -259,3 +259,12 @@ unit-test assertions. Keep numerical/contract assertions separate from benchmark
 Before publication run `scripts/check_public.py`, build a source archive and
 check the extracted clean source with `--strict`. Never expand the allowlist to
 include private receipts or photos just to make a gate pass.
+
+Develop history uses one transactional writer for direct edits, presets and sync.
+Never restore the old destructive pop or fifty-step truncation. Normalize recipes
+before no-op comparison; preserve redo on no-ops, discard only the future branch
+on a changed edit, and never reuse step identities. Page summaries without recipe
+payloads or whole-history counts. Capture the displayed photo revision for list,
+selection, rename and clear, including dialogs opened before an external edit.
+Virtual-copy creation must reset history fields instead of inheriting a parent's
+cursor. Keep baseline assets in backup/restore and test real legacy migrations.

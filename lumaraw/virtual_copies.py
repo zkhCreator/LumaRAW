@@ -105,7 +105,9 @@ class VirtualCopies:
             ids = []
             for row in rows:
                 values = {**row, 'is_virtual':1, 'copy_name':self.copy_name(row['source_id']),
-                          'created':time.time(), 'revision':0, 'metadata_revision':0}
+                          'created':time.time(), 'revision':0, 'metadata_revision':0,
+                          'history_base_recipe':None,'history_base_label':'Virtual Copy',
+                          'history_base_created':None,'history_cursor':0}
                 new_id = self.db.execute('INSERT INTO photos (' + ','.join(columns) + ') VALUES (' +
                     ','.join('?' for _ in columns) + ')', [values[key] for key in columns]).lastrowid
                 self.db.execute('INSERT INTO keyword_photos SELECT ?,keyword_id FROM keyword_photos WHERE photo_id=?',

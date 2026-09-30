@@ -84,6 +84,11 @@ def test_frozen_presets_apply_only_to_checked_new_photos_with_additive_keywords(
         assert c.db.execute('SELECT count(*) FROM history WHERE photo_id=2').fetchone()[0]==0
         assert c.db.execute('SELECT count(*) FROM import_processing').fetchone()[0]==0
     assert all(p.read_bytes()==data for p,data in originals.items())
+    history=s.dispatch('list_history',{'photo_id':2,'expected_revision':0})
+    assert len(history['steps'])==1 and history['steps'][0]['label']=='Import'
+    s.dispatch('edit_photo',{'photo_id':2,'expected_revision':0,'patch':{'exposure':-1}})
+    undone=s.dispatch('undo_photo',{'photo_id':2,'expected_revision':1})
+    assert undone['recipe']==p['recipe']  # Import presets, not neutral defaults, are the baseline.
 
 
 def test_omission_none_and_keyword_clearing_are_independent(library):

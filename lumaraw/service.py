@@ -38,6 +38,7 @@ from .folder_sync_runner import FolderSyncRunner
 from .keyword_exports import KeywordExports
 from .keyword_details import KeywordDetails
 from .previous_import import state as previous_import_state
+from .develop_history import DevelopHistory, adjustment_label
 
 class ConflictError(ValueError): pass
 
@@ -47,6 +48,8 @@ def executable_args():
 def unpack(row):
     if row:
         row=dict(row)
+        for key in ('history_base_recipe','history_base_label','history_base_created','history_cursor'):
+            row.pop(key,None)
         for key in ('recipe','metadata','options','processing','export_metadata','iptc'):
             if key in row and isinstance(row[key],str): row[key]=json.loads(row[key])
     return row
@@ -290,10 +293,24 @@ class Service:
             if method=='get_photo':return unpack(self.require(c,p['photo_id']))
             if method=='get_photo_keywords':return KeywordDetails(c).photo(**p)
             if method=='keyword_choices':return KeywordDetails(c).choices(**p)
+            if method=='list_history':
+                page=DevelopHistory(c.db).page(p['photo_id'],p.get('before_id'))
+                if page['revision']!=p['expected_revision']:
+                    raise ConflictError('Edit conflict: history changed. Read the photo again.')
+                return page
+            if method in ('redo_photo','select_history','rename_history','clear_history'):
+                row=self.check_revision(c,p['photo_id'],p['expected_revision'])
+                history=DevelopHistory(c.db)
+                with c.db:
+                    if method=='redo_photo':history.move(row['id'],redo=True)
+                    elif method=='select_history':history.select(row['id'],p['step_id'])
+                    elif method=='rename_history':history.rename(row['id'],p['step_id'],p['name'])
+                    else:history.clear(row['id'])
+                return unpack(c.photo(row['id']))
             if method in ('edit_photo','undo_photo','restore_version','load_recipe'):
                 row=self.check_revision(c,p['photo_id'],p['expected_revision'])
                 if method=='edit_photo':
-                    values=json.loads(row['recipe']);values.update(p['patch']);c.edit(row['id'],Recipe.parse(values),'App / Agent Adjustments')
+                    values=json.loads(row['recipe']);values.update(p['patch']);c.edit(row['id'],Recipe.parse(values),adjustment_label(p['patch']))
                 elif method=='undo_photo':c.undo(row['id'])
                 elif method=='restore_version':c.restore_version(row['id'],p['version_id'])
                 else:
@@ -343,13 +360,11 @@ class Service:
                 for target in p['targets']:
                     row=self.check_revision(c,target['photo_id'],target['expected_revision']);values=json.loads(row['recipe'])
                     values.update({k:source[k] for g in p['groups'] for k in SYNC_GROUPS[g]});changes.append((row,Recipe.parse(values)))
-                # All validation precedes the transaction. Catalog.edit commits, so write this group atomically here.
+                # All validation precedes the transaction; the timeline writer never commits a batch.
                 with c.db:
                     for row,recipe in changes:
                         if row['id']==p['source_id']:continue
-                        c.db.execute('INSERT INTO history(photo_id,recipe,label,created) VALUES(?,?,?,?)',(row['id'],row['recipe'],'Batch Sync',time.time()))
-                        c.db.execute('UPDATE photos SET recipe=?,revision=revision+1 WHERE id=?',(json.dumps(recipe.dict()),row['id']))
-                        c.db.execute('DELETE FROM history WHERE photo_id=? AND id NOT IN (SELECT id FROM history WHERE photo_id=? ORDER BY id DESC LIMIT 50)',(row['id'],row['id']))
+                        DevelopHistory(c.db).edit(row['id'],recipe,'Batch Sync')
                 return {'synced':sum(r['id']!=p['source_id'] for r,_ in changes)}
             if method=='settings':
                 if 'select_previous_import' in p:c.set_setting('select_previous_import',p['select_previous_import'])

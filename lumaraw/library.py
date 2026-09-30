@@ -127,8 +127,8 @@ def restore_catalog(path,destination):
     catalog=Catalog(dest)
     try:
         # Rebind assets by their immutable content address, including named versions.
-        for table,key,column in [('photos','id','recipe'),('history','id','recipe'),('versions','id','recipe'),('jobs','id','recipe'),('develop_presets','id','patch'),('import_processing','plan_id','develop_patch')]:
-            for id_,payload in catalog.db.execute(f'SELECT {key},{column} FROM {table}'):
+        for table,key,column in [('photos','id','recipe'),('photos','id','history_base_recipe'),('history','id','recipe'),('versions','id','recipe'),('jobs','id','recipe'),('develop_presets','id','patch'),('import_processing','plan_id','develop_patch')]:
+            for id_,payload in catalog.db.execute(f'SELECT {key},{column} FROM {table} WHERE {column} IS NOT NULL'):
                 recipe=json.loads(payload)
                 if recipe.get('lut'):
                     candidate=dest/'assets'/(recipe['lut']['sha256']+'.cube')

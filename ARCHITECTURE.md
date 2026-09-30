@@ -322,7 +322,7 @@ Preset, scope and photo revisions are validated before and after LUT staging.
 Content-addressed LUT copies happen outside SQL locks, reject changed bytes and
 never overwrite destinations. Catalog restore rebinds local preset asset paths.
 Application merges only selected fields, validates all target recipes/camera
-profiles and writes one transaction with normal bounded Develop history. Equal
+profiles and writes one transaction with normal durable Develop history. Equal
 recipes are no-ops. Frozen export jobs, metadata and catalog orientation survive.
 The Mac shell owns immutable editor and Painter captures, selection scope and
 preview refresh; it does not translate Adobe parameters or process image pixels.
@@ -703,3 +703,35 @@ First-party text uses English. Sync group and preset names are English in `recip
 The native shell uses standard navigation sidebars, a hideable inspector, command menus, system typography, and file panels following Apple's [macOS design guidance](https://developer.apple.com/design/human-interface-guidelines/designing-for-macos). Implementation choices do not replace desktop and accessibility testing.
 
 MCP negotiates the [2025-11-25 stdio transport](https://modelcontextprotocol.io/specification/2025-11-25/basic/transports) and [tool contract](https://modelcontextprotocol.io/specification/2025-11-25/server/tools), with the earlier handshake versions listed in the implementation. HTTP, remote authentication, task extensions, resource subscriptions, cancellation notifications, and later protocol versions are not claimed.
+
+## Durable Develop history
+
+`develop_history.py` owns schema 22's timeline and per-photo cursor. Each history
+row stores the recipe after its named action; the photo retains its initial recipe
+separately. Navigation changes the live recipe/cursor and increments the existing
+visual revision, invalidating previews and stale forms. It retains future states.
+A changed edit truncates only states after the cursor and appends one new state;
+normalized no-op edits leave both the revision and future branch untouched.
+Step IDs come from a transactional monotonic allocator and are never reused.
+
+Migration preserves existing history IDs, labels and timestamps, shifting legacy
+before-action payloads through a SQL staging table. The earliest retained recipe
+becomes the baseline. No lost older steps or unknown import presets are invented.
+All changes roll back together. Virtual copies reset the cursor and start from
+the current inherited recipe, while named snapshots remain source-family shared.
+Backup restore rebinds immutable LUT assets in both timeline states and baselines.
+
+The writer never commits a caller's transaction: ordinary edits, batch sync and
+preset application use the same operation. Read pages use the `(photo_id,id)`
+index with a keyset cursor, select no recipe payloads and return at most sixty
+summaries. Undo, redo and individual selection resolve one requested history state. There is
+no automatic retention cap; storage grows with saved changes until explicit clear
+or branch replacement. Original files, descriptive metadata, catalog orientation
+and queued export snapshots are outside this module's responsibility.
+
+The Mac shell holds one summary page. Actions capture photo/revision; asynchronous
+reads are adopted only for the same active photo/revision/request. Pending edits
+and history mutations disable conflicting actions. Engine conflict responses are
+shown and reload current state without replay. SwiftUI/AppKit presents the list,
+menus and confirmation; all history semantics are reusable by a future Windows
+adapter. Global undo, hover preview and Before-state assignment are separate gaps.

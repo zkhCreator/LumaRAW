@@ -176,6 +176,14 @@ import UniformTypeIdentifiers
     @Published var effectiveBudget=4096
     @Published var availableMemory=0.0
     @Published var versions: [[String: Any]] = []
+    @Published var historyPage:DevelopHistoryPage?
+    @Published var historyBefore:Int?
+    @Published var historyError:String?
+    @Published var historyBusy=false
+    @Published var historyLoading=false
+    var historyRequest=0
+    var historyReadPhotoID:Int?
+    var historyReadRevision:Int?
     @Published var defaults: [String: Any] = [:]
     @Published var pointCurvePresets: [String:[[Double]]] = [:]
     @Published var presets: [String: [String: Any]] = [:]
@@ -282,6 +290,7 @@ import UniformTypeIdentifiers
         } catch {self.error=error.localizedDescription}
     }
     func clearPhoto() {
+        historyRequest+=1;historyPage=nil;historyBefore=nil;historyError=nil;historyLoading=false
         cancelCurveTarget(restore:false);curveTargetFrame=nil
         cancelMixerTarget(restore:false);mixerTargetFrame=nil
         generation += 1;previewTask?.cancel();photo=nil;recipe=[:]
@@ -354,7 +363,7 @@ import UniformTypeIdentifiers
             if mixerTargetGesture != nil {cancelMixerTarget(restore:false)} else {mixerTargetPreviews.cancel()}
             mixerTargetFrame=nil
         }
-        if !isDraft { updateThumbnails() }
+        if !isDraft { updateThumbnails();refreshHistoryIfNeeded() }
         if isMultiReview { updateReviewRequests();return }
         guard let p=photo,p.id==selected,!loading else{return}
         if let capture=curveDraft {
@@ -404,7 +413,7 @@ import UniformTypeIdentifiers
         }
     }
     func set(_ key:String,_ value:Any) {
-        guard !loading,!browsing,!orientationBusy,!developPresetBusy,let p=photo,p.id==selected else{return}
+        guard !loading,!browsing,!orientationBusy,!developPresetBusy,!historyBusy,let p=photo,p.id==selected else{return}
         saveFailed=false;recipe[key]=value;pendingPatch[key]=value
         if !editing {scheduleCommit()}
     }
@@ -445,9 +454,7 @@ import UniformTypeIdentifiers
         apply(values.filter{keys.contains($0.key)})
     }
     func undo() {
-        guard let p=photo,p.id==selected,!loading,!browsing,!editing,!orientationBusy,!developPresetBusy,pendingPatch.isEmpty else{return}
-        editing=true
-        Task{await recipeMutation("undo_photo",["photo_id":p.id,"expected_revision":p.revision],photoID:p.id)}
+        moveDevelopHistory("undo_photo")
     }
     func recipeMutation(_ method:String,_ params:[String:Any],photoID:Int) async {
         do {

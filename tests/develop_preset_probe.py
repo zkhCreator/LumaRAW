@@ -90,7 +90,7 @@ def main():
             expected=Recipe(temperature=12,crop='4:5',exposure=1).dict()
             assert all(json.loads(r['recipe'])==expected and r['revision']==1+args.samples*2
                        and r['metadata_revision']==0 and r['orientation']==0 for r in rows)
-            assert c.db.execute('SELECT COUNT(*) FROM history').fetchone()[0]==60*min(50,1+args.samples*2)
+            assert c.db.execute('SELECT COUNT(*) FROM history').fetchone()[0]==60*(1+args.samples*2)
             assert c.db.execute('SELECT COUNT(*) FROM keyword_photos').fetchone()[0]==6000
         assert [hashlib.sha256(path.read_bytes()).hexdigest() for path in paths]==fingerprints
         report['peak_rss_mb']=round(resource.getrusage(resource.RUSAGE_SELF).ru_maxrss/(1024**2 if platform.system()=='Darwin' else 1024),2)

@@ -5,6 +5,7 @@ failures. Outputs: preserved source identities, counts and rollback evidence. Al
 filesystem moves/deletions affect generated fixtures only; no desktop automation.
 """
 import hashlib
+import json
 from pathlib import Path
 import shutil
 import sqlite3
@@ -283,7 +284,12 @@ def test_v8_migration_preserves_tables_and_rolls_back_trigger_replacement(tmp_pa
         patch.setattr(module,'migrate',lambda db:migrate_to(db,8))
         c = Catalog(tmp_path/'legacy')
     path = tmp_path/'legacy-photo.png';Image.new('RGB',(8,8)).save(path)
-    seed_photo(c.db,path);c.edit(1,Recipe(exposure=1.25));c.save_version(1,'Keep')
+    seed_photo(c.db,path)
+    # Seed the published before-action history shape, not the current writer.
+    with c.db:
+        c.db.execute("INSERT INTO history(photo_id,recipe,label,created) SELECT id,recipe,'Adjustments',0 FROM photos WHERE id=1")
+        c.db.execute('UPDATE photos SET recipe=?,revision=1 WHERE id=1',(json.dumps(Recipe(exposure=1.25).dict()),))
+    c.save_version(1,'Keep')
     # Populate the actual v8 job shape without current export-snapshot methods.
     with c.db:
         c.db.execute('INSERT INTO jobs(photo_id,source,recipe,destination,format,created,source_id) '

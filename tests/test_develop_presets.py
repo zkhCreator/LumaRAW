@@ -1,7 +1,7 @@
 """Partial presets, cross-catalog storage and transactional application contracts.
 
 Generated photographs and isolated user directories verify captured revisions,
-selected fields, bounded lists/history, original/job safety and retained LUT assets.
+selected fields, bounded lists/durable history, original/job safety and retained LUT assets.
 Legacy migration uses the actual schema-15 chain. No Adobe rendering, preset-file
 compatibility or native desktop acceptance is established here.
 """
@@ -253,7 +253,7 @@ def test_asset_staging_releases_lock_and_rechecks_captured_state(library,monkeyp
     assert state(s,search='Custom')['total']==0
 
 
-def test_camera_compatibility_and_history_limit(library):
+def test_camera_compatibility_and_history_retention(library):
     s,_=library
     profile={'camera':'Nikon Test','space':'LibRaw-ProPhoto-D65-linear','matrix':[[1,0,0],[0,1,0],[0,0,1]]}
     edit(s,{'camera_profile':profile})
@@ -270,7 +270,7 @@ def test_camera_compatibility_and_history_limit(library):
         edit(s,{'exposure':0},2)
         apply(s,light,ids=(2,))
     with s.catalog() as c:
-        assert c.db.execute('SELECT COUNT(*) FROM history WHERE photo_id=2').fetchone()[0]==50
+        assert c.db.execute('SELECT COUNT(*) FROM history WHERE photo_id=2').fetchone()[0]==52
 
 
 @pytest.mark.parametrize('change',['target','storage'])
