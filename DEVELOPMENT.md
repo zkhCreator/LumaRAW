@@ -29,6 +29,15 @@ when a clear function is more maintainable. Avoid unrelated formatting churn.
   Preserve copied Before settings, live recipes/history, queued exports and
   legacy migration payloads. Snapshot update/delete have no Develop undo; expose
   deliberate native confirmations and accurate command effect annotations.
+- Snapshot presence is shared by source family. Maintain indexed counts and the
+  compact first/last-change token transactionally, including bulk removals and
+  backup restoration. Reuse the same predicate for filters and smart rules; do
+  not parse recipes or sum every family's revision while polling. Empty views
+  and nested sets must notice external membership changes without stealing
+  navigation or interrupting pending edits and captured snapshot forms.
+  Keep exact indexed counts separate from bounded page retrieval. Any adaptive
+  query shape must preserve source restrictions, all/any logic, stable ordering
+  and stack projection; measure dense, sparse and empty cases before changing it.
 
 - Before snapshots are independent of the Develop timeline. Preserve imported
   presets and inherited virtual-copy settings, and never retarget Before when

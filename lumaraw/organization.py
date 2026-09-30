@@ -21,6 +21,7 @@ FILTER_PROPERTIES = {
     'keyword': {'type': 'string', 'minLength': 1, 'maxLength': 120},
     'keyword_id': {'type': 'integer', 'minimum': 1, 'maximum': 2**53-1},
     'has_keywords': {'type': 'boolean'},
+    'has_snapshots': {'type': 'boolean'},
     'camera': {'type': 'string', 'minLength': 1, 'maxLength': 200},
     'folder': {'type': 'string', 'minLength': 1, 'maxLength': 4096},
     'taken_from': {'type': 'integer', 'minimum': 0, 'maximum': 2**53-1},
@@ -122,6 +123,8 @@ def migrate(db):
     migrate_before_after(db)
     from .snapshots import migrate as migrate_snapshots
     migrate_snapshots(db)
+    from .snapshot_status import migrate as migrate_snapshot_status
+    migrate_snapshot_status(db)
 
 
 def text_predicate(text):
@@ -135,7 +138,7 @@ def text_predicate(text):
         'OR ' + keyword_clause + ')', [folded(text)] * 5 + keyword_values)
 
 
-def criteria(filters, match='all'):
+def criteria(filters, match='all', *, ordered_page=False):
     clauses, values = [], []
     if match == 'all' and filters.get('rating_min', 0) > filters.get('rating_max', 5):
         raise ValueError('Minimum rating exceeds maximum rating')
@@ -170,6 +173,13 @@ def criteria(filters, match='all'):
         elif key == 'has_keywords':
             clauses.append(('' if value else 'NOT ') +
                            'EXISTS (SELECT 1 FROM keyword_photos k WHERE k.photo_id=photos.id)')
+        elif key == 'has_snapshots':
+            condition='>0' if value else '=0'
+            if ordered_page:
+                clauses.append('EXISTS(SELECT 1 FROM photo_sources snapshot_source '
+                               'WHERE snapshot_source.id=photos.source_id AND snapshot_source.snapshot_count'+condition+')')
+            else:
+                clauses.append('source_id IN (SELECT id FROM photo_sources WHERE snapshot_count'+condition+')')
         elif key == 'folder':
             prefix = os.path.abspath(os.path.expanduser(value)).rstrip(os.sep) + os.sep
             clauses.append('substr(path, 1, ?) = ?')
@@ -198,8 +208,8 @@ class Organization:
     def collection(self, collection_id):
         return self.collections.get(collection_id)
 
-    def collection_predicate(self, collection_id):
-        return self.collections.predicate(collection_id)
+    def collection_predicate(self, collection_id, *, ordered_page=False):
+        return self.collections.predicate(collection_id,ordered_page=ordered_page)
 
     def list_collections(self, **params):
         return self.collections.list(**params)

@@ -224,7 +224,7 @@ class Catalog:
             self.db.execute("UPDATE jobs SET state='pending',error='' WHERE state IN ('failed','interrupted','cancelled')")
 
 
-    def filter_sql(self,mode='all',search='',filters=None,collection_id=None,folder_id=None,include_subfolders=True):
+    def filter_sql(self,mode='all',search='',filters=None,collection_id=None,folder_id=None,include_subfolders=True,*,ordered_page=False):
         if collection_id is not None and folder_id is not None:
             raise ValueError('Choose either a folder or collection source')
         if mode=='previous_import' and (collection_id is not None or folder_id is not None):
@@ -242,10 +242,10 @@ class Catalog:
             clause, values = text_predicate(search[:200])
             clauses.append(clause);params.extend(values)
         if filters:
-            clause, values = criteria(filters)
+            clause, values = criteria(filters,ordered_page=ordered_page)
             clauses.append(clause);params.extend(values)
         if collection_id is not None:
-            clause, values = Organization(self).collection_predicate(collection_id)
+            clause, values = Organization(self).collection_predicate(collection_id,ordered_page=ordered_page)
             clauses.append(clause);params.extend(values)
         if folder_id is not None:
             from .folders import Folders
@@ -253,8 +253,21 @@ class Catalog:
             clauses.append(clause);params.extend(values)
         return (' WHERE '+' AND '.join(clauses) if clauses else ''),params
 
-    def filtered_page(self,offset=0,mode='all',search='',filters=None,collection_id=None,sort='imported',descending=True,stacked=True,folder_id=None,include_subfolders=True):
-        where,params=self.filter_sql(mode,search,filters,collection_id,folder_id,include_subfolders)
+    def filtered_page(self,offset=0,mode='all',search='',filters=None,collection_id=None,sort='imported',descending=True,stacked=True,folder_id=None,include_subfolders=True,*,match_count=None):
+        # Dense import-order pages can stop after sixty correlated family checks
+        # instead of sorting every matching source. Keep indexed membership for
+        # sparse results, other sorts and actual stack projection. match_count
+        # comes from the service's exact count under the same catalog lock.
+        ordered_page=False
+        if (sort=='imported' and match_count is not None and match_count>=60 and
+                ('has_snapshots' in (filters or {}) or collection_id is not None)):
+            ordered_page=match_count*20>=self.count()
+        if stacked and ordered_page:
+            from .stacks import Stacks
+            scope=Stacks(self).scope(collection_id)
+            if scope is not None and self.db.execute('SELECT 1 FROM photo_stacks WHERE scope=? LIMIT 1',(scope,)).fetchone():
+                ordered_page=False
+        where,params=self.filter_sql(mode,search,filters,collection_id,folder_id,include_subfolders,ordered_page=ordered_page)
         if stacked:
             from .stacks import Stacks
             return Stacks(self).projection(where,params,collection_id,sort,descending,offset)

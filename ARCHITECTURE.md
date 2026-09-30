@@ -79,6 +79,29 @@ Backup restoration retains counters/revisions and rebinds snapshot-only assets.
 Native forms retain their captured photo/snapshot tokens across polling and
 selection changes; errors never trigger an automatic mutation replay.
 
+Schema 25 adds an indexed `photo_sources.snapshot_count` and a singleton
+`snapshot_filter_state` revision. Insert/delete/move triggers maintain counts in
+the same transaction as versions, including bulk folder synchronization. Only
+zero/nonzero transitions advance the filter revision; rename/settings updates
+leave it unchanged. Migration counts existing snapshots without loading recipes
+or rewriting their payloads. `has_snapshots` compiles to an indexed source-family
+predicate used by ordinary Library filtering and all/any smart rules.
+Count queries and sparse/other-sort/stacked projections use source-index
+membership. For dense import-order pages without actual stack groups, a
+correlated family check lets SQLite stop after the requested page without
+sorting every matching source. The service's exact match count under its catalog
+lock selects this strategy at 5% catalog density, with at least sixty matches.
+Both query forms share the same criteria compiler and membership semantics.
+
+`list_photos`, `photo_summaries` and `library_state` include the compact
+`snapshot_filter_revision`, keeping empty and off-page membership changes visible
+without extra polling commands. Native filtered/collection pages refresh when
+that token advances, preserving their source/filter configuration. Collection
+sets may contain matching smart rules at any depth; refresh does not eagerly
+load their hierarchy. Pending edits, active snapshot/history commands and open
+snapshot forms defer this refresh. Unfiltered catalog views do not requery for
+snapshot changes. Photo/recipe revisions and pixel cache keys stay independent.
+
 Before/After comparison owns a separate `photo_before` recipe per photo (schema
 23), initialized transactionally by import/copy triggers and removed with its
 photo. Migration uses the earliest retained history baseline; it cannot recover

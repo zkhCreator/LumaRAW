@@ -146,9 +146,9 @@ class Collections:
                                         [(collection_id,id_) for id_ in photo_ids])
         return self.get(collection_id)
 
-    def predicate(self,id_):
+    def predicate(self,id_,*,ordered_page=False):
         row=self.get(id_)
-        if row['kind']=='smart': return criteria(row['rules'],row['match'])
+        if row['kind']=='smart': return criteria(row['rules'],row['match'],ordered_page=ordered_page)
         if row['kind'] != 'set':
             return 'id IN (SELECT photo_id FROM collection_photos WHERE collection_id=?)',[id_]
         # One relational query covers arbitrarily many regular members. Compile
@@ -159,7 +159,7 @@ class Collections:
         clauses=['id IN ('+TREE+'SELECT photo_id FROM collection_photos WHERE collection_id IN (SELECT id FROM tree))']
         values=[id_]
         for item in smart:
-            clause,args=criteria(json.loads(item[0]),item[1]);clauses.append(clause);values.extend(args)
+            clause,args=criteria(json.loads(item[0]),item[1],ordered_page=ordered_page);clauses.append(clause);values.extend(args)
         return '('+' OR '.join(clauses)+')',values
 
     def membership(self,collection_id,expected_revision,ids,action):

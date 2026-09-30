@@ -196,6 +196,7 @@ import UniformTypeIdentifiers
     @Published var snapshotError:String?
     @Published var snapshotAfter:Int?
     var snapshotRequest=0
+    var snapshotFilterRevision = -1
     @Published var historyPage:DevelopHistoryPage?
     @Published var historyBefore:Int?
     @Published var historyError:String?
@@ -291,6 +292,7 @@ import UniformTypeIdentifiers
             photos=(result["photos"] as? [[String:Any]] ?? []).compactMap(Photo.init)
             adoptStacks(result)
             previousImportRevision=(result["previous_import"] as? [String:Any])?["revision"] as? Int ?? previousImportRevision
+            snapshotFilterRevision=result["snapshot_filter_revision"] as? Int ?? snapshotFilterRevision
             photoFolderRevision=result["folder_revision"] as? Int ?? photoFolderRevision
             photoKeywordRevision=result["keyword_revision"] as? Int ?? photoKeywordRevision
             total=result["total"] as? Int ?? 0

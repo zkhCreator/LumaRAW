@@ -13,6 +13,35 @@ The two `test_core.py` real-RAW tests skip if that environment variable is absen
 
 ## Shared named snapshots
 
+`test_snapshot_status.py` covers shared first/last presence, live all/any and
+nested smart collections, folder/Previous Import/search scope, bounded pages,
+recipe-free indexed SQL, boolean validation, rollback, bulk removal and source
+reassignment, genuine schema-24 upgrade failure/retry and restored triggers.
+`NativeSnapshotFilterRegression` checks the Any/Have/No form mapping, empty-page
+polling, live smart/set membership, deferred refresh while editing or naming a
+snapshot, preserved source navigation, stale tokens and original bytes.
+
+```sh
+.venv/bin/python -m pytest -q tests/test_snapshot_status.py
+.venv/bin/python tests/run_native.py --work work/new-snapshot-filter-native \
+  --engine /absolute/LumaRAW.app/Contents/Resources/Engine/LumaRAWEngine \
+  --suite NativeSnapshotFilterRegression --suite NativeSnapshotsRegression \
+  --suite NativeLibraryRegression --suite NativeCollectionRegression
+.venv/bin/python tests/snapshot_filter_probe.py --work work/new-status-1k --rows 1000
+.venv/bin/python tests/snapshot_filter_probe.py --work work/new-status-100k --rows 100000
+```
+
+Run the status probes sequentially with other tests/builds stopped. One fifth of
+synthetic source families have snapshots. They measure warm service SQL counts
+and pages, deep paging, smart/rating combinations and compact state polling with
+minimal recipes. Setup, IPC, pixels and UI are excluded; record JSON bytes and
+RSS. Rendered filter forms and macOS 14 runtime remain separate acceptance work.
+Query-shape regressions compare dense and indexed pages in both directions,
+deep offsets and all/any smart rules. Sparse results, other sorts and actual
+stack projection retain indexed membership. The probe includes dense default
+stack visibility without groups, sparse presence and no matches; do not infer
+universal latency from one selectivity or image distribution.
+
 `test_snapshots.py` covers current/history capture, original/copy sharing,
 rename/update/delete/restore and copy-to-Before, photo/snapshot conflicts, name
 normalization, no-op counters, preserved legacy commands, alphabetical keysets,

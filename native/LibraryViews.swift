@@ -75,6 +75,10 @@ struct LibraryFilterFields: View {
         Picker("Keywords", selection:$draft.keywordPresence) {
             Text("Any").tag("any"); Text("Has keywords").tag("present"); Text("Without keywords").tag("absent")
         }
+        Picker("Snapshot status",selection:$draft.snapshotPresence) {
+            Text("Any").tag("any");Text("Have snapshots").tag("present");Text("No snapshots").tag("absent")
+        }
+        Text("Snapshot status is shared by each original and its virtual copies.").font(.caption).foregroundStyle(.secondary)
         Picker("Photo type",selection:$draft.virtualType) {
             Text("All photos").tag("all");Text("Master photos").tag("masters");Text("Virtual copies").tag("copies")
         }

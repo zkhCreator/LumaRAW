@@ -67,6 +67,17 @@ form's tokens or replay a stale/uncertain mutation. Older callers may omit the
 new snapshot token on restore and the photo token on current-state creation;
 new clients should always capture and send both relevant tokens.
 
+`list_photos(filters: {has_snapshots: true})` selects photos with at least one
+shared named snapshot; `false` selects those without. The boolean is also a
+`save_collection` smart rule and composes with other all/any criteria and normal
+Library source restrictions. Originals and virtual copies share the status;
+history, saved Before settings and presets do not count as named snapshots.
+`library_state`, `photo_summaries` and `list_photos` expose a compact
+`snapshot_filter_revision`. It advances on first/last snapshot transitions,
+including bulk removals; additional snapshots, renames and settings updates do
+not change this token. Use it to invalidate filtered counts/pages, not to rebase
+captured photo or snapshot revisions. Empty views must poll state too.
+
 Use the LumaRAW MCP tools when connected. The native app's **Agent Connection** page shows the exact command and catalog path. App, CLI and MCP use the same service. No login, API key or network service is needed.
 
 If MCP is unavailable, call the packaged engine at `<LumaRAW.app>/Contents/Resources/Engine/LumaRAWEngine`. Pass `--catalog <catalog-path> <method>` and a JSON object on stdin. `status` and `recipe_schema` need no input. Source checkout fallback: `uv run --frozen lumaraw --catalog <path> <method>` from the project directory. The CLI wraps results in `{ok,result}` or `{ok,error,type}`; stdout of `--mcp` is JSON-RPC only.

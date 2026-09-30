@@ -41,6 +41,7 @@ from .previous_import import state as previous_import_state
 from .develop_history import DevelopHistory, adjustment_label
 from .before_after import BeforeAfter
 from .snapshots import Snapshots
+from .snapshot_status import revision as snapshot_filter_revision
 
 class ConflictError(ValueError): pass
 
@@ -230,8 +231,12 @@ class Service:
                 painter=LibraryPainter(c)
                 return {'get_keyword_shortcut':painter.read,'set_keyword_shortcut':painter.save,'paint_library':painter.paint}[method](**p)
             if method=='get_folder_relocation':return Relocations(c).get(**p)
-            if method=='photo_summaries':return {'photos':c.summaries(p['photo_ids']),'stack_revision':Stacks(c).revision(),'folder_revision':Folders(c).revision(),'keyword_revision':Keywords(c).revision(),'previous_import':previous_import_state(c.db)}
-            if method=='library_state':return {'stack_revision':Stacks(c).revision(),'folder_revision':Folders(c).revision(),'keyword_revision':Keywords(c).revision(),'previous_import':previous_import_state(c.db)}
+            if method in ('photo_summaries','library_state'):
+                state={'stack_revision':Stacks(c).revision(),'folder_revision':Folders(c).revision(),
+                       'keyword_revision':Keywords(c).revision(),'previous_import':previous_import_state(c.db),
+                       'snapshot_filter_revision':snapshot_filter_revision(c.db)}
+                if method=='photo_summaries':state['photos']=c.summaries(p['photo_ids'])
+                return state
             if method=='list_keywords':return Keywords(c).list(**p)
             if method=='get_keyword':return Keywords(c).details(**p)
             if method=='save_keyword':return Keywords(c).save(**p)
@@ -255,7 +260,7 @@ class Service:
                 folder=p.get('folder_id');subfolders=p.get('include_subfolders',True)
                 total=c.filtered_count(mode,search,filters,collection,stacked,folder,subfolders)
                 offset=min(offset,max(0,((total-1)//60)*60))
-                return {'photos':c.filtered_page(offset,mode,search,filters,collection,p.get('sort','imported'),p.get('descending',True),stacked,folder,subfolders),'total':total,'offset':offset,'page_size':60,'stack_revision':Stacks(c).revision(),'folder_revision':Folders(c).revision(),'keyword_revision':Keywords(c).revision(),'previous_import':previous_import_state(c.db)}
+                return {'photos':c.filtered_page(offset,mode,search,filters,collection,p.get('sort','imported'),p.get('descending',True),stacked,folder,subfolders,match_count=total),'total':total,'offset':offset,'page_size':60,'stack_revision':Stacks(c).revision(),'folder_revision':Folders(c).revision(),'keyword_revision':Keywords(c).revision(),'previous_import':previous_import_state(c.db),'snapshot_filter_revision':snapshot_filter_revision(c.db)}
             if method=='stack_state':return {'revision':Stacks(c).revision()}
             if method=='preview_export_metadata':return KeywordExports(c).preview(**p)
             if method=='stack_photos':return Stacks(c).change(**p)

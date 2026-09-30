@@ -48,6 +48,14 @@ struct SnapshotDraft:Identifiable {
 }
 
 extension Store {
+    func snapshotFilterChanged(_ result:[String:Any])->Bool {
+        guard let revision=result["snapshot_filter_revision"] as? Int,revision>snapshotFilterRevision,
+              !hasPendingEdits,!snapshotBusy,!historyBusy,snapshotDraft==nil else {return false}
+        // Collection sets may contain a smart rule at any depth; do not eagerly
+        // load their descendants just to decide whether a refresh is needed.
+        return libraryFilters["has_snapshots"] != nil || collectionID != nil
+    }
+
     var snapshotReady:Bool {
         guard let p=photo,p.id==selected else {return false}
         return !loading && !browsing && !hasPendingEdits && !orientationBusy &&

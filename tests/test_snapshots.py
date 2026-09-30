@@ -18,6 +18,7 @@ from lumaraw.catalog import Catalog
 from lumaraw.model import Recipe
 from lumaraw.service import Service
 from lumaraw.snapshots import Snapshots, migrate
+from lumaraw.runtime import CATALOG_VERSION
 from legacy_catalog import migrate_to, seed_photo
 
 
@@ -263,7 +264,7 @@ def test_genuine_schema23_migration_preserves_legacy_duplicates_and_rolls_back(t
         c.close()
     with closing(Catalog(root)) as c:
         migrate(c.db)
-        assert c.db.execute('PRAGMA user_version').fetchone()[0] == 24
+        assert c.db.execute('PRAGMA user_version').fetchone()[0] == CATALOG_VERSION
         assert [tuple(r) for r in c.db.execute('SELECT id,photo_id,name,recipe,created,source_id FROM versions')] == original
         assert len(Snapshots(c.db).page(1)['versions']) == 2
         assert c.save_version(1, 'New')['version']['id'] == 92

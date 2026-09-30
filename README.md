@@ -119,8 +119,15 @@ current edits, copied Before settings and submitted export jobs. Restoring a
 snapshot creates an ordinary Develop history step. Duplicate names are rejected;
 use Update explicitly to replace stored settings. If a photo or snapshot changes
 while a form is open, close the form and refresh before trying again. Snapshot
-hover previews, snapshot-based Library filters and Adobe sidecar exchange remain
-unimplemented.
+hover previews and Adobe sidecar exchange remain unimplemented.
+
+Use **Library → Filter Photos → Snapshot status** to choose Have snapshots or
+No snapshots. The same criterion is available in new or edited smart collections,
+combined with other rules using All or Any. Original photos and virtual copies
+share the same snapshot status. First/last snapshot changes refresh filtered
+pages and collection sources on the next background poll, including empty views
+and nested collection sets. Pending adjustments and open snapshot name forms
+defer that refresh until they finish; unrelated navigation stays selected.
 
 **Before / After** offers After Only, Before Only, whole-image Left/Right and
 Top/Bottom pairs, and Left/Right or Top/Bottom splits. Before

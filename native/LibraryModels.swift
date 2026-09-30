@@ -80,6 +80,7 @@ struct LibraryFilterDraft {
     var color = "any"
     var keyword = ""
     var keywordPresence = "any"
+    var snapshotPresence = "any"
     var text = ""
     var camera = ""
     var folder = ""
@@ -97,6 +98,7 @@ struct LibraryFilterDraft {
         color=rules["color_label"] as? String ?? "any"
         keyword=rules["keyword"] as? String ?? ""
         if let present=rules["has_keywords"] as? Bool { keywordPresence=present ? "present":"absent" }
+        if let present=rules["has_snapshots"] as? Bool { snapshotPresence=present ? "present":"absent" }
         text=rules["text"] as? String ?? ""
         camera=rules["camera"] as? String ?? ""
         folder=rules["folder"] as? String ?? ""
@@ -104,7 +106,7 @@ struct LibraryFilterDraft {
 
     var rules: [String: Any] {
         var result=retained
-        for key in ["rating_min", "rating_max", "flag", "color_label", "keyword", "has_keywords", "text", "camera", "folder", "is_virtual", "copy_name"] {
+        for key in ["rating_min", "rating_max", "flag", "color_label", "keyword", "has_keywords", "has_snapshots", "text", "camera", "folder", "is_virtual", "copy_name"] {
             result.removeValue(forKey: key)
         }
         if virtualType != "all" { result["is_virtual"]=virtualType == "copies" }
@@ -113,6 +115,7 @@ struct LibraryFilterDraft {
         if flag != 2 { result["flag"]=flag }
         if color != "any" { result["color_label"]=color }
         if keywordPresence != "any" { result["has_keywords"]=keywordPresence == "present" }
+        if snapshotPresence != "any" { result["has_snapshots"]=snapshotPresence == "present" }
         for (key, value) in [("copy_name",copyName), ("keyword",keyword), ("text",text), ("camera",camera), ("folder",folder)] {
             let trimmed=value.trimmingCharacters(in: .whitespacesAndNewlines)
             if !trimmed.isEmpty { result[key]=trimmed }

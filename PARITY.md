@@ -56,7 +56,7 @@ gaps. Nothing below is full Lightroom parity merely because historical tests pas
 | Area | Current implementation | Remaining acceptance / work |
 | --- | --- | --- |
 | Import and catalogs | Partial: durable Add review with checked selection, Grid/Loupe source previews, subfolder choice, suspected duplicates, bounded sorting/filtering, XMP descriptions, captured import-time Develop/metadata presets and keyword additions, cancellation/restart, durable Previous Import source with automatic navigation preference, referenced originals and backup/restore | Copy/Move/Copy as DNG, destinations/rename/backup, saved import configurations, preview policies, cards/tethering, progressive Current Import, catalog switching/merge and desktop/reference acceptance |
-| Library navigation | Partial: bounded grid/filmstrip, folder tree/search/favorites/labels, durable missing-folder relocation and folder synchronization, direct/recursive sources, filters/sorting, regular/smart/Quick collections and nested sets | Multi-source selection, complete sync Import Dialog/duplicate policy, folder move/rename, relocation overlap/collision handling, collection drag/drop/color labels, full smart criteria/import-export, source-selection memory, desktop acceptance |
+| Library navigation | Partial: bounded grid/filmstrip, folder tree/search/favorites/labels, durable missing-folder relocation and folder synchronization, direct/recursive sources, filters/sorting including live snapshot status, regular/smart/Quick collections and nested sets | Multi-source selection, complete sync Import Dialog/duplicate policy, folder move/rename, relocation overlap/collision handling, collection drag/drop/color labels, full smart criteria/import-export, source-selection memory, desktop acceptance |
 | Organization | Partial: duplicate/missing detection, hierarchical keywords/synonyms/export flags/Will Export preview, text/CSV vocabulary exchange and manual person tags, custom nine-slot keyword sets/recent entries/shared or catalog storage, multi-keyword shortcuts and keyword/rating/flag/label/target-collection/rotation/Develop-preset/metadata-preset Painter strokes, independent catalog rotation/flips, title/caption/copyright plus thirty IPTC fields, selective metadata presets, labels, batch metadata, virtual copies, manual/split/capture-time scoped stacks | Keyword policy/file and preset reference acceptance, built-in sets/suggestions/undo, Painter desktop acceptance, IPTC Extension and complete metadata parity, stack interaction acceptance, rename and sidecars |
 | Culling | Partial: Loupe/Compare/Survey, linked detail, anchored page selection | Desktop acceptance, cross-page selection, Develop reference view, auto advance, persistent workspace state |
 | Basic development | Partial: light/WB/color, eight-band HSL and B&W Mix with photo-targeted adjustment and selective resets/sync | Calibrated absolute WB, eyedropper, texture/clarity/dehaze, Point Color, Auto B&W mix, color grading and Adobe processing/reference acceptance |
@@ -64,7 +64,7 @@ gaps. Nothing below is full Lightroom parity merely because historical tests pas
 | Detail and optics | Partial: noise/sharpen, manual lens | Complete manual detail controls, automatic lens profiles, bounded full-resolution acceptance |
 | Geometry | Partial: crop/straighten/perspective, independent rotation/flips with attached masks and displayed crop ratios | Interactive retained handles, guided transforms, full crop state and rendered/reference parity |
 | Local editing | Partial: radial/gradient/brush/luma | Mask list/edit/reorder/intersection, range masks, clone/heal, red-eye (non-AI) |
-| History and presets | Partial: durable paged Develop history with undo/redo, state selection/rename/clear, persistent Before assignment/copy/swap, separate 50-batch orientation undo, alphabetical shared snapshots with current/history capture, rename/update/delete and Before copy, partial Develop presets/groups/favorites/shared or local storage, batch/Painter and reviewed-import application | Unified application Undo/Redo, history/snapshot hover, snapshot filter criteria, preset hover preview/Amount/ISO adaptation/Adobe exchange and rendered reference acceptance |
+| History and presets | Partial: durable paged Develop history with undo/redo, state selection/rename/clear, persistent Before assignment/copy/swap, separate 50-batch orientation undo, alphabetical shared snapshots with current/history capture, rename/update/delete and Before copy, partial Develop presets/groups/favorites/shared or local storage, batch/Painter and reviewed-import application | Unified application Undo/Redo, history/snapshot hover, preset hover preview/Amount/ISO adaptation/Adobe exchange and rendered reference acceptance |
 | Preview/performance | Partial: Metal, proxies, 1:1 viewport, developed thumbnail fast path, on-demand Before with independent cache, four paired layouts and shared detail zoom/pan | Real-RAW catalog/slider latency, offline previews, cache controls and desktop/reference acceptance |
 | Export | Partial: JPEG/16-bit TIFF, ICC, durable jobs with frozen catalog/rights IPTC XMP and keyword hierarchy options | Presets, complete EXIF/IPTC Extension/GPS metadata policies, watermark, additional formats, publish workflows |
 | External editing and video | Missing | External-editor setup and derivative round trips; supported video import/playback, frame capture, trimming and export |
@@ -78,8 +78,9 @@ gaps. Nothing below is full Lightroom parity merely because historical tests pas
 
 ## Active increment
 
-Shared snapshot management and bounded listing, followed by further import, Library and Develop
-workflows. The full feature inventory above remains the acceptance scope.
+Continue import, Library and Develop workflows after the implemented
+snapshot-status filters and live smart collections. The full feature inventory
+above remains the acceptance scope.
 Rendered Mac/reference acceptance,
 Copy/Move/DNG, complete IPTC, Adobe exchange, unified Undo/Redo and the full inventory
 stay in scope. This does not complete product parity.
@@ -2700,3 +2701,99 @@ Actual desktop sheets/menus/Command-N routing, mouse interaction, VoiceOver and
 macOS 14 runtime are **not verified**. Native Store/IPC tests and compilation do
 not replace those acceptance checks. Private catalogs, photographs, outputs,
 builds and detailed receipts remain excluded from source publication.
+
+## Snapshot-status Library and smart filters (September 29, 2026)
+
+Library filters and smart-collection forms now offer Any, Have snapshots and
+No snapshots. The shared `has_snapshots` boolean composes with All/Any rules,
+nested collection sets, folder/subfolder sources, Previous Import, search and
+sorting. Originals and virtual copies share presence; retained history, Before
+settings and presets do not count as named snapshots. This implements the
+documented criterion, not the complete Lightroom metadata-filter interface or
+all smart-collection criteria.
+
+Schema 25 backfills indexed family counts without rewriting snapshot payloads.
+Insert/delete/source-change triggers keep counts and a compact first/last-change
+revision in the same transaction, including bulk catalog removal. Additional
+snapshots, renaming and settings updates do not invalidate presence. Library
+replies carry the revision so empty pages and off-page changes can be observed
+without an extra polling request. Native filtered/collection sources refresh
+without changing their source configuration; pending edits, active history or
+snapshot commands, and captured snapshot forms defer the refresh. Unfiltered
+catalog pages avoid unnecessary queries.
+
+Counts retain indexed source membership. Import-order pages with at least sixty
+matches and 5% catalog density use correlated family checks, avoiding a sort of
+every matching family. Sparse results, other sort orders and actual stack
+projections keep indexed membership. Both forms produce the same ordered pages;
+the optimization does not change filtering or stack semantics.
+
+The final required-Metal Python suite passes **671 tests in 70.44 s, no skips**,
+including the existing fixed public Nikon D3S NEF. Eight new cases cover shared
+presence, live scopes and collections, bounded recipe-free queries, strict
+booleans, injected transaction failure, adaptive ordering, bulk deletion/moves,
+schema-24 upgrade rollback/retry and restored triggers. The old-schema fixture
+uses the published row layout rather than the current writer. A source-level
+native probe passes **25 assertions**, including empty-list recovery, captured
+form/pending-edit guards, nested-set updates and original-byte preservation.
+
+### Snapshot-filter catalog measurements
+
+Sequential warm probes use Apple M3 Max / 128 GiB / macOS 26.6.2, one generated
+64×48 original and 1,000 or 100,000 catalog rows with minimal recipes. Initially
+one fifth of source families have snapshots. Thirty samples include service
+validation, SQLite opens, exact counts and bounded pages; setup, IPC, pixels,
+cold OS caches and desktop interaction are excluded. Sparse and empty phases
+then remove snapshots in the same disposable catalog.
+
+| Operation | 1,000 photos median / p95 | 100,000 photos median / p95 |
+| --- | ---: | ---: |
+| Have snapshots, first 60 | 4.812 / 5.330 ms | 10.913 / 12.787 ms |
+| No snapshots, first 60 | 4.910 / 8.091 ms | 25.187 / 26.614 ms |
+| Have snapshots, deep page | 4.744 / 6.128 ms | 23.199 / 24.374 ms |
+| Smart collection | 4.718 / 5.099 ms | 10.944 / 12.847 ms |
+| Presence plus rating | 4.838 / 5.447 ms | 17.372 / 20.880 ms |
+| Stack visibility enabled, no groups | 5.503 / 21.926 ms | 10.541 / 12.020 ms |
+| Sparse presence (1 / 100 matches) | 4.211 / 4.636 ms | 5.130 / 5.536 ms |
+| Empty presence | 4.157 / 4.500 ms | 4.276 / 4.855 ms |
+| Compact state poll | 1.282 / 1.515 ms | 1.342 / 1.644 ms |
+
+Before the adaptive query change, the 100,000-photo first-page medians were
+14.468 ms for Have snapshots and 44.187 ms for No snapshots, versus 10.913 and
+25.187 ms afterward. These sequential synthetic measurements establish a query
+improvement for this distribution, not a universal performance guarantee. Deep
+offsets still incur traversal cost; small-catalog timings do not show the same
+improvement. Full unstacked pages are 24,917–24,921 / 25,523–25,527 bytes;
+state replies are 201 / 205 bytes. Peak process RSS is 47.61 / 91.45 MiB,
+including probe setup and all phases. No image worker starts and original hashes
+remain unchanged. Reproduce with `tests/snapshot_filter_probe.py`.
+
+The arm64 Mac app builds for the macOS 14 deployment target and passes local
+ad-hoc signature verification on macOS 26.6.2. Engine generation **32**, schema
+**25**, **120 tools**; all packaged MCP schemas and the bundled guide match the
+current source. Engine manifest digest:
+`1ffeef484b9292833d909a83cbf05b596155787ebbc350d51c4b19d237900ddf`.
+Engine executable SHA-256:
+`a0f0ae4f346ccca22bc36146776cd9272a29d3599eb075eb7394eef49e07720d`.
+Native executable SHA-256:
+`2a99709a348e0a4f7e309b7c2641b73f581ce44870630bcce04ed2f8777c8ad8`.
+Swift compilation has no diagnostics. The existing optional PyInstaller
+`scipy.special._cdflib` hidden-import warning remains.
+
+The final packaged engine passes **181 assertions across nine native suites**:
+Snapshot Filters (25), Snapshots (33), Library (13), Collections (21), Thumbnails
+(14), Previous Import (19), Folder Synchronization (24), Connection (10) and
+Stacks (22). Logs have no Swift warnings/errors. These checks exercise native
+state against the actual packaged engine, including safe pending-edit deferral,
+original preservation and compatibility with existing organization workflows.
+
+Current source/index and extracted strict archive checks cover **357 public
+files with zero findings**. A remote refresh found no unmerged local or remote
+branches; main remains an ancestor of the development branch. Generated catalogs,
+photographs, build outputs and detailed receipts remain private and ignored.
+
+Rendered filter forms, real desktop mouse/menu events, VoiceOver and the macOS 14
+runtime remain **not verified**. Native state/IPC tests and a macOS 14 deployment
+target do not establish desktop or older-OS acceptance. Complete metadata filter
+facets, all smart criteria, snapshot hover and the full non-AI inventory remain
+open; this increment does not complete Lightroom Classic parity.
