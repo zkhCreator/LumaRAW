@@ -58,7 +58,7 @@ gaps. Nothing below is full Lightroom parity merely because historical tests pas
 | Organization | Partial: duplicate/missing detection, hierarchical keywords/synonyms/export flags/Will Export preview, text/CSV vocabulary exchange and manual person tags, custom nine-slot keyword sets/recent entries/shared or catalog storage, multi-keyword shortcuts and keyword/rating/flag/label/target-collection/rotation/Develop-preset/metadata-preset Painter strokes, independent catalog rotation/flips, title/caption/copyright plus thirty IPTC fields, selective metadata presets, labels, batch metadata, virtual copies, manual/split/capture-time scoped stacks | Keyword policy/file and preset reference acceptance, built-in sets/suggestions/undo, Painter desktop acceptance, IPTC Extension and complete metadata parity, stack interaction acceptance, rename and sidecars |
 | Culling | Partial: Loupe/Compare/Survey, linked detail, anchored page selection | Desktop acceptance, cross-page selection, Develop reference view, auto advance, persistent workspace state |
 | Basic development | Partial: light/WB/color, eight-band HSL and B&W Mix with selective resets/sync | Calibrated absolute WB, eyedropper, texture/clarity/dehaze, targeted adjustment, Point Color, Auto B&W mix, color grading and Adobe processing/reference acceptance |
-| Curves and profiles | Partial: four-region parametric curves with movable splits, interactive RGB/channel point curves, shared temporary previews, legacy luminance curve, LUT/ICC | Targeted adjustment, curve exchange, camera/profile browser, Adobe processing and rendered/reference acceptance |
+| Curves and profiles | Partial: four-region parametric curves with movable splits and photo-targeted adjustment, interactive RGB/channel point curves, shared temporary previews, legacy luminance curve, LUT/ICC | Point/channel targeting, curve exchange, camera/profile browser, Adobe processing and rendered/reference acceptance |
 | Detail and optics | Partial: noise/sharpen, manual lens | Complete manual detail controls, automatic lens profiles, bounded full-resolution acceptance |
 | Geometry | Partial: crop/straighten/perspective, independent rotation/flips with attached masks and displayed crop ratios | Interactive retained handles, guided transforms, full crop state and rendered/reference parity |
 | Local editing | Partial: radial/gradient/brush/luma | Mask list/edit/reorder/intersection, range masks, clone/heal, red-eye (non-AI) |
@@ -76,7 +76,7 @@ gaps. Nothing below is full Lightroom parity merely because historical tests pas
 
 ## Active increment
 
-Four-region parametric curves and shared gesture previews, followed by further
+Photograph-targeted parametric curves, followed by further
 import, Library and Develop workflows.
 Rendered Mac/reference acceptance,
 Copy/Move/DNG, complete IPTC, Adobe exchange, unified Undo/Redo and the full inventory
@@ -2181,3 +2181,84 @@ Targeted adjustment on the photograph, curve-only exchange, Adobe processing and
 reference acceptance remain open. Desktop slider/graph/divider gestures, focus,
 keyboard dispatch, VoiceOver and macOS 14 runtime remain unverified. Implemented
 region controls and numerical consistency do not complete Lightroom parity.
+
+### Photograph-targeted parametric curves
+
+The Mac Parametric panel's **Adjust in Photo** action and Tools menu now enable
+photo-space tone targeting. Hover shows the corresponding curve input and region;
+an upward/downward drag changes that region through temporary previews. Release
+saves one revision, Escape restores saved settings, and a click without movement
+creates no edit. Up/Down adjust the selected region after its preview is ready.
+Fit uses the centered image rectangle; 1:1 attaches to the actual Retina-scaled
+image inside the scroll view. Before/split comparison, pending edits and stale
+photo/revision/viewport captures cannot be used to submit a targeted edit.
+
+The engine optionally produces a geometry-aligned pre-parametric luminance map
+while processing preview strips. Source stat identity, upstream recipe settings
+and actual geometry define its cache key. Parametric/RGB curves, color mixing,
+masks, LUTs and display proofing do not invalidate this input stage. Repeated
+pointer events use a bounded native map lookup with no worker request; subsequent
+curve previews reuse the map. The portable binary contract has explicit byte
+order, dimensions and stage, with a maximum 12 MiB pixel payload. The shell
+validates its size/header and rejects invalid samples. Ordinary previews/exports
+do not capture extra tones. Originals remain read-only and no migration is added.
+
+The complete Python suite passes **589 tests, no skips**, including the fixed
+Nikon D3S NEF and required Metal. New coverage includes all eight catalog
+orientations, legacy recipe rotation, crop/aspect/straighten/perspective/lens
+geometry, reduced fits and detail ROIs, upstream invalidation, downstream and
+display-warning cache reuse, binary bounds/corruption, temporary-worker previews,
+revision conflicts and unchanged source hashes. The synthetic coordinate cases
+compare independent full-image transforms with strip/ROI maps.
+
+The Mac app builds and passes ad-hoc signature verification for the macOS 14
+target on macOS 26.6.2. Engine generation **27**, schema **21**, **111 tools** and
+78 editable recipe fields remain consistent; the bundled guide matches source.
+Source digest:
+`894f5aa631d1e3d40f8c7c9a4859c0f81625fc3b0fd58e13c011c3f4fccfee28`.
+The existing PyInstaller `scipy.special._cdflib` hidden-import warning remains;
+there are no Swift compilation warnings/errors. The remote refresh found no
+unmerged branches before this increment.
+
+The packaged engine passes **167 assertions in six native suites**: targeted
+curves (33), parametric curves (30), point curves (28), orientation (51), shared
+state (15) and connection compatibility (10). Targeted cases include bounded
+binary decoding, top-left/edge samples, fitted/Retina rectangles, temporary values,
+one release/one revision, click-only no-op, retained keyboard target, cancellation,
+stale zoom/pan, before/split guards, service conflicts and photo switching. Tests
+use isolated generated photographs and actual IPC; originals retain their bytes.
+
+Sequential packaged workers use the same pinned 4284×2844 Nikon D3S NEF and the
+previous increment's combined parametric/RGB/legacy/color recipe, on Apple M3
+Max, 128 GB, arm64 macOS 26.6.2. Here previews request tone maps and omit before
+images, matching draft processing. There is one empty-application-cache preview,
+two warm previews, one full-size ProPhoto 16-bit export and one 1280×900 detail
+pair. Warm timings are medians of two; RSS is the maximum sampled per row. Tests
+and builds had finished before these sequential runs.
+
+| Operation | CPU wall | Metal wall | CPU / Metal peak RSS |
+| --- | ---: | ---: | ---: |
+| First preview and tone map, 1680×1115 | 1.943 s | 1.084 s | 186.97 / 158.34 MiB |
+| Warm preview with map reuse | 1.537 s | 0.610 s | 176.27 / 136.70 MiB |
+| Full-size TIFF | 7.108 s | 1.166 s | 402.67 / 233.91 MiB |
+| Detail with first viewport map | 1.288 s | 0.667 s | 167.23 / 144.50 MiB |
+
+Map payloads plus headers are 7,492,816 bytes fitted and 4,608,016 bytes detail.
+The first Metal-worker capture stages take 0.156 s fitted and 0.096 s detail;
+warm receipts reuse the file and contain no capture stage. CPU/Metal maps have
+identical hashes. GPU grading remains fused (9 fitted, 23 export, 8 detail tiles)
+with no fallback. All output pairs differ by at most one code value; the 16-bit
+export's mean difference is 0.001957 codes. Source SHA-256 is unchanged. The
+full-export wall ratio is 6.094× for this sample. These timings include process
+startup/encoding but exclude broker IPC and desktop events, and are not pointer
+latency or a general speed claim. Empty application cache is not cold OS/shader
+cache. The generated preview was inspected as an image, not as a desktop test.
+
+Public-source and extracted strict-archive gates cover **330 files with zero
+findings**; ignored photographs, catalogs, logs and raw receipts remain private.
+
+The coordinate/state checks do not establish rendered Mac interaction, actual
+pointer/keyboard/VoiceOver dispatch or macOS 14 runtime behavior. Desktop
+automation was unavailable for this increment. Point/channel targeting, curve
+exchange, Adobe processing/reference acceptance and the wider feature inventory
+remain open. This workflow does not complete Lightroom parity.

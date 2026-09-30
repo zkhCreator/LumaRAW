@@ -111,6 +111,14 @@ amount. Reset Splits restores the boundaries; Reset Parametric Curve restores
 both amounts and splits while preserving point curves. Sliders and graph drags
 preview temporary changes and save once on release; Escape cancels a gesture.
 
+Choose **Adjust in Photo** (also **Tools → Targeted Tone Curve**) to select tones
+directly from the photograph. Drag upward to lighten or downward to darken the
+selected parametric region; Up/Down adjust its amount. The graph shows the input
+tone. Fit and 1:1 Detail use matching crop/orientation coordinates. A release saves
+one edit; Escape cancels a drag, then exits targeting. Input samples are prepared
+by the engine and reused during curve previews. Wait for the new preview after
+changing exposure, geometry or other upstream settings before selecting a tone.
+
 In **Tone Curve → Point**, choose RGB, Red, Green or Blue. Click the graph to add a point,
 drag it, or edit its Input/Output values (0–255). Arrow keys adjust the selected
 point; Delete removes an interior point. A drag previews temporary changes and
@@ -118,8 +126,8 @@ saves once on release; Escape cancels it. Linear, Medium Contrast and Strong
 Contrast are LumaRAW presets. Reset Channel affects only the selected curve;
 Reset RGB Curves clears all four. Existing luminance curves remain unchanged and
 appear as **Legacy Luminance** when active. The three older region sliders remain
-under **Legacy Region Adjustments**. Adobe processing equivalence, targeted
-adjustment on the photograph and rendered/reference parity remain unfinished.
+under **Legacy Region Adjustments**. Point/channel targeting, Adobe processing
+equivalence and rendered/reference parity remain unfinished.
 
 Use **Photo → Stacking** to group, unstack, remove members, choose a cover or
 reorder photos. **⌘G / ⇧⌘G** group/unstack; with a photo surface focused, **S**

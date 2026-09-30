@@ -36,6 +36,8 @@ struct ToneCurveControls:View {
                 Text("Legacy region adjustments are also applied.").font(.caption).foregroundStyle(.secondary)
             }
         }
+        .onChange(of:mode) {_,value in if value == "Point",s.canvasTool == "curve" {s.setCurveTargeting(false)}}
+        .onChange(of:s.canvasTool) {_,value in if value == "curve" {mode="Parametric"}}
     }
     func legacy(_ label:String,_ key:String) -> some View {
         ParameterRow(label:label,value:Binding(get:{(s.recipe[key] as? NSNumber)?.doubleValue ?? 0},set:{s.set(key,$0)}),range:-30...30)
@@ -51,7 +53,7 @@ struct ParametricCurveControls:View {
     @State private var activeDivider:Int?
     @State private var hoverInput:Double?
     @FocusState private var focused:Bool
-    var values:ParametricCurveValues {drag?.values ?? s.parametricCurve}
+    var values:ParametricCurveValues {drag?.values ?? s.curveTargetGesture?.values ?? s.parametricCurve}
     var activeLabel:String {
         if let activeDivider {return ["Shadow Split","Midtone Split","Highlight Split"][activeDivider]}
         return ParametricCurveValues.labels[activeRegion]
@@ -59,9 +61,15 @@ struct ParametricCurveControls:View {
     var body:some View {
         VStack(spacing:10) {
             HStack {
+                Button {s.setCurveTargeting(s.canvasTool != "curve")} label: {
+                    Label(s.canvasTool == "curve" ? "Done Targeting":"Adjust in Photo",systemImage:"scope")
+                }.disabled(drag != nil || s.hasPendingEdits)
+                Spacer()
+            }
+            HStack {
                 Text(activeLabel).font(.caption)
                 Spacer()
-                if let x=hoverInput {
+                if let x=s.curveTargetSample?.input ?? hoverInput {
                     Text("Input \(x*100,specifier:"%.1f") / Output \(values.output(x)*100,specifier:"%.1f")")
                         .font(.caption.monospacedDigit())
                 }
@@ -90,6 +98,7 @@ struct ParametricCurveControls:View {
             }
         }
         .onDisappear {cancel()}
+        .onChange(of:s.curveTargetSample?.region) {_,region in if let region {activeRegion=region;activeDivider=nil}}
     }
     func amountRow(_ region:Int) -> some View {
         VStack(spacing:4) {
@@ -152,6 +161,10 @@ struct ParametricCurveControls:View {
             var curve=Path();curve.move(to:location(0,0))
             for step in 1...256 {let x=Double(step)/256;curve.addLine(to:location(x,values.output(x)))}
             context.stroke(curve,with:.color(.primary),lineWidth:2)
+            if let sample=s.curveTargetSample {
+                let p=location(sample.input,values.output(sample.input))
+                context.fill(Path(ellipseIn:CGRect(x:p.x-4,y:p.y-4,width:8,height:8)),with:.color(.accentColor))
+            }
             for i in 0..<3 {
                 let x=rect.minX+values.splits[i]*rect.width
                 var line=Path();line.move(to:CGPoint(x:x,y:rect.minY));line.addLine(to:CGPoint(x:x,y:rect.maxY))

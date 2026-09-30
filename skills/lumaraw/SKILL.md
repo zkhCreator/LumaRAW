@@ -92,6 +92,15 @@ The smooth monotone transform changes encoded luminance before RGB point curves,
 preserving channel ratios and out-of-SDR luminance. It is not an Adobe parameter
 translation. Old recipes default to neutral amounts without a catalog rewrite.
 
+`preview_photo(include_curve_tones: true)` also returns `curve_tones`: a bounded
+file-backed map of encoded luminance immediately before parametric curves. Its
+dimensions match the returned preview/ROI after crop and orientation. The binary
+format is `LRTONE1\0`, little-endian uint32 width/height, then row-major float32
+values in 0–1. It is intended for photo-targeted controls, not RGB eyedropping.
+Downstream curve/color/mask/LUT edits reuse it; upstream settings and geometry
+invalidate it. Display proofing never changes these inputs. Map requests and
+temporary previews do not save recipes. Normal clients can omit the option.
+
 ## Reviewed Add import
 
 `prepare_import(paths, include_subfolders?, skip_duplicates?)` captures explicit

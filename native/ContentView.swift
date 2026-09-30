@@ -84,6 +84,11 @@ struct ContentView: View {
         .sheet(item:$s.painterKeywordPicker){PainterKeywordPicker(model:$0)}
         .onChange(of:s.workspace) { _,_ in if !s.isMultiReview {s.reviewRenderer.stop()} else {s.updateReviewRequests()} }
         .onChange(of:s.develop) { _,value in if value {s.reviewRenderer.stop()} }
+        .onChange(of:s.curveTargetActive) {_,active in
+            if !active {s.cancelCurveTarget();s.curveTargetFrame=nil}
+            else if s.curveTargetFrame == nil {s.render()}
+        }
+        .onChange(of:s.curveTargetContext) {_,_ in if s.curveTargetGesture != nil {s.cancelCurveTarget()}}
         .onChange(of:s.painterSource) { _,_ in s.cancelPainterStroke();if !s.painterInGrid { s.setPainting(false) } }
         .onDrop(of:[UTType.fileURL],isTargeted:nil){providers in
             Task { await s.reviewImportProviders(providers) };return true
@@ -102,12 +107,13 @@ struct ContentView: View {
                 if s.develop {
                     Menu {
                         Button("Browse"){s.canvasTool="view"}
+                        Button("Targeted Tone Curve"){s.setCurveTargeting(true)}.disabled(!s.canEditPointCurves || s.hasPendingEdits)
                         Button("Split Before and After"){s.splitCompare.toggle();s.compare=false;s.canvasTool="view";s.detail=false}
                         Button("Draw Freeform Crop"){s.canvasTool="crop";s.detail=false;s.compare=false;s.splitCompare=false}
                         Button("Draw Radial Mask"){s.canvasTool="radial";s.detail=false;s.compare=false;s.splitCompare=false}
                         Button("Draw Gradient Mask"){s.canvasTool="linear";s.detail=false;s.compare=false;s.splitCompare=false}
                         Button("Draw Brush Mask"){s.canvasTool="brush";s.detail=false;s.compare=false;s.splitCompare=false}
-                    } label:{Label(s.canvasTool=="view" ? "Tools":"Drawing",systemImage:s.canvasTool=="crop" ? "crop":"paintbrush.pointed")}
+                    } label:{Label(s.canvasTool=="view" ? "Tools":(s.canvasTool=="curve" ? "Tone Curve":"Drawing"),systemImage:s.canvasTool=="curve" ? "scope":(s.canvasTool=="crop" ? "crop":"paintbrush.pointed"))}
                     Picker("Zoom",selection:$s.detail){Text("Fit").tag(false);Text("1:1 Detail").tag(true)}.frame(width:155).onChange(of:s.detail){_,_ in s.render()}
                 } else {
                     if s.libraryView == .loupe {
@@ -220,6 +226,11 @@ struct PhotoCanvas:View {
                             let scale=displayScale
                             let pixels=image.representations.first
                             Image(nsImage:image).resizable().frame(width:CGFloat(pixels?.pixelsWide ?? 1600)/scale,height:CGFloat(pixels?.pixelsHigh ?? 1100)/scale)
+                                .overlay {
+                                    if s.curveTargetActive {
+                                        GeometryReader {frame in CurveTargetOverlay(imageSize:image.size,available:frame.size,fitted:false)}
+                                    }
+                                }
                                 .frame(minWidth:geo.size.width,minHeight:geo.size.height)
                         }
                     } else {
@@ -230,7 +241,8 @@ struct PhotoCanvas:View {
                             Rectangle().fill(.white.opacity(0.85)).frame(width:2).position(x:geo.size.width*s.splitPosition,y:geo.size.height/2)
                             VStack{Spacer();HStack{Text("Before");Slider(value:$s.splitPosition,in:0...1).accessibilityLabel("Before and after divider");Text("After")}.font(.caption).padding(9).background(.ultraThinMaterial,in:Capsule()).frame(width:280).padding(.bottom,14)}
                         }
-                        if s.develop,s.canvasTool != "view",!s.compare {DrawingOverlay(image:image,available:geo.size)}
+                        if s.curveTargetActive {CurveTargetOverlay(imageSize:image.size,available:geo.size)}
+                        if s.develop,!["view","curve"].contains(s.canvasTool),!s.compare {DrawingOverlay(image:image,available:geo.size)}
                     }
                 } else if s.rendering {ProgressView("Developing…").tint(.white).foregroundStyle(.white)}
                 else {Text("Select a photo to start editing").foregroundStyle(.gray)}
@@ -242,6 +254,13 @@ struct PhotoCanvas:View {
         .focusable().focused($keyboardFocus)
         .onTapGesture { keyboardFocus=true }
         .modifier(PhotoKeyboardShortcuts())
+        .onKeyPress(.escape) {
+            guard s.curveTargetActive else {return .ignored}
+            if s.curveTargetGesture != nil {s.cancelCurveTarget()} else {s.setCurveTargeting(false)}
+            return .handled
+        }
+        .onKeyPress(.upArrow) {guard s.curveTargetActive else {return .ignored};s.nudgeCurveTarget(1);return .handled}
+        .onKeyPress(.downArrow) {guard s.curveTargetActive else {return .ignored};s.nudgeCurveTarget(-1);return .handled}
         .onKeyPress(.leftArrow) { s.navigateLoupe(-1);return .handled }
         .onKeyPress(.rightArrow) { s.navigateLoupe(1);return .handled }
     }

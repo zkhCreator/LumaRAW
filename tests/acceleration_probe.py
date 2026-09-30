@@ -18,7 +18,9 @@ def digest(p):
     return h.hexdigest()
 
 def main():
-    parser=argparse.ArgumentParser();parser.add_argument('--engine',required=True,type=Path);parser.add_argument('--fixture',required=True,type=Path);parser.add_argument('--work',required=True,type=Path);parser.add_argument('--preset',choices=['creative','neutral','mixer','bw_mixer','point_curves','parametric'],default='creative');a=parser.parse_args()
+    parser=argparse.ArgumentParser();parser.add_argument('--engine',required=True,type=Path);parser.add_argument('--fixture',required=True,type=Path);parser.add_argument('--work',required=True,type=Path);parser.add_argument('--preset',choices=['creative','neutral','mixer','bw_mixer','point_curves','parametric'],default='creative')
+    parser.add_argument('--curve-tones',action='store_true',help='Include targeted input maps; omit the baseline image as during interactive drafts')
+    a=parser.parse_args()
     if a.work.exists():raise SystemExit('Choose new work directory')
     a.work.mkdir(parents=True);a.work=a.work.resolve();a.engine=a.engine.resolve();a.fixture=a.fixture.resolve()
     before=digest(a.fixture);runs=[]
@@ -41,6 +43,8 @@ def main():
         budget=min(4096,int(psutil.virtual_memory().available/1024**2*.7))
         request={'operation':operation,'path':str(a.fixture),'recipe':recipe,'cache':str(cache),'budget_mb':budget,'compute_backend':mode,'destination':str(dest),'format':'tiff16','job_id':len(runs)+1,'options':{'space':'prophoto','max_edge':0}}
         if operation=='detail':request['detail']={'width':1280,'height':900}
+        if a.curve_tones and operation!='export':
+            request.update(include_curve_tones=True,include_before=False)
         start=time.perf_counter()
         p=subprocess.Popen([str(a.engine),'--worker'],stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=subprocess.PIPE,env={**os.environ,'OMP_NUM_THREADS':'2','OPENBLAS_NUM_THREADS':'1','VECLIB_MAXIMUM_THREADS':'2'})
         peak=[0.];done=threading.Event()
@@ -56,6 +60,16 @@ def main():
             saved=dest/'preview.png';shutil.copy2(result['preview'],saved);result['preview']=str(saved)
         if mode=='metal':assert result['processing']['metal_grade_tiles']>0,result
         item={'label':label,'mode':mode,'operation':operation,'wall_seconds':round(elapsed,6),'rss_peak_mb':round(peak[0],2),'processing':result['processing'],'output':result.get('output',result.get('preview'))};runs.append(item)
+        if a.curve_tones and operation!='export':
+            receipt=result['curve_tones'];tone_path=Path(receipt['path'])
+            assert receipt['stage']=='pre-parametric-v1'
+            assert (receipt['width'],receipt['height'])==(result['width'],result['height'])
+            assert tone_path.stat().st_size==16+receipt['width']*receipt['height']*4
+            assert receipt['cache_hit']==label.startswith('warm-preview')
+            values=np.frombuffer(tone_path.read_bytes()[16:],'<f4')
+            assert np.isfinite(values).all() and values.min()>=0 and values.max()<=1
+            item['curve_tones']={**receipt,'sha256':digest(tone_path),'bytes':tone_path.stat().st_size}
+            if receipt['cache_hit']:assert 'curve_input_tones' not in result['processing']['stages']
         return item
     pairs=[]
     # Alternate order between passes. The source cache is private per backend.
@@ -71,6 +85,8 @@ def main():
         diff=np.abs(cpu.astype(np.int32)-gpu.astype(np.int32));limit=8 if cpu.dtype==np.uint16 else 1
         differences.append({'label':pair['cpu']['label'],'shape':list(cpu.shape),'dtype':str(cpu.dtype),'max_code_difference':int(diff.max()),'mean_code_difference':float(diff.mean()),'limit':limit})
         assert diff.max()<=limit,differences[-1]
+        if a.curve_tones and pair['cpu']['operation']!='export':
+            assert pair['cpu']['curve_tones']['sha256']==pair['metal']['curve_tones']['sha256']
     assert digest(a.fixture)==before
     summary=[]
     for pair in pairs:

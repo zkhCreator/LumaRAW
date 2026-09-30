@@ -25,6 +25,10 @@ import UniformTypeIdentifiers
     })
     @Published var preview: NSImage?
     @Published var previewGeometry: PhotoPreviewGeometry?
+    @Published var curveTargetFrame:CurveTargetFrame?
+    @Published var curveTargetSample:CurveTargetSample?
+    @Published var curveTargetGesture:CurveTargetGesture?
+    let curveTargetPreviews=CurvePreviewScheduler()
     @Published var orientationState: PhotoOrientationState?
     @Published var orientationBusy=false
     @Published var developPresetPage: DevelopPresetPage?
@@ -273,6 +277,7 @@ import UniformTypeIdentifiers
         } catch {self.error=error.localizedDescription}
     }
     func clearPhoto() {
+        cancelCurveTarget(restore:false);curveTargetFrame=nil
         generation += 1;previewTask?.cancel();photo=nil;recipe=[:]
         preview=nil;previewGeometry=nil;before=nil;metadata=[:];histogram=[];rendering=false;loading=false
     }
@@ -335,6 +340,10 @@ import UniformTypeIdentifiers
         } catch {if selected==id,token==generation{self.error=error.localizedDescription}}
     }
     func render(curveDraft:CurvePreviewDraft?=nil,debounce:Bool=true) {
+        if curveDraft == nil {
+            if curveTargetGesture != nil {cancelCurveTarget(restore:false)} else {curveTargetPreviews.cancel()}
+            curveTargetFrame=nil
+        }
         if curveDraft == nil { updateThumbnails() }
         if isMultiReview { updateReviewRequests();return }
         guard let p=photo,p.id==selected,!loading else{return}
@@ -349,6 +358,8 @@ import UniformTypeIdentifiers
             guard !Task.isCancelled,token==generation else{return}
             rendering=true
             var params:[String:Any]=["photo_id":p.id,"client_id":previewClient,"generation":token]
+            let toneContext=curveTargetActive ? curveTargetContext:nil
+            if toneContext != nil {params["include_curve_tones"]=true}
             if let capture=curveDraft {
                 params["curve_patch"]=capture.patch;params["expected_revision"]=capture.revision
                 params["include_before"]=false
@@ -366,6 +377,7 @@ import UniformTypeIdentifiers
                 histogram=r["histogram"] as? [[Double]] ?? []
                 metadata=r["metadata"] as? [String:Any] ?? [:]
                 previewGeometry=PhotoPreviewGeometry(r)
+                if let toneContext {acceptCurveTones(r,context:toneContext)} else {curveTargetFrame=nil}
                 message=curveDraft != nil ? "Curve preview · Release to save, Escape to cancel" : (detail ? "Full-resolution viewport · 1 image pixel = 1 screen pixel" : "Preview · Originals are read-only · Edits save automatically")
                 rendering=false
             } catch {if token==generation {rendering=false;self.error=error.localizedDescription}}

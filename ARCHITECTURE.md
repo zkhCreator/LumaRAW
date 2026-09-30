@@ -645,6 +645,28 @@ reads the latest draft only after existing image work finishes. Changing editor,
 photo or revision cancels that draft. Sliders capture the same transaction boundary
 as graph/divider gestures; typed edits use ordinary coalesced partial changes.
 
+`preview_photo(include_curve_tones=true)` adds an optional geometry-aligned input
+map for parametric photo targeting. The worker reuses sampled, halo-filtered tiles
+and the CPU grading prefix through legacy curves to capture encoded luminance
+before parametric/RGB curves, color mixing, masks and LUTs. Output proofing/gamut
+markers do not affect input samples. The portable map contains `LRTONE1\0`, two
+little-endian uint32 dimensions and row-major little-endian float32 values in
+0…1. It is bounded to 2048 per dimension and 2048×1536 pixels, atomically replaced,
+pinned during cache trimming and invalidated by source stat identity, upstream
+settings and actual viewport geometry. Downstream edits reuse it without capture
+work. Normal previews/exports do not request maps or pay for extra grading.
+Changing the input-stage equation or binary layout requires a new stage/version
+in the map key and receipt so older cached samples cannot survive that change.
+
+The Mac adapter validates size/header before mapping the file, samples one value
+per pointer event and owns no photographic pixel equation. Fit coordinates follow
+the inset image; detail coordinates attach inside the scrollable image frame.
+Gestures capture photo/revision, orientation, viewport, map identity and original
+curve values. Drafts use the shared scheduler; release commits only if that
+capture is still current. Escape and context changes discard it. Keyboard actions
+use the retained input position after the saved preview is refreshed. The map
+format and service contract can be reused by a future platform adapter.
+
 This does not establish monitor calibration, Nikon Picture Control equivalence, or per-camera color accuracy. Camera profiles are bound to a specific model. A synthetic chart fit is algorithm evidence, not independent camera acceptance.
 
 ## Language and contracts

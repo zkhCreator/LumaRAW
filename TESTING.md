@@ -804,6 +804,30 @@ one transaction. Repeated page/sort/filter/state queries use thirty warm samples
 replacement uses one sample. Report median/p95, RSS, response size and indexed
 query plan. It excludes setup, file verification, decoding, IPC and desktop timing.
 
+## Photograph-targeted parametric curves
+
+`test_curve_targeting.py` verifies all eight catalog orientations, recipe rotation,
+crop/aspect/straighten/perspective/lens geometry, detail ROIs, upstream invalidation,
+downstream cache reuse, bounded binary maps and read-only real-worker drafts.
+`NativeCurveTargetRegression` checks binary parsing, fitted/Retina coordinate
+rectangles, temporary edits, one revision per release, cancellation, keyboard state,
+stale zoom/pan, before/split guards, external conflicts and photo changes via IPC.
+These checks do not drive actual pointer/keyboard dispatch or the desktop.
+
+```sh
+.venv/bin/python -m pytest -q tests/test_curve_targeting.py
+.venv/bin/python tests/run_native.py --work work/new-target-native --suite NativeCurveTargetRegression
+.venv/bin/python tests/acceleration_probe.py --preset parametric --curve-tones \
+  --engine /absolute/LumaRAW.app/Contents/Resources/Engine/LumaRAWEngine \
+  --fixture /absolute/nikon.NEF --work work/new-target-nef
+```
+
+The optional map probe omits before images, as interactive drafts do. It asserts
+identical CPU/Metal map bytes, matching dimensions, first-capture and warm-reuse
+receipts, and absence of capture work on warm runs. Record map sizes, per-stage
+time, wall time and RSS. Run sequentially with no tests/builds in progress. Worker
+timing excludes broker IPC, pointer dispatch and display; it is not drag latency.
+
 ## Public source check
 
 ```sh
