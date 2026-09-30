@@ -46,6 +46,25 @@ Wall times include worker launch and encoding, not desktop latency. Empty app
 caches do not imply cold OS/GPU caches. Single-fixture results are not a camera
 accuracy or Lightroom processing claim.
 
+`NativeComparisonLayoutRegression` uses generated 2400×1800 originals and actual
+worker replies. It checks equal whole-image panes, aspect-preserving fit,
+image-relative split boundaries, physical Retina scale, reuse on fitted layout
+changes, all four layouts at 1:1, bounded resizing, shared ROI panning, edge
+clamping, invalid values and stale layout/photo/viewport events. Shortcut routing
+is exercised through Store, not actual keyboard dispatch. View changes must leave
+the photo revision, Develop history and original bytes unchanged.
+
+```sh
+.venv/bin/python tests/run_native.py --work work/new-comparison-layouts \
+  --engine /absolute/LumaRAW.app/Contents/Resources/Engine/LumaRAWEngine \
+  --suite NativeComparisonLayoutRegression --suite NativeBeforeAfterRegression \
+  --suite NativeReviewRegression --suite NativeCurveTargetRegression \
+  --suite NativeMixerTargetRegression --suite NativeStateRegression
+```
+
+Compilation and these geometry/state tests do not verify rendered desktop pane
+layout, actual mouse/key input, VoiceOver or behavior on macOS 14.
+
 ## Eight-band color and black-and-white mixer
 
 `test_color_mixer.py` uses a synthetic Oklab color ring to test every band's hue,

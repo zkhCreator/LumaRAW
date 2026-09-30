@@ -37,6 +37,7 @@ def main():
     suites+=('NativeMixerTargetRegression',)
     suites+=('NativeHistoryRegression',)
     suites+=('NativeBeforeAfterRegression',)
+    suites+=('NativeComparisonLayoutRegression',)
     parser.add_argument('--suite',choices=suites,action='append',help='Run selected suites; default: all')
     args=parser.parse_args()
     work=args.work.resolve()
@@ -61,7 +62,7 @@ def main():
                 second,fraction=((0,'9'),(1,'1'),(2,'0'),(2,'3'),(4,'0'))[index]
                 exif[34665]={36867:f'2026:09:26 12:00:{second:02d}',37521:fraction,36881:'+00:00'}
                 Image.new('RGB',(160,100),color).save(path,exif=exif)
-            else:Image.new('RGB',(160,100),color).save(path)
+            else:Image.new('RGB',(2400,1800) if suite=='NativeComparisonLayoutRegression' else (160,100),color).save(path)
             paths.append(str(path))
         executable=work/suite
         subprocess.run(['xcrun','swiftc','-swift-version','5','-parse-as-library',

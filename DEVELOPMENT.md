@@ -27,6 +27,11 @@ when a clear function is more maintainable. Avoid unrelated formatting churn.
   Before-only actions preserve redo. Keep complete copied recipes distinct from
   the geometry-aligned preview recipe. Bound and validate the independent cache;
   omit Before work when hidden and reject sources changed during comparison.
+- Comparison layouts share one zoom/pan state and one captured pair of images.
+  Fit layout/divider changes must not start workers. Convert point dimensions and
+  drags using physical display scale, bound requests, and pan from returned ROI
+  centers to avoid sticky edges. Reject captures after photo, revision, viewport
+  or layout changes. Keep presentation out of recipes and Develop history.
 
 - Keep reviewed imports separate from catalog photos until explicit application.
   Read directory entries, capture headers, XMP and pixels outside catalog locks;

@@ -151,8 +151,19 @@ import UniformTypeIdentifiers
     var reviewPaneHeight=900
     var reviewSwitchGeneration=0
     @Published var showInspector=true
-    @Published var compare=false
-    @Published var splitCompare=false
+    @Published var comparisonMode:BeforeAfterMode = .after
+    // Existing editing tools use these gates to leave comparison or block sampling.
+    var compare:Bool {
+        get {comparisonMode == .before}
+        set {if newValue {comparisonMode = .before} else if compare {comparisonMode = .after}}
+    }
+    var splitCompare:Bool {
+        get {comparisonMode.isPaired}
+        set {if newValue {comparisonMode = .leftRightSplit} else if splitCompare {comparisonMode = .after}}
+    }
+    var comparisonPixelWidth=1600
+    var comparisonPixelHeight=1100
+    var comparisonFrame:BeforeAfterFrame?
     @Published var splitPosition=0.5
     @Published var canvasTool="view"
     @Published var detail=false
@@ -292,7 +303,7 @@ import UniformTypeIdentifiers
         } catch {self.error=error.localizedDescription}
     }
     func clearPhoto() {
-        beforeLabel="Before";beforePreviewContext=nil
+        beforeLabel="Before";beforePreviewContext=nil;comparisonFrame=nil
         historyRequest+=1;historyPage=nil;historyBefore=nil;historyError=nil;historyLoading=false
         cancelCurveTarget(restore:false);curveTargetFrame=nil
         cancelMixerTarget(restore:false);mixerTargetFrame=nil
@@ -397,7 +408,7 @@ import UniformTypeIdentifiers
                 params["mixer_patch"]=capture.patch;params["expected_revision"]=capture.revision
                 params["include_before"]=false
             }
-            if detail{params["detail"]=["cx":cx,"cy":cy,"width":1600,"height":1100]}
+            if detail{params["detail"]=["cx":cx,"cy":cy,"width":detailPixelWidth,"height":detailPixelHeight]}
             var display:[String:Any]=["gamut":gamut]
             if let path=proof["path"],let sha=proof["sha256"]{display["proof_path"]=path;display["proof_sha"]=sha}
             params["display"]=display
@@ -408,8 +419,9 @@ import UniformTypeIdentifiers
                 if let path=r["preview"] as? String{preview=NSImage(contentsOfFile:path)}
                 if let path=r["before"] as? String {
                     before=NSImage(contentsOfFile:path);beforePreviewContext=beforeContext
+                    comparisonFrame=beforeContext.flatMap {BeforeAfterFrame(r,context:$0)}
                     beforeLabel=r["before_label"] as? String ?? "Before"
-                } else if !isDraft {before=nil;beforePreviewContext=nil}
+                } else if !isDraft {before=nil;beforePreviewContext=nil;comparisonFrame=nil}
                 histogram=r["histogram"] as? [[Double]] ?? []
                 metadata=r["metadata"] as? [String:Any] ?? [:]
                 previewGeometry=PhotoPreviewGeometry(r)

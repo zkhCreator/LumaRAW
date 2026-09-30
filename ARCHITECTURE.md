@@ -75,6 +75,15 @@ atomic replacement protect cache reuse; source-identity changes during rendering
 fail visibly. Hidden Before skips its processing. Native reuse also captures
 photo/revision/view context. These states are separate from global application undo.
 
+The Mac shell represents comparison with one mode value, avoiding contradictory
+Before-only/pair flags. All four paired layouts reuse the same two aligned engine
+images. Fitted layout and divider changes do not request pixels. Detail pane size
+is converted from points to physical pixels and capped at the existing 2048×1536
+service limit. Both panes share one captured ROI and normalized center; a drag
+uses the actual returned ROI center (including edge clamping) and commits one
+preview on release. Photo/revision/viewport/mode changes invalidate old drags.
+The shell does not reimplement processing or persist presentation in recipes.
+
 - `get_photo` returns a revision. Edits, undo, version restore, recipe import, and sync require the expected revision. Stale writes fail; the caller must read again and reconcile.
 - Service database access is serialized. Sync validates every target before one transaction writes all changes. Ratings and flags are separate explicit operations.
 - Export submission freezes the recipe, source, destination, output options and resolved descriptive metadata. The request key, normalized argument digest, and job IDs are stored atomically. The same key and arguments return the original result; different arguments with that key fail.

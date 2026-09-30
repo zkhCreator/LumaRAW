@@ -123,7 +123,7 @@ struct ContentView: View {
                                 Button("Luminance") {s.setMixerTargeting("lum")}
                             }
                         }.disabled(!s.canEditPointCurves || s.hasPendingEdits)
-                        Button("Split Before and After"){s.setComparisonMode(s.splitCompare ? "after":"split")}
+                        Button("Split Before and After"){s.setComparisonMode(s.comparisonMode == .leftRightSplit ? .after:.leftRightSplit)}
                         Button("Draw Freeform Crop"){s.canvasTool="crop";s.detail=false;s.compare=false;s.splitCompare=false}
                         Button("Draw Radial Mask"){s.canvasTool="radial";s.detail=false;s.compare=false;s.splitCompare=false}
                         Button("Draw Gradient Mask"){s.canvasTool="linear";s.detail=false;s.compare=false;s.splitCompare=false}
@@ -235,7 +235,9 @@ struct PhotoCanvas:View {
         GeometryReader {geo in
             ZStack {
                 Color(white:0.075)
-                if let image=s.develop && s.compare ? s.before:s.preview {
+                if s.develop,s.comparisonMode.isPaired {
+                    BeforeAfterCanvas()
+                } else if let image=s.develop && s.compare ? s.before:s.preview {
                     if s.detail {
                         ScrollView([.horizontal,.vertical]) {
                             let scale=displayScale
@@ -253,12 +255,6 @@ struct PhotoCanvas:View {
                         }
                     } else {
                         Image(nsImage:image).resizable().aspectRatio(contentMode:.fit).padding(26)
-                        if s.develop,s.splitCompare,!s.compare,let baseline=s.before {
-                            Image(nsImage:baseline).resizable().aspectRatio(contentMode:.fit).padding(26)
-                                .mask(alignment:.leading){Rectangle().frame(width:geo.size.width*s.splitPosition)}
-                            Rectangle().fill(.white.opacity(0.85)).frame(width:2).position(x:geo.size.width*s.splitPosition,y:geo.size.height/2)
-                            VStack{Spacer();HStack{Text("Before");Slider(value:$s.splitPosition,in:0...1).accessibilityLabel("Before and after divider");Text("After")}.font(.caption).padding(9).background(.ultraThinMaterial,in:Capsule()).frame(width:280).padding(.bottom,14)}
-                        }
                         if s.curveTargetActive {CurveTargetOverlay(imageSize:image.size,available:geo.size)}
                         if s.mixerTargetActive {MixerTargetOverlay(imageSize:image.size,available:geo.size)}
                         if s.develop,!["view","curve","mixer"].contains(s.canvasTool),!s.compare {DrawingOverlay(image:image,available:geo.size)}
@@ -267,7 +263,7 @@ struct PhotoCanvas:View {
                 else {Text("Select a photo to start editing").foregroundStyle(.gray)}
                 VStack {HStack{if s.compare{Text("Before · \(s.beforeLabel)").font(.caption.weight(.medium)).padding(8).background(.ultraThinMaterial,in:Capsule())};Spacer();if s.rendering && s.preview != nil{ProgressView().controlSize(.small).padding(8).background(.ultraThinMaterial,in:Circle())}};Spacer()}.padding(16)
             }
-            .accessibilityLabel(s.compare ? "Photo before editing":"Photo after editing")
+            .accessibilityLabel(s.develop && s.comparisonMode.isPaired ? "Before and After comparison":(s.compare ? "Photo before editing":"Photo after editing"))
             .accessibilityValue(s.photo?.displayName ?? "No photo selected")
         }
         .focusable().focused($keyboardFocus)

@@ -108,7 +108,8 @@ Upgrading preserves all remaining legacy steps, but cannot recover steps already
 discarded by older releases. Develop undo is separate from rotation/flip undo;
 global application undo and history hover previews remain unimplemented.
 
-**Before / After** offers After Only, Before Only and Left/Right Split. Before
+**Before / After** offers After Only, Before Only, whole-image Left/Right and
+Top/Bottom pairs, and Left/Right or Top/Bottom splits. Before
 starts with imported settings, including import presets; virtual copies start
 with their inherited settings. Copy After Settings to Before, Copy Before Settings
 to After, or Swap Before and After Settings from this menu or the Photo menu.
@@ -117,8 +118,16 @@ The saved Before survives restart, history branching and Clear History. Copy/swa
 transfers the full recipe; the comparison preview uses current After geometry
 on both sides to keep corresponding pixels aligned. Develop undo affects After;
 it does not undo changes to Before. Older catalogs use their earliest retained
-history baseline when original import settings are unavailable. Whole-image pairs
-and top/bottom layouts remain unimplemented.
+history baseline when original import settings are unavailable.
+
+Paired views share Fit or 1:1 Detail zoom and viewport position. In 1:1, drag
+either side to pan both; a single new bounded viewport is requested on release.
+The Inspector's viewport sliders also move both sides. Detail uses physical
+display pixels, including Retina scale, with a maximum 2048×1536 image viewport.
+Fitted layout and divider changes reuse the loaded images. With a viewing surface
+focused, **Y** selects Left/Right, **Option-Y** selects Top/Bottom, and **Shift-Y**
+selects a split along the current axis; repeating that choice returns to After.
+**D** returns to the normal After view and leaves drawing tools.
 
 In **Color Mixer**, use HSL to show Hue, Saturation, Luminance or all components,
 or Color to edit one color band. Red, orange, yellow, green, aqua, blue, purple and

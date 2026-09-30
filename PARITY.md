@@ -64,7 +64,7 @@ gaps. Nothing below is full Lightroom parity merely because historical tests pas
 | Geometry | Partial: crop/straighten/perspective, independent rotation/flips with attached masks and displayed crop ratios | Interactive retained handles, guided transforms, full crop state and rendered/reference parity |
 | Local editing | Partial: radial/gradient/brush/luma | Mask list/edit/reorder/intersection, range masks, clone/heal, red-eye (non-AI) |
 | History and presets | Partial: durable paged Develop history with undo/redo, state selection/rename/clear, persistent Before assignment/copy/swap, separate 50-batch orientation undo, shared named snapshots, partial Develop presets/groups/favorites/shared or local storage, batch/Painter and reviewed-import application | Unified application Undo/Redo, history hover, preset hover preview/Amount/ISO adaptation/Adobe exchange and rendered reference acceptance |
-| Preview/performance | Partial: Metal, proxies, 1:1 viewport, developed thumbnail fast path, on-demand Before with independent cache and aligned Before-only/left-right split comparison | Whole-pair/top-bottom comparison, real-RAW catalog/slider latency, offline previews, cache controls and desktop acceptance |
+| Preview/performance | Partial: Metal, proxies, 1:1 viewport, developed thumbnail fast path, on-demand Before with independent cache, four paired layouts and shared detail zoom/pan | Real-RAW catalog/slider latency, offline previews, cache controls and desktop/reference acceptance |
 | Export | Partial: JPEG/16-bit TIFF, ICC, durable jobs with frozen catalog/rights IPTC XMP and keyword hierarchy options | Presets, complete EXIF/IPTC Extension/GPS metadata policies, watermark, additional formats, publish workflows |
 | External editing and video | Missing | External-editor setup and derivative round trips; supported video import/playback, frame capture, trimming and export |
 | Merge | Missing | Non-AI HDR merge and panorama with bounded resources and reference acceptance |
@@ -77,7 +77,7 @@ gaps. Nothing below is full Lightroom parity merely because historical tests pas
 
 ## Active increment
 
-Persistent Before/After snapshots and cache reuse, followed by further import, Library and Develop
+Four Before/After layouts and shared detail viewports, followed by further import, Library and Develop
 workflows. The full feature inventory above remains the acceptance scope.
 Rendered Mac/reference acceptance,
 Copy/Move/DNG, complete IPTC, Adobe exchange, unified Undo/Redo and the full inventory
@@ -2538,3 +2538,62 @@ Before assignments and complete snapshot management remain gaps. Rendered Mac
 controls, actual pointer/key dispatch, VoiceOver, macOS 14 runtime and Adobe
 reference/pixel acceptance remain unverified. These limitations are not replaced
 by state probes or build success; full Lightroom parity is not complete.
+
+## Four comparison layouts and shared detail viewport (September 29, 2026)
+
+The Mac Before/After menu now offers whole-image Left/Right and Top/Bottom pairs,
+and Left/Right and Top/Bottom splits. One mode value replaces contradictory
+Before-only/paired flags. Each side displays the same captured photo, revision,
+orientation, proof options and viewport, with explicit Before/After labels.
+Split boundaries use the actual image rectangle, including letterboxing.
+Fitted layout changes and the divider slider reuse loaded images.
+
+All four modes retain Fit or 1:1 Detail zoom. Detail pane dimensions convert from
+points to physical pixels and are bounded by the existing 2048×1536 contract.
+Dragging either side moves both displayed images; release requests one shared
+engine viewport. Panning starts from the returned ROI center, so out-of-range
+requested centers do not cause sticky edges. Captured photo/revision/viewport
+and mode guards reject old drags. The existing Inspector position sliders also
+move both sides. Y, Option-Y and Shift-Y route through the focused photo surface
+to the horizontal, vertical and corresponding split layouts; repeating a choice
+returns to After. Crop/mask and photo-targeted editing still leave comparison.
+D returns to the normal Develop After view and exits drawing tools.
+
+This increment changes native presentation and its test harness only. Portable
+engine, recipes, schema, API and numerical processing are byte-for-byte unchanged
+from the preceding module. Engine generation **30**, schema **23**, **117 tools**
+and source digest
+`a861d2b98054ddd4a0f43e0eb51bb0c2799ed82eca6bbd01bbb28946fee782ef`
+remain valid. The preceding module's 649 Python checks and RAW timings belong to
+that unchanged engine; they are not rerun or claimed as desktop layout timing.
+The final Apple Silicon application builds for macOS 14 and passes ad-hoc
+signature verification on macOS 26.6.2. Its packaged engine executable remains
+byte-identical (SHA-256
+`3b551a961280b90ccfb0dec79a0e82ed0ceec7a4fa0604780d821ed5a9dc2f94`).
+The new native executable SHA-256 is
+`deaec38ef730c037bc5faba6d1f4637b701cb2cdb88ede9eb4a28cf408b39a67`.
+Bundled guide and manifest checks pass. There are no Swift compiler diagnostics;
+the existing optional PyInstaller `scipy.special._cdflib` warning remains.
+
+The new source-level native probe passes **38 assertions** with generated
+2400×1800 originals. Coverage includes equal panes, aspect fit, image-relative
+splits, Retina scale, reuse of loaded fit images, all modes at 1:1, bounded pane
+resizing, actual ROI panning, edge clamps, invalid numbers, stale mode/photo/
+viewport captures, shortcut routing, history/revision isolation and original
+bytes. Initial test compilation failed on one missing operator space and use of
+a private preview counter; tests now observe image reuse and published state
+without weakening source encapsulation. Final package checks additionally cover
+rotated output dimensions and displayed-coordinate panning.
+
+Before the final D-entry correction, the packaged app passes **175 assertions
+across six native suites**: Comparison Layouts (40), Before/After (19), Library
+Review (20), Curve Targeting (33), Mixer Targeting (48) and State (15). Source
+review found that the old Develop entry retained paired/drawing modes; D now
+returns to ordinary After and leaves drawing tools, with two additional checks.
+The final package then passes **77 assertions** across Comparison Layouts (42),
+Library Review (20) and State (15). Remote refresh again finds no unmerged branches.
+
+Actual mouse/key dispatch, rendered desktop layouts, VoiceOver, multi-monitor
+scale transitions and the macOS 14 runtime remain unverified. Native geometry/
+state probes are not desktop acceptance. Reference matching, history hover,
+global undo of Before assignment and the full product inventory remain open.

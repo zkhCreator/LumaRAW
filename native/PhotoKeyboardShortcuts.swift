@@ -39,6 +39,8 @@ struct PhotoKeyboardShortcuts: ViewModifier {
                 Task { await s.changeStack(action,ids:[id]) };return .handled
             }
             return .ignored
+        }.onKeyPress(characters:CharacterSet(charactersIn:"yY¥")) { press in
+            s.comparisonShortcut(press.modifiers) ? .handled:.ignored
         }.onKeyPress(characters:CharacterSet(charactersIn:"012345pxu\\gecnd/b")) { press in
             guard press.modifiers.isEmpty, s.selected != nil else { return .ignored }
             if let rating=Int(press.characters), (0...5).contains(rating) {
