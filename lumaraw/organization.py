@@ -120,6 +120,8 @@ def migrate(db):
     migrate_develop_history(db)
     from .before_after import migrate as migrate_before_after
     migrate_before_after(db)
+    from .snapshots import migrate as migrate_snapshots
+    migrate_snapshots(db)
 
 
 def text_predicate(text):

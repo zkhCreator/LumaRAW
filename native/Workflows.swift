@@ -1,4 +1,4 @@
-// Purpose: export, history, batch, calibration and agent connection workflows.
+// Purpose: export, recipe, batch, calibration and agent connection workflows.
 // Inputs: explicit native panels and user-entered settings. Outputs: domain calls.
 // Exports retain snapshots; app never overwrites an original or existing output.
 // Calibration rectangles address full decoded sources before catalog/Develop edits.
@@ -63,17 +63,6 @@ struct QueueView:View {
             }.listStyle(.inset)}
             Text("Showing the latest 60 jobs. Interrupted jobs require an explicit retry; check the destination for any completed output first.").font(.caption).foregroundStyle(.secondary)
         }.padding(28).task{await s.refreshJobs()}
-    }
-}
-struct VersionsSheet:View {
-    @EnvironmentObject var s:Store
-    @Environment(\.dismiss) var dismiss
-    @State private var name="New Version"
-    var body:some View {
-        VStack(alignment:.leading,spacing:16){Text("Snapshots").font(.title2.weight(.semibold));HStack{TextField("Version Name",text:$name);Button("Save Current Adjustments"){Task{await s.saveVersion(name)}}.disabled(name.trimmingCharacters(in:.whitespaces).isEmpty)}
-            List(Array(s.versions.enumerated()),id:\.offset){_,row in HStack{Text(row["name"] as? String ?? "Version");Spacer();Button("Restore"){if let id=row["id"] as? Int{Task{await s.restoreVersion(id);dismiss()}}}}}
-            HStack{Text("Shared by master and copies · Restoring keeps undo history").font(.caption).foregroundStyle(.secondary);Spacer();Button("Done"){dismiss()}.keyboardShortcut(.cancelAction)}
-        }.padding(24).frame(width:480,height:360).task{await s.readVersions()}
     }
 }
 struct RecipeSheet:View {

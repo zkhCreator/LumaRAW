@@ -36,6 +36,7 @@ struct InspectorView:View {
                 }
                 Button { s.showDevelopPresets=true } label: { Label("Develop Presets…",systemImage:"camera.filters") }.frame(maxWidth:.infinity)
                 DevelopHistoryPanel()
+                SnapshotsPanel()
                 Divider()
                 DisclosureGroup("Light",isExpanded:$light){VStack(spacing:12){
                     edit("Exposure","exposure",-5...5,0.05,"EV")

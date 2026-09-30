@@ -66,6 +66,7 @@ struct ContentView: View {
         .sheet(isPresented:$s.showExport){ExportSheet()}
         .sheet(item:$s.importReview){ImportReviewSheet(model:$0)}
         .sheet(isPresented:$s.showVersions){VersionsSheet()}
+        .modifier(SnapshotNamePresentation())
         .sheet(isPresented:$s.showRecipe){RecipeSheet()}
         .sheet(isPresented:$s.showSync){SyncSheet()}
         .sheet(isPresented:$s.showCalibration){CalibrationSheet()}

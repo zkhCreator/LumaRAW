@@ -294,18 +294,19 @@ class Catalog:
     def bursts(self):
         return [dict(r) for r in self.db.execute('SELECT burst,camera,min(taken) AS taken,count(*) AS count FROM photos WHERE burst>0 AND is_virtual=0 GROUP BY burst HAVING count(*)>1 ORDER BY taken DESC LIMIT 200')]
 
-    def save_version(self,photo_id,name):
-        if not name.strip(): raise ValueError('Version name must not be empty')
+    def save_version(self,photo_id,name,expected_revision=None,step_id=None):
+        from .snapshots import Snapshots
         with self.db:
-            self.db.execute('INSERT INTO versions(photo_id,name,recipe,created,source_id) VALUES(?,?,?,?,?)',(photo_id,name[:120],self.photo(photo_id)['recipe'],time.time(),self.photo(photo_id)['source_id']))
+            self.db.execute('BEGIN IMMEDIATE')
+            return Snapshots(self.db).create(photo_id,name,expected_revision,step_id)
 
     def versions(self,photo_id):
         return [dict(r) for r in self.db.execute('SELECT * FROM versions WHERE source_id=? ORDER BY id DESC LIMIT 100',(self.photo(photo_id)['source_id'],))]
 
-    def restore_version(self,photo_id,version_id):
-        row=self.db.execute('SELECT recipe FROM versions WHERE id=? AND source_id=?',(version_id,self.photo(photo_id)['source_id'])).fetchone()
-        if not row: raise ValueError('Edit version does not exist')
-        recipe=Recipe.parse(json.loads(row[0]));self.edit(photo_id,recipe,'Restore Edit Version');return recipe
+    def restore_version(self,photo_id,version_id,expected_version_revision=None):
+        from .snapshots import Snapshots
+        recipe,name=Snapshots(self.db).value(photo_id,version_id,expected_version_revision)
+        self.edit(photo_id,recipe,'Snapshot: '+name[:110]);return recipe
 
     def sync(self,source_id,target_ids,groups):
         source=self.recipe(source_id).dict();keys=[key for group in groups for key in SYNC_GROUPS[group]];count=0

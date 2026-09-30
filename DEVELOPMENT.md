@@ -20,6 +20,16 @@ when a clear function is more maintainable. Avoid unrelated formatting churn.
 
 ## Contracts and persistence
 
+- Snapshot names and recipes are shared by original/virtual-copy families. Keep
+  stable non-reused IDs, independent snapshot revisions and a family list token.
+  Read summaries through indexed alphabetical pages; never load all recipes for
+  listing or polling. Reject stale cursors and stale captured forms. Validate
+  photo and snapshot revisions for replacing/restoring settings, and snapshot
+  revisions for rename/delete. Capture retained history without selecting it.
+  Preserve copied Before settings, live recipes/history, queued exports and
+  legacy migration payloads. Snapshot update/delete have no Develop undo; expose
+  deliberate native confirmations and accurate command effect annotations.
+
 - Before snapshots are independent of the Develop timeline. Preserve imported
   presets and inherited virtual-copy settings, and never retarget Before when
   history is cleared or branched. Validate revisions for copy/swap/history

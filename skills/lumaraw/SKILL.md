@@ -26,7 +26,8 @@ These commands cover per-photo Develop history, not global application undo.
 ## Before / After
 
 `before_after` requires `photo_id`, `expected_revision` and an `action`:
-`after_to_before`, `before_to_after`, `swap`, or `history_to_before` with a
+`after_to_before`, `before_to_after`, `swap`, `snapshot_to_before` with captured
+`version_id` and `expected_version_revision`, or `history_to_before` with a
 `step_id` (zero selects the retained history baseline). Copying history does not
 move its cursor. Before is a separate persistent recipe, initially the imported
 or inherited virtual-copy settings. Branching and clearing history leave it
@@ -39,6 +40,32 @@ requested. Its Before preview uses current After geometry to align both sides,
 while copy/swap always transfers the complete stored recipe. Set `include_before:
 false` when only After is needed. The service captures the stored Before; clients
 cannot inject another baseline into the preview contract.
+
+## Named snapshots
+
+`list_versions(photo_id)` returns sixty alphabetical summaries without recipes.
+Pass `next_after` as `after_id` with `expected_snapshots_revision` for the next
+page. A list mutation invalidates that cursor; restart explicitly from the first
+page. For polling, `known_revision` returns a compact `unchanged` receipt without
+rows. Lists are shared by every variant of the same source.
+
+Use `save_version(photo_id,name,expected_revision)` to capture current settings.
+Optional `step_id` saves retained history without selecting it. Keep the returned
+snapshot `id` and `revision`; `rename_version` needs those as `version_id` and
+`expected_version_revision`, plus `photo_id` and `name`. `update_version` replaces
+the stored recipe with current settings and also requires `expected_revision`.
+`delete_version` removes the shared snapshot at its captured revision. Update and
+delete require explicit intent and have no Develop undo. Current edits, copied
+Before values, history and submitted jobs stay unchanged. Never replace a name
+collision implicitly; new names are NFC/casefold unique within the family.
+
+`restore_version` takes both photo `expected_revision` and snapshot
+`expected_version_revision` and creates an ordinary Develop history edit on the
+selected variant. `before_after(action: snapshot_to_before)` copies the complete
+recipe to independent Before and preserves history/redo. Never rebase an open
+form's tokens or replay a stale/uncertain mutation. Older callers may omit the
+new snapshot token on restore and the photo token on current-state creation;
+new clients should always capture and send both relevant tokens.
 
 Use the LumaRAW MCP tools when connected. The native app's **Agent Connection** page shows the exact command and catalog path. App, CLI and MCP use the same service. No login, API key or network service is needed.
 

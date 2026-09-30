@@ -11,6 +11,37 @@ LUMARAW_TEST_NEF=/absolute/nikon.NEF uv run --frozen pytest -q
 
 The two `test_core.py` real-RAW tests skip if that environment variable is absent. `test_service.py` verifies revision conflicts, invalid edit atomicity, all-target sync, immutable export snapshots, deduplication keys, bounded queue pages and specific receipts, memory stopping, cancellation while a worker slot is occupied, superseded UI previews, cold job recovery and newline MCP framing through real subprocesses.
 
+## Shared named snapshots
+
+`test_snapshots.py` covers current/history capture, original/copy sharing,
+rename/update/delete/restore and copy-to-Before, photo/snapshot conflicts, name
+normalization, no-op counters, preserved legacy commands, alphabetical keysets,
+compact conditional refresh, recipe-free SQL reads, rollback, non-reused IDs and
+genuine schema-23 migration failure/retry with legacy duplicates. Snapshot-only
+LUT backup restores payloads, revisions, name keys and identity counters.
+
+`NativeSnapshotsRegression` checks captured forms/actions, explicit conflict
+refresh, shared copy state, frozen Before, history capture without selection,
+bounded alphabetical pages, conditional polling, pending-edit barriers and
+original bytes through real Store/IPC calls. It does not establish native event
+routing, rendered sheets/context menus, VoiceOver or macOS 14 runtime behavior.
+
+```sh
+.venv/bin/python -m pytest -q tests/test_snapshots.py
+.venv/bin/python tests/run_native.py --work work/new-snapshots-native \
+  --engine /absolute/LumaRAW.app/Contents/Resources/Engine/LumaRAWEngine \
+  --suite NativeSnapshotsRegression --suite NativeVirtualCopyRegression \
+  --suite NativeHistoryRegression --suite NativeBeforeAfterRegression
+.venv/bin/python tests/snapshot_probe.py --work work/new-snapshots-1k --rows 1000
+.venv/bin/python tests/snapshot_probe.py --work work/new-snapshots-100k --rows 100000
+```
+
+Run catalog probes sequentially after other checks stop. They measure warm
+in-process service reads/writes with connection/validation/commit costs included.
+Synthetic setup, broker IPC, image work and native interaction are excluded.
+Record page/unchanged bytes and peak process RSS; no preview or RAW throughput
+claim follows from catalog timings.
+
 ## Persistent Before / After
 
 `test_before_after.py` checks full-recipe copy/swap, history assignment without

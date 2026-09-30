@@ -31,7 +31,7 @@ extension Store {
     var historyReady:Bool {
         guard let p=photo,let page=historyPage else {return false}
         return p.id==selected && page.photoID==p.id && page.revision==p.revision &&
-            !loading && !browsing && !hasPendingEdits && !orientationBusy && !developPresetBusy && !historyBusy
+            !loading && !browsing && !hasPendingEdits && !orientationBusy && !developPresetBusy && !historyBusy && !snapshotBusy
     }
     var canUndoDevelop:Bool { historyReady && historyPage?.canUndo == true }
     var canRedoDevelop:Bool { historyReady && historyPage?.canRedo == true }
@@ -70,7 +70,7 @@ extension Store {
     func redo() { moveDevelopHistory("redo_photo") }
     func moveDevelopHistory(_ method:String,step:Int?=nil,name:String?=nil,action:String?=nil,captured:DevelopHistoryPage?=nil) {
         guard let p=photo,p.id==selected,!loading,!browsing,!hasPendingEdits,
-              !orientationBusy,!developPresetBusy,!historyBusy else {return}
+              !orientationBusy,!developPresetBusy,!historyBusy,!snapshotBusy else {return}
         if let captured {
             guard captured.photoID==p.id,captured.revision==p.revision else {
                 error="History changed; refresh before applying this action";return
@@ -125,6 +125,8 @@ struct DevelopHistoryPanel:View {
                                 }.buttonStyle(.plain).disabled(!s.historyReady)
                                     .accessibilityLabel("\(step.label)\(step.current ? ", current state":"")")
                                     .contextMenu {
+                                        Button("Create Snapshot from This Step…"){s.prepareSnapshot(step:step.id,history:page)}
+                                            .disabled(!s.snapshotReady || !s.historyReady)
                                         Button("Copy History Step Settings to Before"){s.beforeAfter("history_to_before",step:step.id,captured:page)}
                                             .disabled(!s.historyReady)
                                         Button("Rename…"){captured=page;renameStep=step;name=step.label}

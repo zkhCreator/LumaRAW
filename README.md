@@ -18,7 +18,7 @@ LumaRAW references your originals without changing them. The SwiftUI app and you
 | Library | Folder tree/search/favorites/labels, ratings, flags, catalog metadata/keywords, regular/live smart collections, nested sets, Quick/target collections, SQL filters/sorting, manual/capture-time stacks, duplicate/missing indexing, virtual copies/shared snapshots, selective sync, and backup/restore |
 | Culling | Grid/Loupe/Compare/Survey, anchored page selections, active-photo review actions, linked or independent full-resolution comparison viewports |
 | Export | JPEG and 16-bit TIFF with embedded sRGB, Display P3, Adobe RGB, or ProPhoto RGB ICC profiles; frozen catalog XMP/keyword policies, persistent queue, pause/cancel/retry, and collision-safe filenames |
-| Agents | 117 MCP tools, equivalent JSON CLI commands, and a bundled skill; app and agent edits share conflict detection |
+| Agents | 120 MCP tools, equivalent JSON CLI commands, and a bundled skill; app and agent edits share conflict detection |
 
 ## Build and run
 
@@ -107,6 +107,20 @@ exports keep their original recipe snapshot even if you continue editing.
 Upgrading preserves all remaining legacy steps, but cannot recover steps already
 discarded by older releases. Develop undo is separate from rotation/flip undo;
 global application undo and history hover previews remain unimplemented.
+
+Open **Snapshots** in the inspector, or press **⌘N** in Develop, to name the
+current settings. Right-click a History step and choose **Create Snapshot from
+This Step** to save an earlier state without changing the current edit. Snapshots
+are listed alphabetically in pages of sixty and shared by the original and all
+its virtual copies. Click a name to restore it; the row menu offers Rename,
+Update with Current Settings, Copy Snapshot Settings to Before and Delete.
+Update and Delete require confirmation and cannot be undone. They preserve the
+current edits, copied Before settings and submitted export jobs. Restoring a
+snapshot creates an ordinary Develop history step. Duplicate names are rejected;
+use Update explicitly to replace stored settings. If a photo or snapshot changes
+while a form is open, close the form and refresh before trying again. Snapshot
+hover previews, snapshot-based Library filters and Adobe sidecar exchange remain
+unimplemented.
 
 **Before / After** offers After Only, Before Only, whole-image Left/Right and
 Top/Bottom pairs, and Left/Right or Top/Bottom splits. Before

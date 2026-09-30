@@ -22,6 +22,7 @@ Official references checked September 2026:
 - [Smart collection criteria](https://helpx.adobe.com/lightroom-classic/desktop/organize-photos-in-lightroom-classic/smart-collections-criteria-in-lightroom-classic.html)
 - [Develop tools](https://helpx.adobe.com/lightroom-classic/desktop/process-and-develop-photos/develop-module-tools.html)
 - [History state selection, naming, clearing and snapshots](https://helpx.adobe.com/uk/lightroom-classic/desktop/process-and-develop-photos/develop-module-options.html)
+- [Snapshot creation, update, sharing and Before assignment, Adobe's Julieanne Kost](https://jkost.com/blog/2024/08/working-with-snapshots-in-lightroom-classic-and-photoshop.html)
 - [Tone Curve controls and channels](https://helpx.adobe.com/lightroom-classic/desktop/process-and-develop-photos/image-tone-color.html)
 - [Color Mixer](https://helpx.adobe.com/lightroom-classic/desktop/process-and-develop-photos/color-mixer.html) and [Black & White Mix](https://www.adobe.com/learn/lightroom-classic/web/convert-photo-black-white)
 - [Loupe, Compare and Survey](https://helpx.adobe.com/lightroom-classic/desktop/viewing-photos/browse-compare-photos.html)
@@ -63,7 +64,7 @@ gaps. Nothing below is full Lightroom parity merely because historical tests pas
 | Detail and optics | Partial: noise/sharpen, manual lens | Complete manual detail controls, automatic lens profiles, bounded full-resolution acceptance |
 | Geometry | Partial: crop/straighten/perspective, independent rotation/flips with attached masks and displayed crop ratios | Interactive retained handles, guided transforms, full crop state and rendered/reference parity |
 | Local editing | Partial: radial/gradient/brush/luma | Mask list/edit/reorder/intersection, range masks, clone/heal, red-eye (non-AI) |
-| History and presets | Partial: durable paged Develop history with undo/redo, state selection/rename/clear, persistent Before assignment/copy/swap, separate 50-batch orientation undo, shared named snapshots, partial Develop presets/groups/favorites/shared or local storage, batch/Painter and reviewed-import application | Unified application Undo/Redo, history hover, preset hover preview/Amount/ISO adaptation/Adobe exchange and rendered reference acceptance |
+| History and presets | Partial: durable paged Develop history with undo/redo, state selection/rename/clear, persistent Before assignment/copy/swap, separate 50-batch orientation undo, alphabetical shared snapshots with current/history capture, rename/update/delete and Before copy, partial Develop presets/groups/favorites/shared or local storage, batch/Painter and reviewed-import application | Unified application Undo/Redo, history/snapshot hover, snapshot filter criteria, preset hover preview/Amount/ISO adaptation/Adobe exchange and rendered reference acceptance |
 | Preview/performance | Partial: Metal, proxies, 1:1 viewport, developed thumbnail fast path, on-demand Before with independent cache, four paired layouts and shared detail zoom/pan | Real-RAW catalog/slider latency, offline previews, cache controls and desktop/reference acceptance |
 | Export | Partial: JPEG/16-bit TIFF, ICC, durable jobs with frozen catalog/rights IPTC XMP and keyword hierarchy options | Presets, complete EXIF/IPTC Extension/GPS metadata policies, watermark, additional formats, publish workflows |
 | External editing and video | Missing | External-editor setup and derivative round trips; supported video import/playback, frame capture, trimming and export |
@@ -77,7 +78,7 @@ gaps. Nothing below is full Lightroom parity merely because historical tests pas
 
 ## Active increment
 
-Four Before/After layouts and shared detail viewports, followed by further import, Library and Develop
+Shared snapshot management and bounded listing, followed by further import, Library and Develop
 workflows. The full feature inventory above remains the acceptance scope.
 Rendered Mac/reference acceptance,
 Copy/Move/DNG, complete IPTC, Adobe exchange, unified Undo/Redo and the full inventory
@@ -2597,3 +2598,105 @@ Actual mouse/key dispatch, rendered desktop layouts, VoiceOver, multi-monitor
 scale transitions and the macOS 14 runtime remain unverified. Native geometry/
 state probes are not desktop acceptance. Reference matching, history hover,
 global undo of Before assignment and the full product inventory remain open.
+
+## Shared snapshot management (September 29, 2026)
+
+The self-contained arm64 Mac app builds for the macOS 14 deployment target and
+passes local ad-hoc signature validation on macOS 26.6.2. Engine generation
+**31**, catalog schema **24**, **120 tools**; packaged MCP schemas and the bundled
+guide match current source. The engine manifest digest is
+`4d37ea21d0248a98906eb66bbec7c141d3f7e7bb06fa8d3c121603ac543e1369`.
+Packaged engine SHA-256 is
+`84660806a730f14078bcc3a069f9bf727ec875bf0ce0ea2503e56c68106b299e`;
+native executable SHA-256 is
+`46dc8a757996e0840b68a72183a1c5033b2382a49d30955602f7293cb8d05c15`.
+
+Snapshots now support named current settings and retained history-step capture,
+alphabetical pages, rename, Update with Current Settings, explicit deletion,
+restore, and Copy Snapshot Settings to Before. The Mac inspector has a Snapshots
+panel, a separate browser, captured name forms, context/row menus and a Develop
+Command-N entry. Update/delete confirmations explain the shared scope and lack
+of Develop undo. A history snapshot does not select that state or truncate redo.
+Snapshots stay shared after master promotion or removal of their creating copy.
+
+Schema 24 preserves old IDs, recipe payloads, duplicate names and creation times,
+adds non-reused identity allocation, per-snapshot revisions and source-family
+list revisions, and indexes normalized alphabetical keys. Sixty-row keyset pages
+avoid recipe/metadata reads and full-list materialization. Compact unchanged
+polling retains the native page; a list mutation invalidates old cursors.
+New names use NFC/casefold collision checks; duplicate creation never overwrites
+stored settings. Existing duplicate legacy names remain distinguishable by ID.
+
+Create/update/restore/Before assignment check the captured photo revision as
+applicable; snapshot updates, restores, renames, deletion and Before assignment
+check the snapshot revision. Native forms retain captured tokens when polling or
+selection changes. Mutations and identity/list counters commit together; stale
+or uncertain replies are never automatically retried. Current recipes, private
+history, copied Before and frozen exports stay independent of snapshot CRUD.
+Restoration creates an ordinary Develop step; Before receives a separate complete
+recipe. Backups preserve revisions/counters and rebind snapshot-only LUT assets.
+
+The existing command names remain available. Older save callers may omit the
+photo revision, and older restore callers may omit the new snapshot revision;
+the Mac client supplies the relevant captured values. List replies keep the
+`versions` field but now return alphabetical summary pages of sixty with cursors,
+rather than the legacy newest-first list capped at one hundred.
+
+Snapshot hover/Navigator previews, snapshot-status Library/smart filters, Adobe
+sidecar exchange, global snapshot undo and rendered reference acceptance remain
+open. No Adobe pixel-equivalence claim follows from saved recipe restoration.
+
+### Snapshot regression and catalog measurements
+
+The full required-Metal Python run passes **663 tests in 57.02 s, no skips**,
+including the fixed public Nikon D3S NEF fixture used by preceding increments.
+Fourteen snapshot cases cover shared/current/history behavior, preserved frozen
+values, conflicts, legacy commands, recipe-free pages, name rules, transactional
+failure injection, identity persistence and schema-23 upgrade rollback/retry.
+A snapshot-only LUT backup also retains IDs/revisions/counters and restored asset
+bytes. Initial targeted failures used an incorrect virtual-copy response key;
+the first full run exposed a v8 migration fixture calling the new snapshot writer.
+The fixtures now use the existing `photos` response and the actual old schema;
+no migration-preservation assertion was removed.
+
+Sequential warm catalog probes on Apple M3 Max / 128 GiB / macOS 26.6.2 use one
+generated 64×48 original and 1,000 or 100,000 seeded snapshot rows. Thirty samples
+per operation include in-process service validation, SQLite opens and commits;
+setup, IPC, image processing, cold OS caches and native interaction are excluded.
+
+| Operation | 1,000 rows median / p95 | 100,000 rows median / p95 |
+| --- | ---: | ---: |
+| First 60 summaries | 1.621 / 1.938 ms | 1.562 / 3.704 ms |
+| Deep keyset page | 1.623 / 1.685 ms | 1.625 / 1.871 ms |
+| Conditional unchanged read | 1.473 / 1.560 ms | 1.483 / 1.742 ms |
+| Rename | 1.862 / 1.981 ms | 1.943 / 2.821 ms |
+| Update settings | 1.913 / 2.004 ms | 1.917 / 2.102 ms |
+| Create + delete pair | 3.709 / 4.035 ms | 3.787 / 5.205 ms |
+
+Summary pages are 6,405 / 6,407 bytes and unchanged receipts 99 / 101 bytes.
+Peak process RSS is 37.88 / 39.06 MiB; no image worker starts and original hashes
+remain unchanged. Reproduce with `tests/snapshot_probe.py`. These measurements
+establish bounded catalog behavior, not RAW or desktop responsiveness.
+
+The final packaged engine passes **161 assertions across seven native suites**:
+Snapshots (33), Virtual Copies (19), History (23), Before/After (19), Comparison
+Layouts (42), State (15) and Connection (10). New coverage includes captured
+forms, snapshot/photo conflicts, explicit refresh without rebasing, conflict
+messages surviving background polling, shared-copy deletion, frozen Before,
+history capture, bounded alphabetical paging and pending-edit barriers. The
+initial source probe read before asynchronous virtual-copy selection finished;
+its fixture now awaits the existing selection lifecycle. Source checks then
+passed 32 assertions, with the polling-error assertion added for the final
+33-assertion packaged run.
+
+Swift compilation and native logs have no warnings/errors. Packaging retains the
+existing optional SciPy `_cdflib` hidden-import warning; exercised processing
+checks passed. Current source/index and extracted strict archive checks cover
+**353 public files with zero findings**. A remote refresh before this increment
+found no unmerged branches; local main and remote main remain ancestors of the
+development branch.
+
+Actual desktop sheets/menus/Command-N routing, mouse interaction, VoiceOver and
+macOS 14 runtime are **not verified**. Native Store/IPC tests and compilation do
+not replace those acceptance checks. Private catalogs, photographs, outputs,
+builds and detailed receipts remain excluded from source publication.

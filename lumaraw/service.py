@@ -40,6 +40,7 @@ from .keyword_details import KeywordDetails
 from .previous_import import state as previous_import_state
 from .develop_history import DevelopHistory, adjustment_label
 from .before_after import BeforeAfter
+from .snapshots import Snapshots
 
 class ConflictError(ValueError): pass
 
@@ -306,7 +307,7 @@ class Service:
             if method=='before_after':
                 row=self.check_revision(c,p['photo_id'],p['expected_revision'])
                 with c.db:
-                    result=BeforeAfter(c.db).apply(row['id'],p['action'],p.get('step_id'))
+                    result=BeforeAfter(c.db).apply(row['id'],p['action'],p.get('step_id'),p.get('version_id'),p.get('expected_version_revision'))
                 return {**unpack(c.photo(row['id'])),**result,'before_label':BeforeAfter(c.db).read(row['id'])[1]}
             if method in ('redo_photo','select_history','rename_history','clear_history'):
                 row=self.check_revision(c,p['photo_id'],p['expected_revision'])
@@ -322,7 +323,7 @@ class Service:
                 if method=='edit_photo':
                     values=json.loads(row['recipe']);values.update(p['patch']);c.edit(row['id'],Recipe.parse(values),adjustment_label(p['patch']))
                 elif method=='undo_photo':c.undo(row['id'])
-                elif method=='restore_version':c.restore_version(row['id'],p['version_id'])
+                elif method=='restore_version':c.restore_version(row['id'],p['version_id'],p.get('expected_version_revision'))
                 else:
                     from .library import load_recipe
                     c.edit(row['id'],load_recipe(p['path'],self.root),'Import Recipe Bundle')
@@ -362,9 +363,14 @@ class Service:
                 if not row:raise ValueError('Job does not exist')
                 return unpack(dict(row))
             if method=='list_jobs':return {'jobs':[{k:v for k,v in unpack(j).items() if k!='recipe'} for j in c.jobs(60)],'counts':c.job_counts(),'paused':self.paused,'active':self.active}
-            if method=='save_version':self.require(c,p['photo_id']);c.save_version(p['photo_id'],p['name']);return {'saved':True}
+            if method=='save_version':
+                return {'saved':True,**c.save_version(p['photo_id'],p['name'],p.get('expected_revision'),p.get('step_id'))}
             if method=='list_versions':
-                row=self.require(c,p['photo_id']);return {'versions':[dict(r) for r in c.db.execute('SELECT id,photo_id,name,created FROM versions WHERE source_id=? ORDER BY id DESC LIMIT 100',(row['source_id'],))]}
+                return Snapshots(c.db).page(**p)
+            if method in ('rename_version','update_version','delete_version'):
+                with c.db:
+                    c.db.execute('BEGIN IMMEDIATE')
+                    return getattr(Snapshots(c.db),method.removesuffix('_version'))(**p)
             if method=='sync_photos':
                 source=Recipe.parse(json.loads(self.require(c,p['source_id'])['recipe'])).dict();changes=[]
                 for target in p['targets']:

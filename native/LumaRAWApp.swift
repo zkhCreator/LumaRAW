@@ -18,6 +18,8 @@ import AppKit
             CommandGroup(replacing:.newItem) {
                 Button("Import Photos…"){store.importPanel()}.keyboardShortcut("i")
                 Button("Review Pending Import…") { Task { await store.reviewImport() } }
+                Button("New Snapshot…"){store.prepareSnapshot()}.keyboardShortcut("n")
+                    .disabled(!store.develop || !store.snapshotReady || store.snapshotDraft != nil)
                 Button("Export Selected Photos…"){store.showExport=true}.keyboardShortcut("e",modifiers:[.command,.shift]).disabled(store.selected==nil)
             }
             CommandGroup(replacing:.undoRedo) {

@@ -58,6 +58,27 @@ the manifest; binaries remain subject to release signing/notarization controls.
 
 ## Consistency and recovery
 
+Named snapshots (schema 24) belong to the shared source family. Stable monotonic
+IDs survive deletion and restart. Each snapshot has a revision, creation/update
+time and a normalized alphabetical key; the source has a separate list revision.
+Indexed keyset pages contain at most sixty summaries and never read recipes.
+Conditional polling returns only identity/revision when unchanged. Any family
+mutation invalidates cursors; clients start again instead of skipping renamed
+rows. Migration preserves legacy IDs, payloads, duplicate names and timestamps.
+New names use NFC/casefold collision checks and explicit replacement commands.
+
+Create captures current settings or a retained history step without moving the
+history cursor. Update validates both photo and snapshot revisions; rename/delete
+validate the snapshot revision. Restore and copy-to-Before validate both captured
+states. The older save/restore contracts remain compatible when their optional
+new revision fields are omitted; the native shell always supplies them. Snapshot
+CRUD preserves photo recipes, history, Before and queued exports. Restoring uses
+the ordinary Develop writer, while copy-to-Before stores an independent recipe.
+All snapshot mutations and family/identity counters share one write transaction.
+Backup restoration retains counters/revisions and rebinds snapshot-only assets.
+Native forms retain their captured photo/snapshot tokens across polling and
+selection changes; errors never trigger an automatic mutation replay.
+
 Before/After comparison owns a separate `photo_before` recipe per photo (schema
 23), initialized transactionally by import/copy triggers and removed with its
 photo. Migration uses the earliest retained history baseline; it cannot recover

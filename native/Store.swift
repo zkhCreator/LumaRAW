@@ -188,7 +188,14 @@ import UniformTypeIdentifiers
     @Published var processingSummary="No photos processed yet"
     @Published var effectiveBudget=4096
     @Published var availableMemory=0.0
-    @Published var versions: [[String: Any]] = []
+    @Published var snapshotPage:SnapshotPage?
+    @Published var snapshotDraft:SnapshotDraft?
+    @Published var snapshotExpanded=false
+    @Published var snapshotLoading=false
+    @Published var snapshotBusy=false
+    @Published var snapshotError:String?
+    @Published var snapshotAfter:Int?
+    var snapshotRequest=0
     @Published var historyPage:DevelopHistoryPage?
     @Published var historyBefore:Int?
     @Published var historyError:String?
@@ -236,6 +243,7 @@ import UniformTypeIdentifiers
                     guard let self else { return }
                     await self.refreshJobs()
                     await self.refreshVisibleSummaries()
+                    self.refreshSnapshotsIfVisible()
                     if let current=self.photo, !self.editing, self.pendingPatch.isEmpty {
                         if let row=try? await Backend.call("get_photo",["photo_id":current.id]),let updated=Photo(row) {
                             guard !self.editing,self.pendingPatch.isEmpty,self.selected==current.id,self.photo?.revision==current.revision else{continue}
@@ -303,6 +311,7 @@ import UniformTypeIdentifiers
         } catch {self.error=error.localizedDescription}
     }
     func clearPhoto() {
+        snapshotRequest+=1;snapshotPage=nil;snapshotAfter=nil;snapshotLoading=false;snapshotError=nil
         beforeLabel="Before";beforePreviewContext=nil;comparisonFrame=nil
         historyRequest+=1;historyPage=nil;historyBefore=nil;historyError=nil;historyLoading=false
         cancelCurveTarget(restore:false);curveTargetFrame=nil
@@ -377,7 +386,7 @@ import UniformTypeIdentifiers
             if mixerTargetGesture != nil {cancelMixerTarget(restore:false)} else {mixerTargetPreviews.cancel()}
             mixerTargetFrame=nil
         }
-        if !isDraft { updateThumbnails();refreshHistoryIfNeeded() }
+        if !isDraft { updateThumbnails();refreshHistoryIfNeeded();refreshSnapshotsIfVisible() }
         if isMultiReview { updateReviewRequests();return }
         guard let p=photo,p.id==selected,!loading else{return}
         if let capture=curveDraft {
@@ -433,7 +442,7 @@ import UniformTypeIdentifiers
         }
     }
     func set(_ key:String,_ value:Any) {
-        guard !loading,!browsing,!orientationBusy,!developPresetBusy,!historyBusy,let p=photo,p.id==selected else{return}
+        guard !loading,!browsing,!orientationBusy,!developPresetBusy,!historyBusy,!snapshotBusy,let p=photo,p.id==selected else{return}
         saveFailed=false;recipe[key]=value;pendingPatch[key]=value
         if !editing {scheduleCommit()}
     }
@@ -476,7 +485,7 @@ import UniformTypeIdentifiers
     func undo() {
         moveDevelopHistory("undo_photo")
     }
-    func recipeMutation(_ method:String,_ params:[String:Any],photoID:Int) async {
+    @discardableResult func recipeMutation(_ method:String,_ params:[String:Any],photoID:Int) async ->Bool {
         do {
             let row=try await Backend.call(method,params)
             if let updated=Photo(row),selected==photoID {
@@ -485,9 +494,11 @@ import UniformTypeIdentifiers
             }
             editing=false
             if pendingPatch.isEmpty{render()}else{await commit()}
+            return true
         }catch{
             pendingPatch=[:];editing=false;saveFailed=true;self.error=error.localizedDescription
             if selected==photoID{await load(photoID)}
+            return false
         }
     }
     func selectAllVisible() {
@@ -568,13 +579,6 @@ import UniformTypeIdentifiers
         let ids=Array(selection).sorted()
         guard !ids.isEmpty else{error="Select photos to export";return}
         do{_=try await Backend.call("enqueue_exports",["photo_ids":ids,"destination":destination,"format":format,"options":options,"request_key":UUID().uuidString]);showExport=false;workspace="exports";await refreshJobs()}catch{self.error=error.localizedDescription}
-    }
-    func readVersions() async {guard let p=photo else{return};if let r=try? await Backend.call("list_versions",["photo_id":p.id]){versions=r["versions"] as? [[String:Any]] ?? []}}
-    func saveVersion(_ name:String) async {guard await flushEdits(),let p=photo else{return};do{_=try await Backend.call("save_version",["photo_id":p.id,"name":name]);await readVersions()}catch{self.error=error.localizedDescription}}
-    func restoreVersion(_ id:Int) async {
-        guard await flushEdits(),let p=photo,p.id==selected,!loading else{return}
-        editing=true
-        await recipeMutation("restore_version",["photo_id":p.id,"version_id":id,"expected_revision":p.revision],photoID:p.id)
     }
     func asset(_ kind:String) {
         let panel=NSOpenPanel();panel.canChooseDirectories=false;panel.allowsMultipleSelection=false
