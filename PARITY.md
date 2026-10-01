@@ -56,7 +56,7 @@ gaps. Nothing below is full Lightroom parity merely because historical tests pas
 
 | Area | Current implementation | Remaining acceptance / work |
 | --- | --- | --- |
-| Import and catalogs | Partial: durable Add review with checked selection, Grid/Loupe source previews, subfolder choice, suspected duplicates, bounded sorting/filtering, XMP descriptions, captured import-time Develop/metadata presets and keyword additions, cancellation/restart, durable Previous Import source with automatic navigation preference, referenced originals and backup/restore | Copy/Move/Copy as DNG, destinations/rename/backup, saved import configurations, preview policies, cards/tethering, progressive Current Import, catalog switching/merge and desktop/reference acceptance |
+| Import and catalogs | Partial: durable Add/Copy review with checked selection, Grid/Loupe source previews, suspected duplicates, bounded sorting/filtering, captured import-time presets and keywords, Copy destination/subfolder and flat/source/date organization, byte-verified original/XMP transfers, explicit crash recovery and retained-copy cancellation, Previous Import navigation and catalog backup/restore | Move/Copy as DNG, destination-tree grouping and more date formats, rename/second-copy backup, saved import configurations, preview policies, cards/tethering, progressive Current Import, catalog switching/merge and desktop/reference acceptance |
 | Library navigation | Partial: bounded grid/filmstrip, folder tree/search/favorites/labels, durable missing-folder relocation and folder synchronization, direct/recursive sources, filters/sorting including live snapshot status, regular/smart/Quick collections and nested sets | Multi-source selection, complete sync Import Dialog/duplicate policy, folder move/rename, relocation overlap/collision handling, collection drag/drop/color labels, full smart criteria/import-export, source-selection memory, desktop acceptance |
 | Organization | Partial: duplicate/missing detection, hierarchical keywords/synonyms/export flags/Will Export preview, text/CSV vocabulary exchange and manual person tags, custom nine-slot keyword sets/recent entries/shared or catalog storage, multi-keyword shortcuts and keyword/rating/flag/label/target-collection/rotation/Develop-preset/metadata-preset Painter strokes, independent catalog rotation/flips, title/caption/copyright plus thirty IPTC fields, selective metadata presets, labels, batch metadata, virtual copies, manual/split/capture-time scoped stacks | Keyword policy/file and preset reference acceptance, built-in sets/suggestions/undo, Painter desktop acceptance, IPTC Extension and complete metadata parity, stack interaction acceptance, rename and sidecars |
 | Culling | Partial: Loupe/Compare/Survey, linked detail, anchored page selection, Develop Reference/Active pairs with independent Fit/1:1 viewports, session lock and RGB/LAB readouts | Desktop and numerical reference acceptance, HDR readouts, scrubby/box zoom, cross-page selection, auto advance, persistent workspace state |
@@ -86,7 +86,7 @@ work; the first-map optimization is recorded below rather than treated as full
 interactive performance acceptance.
 The full feature inventory above remains the acceptance scope.
 Rendered Mac/reference acceptance,
-Copy/Move/DNG, complete IPTC, Adobe exchange, unified Undo/Redo and the full inventory
+Copy refinements, Move/DNG, complete IPTC, Adobe exchange, unified Undo/Redo and the full inventory
 stay in scope. This does not complete product parity.
 
 ## Evidence log
@@ -3370,3 +3370,86 @@ The known optional PyInstaller `scipy.special._cdflib` warning remains. Desktop
 automation was not retried after its earlier denial. Actual desktop input, macOS
 14 runtime, VoiceOver and Adobe rendering equivalence remain **not verified**.
 Full non-AI parity remains incomplete.
+
+### Reviewed Copy destinations and durable transfer recovery
+
+Generation 38/schema 26 extends the reviewed import workflow with Copy. The native
+dialog captures a destination, optional subfolder and flat/original-folder/date
+organization, displays computed target paths, and keeps preset/metadata/keyword
+application and Previous Import navigation. Original-folder organization includes
+the selected root; date folders use the original EXIF civil date in
+`YYYY/YYYY-MM-DD`, with an explicit Unknown Date fallback. Checked originals and
+recognized XMP sidecars copy byte-for-byte; shared sidecars are transferred once
+per target. This is a functional increment, not completed Lightroom import parity.
+
+The new filesystem adapter streams 1 MiB blocks outside catalog locks. Entire
+target scope is preflighted; exclusive publication still rejects a later collision.
+The journal distinguishes planned, writing, sealed and published copies, retaining
+ownership and SHA-256 evidence. Explicit recovery validates owned files and never
+adopts an unrelated equal-byte target. Source/destination replacement, changed
+content, uncertain scratch ownership and unsupported publication filesystems fail
+visibly. Cancellation removes only owned scratch links and keeps completed files.
+One final catalog transaction applies destination references, descriptions,
+captured presets, folder counts and Previous Import together. Restored catalogs
+cannot resume/clean another catalog's filesystem transfer.
+
+Validation includes **804 Python tests in 92.61 seconds**, no skips, with the
+existing real NEF and required Metal checks. A final directory-fsync ordering
+refinement passes all **71 affected import/capture tests in 8.41 seconds**. The
+initial full run found an obsolete schema-25 assertion in a schema-24 migration
+test; updating it to the current catalog version preserves its actual rollback
+and payload checks. An initial native navigation run correctly received a
+no-mutation busy refusal from folder synchronization while a preview was active.
+The harness now permits bounded retries only for that exact documented refusal,
+checking that no photos were imported; other/uncertain failures are not replayed.
+
+The final engine passes **86 native assertions** across Import (29), Import
+Processing (22), Previous Import (19) and Responsiveness (16). Offscreen Copy
+options/interruption renders exposed a wrapped view label; the layout now hides
+that redundant visible label while retaining its accessibility name. The final
+UI also disables checks while Copy is interrupted and exposes Resume Copy without
+the unrelated Resume Scan button. These are component/state/IPC checks, not
+desktop file-panel, input or VoiceOver acceptance.
+
+#### Packaged filesystem measurements
+
+Measured on Apple M3 Max, 128 GiB, macOS 26.6.2, after tests/builds stopped. Each of
+three rounds copies 24 disposable clones of the same Nikon D3S NEF: 4284x2844,
+10,656,312 bytes each, 255,751,488 bytes per batch (about 244 MiB). Each round has
+a fresh catalog/destination; source/OS caches are warm and no app preview exists.
+The timer includes IPC, collision preflight, streaming, SHA-256 verification,
+fsync and catalog application; source generation and desktop rendering are excluded.
+
+| Round | Apply | Throughput | Concurrent control median / p95 / max | Sampled broker peak |
+| --- | --- | --- | --- | --- |
+| 1 | 1847.290 ms | 132.03 MiB/s | 1.891 / 3.673 / 9.409 ms (113 calls) | 54.86 MiB |
+| 2 | 1690.053 ms | 144.32 MiB/s | 1.887 / 3.115 / 12.276 ms (104 calls) | 52.56 MiB |
+| 3 | 1651.254 ms | 147.71 MiB/s | 2.131 / 7.562 / 15.731 ms (97 calls) | 67.17 MiB |
+
+Metadata scan times are 18.208, 17.568 and 19.659 ms. All 72 copies match the
+input SHA-256, originals remain unchanged, and no scratch files remain. Worker
+peak is zero because no image worker/GPU work is needed; broker memory is sampled
+separately every 5 ms. This is local filesystem throughput and service latency,
+not a desktop frame-rate, cold-disk, card-reader or multi-camera claim.
+
+The engine identity is shared by the measured package and final native-only
+layout rebuild; the engine executable remains byte-identical:
+
+- Source digest: `e8b18d751cc6961d6043d71583f94dc9ed12b794a37c16ad17a33b8546050d07`
+- Engine SHA-256: `08eabab0b799e7d30925fc2cc3a577c911080e6d90b2acf21b9cdf07d85b30fe`
+- Final native executable SHA-256: `42ca7c6589b97f2328bdd1fbd2a5da392e8ba581e5047223dca6d40057fbc163`
+- RAW SHA-256: `5922721d13f11795557d97fdeb0a60b900086c402bc82a848ff280d15b99ffd4`
+
+All 122 full MCP schemas, initialization and the bundled guide match source through
+the packaged stdio protocol. The optional official Python MCP SDK is unavailable
+in this environment; this increment does not claim a new SDK-client run. Local
+deep/strict ad-hoc signature checks pass; the known optional PyInstaller
+`scipy.special._cdflib` warning remains.
+
+Move, DNG conversion, rename templates, second-copy backup, additional date formats,
+destination-tree grouping and preview policies remain open. Copy currently requires
+hard-link publication support and does not preserve Finder tags, resource forks,
+ACLs or all extended attributes. Power-loss hardware testing, removable/network
+volumes, macOS 14 runtime, actual desktop input/VoiceOver and Lightroom reference
+acceptance remain unverified. Desktop automation was not retried after its prior
+denial. The complete non-AI inventory remains the goal.

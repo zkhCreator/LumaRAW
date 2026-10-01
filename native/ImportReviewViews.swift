@@ -1,6 +1,6 @@
 // Purpose: native import source options, thumbnail checks and focused Loupe review.
 // Inputs: one bounded ImportReviewModel page. Outputs: explicit scan, selection,
-// duplicate policy, Add import and cancellation commands. No filesystem traversal,
+// duplicate policy, Add/Copy import and cancellation commands. No filesystem traversal,
 // original writes or AI choices. Closing retains unfinished plans for later review.
 import SwiftUI
 import AppKit
@@ -9,18 +9,42 @@ struct ImportReviewSheet: View {
     @ObservedObject var model: ImportReviewModel
     @Environment(\.dismiss) private var dismiss
     @State private var thumbnailSize=150.0
+    @State private var showCopies=false
     var body: some View {
+        content.task { await model.load(initial:true) }.onDisappear { model.invalidate() }
+            .interactiveDismissDisabled(model.busy)
+            .sheet(item:$model.processingEditor) { ImportProcessingSheet(model:$0) }
+            .sheet(isPresented:$showCopies) { if let plan=model.plan { ImportCopyReceipts(planID:plan.id) } }
+    }
+    var content: some View {
         VStack(alignment:.leading,spacing:14) {
             HStack {
                 VStack(alignment:.leading,spacing:4) {
                     Text("Import Photos").font(.title2)
-                    Text("Add photographs in their current location").foregroundStyle(.secondary)
+                    Text("Review photographs before adding or copying them").foregroundStyle(.secondary)
                 }
                 Spacer()
                 Button("Choose Sources…") { chooseSources() }.disabled(model.busy || model.loading || model.plan?.active == true)
             }
             if model.plan?.active != true {
                 VStack(alignment:.leading,spacing:8) {
+                    Picker("Import Method",selection:$model.mode) {
+                        Text("Add").tag("add");Text("Copy").tag("copy")
+                    }.pickerStyle(.segmented).frame(width:220)
+                    if model.mode == "copy" {
+                        HStack {
+                            Button("Choose Destination…") { chooseDestination() }
+                            Text(model.destination.isEmpty ? "Choose an existing folder":model.destination).font(.caption).lineLimit(1).help(model.destination)
+                        }
+                        HStack {
+                            Picker("Organize",selection:$model.organization) {
+                                Text("Into One Folder").tag("flat")
+                                Text("By Original Folders").tag("source")
+                                Text("By Date (YYYY/YYYY-MM-DD)").tag("date")
+                            }.frame(width:350)
+                            TextField("Into Subfolder (optional)",text:$model.subfolder).frame(maxWidth:260)
+                        }
+                    }
                     Text(model.sources.isEmpty ? "Choose files or folders to review.":"\(model.sources.count) sources selected")
                     ForEach(Array(model.sources.prefix(3).enumerated()),id:\.offset) { _,path in Text(path).font(.caption).lineLimit(1).help(path) }
                     Toggle("Include Subfolders",isOn:$model.includeSubfolders)
@@ -30,6 +54,14 @@ struct ImportReviewSheet: View {
                 }.disabled(model.busy || model.loading)
             }
             if let plan=model.plan {
+                if plan.isCopy {
+                    HStack {
+                        Text("Copy to \(plan.copy["destination"] as? String ?? "")").font(.caption).lineLimit(1)
+                        Spacer()
+                        Text("\(plan.copy["copied"] as? Int ?? 0) of \(plan.copy["transfer_count"] as? Int ?? 0) files copied").font(.caption)
+                        Button("Transfer Details…") { showCopies=true }
+                    }
+                }
                 HStack {
                     Text(plan.state.capitalized).fontWeight(.semibold)
                     Text("\(plan.number("scanned")) of \(plan.number("file_count")) scanned").foregroundStyle(.secondary)
@@ -61,6 +93,7 @@ struct ImportReviewSheet: View {
                         }.help("Reverse sort direction")
                         Spacer()
                         Picker("View",selection:$model.loupe) { Text("Grid").tag(false);Text("Loupe").tag(true) }
+                            .labelsHidden().accessibilityLabel("Preview view")
                             .pickerStyle(.segmented).frame(width:130).onChange(of:model.loupe) { _,_ in model.refreshDetail() }
                     }.disabled(model.busy || model.loading || !plan.ready)
                     if model.loupe { loupe } else { grid }
@@ -84,7 +117,9 @@ struct ImportReviewSheet: View {
                 }
             } else { Spacer() }
             if let error=model.error { Text(error).font(.caption).foregroundStyle(.red).textSelection(.enabled) }
-            Text("Files stay in place. Supported embedded and sidecar descriptions are read into the catalog; existing catalog photos are preserved.")
+            Text((model.plan?.isCopy ?? (model.mode == "copy")) ?
+                 "Copy preserves originals and copies associated XMP. Existing destinations are never overwritten. Cancelling keeps completed copies. Unknown capture dates use an Unknown Date folder.":
+                 "Files stay in place. Supported embedded and sidecar descriptions are read into the catalog; existing catalog photos are preserved.")
                 .font(.caption).foregroundStyle(.secondary)
             HStack {
                 Button("Done") { dismiss() }.keyboardShortcut(.cancelAction).disabled(model.busy)
@@ -92,15 +127,17 @@ struct ImportReviewSheet: View {
                     Button(model.cancelling ? "Cancelling…":"Cancel Import Review",role:.destructive) { Task { await model.cancel() } }.disabled(model.cancelling)
                 }
                 Spacer()
-                Button(model.plan?.active == true ? "Resume Scan":"Scan Photos") { Task { await model.scan() } }
-                    .disabled(!model.canScan || model.plan?.active != true && model.sources.isEmpty)
+                if model.plan?.interruptedCopy == true {
+                    Button("Resume Copy") { Task { await model.resumeCopy() } }.disabled(!model.canResumeCopy)
+                }
+                if model.plan?.interruptedCopy != true {
+                    Button(model.plan?.active == true ? "Resume Scan":"Scan Photos") { Task { await model.scan() } }
+                        .disabled(!model.canScan || model.plan?.active != true && model.sources.isEmpty)
+                }
                 Button("Import Checked") { Task { await model.apply() } }.buttonStyle(.borderedProminent)
                     .keyboardShortcut(.defaultAction).disabled(!model.canApply)
             }
         }.padding(22).frame(minWidth:900,idealWidth:1060,minHeight:650,idealHeight:760)
-            .task { await model.load(initial:true) }.onDisappear { model.invalidate() }
-            .interactiveDismissDisabled(model.busy)
-            .sheet(item:$model.processingEditor) { ImportProcessingSheet(model:$0) }
     }
     var grid: some View {
         ScrollView {
@@ -117,10 +154,11 @@ struct ImportReviewSheet: View {
                             .accessibilityLabel("Preview \(item.name)")
                         Toggle(isOn:Binding(get:{item.selected && item.eligible},set:{value in Task { await model.select(value,ids:[item.id]) }})) {
                             Text(item.name).lineLimit(1).font(.caption)
-                        }.disabled(!item.eligible || model.busy || model.loading)
+                        }.disabled(!item.eligible || model.busy || model.loading || model.plan?.ready != true)
                         Text(item.state == "existing" ? "Already imported":item.state == "duplicate" ? "Suspected duplicate":item.state.capitalized)
                             .font(.caption2).foregroundStyle(item.eligible ? Color.secondary:Color.orange)
                         if item.hasNotes { Text("Some metadata is unsupported").font(.caption2).foregroundStyle(.secondary) }
+                        if !item.destination.isEmpty { Text("To: \(item.destination)").font(.caption2).lineLimit(2).help(item.destination) }
                         if !item.error.isEmpty { Text(item.error).font(.caption2).foregroundStyle(.red).lineLimit(2) }
                         if let error=model.previewErrors[item.id] { Text(error).font(.caption2).foregroundStyle(.red).lineLimit(2) }
                     }.padding(8).background(RoundedRectangle(cornerRadius:7).fill(model.focused == item.id ? Color.accentColor.opacity(0.15):Color.clear))
@@ -140,7 +178,7 @@ struct ImportReviewSheet: View {
                 HStack {
                     Button("Previous Photo") { moveFocus(-1) }
                     Toggle(item.name,isOn:Binding(get:{item.selected && item.eligible},set:{value in Task { await model.select(value,ids:[item.id]) }}))
-                        .disabled(!item.eligible || model.busy)
+                        .disabled(!item.eligible || model.busy || model.loading || model.plan?.ready != true)
                     Button("Next Photo") { moveFocus(1) }
                 }
                 Text(item.path).font(.caption).textSelection(.enabled)
@@ -157,5 +195,10 @@ struct ImportReviewSheet: View {
         let panel=NSOpenPanel();panel.canChooseFiles=true;panel.canChooseDirectories=true;panel.allowsMultipleSelection=true
         panel.prompt="Review";panel.message="Choose photographs or folders to review before importing"
         if panel.runModal() == .OK { model.sources=panel.urls.map(\.path) }
+    }
+    func chooseDestination() {
+        let panel=NSOpenPanel();panel.canChooseFiles=false;panel.canChooseDirectories=true;panel.allowsMultipleSelection=false
+        panel.prompt="Choose Destination";panel.message="Copies will be written here when you import the checked photographs"
+        if panel.runModal() == .OK,let path=panel.url?.path { model.destination=path }
     }
 }

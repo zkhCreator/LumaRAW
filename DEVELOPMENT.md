@@ -98,8 +98,8 @@ when a clear function is more maintainable. Avoid unrelated formatting churn.
   metadata, folder counts and maintenance flags, including inside bulk SQL.
   A completed import receipt is immutable; an uncertain response is read back,
   never automatically replayed. Resumption retains captured selection and source
-  identity, and must not silently accept changed files. Future Copy/Move adapters
-  require explicit destination/collision/recovery contracts beyond Add.
+  identity, and must not silently accept changed files. Copy uses the explicit
+  destination/collision/recovery contract below; Move remains separate scope.
 - Import-time presets are captured values. Validate preset and plan revisions
   when choosing them; do not reinterpret a saved choice after library edits or
   deletion. Stage LUT assets outside catalog locks, verify before applying and
@@ -309,6 +309,15 @@ Windows adapter code remains unverified until run on Windows. iOS is not part of
 the current deliverable; its navigation policy is recorded in `AGENTS.md`.
 
 ## Verification and performance
+
+Copy import filesystem writes belong only to the replaceable copy adapter. Stage
+all selected targets before publishing any file. Keep exclusive creation and
+publication, source/target identity checks, bounded streaming, checksums and
+durable ownership receipts. Never overwrite or delete an existing destination to
+make recovery pass. Cancellation retains published files and removes only owned
+scratch links; report uncertain scratch ownership. A restored catalog cannot
+continue another catalog's transfer. The final catalog transaction must use
+destination paths consistently for metadata, presets, folders and Previous Import.
 
 Run targeted regression tests first, then the relevant existing suite and Mac
 compile. Use disposable catalogs and generated images by default. Real RAW and

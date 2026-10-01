@@ -220,7 +220,7 @@ bands. `mixer_patch` previews only mixer fields at `expected_revision`, with
 `mixer_draft: true`; it cannot accompany `curve_patch`. Persist accepted results
 with ordinary revision-checked partial edits. Map/draft reads never save history.
 
-## Reviewed Add import
+## Reviewed Add / Copy import
 
 `prepare_import(paths, include_subfolders?, skip_duplicates?)` captures explicit
 files/folders in one durable review. Both options default to true. Repeatedly call
@@ -253,8 +253,24 @@ partial catalog changes. Use `get_import` to inspect an uncertain response; neve
 retry application blindly. `cancel_import(plan_id)` interrupts pending work and
 discards staging, preserving originals and any completed import. Up to 32 compact
 receipts are retained. Review state is included in catalog backup/restore.
-This is Add only; copying, moving and DNG conversion are not supported by this
-command family.
+Add is the default. For Copy, pass `mode: "copy"`, an existing `destination`,
+optional `organization` (`flat`, `source`, `date`) and `subfolder` (one folder name)
+to `prepare_import`. Only `apply_import` writes the chosen destination. Source
+hierarchy includes the selected root name; dates use the camera's civil date in
+`YYYY/YYYY-MM-DD`, with `Unknown Date` for unavailable metadata. Review pages show
+computed destination paths. Originals and recognized XMP are copied byte-for-byte;
+existing targets are never overwritten, and all target names are preflighted.
+
+Copy failures retain a journal and `interrupted` state. When phase is `copying` or
+`copy_preparing`, use `resume_import_copy(plan_id, expected_revision)` only on an
+explicit recovery request, not `scan_import`. Completed copies are revalidated;
+unowned equal-byte files are never adopted. Cancellation keeps completed copies,
+cleans owned scratch files and reports any unsafe cleanup. `get_import_copies`
+returns sixty transfer receipts per offset, including after cancellation. A
+restored catalog can inspect/cancel but cannot resume or clean the original
+catalog's transfer. Read the plan after an uncertain reply; never replay blindly.
+Move, DNG conversion, renaming, second-copy backup and extended-attribute copying
+remain unsupported. Copy requires a filesystem supporting exclusive hard links.
 
 For a ready review, `set_import_processing(plan_id, expected_revision, ...)` changes
 one or more of `develop_preset`, `metadata_preset` and `keywords`. A preset choice

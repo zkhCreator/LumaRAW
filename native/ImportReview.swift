@@ -1,4 +1,4 @@
-// Purpose: captured Add import reviews and bounded preview scheduling for Mac.
+// Purpose: captured Add/Copy import reviews and bounded preview scheduling for Mac.
 // Inputs: explicit source choices, service plans/pages and client generations.
 // Outputs: checked selections, resumable scans and one explicit apply command.
 // No filesystem scanning, SQL, image processing or automatic mutation replay.
@@ -13,6 +13,9 @@ struct ImportPlan {
     var state: String { text("state") }
     var active: Bool { ["planning","scanning","ready","verifying","interrupted"].contains(state) }
     var ready: Bool { state == "ready" }
+    var isCopy: Bool { text("mode") == "copy" }
+    var copy: [String:Any] { values["copy"] as? [String:Any] ?? [:] }
+    var interruptedCopy: Bool { isCopy && state == "interrupted" && ["copying","copy_preparing"].contains(text("phase")) }
     var skipDuplicates: Bool { number("skip_duplicates") != 0 }
     func number(_ key: String) -> Int { values[key] as? Int ?? 0 }
     func text(_ key: String) -> String { values[key] as? String ?? "" }
@@ -29,6 +32,7 @@ struct ImportItem: Identifiable {
     let bytes: Int64
     let error: String
     let hasNotes: Bool
+    let destination: String
     init?(_ row: [String:Any]) {
         guard let id=row["id"] as? Int,let path=row["path"] as? String,let name=row["name"] as? String,
               let state=row["state"] as? String else { return nil }
@@ -36,6 +40,7 @@ struct ImportItem: Identifiable {
         selected=(row["selected"] as? Int ?? 0) != 0;eligible=row["eligible"] as? Bool ?? false
         bytes=(row["bytes"] as? NSNumber)?.int64Value ?? 0
         error=row["error"] as? String ?? "";hasNotes=(row["has_notes"] as? Int ?? 0) != 0
+        destination=row["destination"] as? String ?? ""
     }
 }
 
@@ -44,6 +49,10 @@ struct ImportItem: Identifiable {
     @Published var sources: [String]
     @Published var includeSubfolders=true
     @Published var initialSkipDuplicates=true
+    @Published var mode="add"
+    @Published var destination=""
+    @Published var organization="flat"
+    @Published var subfolder=""
     @Published var plan: ImportPlan?
     @Published var items: [ImportItem]=[]
     @Published var kind="all"
@@ -73,8 +82,9 @@ struct ImportItem: Identifiable {
     private var closed=false
     private var delivered: Set<Int>=[]
     var onApplied: ((Int)->Void)?
-    var canScan: Bool { !busy && !loading && (plan == nil || plan?.active == false || ["planning","interrupted"].contains(plan?.state ?? "")) }
+    var canScan: Bool { !busy && !loading && plan?.interruptedCopy != true && (plan == nil || plan?.active == false || ["planning","interrupted"].contains(plan?.state ?? "")) }
     var canApply: Bool { !busy && !loading && plan?.ready == true && (plan?.number("selected_count") ?? 0)>0 }
+    var canResumeCopy: Bool { !busy && !loading && plan?.interruptedCopy == true }
     init(sources: [String]=[]) { self.sources=sources }
 
     func receive(_ result: [String:Any]) {
@@ -120,7 +130,12 @@ struct ImportItem: Identifiable {
             if plan?.active != true {
                 guard !sources.isEmpty else { throw EngineFailure(message:"Choose photos or folders first") }
                 kind="all";offset=0
-                receive(try await Backend.call("prepare_import",["paths":sources,"include_subfolders":includeSubfolders,"skip_duplicates":initialSkipDuplicates]))
+                var params: [String:Any]=["paths":sources,"include_subfolders":includeSubfolders,"skip_duplicates":initialSkipDuplicates,"mode":mode]
+                if mode == "copy" {
+                    guard !destination.isEmpty else { throw EngineFailure(message:"Choose a Copy destination") }
+                    params["destination"]=destination;params["organization"]=organization;params["subfolder"]=subfolder
+                }
+                receive(try await Backend.call("prepare_import",params))
             }
             while !closed,let captured=plan,["planning","interrupted"].contains(captured.state) {
                 receive(try await Backend.call("scan_import",["plan_id":captured.id,"expected_revision":captured.revision]))
@@ -145,7 +160,14 @@ struct ImportItem: Identifiable {
 
     private func mutate(_ method: String,_ params: [String:Any]) async {
         busy=true;error=nil;readGeneration+=1;stopPreviews()
-        defer { busy=false }
+        let poll: Task<Void,Never>? = (plan?.isCopy == true && ["apply_import","resume_import_copy"].contains(method)) ? Task { [weak self] in
+            while !Task.isCancelled {
+                do { try await Task.sleep(nanoseconds:500_000_000) } catch { return }
+                guard let self,!closed,let captured=plan else { return }
+                if let result=try? await Backend.call("get_import",["plan_id":captured.id]),!Task.isCancelled { receive(result) }
+            }
+        } : nil
+        defer { poll?.cancel();busy=false }
         do { receive(try await Backend.call(method,params));await load() }
         catch { self.error=error.localizedDescription }
     }
@@ -154,6 +176,12 @@ struct ImportItem: Identifiable {
         guard canApply,let captured=plan else { return }
         await mutate("apply_import",["plan_id":captured.id,"expected_revision":captured.revision])
         // If the reply was lost, inspect the receipt. Do not retry apply.
+        if error != nil,!closed { await load() }
+    }
+
+    func resumeCopy() async {
+        guard canResumeCopy,let captured=plan else { return }
+        await mutate("resume_import_copy",["plan_id":captured.id,"expected_revision":captured.revision])
         if error != nil,!closed { await load() }
     }
 

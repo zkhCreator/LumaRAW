@@ -1,7 +1,8 @@
 """Bounded filesystem reads for durable folder synchronization.
 
 Inputs: a staged directory/file and cancellation callback. Outputs: at most 256
-directory entries or one file's stat/metadata snapshot. No catalog connection,
+directory entries or one file's stat/metadata snapshot (optionally retaining the
+camera's civil date for Copy organization). No catalog connection,
 pixel decoding, hashing or original writes. One live directory iterator survives
 page requests; after restart it can replay into unique on-disk staging rows.
 """
@@ -61,7 +62,7 @@ class DirectoryReader:
         return {'files':files,'directories':directories,'done':done}
 
 
-def inspect_file(row, scan_metadata, cancelled):
+def inspect_file(row, scan_metadata, cancelled, include_date=False):
     if cancelled():
         raise InterruptedError('Folder synchronization cancelled')
     path = Path(row['path'])
@@ -76,7 +77,7 @@ def inspect_file(row, scan_metadata, cancelled):
         result = {'missing':False,'fingerprints':{str(path):before},'clock':{},'patch':{},'notes':[]}
         if scan_metadata or not row['source_id']:
             result.update(read_xmp(path))
-            result['clock'] = read_capture_time(path)
+            result['clock'] = read_capture_time(path, include_date=include_date)
         if cancelled():
             raise InterruptedError('Folder synchronization cancelled')
         if identity(path) != before:

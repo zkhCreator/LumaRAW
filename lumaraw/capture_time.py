@@ -4,6 +4,7 @@ Inputs: TIFF-family, JPEG or PNG headers. Outputs: camera model, integer
 microseconds and clock provenance; no pixel decoder, hash, original writes or
 host-timezone dependence. Explicit offsets normalize to UTC. Without an offset,
 camera wall time is compared as-is, not claimed to be an absolute UTC instant.
+An optional civil date supports import folders without changing UTC comparisons.
 Only IFD0 and its Exif IFD are read; maker notes and embedded previews are ignored.
 Unsupported containers/malformed metadata remain unknown instead of using mtime.
 """
@@ -106,12 +107,13 @@ def read_tags(reader):
     return {}
 
 
-def clock_from_tags(tags):
+def clock_from_tags(tags, include_date=False):
     result={'camera':tags.get(272,'')[:100],'taken_us':None,'taken_submicro':'','capture_clock':'unknown','taken':0}
     for date,subsec,offset in ((36867,37521,36881),(36868,37522,36882),(306,37520,36880)):
         if not tags.get(date):continue
         try:
             value=datetime.strptime(tags[date],'%Y:%m:%d %H:%M:%S')
+            civil_date=value.strftime('%Y/%Y-%m-%d')
             fraction=tags.get(subsec,'').strip()
             if fraction and not re.fullmatch(r'\d+',fraction):raise ValueError('Invalid subsecond time')
             # Keep any finer residual as exact digits, never silently round it.
@@ -129,12 +131,13 @@ def clock_from_tags(tags):
             delta=value-datetime(1970,1,1,tzinfo=timezone.utc)
             us=(delta.days*86400+delta.seconds)*1000000+delta.microseconds
             result.update(taken_us=us,taken_submicro=residual,capture_clock=basis,taken=us//1000000)
+            if include_date:result['capture_date']=civil_date
             break
         except (ValueError,OverflowError):continue
     return result
 
 
-def read_capture_time(path):
+def read_capture_time(path, include_date=False):
     path=Path(path);before=path.stat()
     with path.open('rb') as stream:
         try:tags=read_tags(Reader(stream,before.st_size))
@@ -142,4 +145,4 @@ def read_capture_time(path):
     after=path.stat()
     if (before.st_size,before.st_mtime_ns)!=(after.st_size,after.st_mtime_ns):
         raise OSError('The source changed while reading capture metadata; refresh again')
-    return clock_from_tags(tags)
+    return clock_from_tags(tags,include_date=include_date)

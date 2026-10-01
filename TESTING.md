@@ -11,6 +11,42 @@ LUMARAW_TEST_NEF=/absolute/nikon.NEF uv run --frozen pytest -q
 
 The two `test_core.py` real-RAW tests skip if that environment variable is absent. `test_service.py` verifies revision conflicts, invalid edit atomicity, all-target sync, immutable export snapshots, deduplication keys, bounded queue pages and specific receipts, memory stopping, cancellation while a worker slot is occupied, superseded UI previews, cold job recovery and newline MCP framing through real subprocesses.
 
+## Copy imports
+
+`test_import_copy.py` uses disposable real files and destinations. It verifies
+flat/source/date organization, civil-date boundaries and unknown dates, exact
+original/XMP bytes and mtime, shared sidecars, captured presets, folder counts and
+Previous Import. Collision preflight covers existing files, symlinks, case-folded
+names and sidecars. Fault injection exercises writing/sealed/linked/published
+crash points, unrecorded ownership, disk write failure, modified checksums with
+preserved stat fields, cancellation while catalog reads remain available, SQL
+rollback/resume, restored-catalog isolation and atomic schema-25 upgrades. A
+125-file case checks bounded review/receipt paging.
+
+`NativeImportRegression` covers Copy option capture, destination previews without
+writes, an existing-target collision, explicit Resume Copy, exact copied bytes and
+retained receipts alongside Add workflows. Its offscreen sheet PNGs permit limited
+layout inspection only; they do not validate desktop input or native file panels.
+
+```sh
+.venv/bin/python -m pytest -q tests/test_import_copy.py tests/test_import_review.py \
+  tests/test_import_processing.py tests/test_capture_time.py
+.venv/bin/python tests/run_native.py --work work/new-copy-native \
+  --engine /absolute/LumaRAW.app/Contents/Resources/Engine/LumaRAWEngine \
+  --suite NativeImportRegression --suite NativeImportProcessingRegression \
+  --suite NativePreviousImportRegression --suite NativeResponsivenessRegression
+.venv/bin/python tests/import_copy_probe.py --work work/new-copy-throughput \
+  --engine /absolute/LumaRAW.app/Contents/Resources/Engine/LumaRAWEngine \
+  --fixture /absolute/nikon.NEF --files 24
+```
+
+Run the throughput probe after tests/builds stop. It generates source clones before
+measurement and runs three fresh catalog/destination batches through the packaged
+relay, recording bytes, dimensions, scan/apply time, throughput, sampled broker
+RSS, concurrent control median/p95/max and byte checks. OS source caches are warm;
+there is no pixel/GPU work. This does not establish SSD-independent throughput,
+desktop frame rate, removable-media behavior or untested filesystem support.
+
 ## Native responsiveness
 
 `test_preview_cache.py` uses real workers for completed Fit/detail/Before replies,

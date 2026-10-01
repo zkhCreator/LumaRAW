@@ -2,7 +2,7 @@
 
 A native macOS RAW darkroom with non-destructive editing, Metal-accelerated color processing, and a shared CLI/MCP interface for agents.
 
-LumaRAW references your originals without changing them. The SwiftUI app and your agent work through the same local catalog service, with revision checks to prevent conflicting edits. No account, API key, or cloud service is required.
+LumaRAW preserves your originals. Add references files in place; Copy imports byte-verified copies into a chosen destination. The SwiftUI app and your agent work through the same local catalog service, with revision checks to prevent conflicting edits. No account, API key, or cloud service is required.
 
 **Status:** source release, version 0.4.1. The packaged build targets Apple Silicon and macOS 14 or later; current validation was performed on macOS 26. Windows support is an architectural target, not a shipped application.
 
@@ -10,7 +10,7 @@ LumaRAW references your originals without changing them. The SwiftUI app and you
 
 | Area | Capabilities |
 | --- | --- |
-| Import | Resumable Add review, thumbnail/Loupe inspection, checked selections, subfolder choice, suspected duplicates, embedded/sidecar descriptions, and captured Develop/metadata presets plus keywords |
+| Import | Resumable Add/Copy review, thumbnail/Loupe inspection, checked selections, suspected duplicates, destination/subfolder and flat/source/date organization, original/XMP copies with explicit recovery, and captured Develop/metadata presets plus keywords |
 | RAW development | Nikon NEF/NRW and other LibRaw formats, as-shot white balance, exposure, highlights/shadows, relative temperature/tint, monochrome, and presets |
 | Color | Eight-band HSL and Black & White Mix, interactive RGB/channel point curves, camera-bound chart calibration, `.cube` LUTs, ICC soft proofing, and gamut warnings |
 | Detail and composition | Full-resolution 1:1 viewports, noise reduction, sharpening, defringing, rotation, crop, straighten, and perspective |
@@ -18,7 +18,7 @@ LumaRAW references your originals without changing them. The SwiftUI app and you
 | Library | Folder tree/search/favorites/labels, ratings, flags, catalog metadata/keywords, regular/live smart collections, nested sets, Quick/target collections, SQL filters/sorting, manual/capture-time stacks, duplicate/missing indexing, virtual copies/shared snapshots, selective sync, and backup/restore |
 | Culling | Grid/Loupe/Compare/Survey, anchored page selections, active-photo review actions, linked or independent full-resolution comparison viewports |
 | Export | JPEG and 16-bit TIFF with embedded sRGB, Display P3, Adobe RGB, or ProPhoto RGB ICC profiles; frozen catalog XMP/keyword policies, persistent queue, pause/cancel/retry, and collision-safe filenames |
-| Agents | 120 MCP tools, equivalent JSON CLI commands, and a bundled skill; app and agent edits share conflict detection |
+| Agents | 122 MCP tools, equivalent JSON CLI commands, and a bundled skill; app and agent edits share conflict detection |
 
 ## Build and run
 
@@ -63,7 +63,7 @@ its remove button only deselects a photo. Click a selected photo to make it acti
 without losing the group. Full-resolution comparison and fitted Survey use separate
 preview requests; unchanged comparison frames are retained.
 
-Import uses **Add**: originals stay in their current locations. Scanning and
+Import offers **Add** and **Copy**. Add leaves originals in their current locations. Scanning and
 previewing do not add photos to the library. Suspected duplicates share an original
 filename, file size and known capture time; an unknown date never uses modification
 time as a substitute. Turning duplicate exclusion off makes those candidates
@@ -78,8 +78,20 @@ Cancelled, empty and failed reviewed imports preserve the preceding batch.
 Upgrading an older catalog starts with an empty Previous Import source until the
 next import; it does not guess old batch membership from timestamps.
 Interrupted scans resume explicitly. Changed sources/sidecars or catalog conflicts
-reject application without a partial import. Copy, Move and Copy as DNG are not
-implemented yet.
+reject application without partial catalog changes.
+
+For **Copy**, choose an existing destination before scanning, optionally enter
+**Into Subfolder**, and organize into one folder, original folders or date folders
+(`YYYY/YYYY-MM-DD`). Unknown capture dates use `Unknown Date`. The review shows
+each target path. Import copies checked originals and associated XMP with checksum
+verification and then registers the completed batch. Existing destinations are
+never overwritten. **Transfer Details…** shows bounded progress/receipts;
+**Resume Copy** explicitly recovers an interrupted transfer after verification.
+Cancelling removes owned scratch files and keeps completed copies at their
+destinations. Inspect any reported scratch-ownership problem before starting
+another review. Copy currently requires a destination filesystem supporting hard
+links; Finder tags, resource forks and ACLs are not copied. Move, Copy as DNG,
+renaming and second-copy backups remain unimplemented.
 
 After scanning, choose **Apply During Import…** to select a Develop preset,
 metadata preset or None. Search and page the preset lists, or use **New…** to

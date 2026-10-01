@@ -1,4 +1,4 @@
-"""Captured Develop/metadata presets and keywords for reviewed Add imports.
+"""Captured Develop/metadata presets and keywords for reviewed Add/Copy imports.
 
 Inputs: explicit preset revisions, a ready plan revision and keyword text. Outputs:
 durable setting snapshots, bounded summaries and atomic new-photo application.
@@ -141,8 +141,9 @@ def apply_metadata(catalog, value, where, params, cancelled):
     while True:
         if cancelled():
             raise InterruptedError('Import cancelled')
+        from .import_review import PHOTO_PATH
         rows = catalog.db.execute('SELECT f.id AS import_id,p.id,p.metadata_revision,p.rating FROM photos p '
-            'JOIN import_files f ON p.path=f.path AND p.is_virtual=0 WHERE '+where+
+            'JOIN import_files f ON p.path='+PHOTO_PATH+' AND p.is_virtual=0 WHERE '+where+
             ' AND f.id>? ORDER BY f.id LIMIT 60', (*params, after)).fetchall()
         if not rows:
             return

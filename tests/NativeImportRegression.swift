@@ -1,9 +1,10 @@
-// Purpose: native durable Add import state and real preview/service integration.
+// Purpose: native durable Add/Copy state and real preview/service integration.
 // Inputs: five generated photos and an isolated catalog. Outputs: checked scope,
 // no-write preview, stale-plan rejection, resume, cancellation and original safety.
 // This does not verify rendered sheets, desktop gestures or VoiceOver.
 import AppKit
 import Foundation
+import SwiftUI
 
 @main struct NativeImportRegression {
     @MainActor static func main() async {
@@ -77,6 +78,40 @@ import Foundation
             await store.reviewImport([paths[1],paths[0]])
             try check(store.importReview?.sources == Array(paths.prefix(2)),"successive_file_open_events_coalesce_without_duplicate_sources")
             store.importReview?.invalidate()
+            let destination=URL(fileURLWithPath:ProcessInfo.processInfo.environment["LUMARAW_CATALOG"]!).deletingLastPathComponent().appendingPathComponent("copy-output")
+            try FileManager.default.createDirectory(at:destination,withIntermediateDirectories:false)
+            let copy=ImportReviewModel(sources:[paths[1]])
+            copy.mode="copy";copy.destination=destination.path;copy.subfolder="Album"
+            func snapshot(_ name:String) throws {
+                let rendered=ImportReviewModel(sources:copy.sources)
+                rendered.mode=copy.mode;rendered.destination=copy.destination;rendered.subfolder=copy.subfolder
+                rendered.plan=copy.plan;rendered.items=copy.items;rendered.total=copy.total
+                let host=NSHostingView(rootView:ImportReviewSheet(model:rendered).content.background(Color(nsColor:.windowBackgroundColor)))
+                host.frame=NSRect(x:0,y:0,width:1060,height:760);host.layoutSubtreeIfNeeded()
+                guard let bitmap=host.bitmapImageRepForCachingDisplay(in:host.bounds) else {throw EngineFailure(message:"Offscreen import layout unavailable")}
+                host.cacheDisplay(in:host.bounds,to:bitmap)
+                guard let png=bitmap.representation(using:.png,properties:[:]) else {throw EngineFailure(message:"Offscreen import PNG unavailable")}
+                try png.write(to:destination.deletingLastPathComponent().appendingPathComponent(name))
+            }
+            try snapshot("import-copy-options.png")
+            await copy.scan()
+            try check(copy.plan?.isCopy == true && copy.canApply,"copy_options_create_ready_destination_review")
+            let target=destination.appendingPathComponent("Album").appendingPathComponent(URL(fileURLWithPath:paths[1]).lastPathComponent)
+            try check(copy.items.first?.destination == target.path && !FileManager.default.fileExists(atPath:target.path),"copy_review_shows_destination_without_writes")
+            try FileManager.default.createDirectory(at:target.deletingLastPathComponent(),withIntermediateDirectories:true)
+            try Data("existing destination".utf8).write(to:target)
+            await copy.apply()
+            try check(copy.plan?.interruptedCopy == true && !copy.canScan && copy.canResumeCopy,"collision_offers_explicit_copy_recovery_not_scan")
+            try snapshot("import-copy-interrupted.png")
+            try check(try Data(contentsOf:target) == Data("existing destination".utf8),"copy_collision_preserves_existing_file")
+            try FileManager.default.removeItem(at:target)
+            await copy.resumeCopy()
+            try check(copy.plan?.state == "applied" && !copy.canResumeCopy,"explicit_copy_resume_applies_catalog")
+            try check(try Data(contentsOf:target) == originals[1],"copied_destination_matches_source_bytes")
+            let receipts=try await Backend.call("get_import_copies",["plan_id":copy.plan!.id])
+            let rows=receipts["items"] as? [[String:Any]] ?? []
+            try check(rows.count == 1 && rows[0]["state"] as? String == "published","completed_copy_keeps_readable_transfer_receipt")
+            copy.invalidate()
             try check(try paths.map { try Data(contentsOf:URL(fileURLWithPath:$0)) } == originals,"all_original_bytes_preserved")
             print(String(data:try JSONSerialization.data(withJSONObject:["ok":true,"checks":checks,"desktop_ui":"NOT_VERIFIED"],options:[.prettyPrinted,.sortedKeys]),encoding:.utf8)!)
             exit(0)

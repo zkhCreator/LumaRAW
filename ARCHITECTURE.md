@@ -714,8 +714,56 @@ Thumbnail and fitted Loupe requests use the existing bounded worker/cache with
 separate client generations and no catalog-photo requirement. The native model
 retains one page of images and rejects late replies. This Add contract never
 copies/moves originals. Filesystem stat checks cannot provide an OS-wide snapshot;
-Copy/Move/DNG, destination/collision recovery, saved import configurations and offline
-preview policy need their own explicit adapters and acceptance evidence.
+Copy uses the separate adapter below. Move/DNG, saved import configurations and
+offline preview policy still need explicit adapters and acceptance evidence.
+
+## Reviewed Copy imports
+
+Schema 26 adds captured destination options, a per-file transfer journal and a
+separate catalog destination on staged photos. `import_copy.py` owns this SQL
+state. `import_copy_runner.py` coordinates sixty-row pages outside catalog locks.
+`import_copy_io.py` is the replaceable filesystem boundary: no-follow directory
+handles, exclusive scratch creation, 1 MiB streaming reads, SHA-256 verification,
+fsync and exclusive hard-link publication on the destination volume. Filesystems
+without that publication primitive fail explicitly; Windows is unverified.
+
+Copy captures an existing destination and optional single subfolder. Organization
+supports one folder, original folder hierarchy (including the selected root name),
+or `YYYY/YYYY-MM-DD`. Date folders use EXIF's original civil date before UTC
+conversion; unavailable dates use `Unknown Date`, never mtime. Overlapping source
+roots choose the most specific selected root. The native review displays target
+paths before application. All selected originals and recognized XMP sidecars are
+preflighted before destination writes; shared RAW/JPEG sidecars copy once per
+target. Normalized case-folded target collisions fail even on case-sensitive
+filesystems. Neither preflight nor exclusive publication overwrites an existing
+target. Choosing a destination inside the catalog or a selected source directory
+is rejected.
+
+Each transfer records planned/writing/sealed/published state, a random scratch
+name, owned inode/device, source stat identity and sealed SHA-256/output identity.
+The sealed receipt commits before publication. A crash between link creation and
+the published receipt can adopt only that exact owned inode and verified content.
+An equal-byte unrelated target is never adopted. An interrupted write restarts
+only in its owned, singly linked scratch file. An interruption before ownership
+was recorded leaves an unclaimed scratch file that requires manual inspection;
+recovery never guesses ownership. Completed copies are rehashed on explicit
+resume. Restored catalogs retain journals for inspection but cannot resume or
+clean up the original catalog's filesystem operation.
+
+After source and target revalidation, one catalog transaction uses destination
+references for photos, metadata, presets, folder counts and Previous Import.
+Failure rolls back all catalog effects and retains copies for explicit recovery.
+Cancellation checks every 1 MiB read and during SQL; it removes only owned scratch
+links and **keeps published copies**. Transfer receipts remain pageable after
+cancellation/completion, under the existing 32-plan retention policy. Empty
+directories created during a cancelled copy are retained. The native shell shows
+these semantics, copy progress, transfer details and an explicit Resume Copy
+action; it never automatically replays an uncertain application response.
+
+Stat checks are not an OS-wide filesystem snapshot. Copy preserves file bytes
+and mtime, not Finder tags, resource forks, ACLs or all extended attributes. Move,
+DNG conversion, import renaming, second-copy backups, more date templates and
+destination-tree grouping remain separate scope.
 
 `import_processing.py` owns schema 20's per-plan Develop/metadata snapshots and
 additional keyword choices. Preset libraries are read with captured revision

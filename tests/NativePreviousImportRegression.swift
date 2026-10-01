@@ -88,7 +88,22 @@ import Foundation
             let sync=FolderSyncModel(folder:folder)
             await sync.reload()
             let sourceState=try await Backend.call("library_state")
-            await sync.prepare(revision:sourceState["folder_revision"] as! Int);await sync.scan();await sync.apply(using:s)
+            await sync.prepare(revision:sourceState["folder_revision"] as! Int);await sync.scan()
+            for _ in 0..<3 {
+                await sync.apply(using:s)
+                if sync.plan?.state == "applied" { break }
+                // A queued preview can enter after the idle observation. Retry
+                // only the documented, definite no-mutation admission refusal;
+                // never replay an uncertain transport or other domain failure.
+                guard sync.plan?.state == "ready",sync.plan?.text("error") == "Image processing is active; synchronize after it finishes" else { break }
+                let unchanged=try await Backend.call("status")
+                try check(unchanged["photos"] as? Int == 7,"busy_sync_admission_does_not_partially_import")
+                for _ in 0..<200 {
+                    let status=try await Backend.call("status")
+                    if status["active"] is NSNull { break }
+                    try await Task.sleep(nanoseconds:20_000_000)
+                }
+            }
             try check(sync.plan?.state == "applied" && s.mode == "previous_import" && s.photos.map(\.id) == [8],"folder_sync_import_uses_same_navigation_preference")
             await s.openLibraryMode("all");await sync.apply(using:s)
             try check(s.mode == "all","completed_sync_receipt_does_not_repeat_navigation")

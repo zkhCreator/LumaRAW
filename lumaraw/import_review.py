@@ -1,10 +1,11 @@
-"""Durable selection and catalog-only application of reviewed Add imports.
+"""Durable selection and catalog-only application of reviewed imports.
 
 Inputs: explicit source snapshots, bounded observations and captured plan revisions.
 Outputs: review pages, duplicate eligibility and one atomic catalog import. Existing
 photos, copies, recipes and exports are never changed. Captured import presets
 initialize only new photos. Filesystem reads and pixels
-belong to the runner; no original writes, copy/move, DNG conversion or AI selection.
+belong to the runner; Copy supplies verified destination references. This file
+performs no filesystem writes, copying, moving, DNG conversion or AI selection.
 Unknown capture time never falls back to mtime for suspected-duplicate matching.
 """
 import json
@@ -16,6 +17,7 @@ from .model import Recipe
 
 ACTIVE=('planning','scanning','ready','verifying','interrupted')
 KINDS=('all','new','duplicate','existing','error','selected')
+PHOTO_PATH="COALESCE(NULLIF(f.catalog_path,''),f.path)"
 
 
 def migrate(db):
@@ -92,6 +94,10 @@ class ImportReview:
         plan=self.row(plan_id);plan['counts']=json.loads(plan['counts'])
         from .import_processing import brief
         plan['processing']=brief(self.catalog,plan_id)
+        from .import_copy import settings, target
+        copy=settings(self.db,plan_id)
+        plan['mode']='copy' if copy else 'add'
+        if copy:plan['copy']={key:copy[key] for key in ('destination','organization','subfolder','copied','copied_bytes','transfer_count')}
         if kind not in KINDS:raise ValueError('Unsupported import filter')
         clause='plan_id=?';args=[plan_id]
         if kind=='selected':clause+=' AND selected=1 AND '+self.eligible(plan)
@@ -109,6 +115,7 @@ class ImportReview:
         for row in rows:
             item=dict(row);item['clock']=json.loads(item['clock'])
             item['eligible']=item['state']=='new' or item['state']=='duplicate' and not plan['skip_duplicates']
+            if copy:item['destination']=target(copy,item)
             items.append(item)
         return {'plan':plan,'items':items,'total':total,'offset':offset,'page_size':60}
 
@@ -118,7 +125,7 @@ class ImportReview:
         if row is None:raise ValueError('Import item does not exist')
         return dict(row)
 
-    def prepare(self,sources,include_subfolders=True,skip_duplicates=True):
+    def prepare(self,sources,include_subfolders=True,skip_duplicates=True,copy=None):
         with self.db:
             self.db.execute('BEGIN IMMEDIATE')
             if self.db.execute("SELECT 1 FROM import_plans WHERE state IN ('planning','scanning','ready','verifying','interrupted')").fetchone():
@@ -126,6 +133,9 @@ class ImportReview:
             self.db.execute('DELETE FROM import_plans WHERE id NOT IN (SELECT id FROM import_plans ORDER BY id DESC LIMIT 31)')
             plan_id=self.db.execute('INSERT INTO import_plans(include_subfolders,skip_duplicates,created) VALUES(?,?,?)',
                 (int(include_subfolders),int(skip_duplicates),time.time())).lastrowid
+            if copy:
+                from .import_copy import ImportCopy
+                ImportCopy(self.catalog).capture(plan_id,copy)
             for source in sources:
                 if source['directory']:
                     self.db.execute('INSERT INTO import_directories(plan_id,path,fingerprint,source) VALUES(?,?,?,1) '
@@ -150,6 +160,8 @@ class ImportReview:
     def start_scan(self,plan_id,expected_revision):
         with self.db:
             self.db.execute('BEGIN IMMEDIATE');plan=self.check(plan_id,expected_revision,('planning','interrupted'))
+            if plan['phase'] in ('copy_preparing','copying'):
+                raise ValueError('Use Resume Copy to recover a filesystem transfer')
             self.db.execute("UPDATE import_plans SET state='scanning',error='',revision=revision+1 WHERE id=?",(plan_id,))
             if plan['phase']=='directories':
                 rows=list(self.db.execute('SELECT * FROM import_directories WHERE plan_id=? AND done=0 ORDER BY id LIMIT 1',(plan_id,)))
@@ -225,7 +237,8 @@ class ImportReview:
         with self.db:
             self.db.execute('BEGIN IMMEDIATE');plan=self.check(plan_id,expected_revision,('ready',))
             if not plan['selected_count']:raise ValueError('Check at least one new photo to import')
-            self.db.execute("UPDATE import_plans SET state='verifying',checked=0,error='',revision=revision+1 WHERE id=?",(plan_id,))
+            self.db.execute("UPDATE import_plans SET state='verifying',checked=0,error='',revision=revision+1,"
+                "phase=CASE WHEN EXISTS(SELECT 1 FROM import_copy_plans WHERE plan_id=?) THEN 'copy_preparing' ELSE phase END WHERE id=?",(plan_id,plan_id))
         return self.row(plan_id)
 
     def pages(self,plan_id,revision,kind,after):
@@ -253,6 +266,11 @@ class ImportReview:
         with self.db:
             self.db.execute('BEGIN IMMEDIATE');plan=self.check(plan_id,revision,('verifying',))
             where='f.plan_id=? AND f.selected=1 AND '+self.eligible(plan).replace('state','f.state')
+            from .import_copy import settings
+            copy=settings(self.db,plan_id)
+            if copy and (copy['copied']!=copy['transfer_count'] or not copy['transfer_count'] or self.db.execute(
+                "SELECT 1 FROM import_files f WHERE "+where+" AND f.catalog_path='' LIMIT 1",(plan_id,)).fetchone()):
+                raise ValueError('Finish and verify every Copy transfer before catalog application')
             processing=import_processing.settings(self.catalog,plan_id)
             recipe=Recipe.parse(processing['develop_patch']).dict()
             self.db.set_progress_handler(lambda:int(cancelled()),2000)
@@ -261,7 +279,7 @@ class ImportReview:
                     if self.db.execute("SELECT 1 FROM import_files f WHERE "+where+
                         " AND COALESCE(json_extract(f.clock,'$.camera'),'')!=? LIMIT 1",(plan_id,profile['camera'])).fetchone():
                         raise ValueError('Import Develop preset camera profile is incompatible with a checked photo')
-                if self.db.execute('SELECT 1 FROM import_files f JOIN photos p ON p.path=f.path AND p.is_virtual=0 WHERE '+where+' LIMIT 1',(plan_id,)).fetchone():
+                if self.db.execute('SELECT 1 FROM import_files f JOIN photos p ON p.path='+PHOTO_PATH+' AND p.is_virtual=0 WHERE '+where+' LIMIT 1',(plan_id,)).fetchone():
                     raise ValueError('A selected photo was imported elsewhere; create a fresh review')
                 if plan['skip_duplicates'] and self.db.execute('SELECT 1 FROM import_files f JOIN photos p ON p.is_virtual=0 '
                     'AND p.original_name=f.name AND p.bytes=f.bytes AND p.capture_clock=f.capture_clock '
@@ -269,18 +287,18 @@ class ImportReview:
                     raise ValueError('A suspected duplicate appeared after review; create a fresh review')
                 imported=self.db.execute('SELECT count(*) FROM import_files f WHERE '+where,(plan_id,)).fetchone()[0]
                 self.db.execute('CREATE TEMP TABLE import_deltas(path TEXT PRIMARY KEY,delta INTEGER NOT NULL)')
-                self.db.execute('INSERT INTO import_deltas SELECT folder_path(f.path),count(*) FROM import_files f WHERE '+where+' GROUP BY folder_path(f.path)',(plan_id,))
+                self.db.execute('INSERT INTO import_deltas SELECT folder_path('+PHOTO_PATH+'),count(*) FROM import_files f WHERE '+where+' GROUP BY folder_path('+PHOTO_PATH+')',(plan_id,))
                 self.db.execute('INSERT OR IGNORE INTO catalog_folders(path,name,parent_path) WITH RECURSIVE paths(path) AS '
                     '(SELECT path FROM import_deltas UNION SELECT folder_parent(path) FROM paths WHERE folder_parent(path) IS NOT NULL) '
                     'SELECT path,folder_name(path),folder_parent(path) FROM paths')
                 self.db.execute('UPDATE folder_maintenance SET enabled=0 WHERE id=1')
                 self.db.execute('INSERT INTO photos(path,name,original_name,bytes,mtime,recipe,created,taken,taken_us,taken_submicro,capture_clock,camera) '
-                    'SELECT f.path,f.name,f.name,f.bytes,f.mtime,?,?,COALESCE(json_extract(f.clock,\'$.taken\'),0),'
+                    'SELECT '+PHOTO_PATH+',f.name,f.name,f.bytes,f.mtime,?,?,COALESCE(json_extract(f.clock,\'$.taken\'),0),'
                     'f.taken_us,f.taken_submicro,f.capture_clock,COALESCE(json_extract(f.clock,\'$.camera\'),\'\') FROM import_files f WHERE '+where,
                     (json.dumps(recipe),time.time(),plan_id))
                 after=0
                 while True:
-                    rows=self.db.execute('SELECT f.id,f.patch,p.id AS photo_id FROM import_files f JOIN photos p ON p.path=f.path AND p.is_virtual=0 '
+                    rows=self.db.execute('SELECT f.id,f.patch,p.id AS photo_id FROM import_files f JOIN photos p ON p.path='+PHOTO_PATH+' AND p.is_virtual=0 '
                         'WHERE '+where+" AND f.id>? AND f.patch!='{}' ORDER BY f.id LIMIT 60",(plan_id,after)).fetchall()
                     if not rows:break
                     for row in rows:
@@ -294,13 +312,15 @@ class ImportReview:
                     'totals AS (SELECT path,sum(delta) AS delta FROM changes GROUP BY path) '
                     'UPDATE catalog_folders SET total_count=total_count+t.delta FROM totals t WHERE catalog_folders.path=t.path')
                 self.db.execute('UPDATE folder_maintenance SET enabled=1 WHERE id=1')
-                for scope,args in [('SELECT path FROM import_directories WHERE plan_id=? AND source=1',(plan_id,)),('SELECT path FROM import_deltas',())]:
+                scopes=[('SELECT path FROM import_deltas',())]
+                if not copy:scopes.insert(0,('SELECT path FROM import_directories WHERE plan_id=? AND source=1',(plan_id,)))
+                for scope,args in scopes:
                     self.db.execute('UPDATE catalog_folders AS target SET is_root=1 WHERE path IN ('+scope+') AND NOT EXISTS '
                         '(SELECT 1 FROM catalog_folders a WHERE a.is_root=1 AND a.path IN ('+chain('target.path')+'))',args)
                 self.db.execute('UPDATE folder_state SET revision=revision+1')
                 if cancelled():raise InterruptedError('Import cancelled')
                 from .previous_import import replace
-                replace(self.db,'SELECT p.source_id FROM import_files f JOIN photos p ON p.path=f.path AND p.is_virtual=0 WHERE '+where,
+                replace(self.db,'SELECT p.source_id FROM import_files f JOIN photos p ON p.path='+PHOTO_PATH+' AND p.is_virtual=0 WHERE '+where,
                         (plan_id,),'reviewed',imported)
                 self.db.execute("UPDATE import_plans SET state='applied',imported=?,revision=revision+1 WHERE id=?",(imported,plan_id))
                 self.discard(plan_id)

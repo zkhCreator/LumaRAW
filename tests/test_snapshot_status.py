@@ -234,7 +234,8 @@ def test_real_schema24_migration_is_atomic_and_preserves_payloads(tmp_path, monk
         c.close()
     with closing(Catalog(root)) as c:
         migrate(c.db)
-        assert c.db.execute('PRAGMA user_version').fetchone()[0] == 25
+        from lumaraw.runtime import CATALOG_VERSION
+        assert c.db.execute('PRAGMA user_version').fetchone()[0] == CATALOG_VERSION
         assert [tuple(r) for r in c.db.execute('SELECT * FROM versions')] == versions
         assert c.db.execute('SELECT snapshot_count FROM photo_sources').fetchone()[0] == 2
         assert revision(c.db) == 0
