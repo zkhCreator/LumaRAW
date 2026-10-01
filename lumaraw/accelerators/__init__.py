@@ -1,7 +1,7 @@
 """Portable compute adapter with optional Metal, deterministic CPU reference/fallback.
 
 Inputs: linear FP32 tiles, validated recipes and output spaces. Outputs: encoded
-RGB/gamut plus per-request evidence. NEF unpack/demosaic stay in LibRaw. Metal never
+RGB/gamut, optional fused RGB/Lab maps and per-request evidence. NEF unpack/demosaic stay in LibRaw. Metal never
 changes RAW decoding, ICC definitions, recipe semantics or publication rules.
 CPU handles geometry/detail and complex masks/LUTs; their output can use Metal's
 color transform. A failed GPU command never exposes a partial output buffer.
@@ -25,7 +25,7 @@ def configure(mode='auto',budget_mb=4096):
     if mode not in ('auto','cpu','metal'):raise ValueError('Compute backend must be auto, cpu or metal')
     if _context is not None:_context.close()
     _context=None;_mode=mode;_limit=min(100*1024**2,int(budget_mb*1024**2*.15));_disabled=''
-    _stats={'requested':mode,'metal_grade_tiles':0,'metal_output_tiles':0,'cpu_tiles':0,'cpu_readout_output_tiles':0,'gpu_seconds':0.,'dispatch_seconds':0.,'initialization_seconds':0.,'shared_buffer_peak_mb':0.,'fallback_reasons':[]}
+    _stats={'requested':mode,'metal_grade_tiles':0,'metal_output_tiles':0,'metal_readout_tiles':0,'cpu_tiles':0,'cpu_readout_tiles':0,'cpu_readout_output_tiles':0,'gpu_seconds':0.,'dispatch_seconds':0.,'initialization_seconds':0.,'shared_buffer_peak_mb':0.,'fallback_reasons':[]}
 
 class Metal:
     def __init__(self):
@@ -35,6 +35,7 @@ class Metal:
         lib=self.lib
         try:
             parameter_count=lib.lr_metal_parameter_count
+            run=lib.lr_metal_run_v3
         except AttributeError as error:
             raise RuntimeError('Metal adapter is outdated; rebuild it for this engine') from error
         parameter_count.argtypes=[];parameter_count.restype=C.c_uint
@@ -43,6 +44,8 @@ class Metal:
         lib.lr_metal_create.argtypes=[C.c_char_p,C.c_size_t,C.c_char_p,C.c_size_t];lib.lr_metal_create.restype=C.c_void_p
         lib.lr_metal_destroy.argtypes=[C.c_void_p];lib.lr_metal_destroy.restype=None
         lib.lr_metal_run_v2.argtypes=[C.c_void_p,C.c_void_p,C.c_void_p,C.c_void_p,C.c_uint,C.c_void_p,C.c_uint,C.c_char_p,C.c_size_t];lib.lr_metal_run_v2.restype=C.c_int
+        run.argtypes=[C.c_void_p,C.c_void_p,C.c_void_p,C.c_void_p,C.c_void_p,C.c_uint,C.c_void_p,C.c_uint,C.c_char_p,C.c_size_t]
+        run.restype=C.c_int
         lib.lr_metal_device.argtypes=[C.c_void_p];lib.lr_metal_device.restype=C.c_char_p
         lib.lr_metal_allocated.argtypes=[C.c_void_p];lib.lr_metal_allocated.restype=C.c_size_t
         lib.lr_metal_seconds.argtypes=[C.c_void_p];lib.lr_metal_seconds.restype=C.c_double
@@ -55,23 +58,31 @@ class Metal:
     def run(self,a,p):
         if p.dtype!=np.float32 or p.shape!=(PARAMETER_COUNT,) or not p.flags.c_contiguous:
             raise RuntimeError('Invalid Metal parameter buffer')
+        if p[54] and p[55]:raise RuntimeError('Cannot capture linear work and readouts together')
         a=np.ascontiguousarray(a,dtype=np.float32);out=np.empty_like(a);mask=np.empty(a.shape[:2],np.uint8)
+        readouts=np.empty((*a.shape[:2],6),np.float32) if p[55] else None
         error=C.create_string_buffer(4096)
-        rc=self.lib.lr_metal_run_v2(self.handle,a.ctypes.data,out.ctypes.data,mask.ctypes.data,mask.size,p.ctypes.data,p.size,error,len(error))
+        rc=self.lib.lr_metal_run_v3(self.handle,a.ctypes.data,out.ctypes.data,mask.ctypes.data,
+            readouts.ctypes.data if readouts is not None else None,mask.size,p.ctypes.data,p.size,error,len(error))
         if rc:raise RuntimeError(error.value.decode(errors='replace') or f'Metal error {rc}')
-        return out,mask.astype(bool)
+        result=(out,mask.astype(bool))
+        return (*result,readouts) if readouts is not None else result
 
-def packed(recipe,space,output_only=False,capture_work=False):
+def packed(recipe,space,output_only=False,capture_work=False,capture_readouts=False):
     from ..imaging import LUMA
     from ..model import MIXER_BANDS,POINT_CURVE_FIELDS
     from ..curves import is_identity,packed_curve
     from ..parametric import active,packed as parametric_packed
-    from ..color import output_matrix,SRGB_FROM_WORK,WORK_FROM_SRGB
+    from ..color import output_matrix,SRGB_FROM_WORK,WORK_FROM_SRGB,PROPHOTO_XYZ
     p=np.zeros(PARAMETER_COUNT,np.float32);r=recipe
     p[:12]=[int(output_only),2**r.exposure,r.shadows/100,r.highlights/100,r.blacks/100,r.whites/100,r.contrast/200,1+r.saturation/100,r.vibrance/100,int(r.monochrome),int(any([r.curve_shadows,r.curve_midtones,r.curve_lights])),len(r.curve_points) if r.curve_points!=[[0.,0.],[1.,1.]] else 0]
     p[12:15]=LUMA;p[16:25]=np.asarray(r.camera_profile.get('matrix',np.eye(3)),np.float32).ravel()
     p[28:37]=output_matrix(space).ravel();p[38]=['srgb','adobe','p3','prophoto'].index(space)
     p[54]=int(capture_work)
+    p[55]=int(capture_readouts)
+    if capture_readouts:
+        p[608:617]=output_matrix('prophoto').ravel()
+        p[617:626]=(PROPHOTO_XYZ/np.array([.96422,1,.82521])[:,None]).ravel()
     for i,name in enumerate(MIXER_BANDS):
         p[176+4*i:180+4*i]=[getattr(r,name+'_hue'),getattr(r,name+'_sat'),
                             getattr(r,name+'_lum'),getattr(r,name+'_bw')]
@@ -94,20 +105,30 @@ def packed(recipe,space,output_only=False,capture_work=False):
 def reason(text):
     if text not in _stats['fallback_reasons']:_stats['fallback_reasons'].append(text)
 
-def grade_output(a,recipe,space,x=0,y=0,total_w=None,total_h=None,capture_work=False):
+def grade_output(a,recipe,space,x=0,y=0,total_w=None,total_h=None,capture_work=False,capture_readouts=False,readout_region=None):
     global _context,_disabled
     from ..render import grade_tile
     from ..color import to_output
     from ..curves import reference_required
+    if capture_work and capture_readouts:
+        raise ValueError('Cannot capture linear work and readouts together')
+    region=readout_region if readout_region is not None else np.s_[:,:]
     if not _stats:configure(_mode)
     def cpu():
         _stats['cpu_tiles']+=1
         work=grade_tile(a,recipe,x,y,total_w,total_h)
         output=to_output(work,space)
+        if capture_readouts:
+            from ..color_readouts import values
+            from ..performance import stage
+            with stage('color_readouts'):
+                readouts=values(work[region])
+            _stats['cpu_readout_tiles']+=1
+            return (*output,readouts)
         return (*output,work) if capture_work else output
     if _mode=='cpu':return cpu()
     count=a.shape[0]*a.shape[1]
-    if count*25>_limit or count>4000000:
+    if count*(49 if capture_readouts else 25)>_limit or count>4000000:
         reason('tile_exceeds_bounded_gpu_buffer');return cpu()
     if _mode=='auto' and count<16384:
         reason('small_tile_uses_cpu');return cpu()
@@ -122,12 +143,15 @@ def grade_output(a,recipe,space,x=0,y=0,total_w=None,total_h=None,capture_work=F
         if sharp_curve:reason('steep_point_curve_uses_cpu_grade')
         complex_recipe=sharp_curve or any(m.get('enabled',True) for m in recipe.masks) or (bool(recipe.lut) and recipe.lut_amount!=0)
         data=grade_tile(a,recipe,x,y,total_w,total_h) if complex_recipe else a
-        params=packed(recipe,space,complex_recipe,capture_work and not complex_recipe)
+        params=packed(recipe,space,complex_recipe,capture_work and not complex_recipe,capture_readouts)
         start=time.perf_counter();out=_context.run(data,params)
         _stats['dispatch_seconds']+=time.perf_counter()-start
         _stats['gpu_seconds']+=_context.lib.lr_metal_seconds(_context.handle)
         _stats['shared_buffer_peak_mb']=max(_stats['shared_buffer_peak_mb'],_context.lib.lr_metal_allocated(_context.handle)/1024**2)
         _stats['metal_output_tiles' if complex_recipe else 'metal_grade_tiles']+=1
+        if capture_readouts:
+            _stats['metal_readout_tiles']+=1
+            return (*out[:2],out[2][region])
         # One GPU grade supplies both the display conversion and readout map.
         # Do not repeat CPU grading or allocate a second shared GPU output.
         if capture_work:

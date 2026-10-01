@@ -49,6 +49,11 @@ VoiceOver and macOS 14 acceptance in the evidence log.
 `test_color_readouts.py` covers analytic D50 neutrals, SDR endpoints, bounded binary
 maps, eight orientations with crop/geometry, full-resolution viewports, proofing
 isolation, Before cache reuse, real revision-bound workers and CPU/Metal values.
+The fused readout checks cover all eight orientations on CPU and Metal, clipping
+and Lab branch boundaries, the complete ordinary recipe test set, output-space
+independence, one-dispatch grading, ROI/halo conversion, memory admission and C
+buffer-layout changes. Injected GPU failures must return complete CPU reference
+outputs with accurate counters, never a partially written readout map.
 `NativeColorReadoutRegression` checks RGB/Lab switching, both Reference/Active
 directions, mismatched cropped dimensions, Before assignment, settled off-viewport
 samples and late cancellation. Its repeated pointer tests require zero Store
@@ -69,6 +74,14 @@ both color-map roles and CPU/Metal values through the persistent native relay.
 Run without other builds/tests. Record actual execution counters, elapsed time,
 dimensions and sampled worker peak RSS. Synthetic and real-RAW numerical agreement
 does not establish Adobe color equivalence or rendered hover behavior.
+
+For a processing optimization, retain both built engines and run this same probe
+three times per engine in alternating old/new, new/old, old/new order, each with
+a new catalog directory. Report median and range, both ordinary-preview controls
+and first/warm maps. The first-map case has a warm decoded source and creates both
+After and Before maps; it is not cold RAW decoding. Compare cached maps between
+versions as well as CPU versus Metal. Keep builds and other tests stopped during
+timing; native state checks may follow once measurement finishes.
 
 `test_reference_preview.py` checks revision-bound ordinary previews, rejection
 before and after worker execution, metadata-only changes, bounded geometry,

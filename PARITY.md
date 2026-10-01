@@ -79,9 +79,11 @@ gaps. Nothing below is full Lightroom parity merely because historical tests pas
 
 ## Active increment
 
-Optimize the measured first-map processing cost of Develop RGB/LAB readouts,
-preserving the completed command/preview responsiveness changes; then further
-import, Library and Develop workflows.
+Continue complete import, Library and Develop workflows while preserving the
+validated command/preview responsiveness and fused RGB/LAB processing changes.
+RAW slider/selection latency and desktop interaction remain performance acceptance
+work; the first-map optimization is recorded below rather than treated as full
+interactive performance acceptance.
 The full feature inventory above remains the acceptance scope.
 Rendered Mac/reference acceptance,
 Copy/Move/DNG, complete IPTC, Adobe exchange, unified Undo/Redo and the full inventory
@@ -3152,3 +3154,96 @@ excluded from the commit. Desktop automation was not retried after its earlier
 denial; actual hover/keyboard/VoiceOver, full-window rendering, macOS 14 runtime
 and Adobe numerical/visual equivalence remain **not verified**. The full non-AI
 feature inventory remains incomplete.
+
+## Fused Develop readout processing (October 1, 2026)
+
+The first-map bottleneck was CPU display and RGB/Lab conversion after an otherwise
+completed Metal grade. The optional six-channel readout output now shares that
+same GPU dispatch with display conversion. Complex masks/LUTs/steep curves retain
+CPU grading, followed by fused Metal output/readouts. The CPU reference equations,
+map format, cache keys, recipes, originals and native interaction remain unchanged.
+Engine generation is **36**, catalog schema remains **25**, and all **120** command
+schemas remain compatible. Windows continues to use the portable CPU adapter.
+
+The v3 C adapter validates the optional buffer before use and counts all 49 bytes
+per pixel against the shared-buffer budget, including the six extra floats.
+Layout changes release previous buffers before replacement; no partial results
+are exposed after failure. Automatic fallback regenerates complete outputs from
+the original input. The ordinary v2 entry point remains usable and was separately
+checked against CPU RGB/gamut. New counters distinguish actual Metal readout work
+from CPU reference conversion; the ordinary fused path no longer claims hybrid
+CPU output work. CPU conversion still excludes neighborhood-filter halos.
+
+### Correctness and native evidence
+
+The initial targeted run passes **102 tests**. The final full run passes **742
+Python tests in 76.66 seconds, with no skips**, requiring actual Metal and the
+fixed NEF. It covers all eight orientations with/without crop geometry on both
+backends, full recipe combinations, SDR clipping/Lab branches, display-space
+independence, one-dispatch grading, ROI alignment, buffer bounds/layout switches,
+old adapter rejection and complete failure fallback. CPU equations retain their
+higher precision Lab intermediates; the existing 0.002 readout error bound is
+unchanged. This bound does not establish Adobe numerical equivalence.
+
+The final packaged engine passes **106 assertions** across four native suites:
+Color Readout 20, Responsiveness 16, Reference 51 and Before/After 19. Repeated
+hover remains local, unchanged polling publishes no Store updates, independent
+roles/Before state remain correct, and stale/cancelled replies stay hidden.
+These are native state/IPC/component checks, not desktop event acceptance.
+
+### Packaged old/new RAW comparison
+
+Three repetitions per engine alternate old/new, new/old, old/new, with fresh
+catalogs and no competing build/test process during timing. All **96 scenarios**
+pass. Both engines use the same Nikon D3S NEF, 4284 by 2844 decoded pixels,
+10,656,312 bytes, SHA-256
+`5922721d13f11795557d97fdeb0a60b900086c402bc82a848ff280d15b99ffd4`,
+on macOS 26.6.2, Apple M3 Max, 128 GiB RAM. Fit is 1680 by 1115; detail is
+800 by 600. Both After and Before maps are requested. Wall time includes
+negotiated persistent IPC and worker startup, excluding desktop rendering.
+First maps use a warm decoded source; neither this nor an empty application
+cache implies a cold OS/GPU cache.
+
+| Case | Previous median / range | Fused median / range | Median reduction |
+| --- | ---: | ---: | ---: |
+| Metal first Fit maps | 1093.364 / 1064.864–1458.676 ms | 648.266 / 610.214–658.649 ms | 40.71% |
+| Metal first detail maps | 549.407 / 544.064–1425.006 ms | 427.513 / 414.265–432.785 ms | 22.19% |
+| Metal warm Fit maps | 490.211 / 436.816–554.389 ms | 481.809 / 436.640–482.551 ms | 1.71% |
+| Metal warm detail maps | 371.621 / 368.875–446.895 ms | 367.124 / 353.178–374.233 ms | 1.21% |
+| CPU first Fit maps | 1598.080 / 1555.140–1753.315 ms | 1579.858 / 1546.807–2505.214 ms | 1.14% |
+| CPU first detail maps | 658.393 / 655.629–673.053 ms | 651.636 / 617.122–662.431 ms | 1.03% |
+
+Ordinary warm Metal preview medians are 491.990 to 477.061 ms for Fit and
+367.486 to 371.328 ms for detail. CPU ordinary controls and warm maps are also
+approximately unchanged. The few-percent control differences and outliers are
+reported as sampling variation, not a claim that unchanged paths were optimized.
+Three samples on one system do not establish general latency percentiles.
+
+First-map sampled worker peak medians fall from 487.3 to 330.5 MiB for Metal Fit
+(ranges 410.6–490.6 and 308.6–333.0) and 194.9 to 149.9 MiB for detail (ranges
+191.6–209.1 and 135.6–166.3). Shared GPU buffers increase from 7.690 to 15.073 MiB
+for Fit and 3.955 to 7.752 MiB for detail; fewer CPU intermediates reduce observed
+worker RSS. RSS is sampled process memory, not a whole-app/system peak guarantee.
+Successful first-map Metal receipts record 18/10 fused grade/readout dispatches
+and zero CPU readout/output tiles. Warm maps record zero readout dispatches.
+
+CPU maps are exactly equal across versions over four maps and 4,706,400 pixels.
+Metal version differences are at most 0.00001526 RGB percentage points and
+0.00004960 Lab units. New CPU/Metal differences stay below 0.000218 RGB percentage
+points and 0.000687 Lab units. Display previews differ by at most one 8-bit code;
+warm maps retain exact values and originals remain byte-identical.
+
+### Package identity and limits
+
+The Mac app builds for macOS 14 and passes deep/strict local signature checks.
+Initialization, all 120 full MCP schemas and the bundled guide match source.
+The tested package has:
+
+- Source digest: `20609f05c48b955db952cea3f09938d0db7e6fd23fcd4a51e24f6b2ff83222ca`
+- Engine SHA-256: `b2910b0969ca0db579e1388566efb7473ee9bad96fe5316e9ee6540d974cebc6`
+- Native executable SHA-256: `c90d4eedf4c8acd1b7b73524812b279c7d2a5292e945d43cadedcaab402483cb`
+
+The known optional PyInstaller `scipy.special._cdflib` warning remains, with no
+new native warnings/errors. Desktop automation was not retried after its earlier
+denial. Real slider/scroll/hover interaction, VoiceOver, macOS 14 runtime and Adobe
+processing equivalence remain **not verified**. Full non-AI parity is incomplete.

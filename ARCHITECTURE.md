@@ -62,8 +62,12 @@ It adapts the LibRaw working space to ProPhoto D50, clips to its SDR cube, then
 computes RGB percentages with the sRGB transfer function and Lab against D50.
 These explicit equations describe LumaRAW's SDR implementation; they do not prove
 Adobe RAW processing or numerical equivalence. HDR readouts remain a separate gap.
-Metal can return its graded linear work once for both conversions; receipt counters
-report CPU output work and mark such execution hybrid instead of calling it pure GPU.
+Metal fuses both display output and readout conversion into the same grading
+dispatch. Complex recipes retain CPU grading and fuse the two output conversions
+on Metal. The v3 C adapter validates an optional six-channel output buffer and
+includes its 24 bytes per pixel in the shared-memory limit. CPU reference/fallback
+equations and map format are unchanged. Receipts distinguish actual Metal readout
+dispatches, CPU readout conversion and complex hybrid grading.
 
 Native map files load on two background operations into immutable data. Mouse
 movement samples retained maps in constant time and publishes only the dedicated

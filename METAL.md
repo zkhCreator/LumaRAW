@@ -11,6 +11,7 @@ The optional backend plugs into `lumaraw.accelerators.grade_output`. A small Obj
 | Exposure, tone, contrast, saturation/vibrance, curves, eight-band HSL/B&W mixer, camera profile matrix, monochrome | Fused Metal grading kernel, or CPU reference |
 | Masks, LUT and very steep point curves | Complete CPU grading followed by Metal output conversion; reported as hybrid |
 | Output matrix, sRGB/P3/Adobe/ProPhoto encoding, gamut flags | Metal, or CPU fallback |
+| Optional Develop SDR RGB/Lab D50 readouts | Fused with Metal grade/output, or unchanged CPU reference |
 | ICC soft proof, histogram, PNG/JPEG/TIFF encoding | CPU; exported files retain ICC profiles |
 | Native display | sRGB-tagged NSImage; no custom MTKView canvas |
 
@@ -27,14 +28,17 @@ derivative exceeds 32 uses CPU grading and Metal output, reported as hybrid with
 `steep_point_curve_uses_cpu_grade`; no curve points are changed to hide precision
 differences. Identity curves bypass encoding/clipping on both backends.
 
-The v2 C entry point (`lr_metal_run_v2`) takes an explicit parameter count. The
-adapter requires 640 floats (2560 bytes) and checks `lr_metal_parameter_count`
+The v3 C entry point (`lr_metal_run_v3`) takes an explicit parameter count and an
+optional six-channel float32 readout output. The v2 entry point retains ordinary
+RGB/gamut compatibility. An absent/mismatched readout buffer fails before dispatch
+or destination writes, and simultaneous linear-work/readout captures are rejected.
+The adapter requires 640 floats (2560 bytes) and checks `lr_metal_parameter_count`
 before allocating. Both Python and C reject mismatched sizes before reading the
-buffer. Old libraries are rejected with rebuild guidance; auto mode retains CPU
+buffer. Libraries lacking v3 are rejected with rebuild guidance; auto mode retains CPU
 fallback. The payload stays below Metal's 4 KiB inline-byte limit.
 
 Four parametric regions use sixteen previously unused floats in that same buffer;
-its v2 ABI and 640-float capacity remain unchanged. The shader composes the same
+the 640-float capacity remains unchanged. The shader composes the same
 smooth monotone warps as the CPU, then applies a shared RGB gain before point
 curves. Ordinary parametric/point/HSL combinations remain fused. Zero amounts and
 unchanged tones bypass unnecessary encoding round trips.
@@ -62,6 +66,21 @@ Each disposable worker owns its Metal device, queue, pipeline, and reusable shar
 
 RGB input and output each use 12 bytes per pixel; gamut flags use one byte. Shared buffers are bounded by the minimum of 100 MiB, 15% of the worker budget, and four million pixels. Growth releases old buffers first. Output is copied back only after a successful command.
 
+Optional readouts add 24 bytes per pixel, making 49 rather than 25 bytes in the
+shared-buffer admission check. Switching buffer layouts releases the previous
+buffers first, including a larger ordinary tile when a smaller readout tile is
+requested. Reuse stays within the same layout and bounded capacity. Allocation
+failure releases partial buffers; command failure publishes no partial output.
+
+Readouts convert the final graded linear work to clipped SDR ProPhoto D50 RGB
+percentages and CIELAB D50 before display/proofing. The fused shader uses the same
+matrix, white point, transfer curves and Lab branch as the CPU reference. FP32
+matrix rounding and subtractive Lab chroma calculations retain the existing
+0.002 absolute readout allowance (percentage points or Lab units); this does not
+change the stored six-float format or claim Adobe numerical equivalence. The
+CPU equations remain unchanged, including higher precision Lab intermediates.
+CPU conversion covers only the visible tile region, excluding filter halos.
+
 Auto mode uses the CPU for tiles below 16,384 pixels or above the buffer allowance. Initialization or command failure triggers CPU fallback for the remainder of that request and records the reason. Explicit Metal mode reports GPU initialization/command failures; small-tile and memory limits still apply.
 
 RAW admission estimates, the dynamic 70% memory cap, RSS sampling, cancellation, broker monitoring, and atomic output publication remain active. Shared-buffer accounting does not include all driver allocations, and RSS is not a machine-wide hard quota.
@@ -73,6 +92,12 @@ RAW admission estimates, the dynamic 70% memory cap, RSS sampling, cancellation,
 `settings.compute_backend` accepts `auto`, `cpu`, or `metal` and defaults to `auto`. It is catalog processing policy, not a recipe change.
 
 Preview and completed-job receipts include `processing`: actual backend/device, Metal grading/output tile counts, CPU tile counts, GPU and dispatch time, initialization time, shared-buffer peak, fallback reasons, worker time, and named stage timings. Status/settings expose the latest worker receipt. A present library alone does not prove GPU execution.
+
+`metal_readout_tiles` counts successful fused conversions; `cpu_readout_tiles`
+counts CPU reference/fallback conversions. Ordinary fused readouts no longer
+require the legacy `cpu_readout_output_tiles` path. Their GPU conversion time is
+part of `grade_and_output`, not an additional `color_readouts` CPU stage. These
+stage counters overlap and must not be summed as independent work durations.
 
 `source_decode` includes its detailed RAW sub-stages, so stage durations overlap. Worker time excludes Python startup; the benchmark's wall time includes startup and encoding. GPU time covers Metal commands only.
 

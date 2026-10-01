@@ -13,6 +13,7 @@ Export metadata is a frozen catalog snapshot encoded separately from pixels;
 internal recipes, source names and asset paths are never embedded as descriptions.
 Independent catalog orientation maps output strips back to canonical Develop
 coordinates, then losslessly rotates/flips each tile. Masks/crops stay attached.
+Readout maps share the grade/output dispatch, before proofing or overlay pixels.
 """
 from dataclasses import replace
 import hashlib
@@ -280,13 +281,13 @@ def _render_strip(plan,x,y,w,h,space='srgb',output_sharpen=0,capture_tones=False
         a=plan.sample(left,start,right-left,end-start)
     with stage("detail_filters"):
         a=detail_filter(a,plan.recipe,plan.pixel_scale,output_sharpen)
-    with stage("grade_and_output"):
-        result=grade_output(a,plan.recipe,space,left,start,plan.width,plan.height,capture_work=readouts is not None)
-        pixels,gamut=result[:2]
     region=np.s_[y-start:y-start+h,x-left:x-left+w]
+    with stage("grade_and_output"):
+        result=grade_output(a,plan.recipe,space,left,start,plan.width,plan.height,
+                            capture_readouts=readouts is not None,readout_region=region)
+        pixels,gamut=result[:2]
     if readouts is not None:
-        with stage('color_readouts'):
-            readouts.append(color_readouts.values(result[2][region]))
+        readouts.append(result[2])
     tones=None
     if capture_tones:
         with stage("curve_input_tones"):

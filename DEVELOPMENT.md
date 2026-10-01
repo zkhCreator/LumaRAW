@@ -44,6 +44,12 @@ when a clear function is more maintainable. Avoid unrelated formatting churn.
   follow Before state. Load maps off the main actor and isolate hover publications
   from Store. Local pointer movement must not start workers; an off-viewport
   counterpart may use a debounced, cancellable, revision-bound one-pixel request.
+- Fuse optional pixel outputs with an existing grading dispatch when their
+  equations permit it. Keep CPU reference values, finite SDR clipping and
+  proofing boundaries unchanged; document FP32 tolerances and validate real RAW.
+  Count every optional GPU buffer in admission and layout changes. Do not expose
+  any partial output after failure, repeat grading for readouts, or count a
+  skipped CPU stage as the total user-visible speed improvement.
 - Snapshot names and recipes are shared by original/virtual-copy families. Keep
   stable non-reused IDs, independent snapshot revisions and a family list token.
   Read summaries through indexed alphabetical pages; never load all recipes for

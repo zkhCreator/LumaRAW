@@ -2,6 +2,7 @@
 // Inputs mirror the CPU equations (FP32, fast math disabled); never decode RAW.
 // Geometry, neighborhood filters, masks and LUTs remain separate CPU stages.
 // Optional p[54] returns graded linear work for display plus readout conversion.
+// Optional p[55] fuses SDR RGB/Lab D50 readouts with ordinary display output.
 #include <metal_stdlib>
 using namespace metal;
 float3 mat(float3 v,constant float *p,int offset) {
@@ -55,7 +56,8 @@ float mixer_weight(float h,float center){
 float mixer_neutral_weight(float3 lab){return min(1.0f,max(0.0f,length(lab.yz)-abs(lab.x)*1e-5f)/(abs(lab.x)*.1f+1e-7f));}
 kernel void grade_output(device const float *input [[buffer(0)]],device float *output [[buffer(1)]],
                          device uchar *gamut [[buffer(2)]],constant float *p [[buffer(3)]],
-                         constant uint &count [[buffer(4)]],uint i [[thread_position_in_grid]]) {
+                         constant uint &count [[buffer(4)]],device float *readouts [[buffer(5)]],
+                         uint i [[thread_position_in_grid]]) {
     if(i>=count)return;
     float3 a=float3(input[3*i],input[3*i+1],input[3*i+2]);
     float3 L=float3(p[12],p[13],p[14]);
@@ -117,6 +119,18 @@ kernel void grade_output(device const float *input [[buffer(0)]],device float *o
     }
     if(p[54]!=0){
         output[3*i]=a.x;output[3*i+1]=a.y;output[3*i+2]=a.z;gamut[i]=0;return;
+    }
+    if(p[55]!=0){
+        float3 wide=clamp(mat(a,p,608),0.0f,1.0f);
+        float3 ratio=mat(wide,p,617);
+        float3 f=select(ratio*(841.0f/108.0f)+4.0f/29.0f,cuberoot(ratio),
+                        ratio>float3(216.0f/24389.0f));
+        readouts[6*i]=enc(wide.x)*100.0f;
+        readouts[6*i+1]=enc(wide.y)*100.0f;
+        readouts[6*i+2]=enc(wide.z)*100.0f;
+        readouts[6*i+3]=116.0f*f.y-16.0f;
+        readouts[6*i+4]=500.0f*(f.x-f.y);
+        readouts[6*i+5]=200.0f*(f.y-f.z);
     }
     float3 linear=mat(a,p,28);
     gamut[i]=any(linear<float3(-1e-5f)) || any(linear>float3(1.00001f));
