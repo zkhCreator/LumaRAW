@@ -19,7 +19,7 @@ func metadataKeywordIdentityReplacement(_ ids: [Int], additions: String, origina
     return ["keyword_ids":ids.sorted(),"keyword_additions":extra]
 }
 
-struct LibraryCollection: Identifiable {
+struct LibraryCollection: Identifiable,Equatable {
     let id: Int
     let name: String
     let kind: String
@@ -28,6 +28,10 @@ struct LibraryCollection: Identifiable {
     let match: String
     let parentID: Int?
     var symbol: String { kind == "set" ? "folder" : kind == "smart" ? "gearshape.2" : kind == "quick" ? "circle.dashed" : "square.stack" }
+    static func ==(lhs:Self,rhs:Self)->Bool {
+        lhs.id==rhs.id && lhs.name==rhs.name && lhs.kind==rhs.kind && lhs.revision==rhs.revision &&
+        lhs.match==rhs.match && lhs.parentID==rhs.parentID && NSDictionary(dictionary:lhs.rules).isEqual(to:rhs.rules)
+    }
 
     init?(_ row: [String: Any]) {
         guard let id=row["id"] as? Int, let name=row["name"] as? String else { return nil }
@@ -45,7 +49,7 @@ struct CollectionPage {
     let total: Int
 }
 
-struct CollectionState {
+struct CollectionState:Equatable {
     let revision: Int
     let quick: LibraryCollection
     let target: LibraryCollection

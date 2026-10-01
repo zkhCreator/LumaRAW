@@ -53,7 +53,7 @@ extension Store {
             if let state=CollectionState(result),state.revision >= (collectionState?.revision ?? 0) {
                 if let current=collectionState,state.revision == current.revision,
                    (state.target.revision < current.target.revision || state.quick.revision < current.quick.revision) { return }
-                collectionState=state
+                if collectionState != state {collectionState=state}
             }
         } catch { message=error.localizedDescription }
     }

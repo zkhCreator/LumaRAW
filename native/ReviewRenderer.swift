@@ -66,9 +66,12 @@ struct ReviewFrame {
                     let result=try await call("preview_photo",params)
                     guard !Task.isCancelled,token == generation else { return }
                     guard result["photo_id"] as? Int == request.photoID,
-                          let path=result["preview"] as? String,let image=NSImage(contentsOfFile:path) else {
+                          let path=result["preview"] as? String else {
                         throw EngineFailure(message:"The comparison preview could not be loaded")
                     }
+                    let loaded=await PreviewImageLoader.load(path)
+                    guard !Task.isCancelled,token==generation else {return}
+                    guard let image=loaded else {throw EngineFailure(message:"The comparison preview could not be loaded")}
                     frames[request.photoID]=ReviewFrame(request:request,image:image,
                         revision:result["revision"] as? Int ?? request.revision,
                         fullWidth:result["full_width"] as? Int ?? 1,fullHeight:result["full_height"] as? Int ?? 1,

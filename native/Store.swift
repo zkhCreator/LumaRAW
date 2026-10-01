@@ -215,6 +215,7 @@ import UniformTypeIdentifiers
     @Published var snapshotError:String?
     @Published var snapshotAfter:Int?
     var snapshotRequest=0
+    var snapshotPolling=false
     var snapshotFilterRevision = -1
     @Published var historyPage:DevelopHistoryPage?
     @Published var historyBefore:Int?
@@ -333,7 +334,7 @@ import UniformTypeIdentifiers
         } catch {self.error=error.localizedDescription}
     }
     func clearPhoto() {
-        snapshotRequest+=1;snapshotPage=nil;snapshotAfter=nil;snapshotLoading=false;snapshotError=nil
+        snapshotRequest+=1;snapshotPolling=false;snapshotPage=nil;snapshotAfter=nil;snapshotLoading=false;snapshotError=nil
         beforeLabel="Before";beforePreviewContext=nil;comparisonFrame=nil;activeViewportFrame=nil
         historyRequest+=1;historyPage=nil;historyBefore=nil;historyError=nil;historyLoading=false
         cancelCurveTarget(restore:false);curveTargetFrame=nil
@@ -448,9 +449,13 @@ import UniformTypeIdentifiers
                 let r=try await Backend.call("preview_photo",params)
                 guard token==generation,selected==p.id else{return}
                 guard r["revision"] as? Int == p.revision else { rendering=false;return }
-                if let path=r["preview"] as? String{preview=NSImage(contentsOfFile:path)}
-                if let path=r["before"] as? String {
-                    before=NSImage(contentsOfFile:path);beforePreviewContext=beforeContext
+                async let loadedPreview=PreviewImageLoader.load(r["preview"] as? String)
+                async let loadedBefore=PreviewImageLoader.load(r["before"] as? String)
+                let (nextPreview,nextBefore)=await (loadedPreview,loadedBefore)
+                guard !Task.isCancelled,token==generation,selected==p.id else {return}
+                if r["preview"] as? String != nil {preview=nextPreview}
+                if r["before"] as? String != nil {
+                    before=nextBefore;beforePreviewContext=beforeContext
                     comparisonFrame=beforeContext.flatMap {BeforeAfterFrame(r,context:$0)}
                     beforeLabel=r["before_label"] as? String ?? "Before"
                 } else if !isDraft {before=nil;beforePreviewContext=nil;comparisonFrame=nil}
@@ -596,7 +601,13 @@ import UniformTypeIdentifiers
             availableMemory=(value["available_mb"] as? NSNumber)?.doubleValue ?? 0
         }
     }
-    func refreshJobs() async {if let r=try? await Backend.call("list_jobs"){jobs=r["jobs"] as? [[String:Any]] ?? [];paused=r["paused"] as? Bool ?? false}}
+    func refreshJobs() async {
+        if let r=try? await Backend.call("list_jobs") {
+            let next=r["jobs"] as? [[String:Any]] ?? [],nextPaused=r["paused"] as? Bool ?? false
+            if !NSArray(array:jobs).isEqual(to:next) {jobs=next}
+            if paused != nextPaused {paused=nextPaused}
+        }
+    }
     func queue(_ action:String,_ id:Int?=nil){Task{do{var p:[String:Any]=["action":action];if let id{p["job_id"]=id};_=try await Backend.call("queue_control",p);await refreshJobs()}catch{self.error=error.localizedDescription}}}
     func export(_ destination:String,_ format:String,_ options:[String:Any]) async {
         guard await flushEdits() else{return}

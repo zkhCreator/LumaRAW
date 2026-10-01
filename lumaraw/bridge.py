@@ -197,12 +197,16 @@ def main():
     parser=argparse.ArgumentParser(description='LumaRAW local service / CLI / MCP')
     parser.add_argument('--catalog',type=Path,default=default_catalog())
     parser.add_argument('--worker',action='store_true');parser.add_argument('--broker',action='store_true');parser.add_argument('--mcp',action='store_true')
+    parser.add_argument('--native-client',action='store_true')
     parser.add_argument('method',nargs='?',default='status');parser.add_argument('--params',help='JSON object; omitted: read stdin for commands other than status and recipe_schema')
     args=parser.parse_args()
     if args.worker:
         from .worker import main as worker_main
         worker_main();return
     if args.broker:serve(args.catalog);return
+    if args.native_client:
+        from .native_client import run
+        run(args.catalog);return
     if args.mcp:
         from .mcp import run
         run(args.catalog);return

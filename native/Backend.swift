@@ -10,6 +10,7 @@ struct EngineFailure: LocalizedError {
     var errorDescription: String? { message }
 }
 struct Backend {
+    private static let transport=NativeCommandTransport(executable:executable,catalog:catalog)
     static var catalog: String {
         if let i=CommandLine.arguments.firstIndex(of:"--catalog"),CommandLine.arguments.count>i+1{return CommandLine.arguments[i+1]}
         return ProcessInfo.processInfo.environment["LUMARAW_CATALOG"] ??
@@ -20,34 +21,7 @@ struct Backend {
         Bundle.main.resourceURL!.appendingPathComponent("Engine/LumaRAWEngine").path
     }
     static func call(_ method: String, _ params: [String: Any] = [:]) async throws -> [String: Any] {
-        let payload = try JSONSerialization.data(withJSONObject: params)
-        return try await withCheckedThrowingContinuation { continuation in
-            DispatchQueue.global(qos: .userInitiated).async {
-                do {
-                    let process = Process()
-                    process.executableURL = URL(fileURLWithPath: executable)
-                    process.arguments = ["--catalog", catalog, method]
-                    let input = Pipe(), output = Pipe()
-                    process.standardInput = input; process.standardOutput = output
-                    process.standardError = FileHandle.nullDevice
-                    try process.run()
-                    if method != "status" && method != "recipe_schema" {
-                        try input.fileHandleForWriting.write(contentsOf: payload + Data([10]))
-                    }
-                    try input.fileHandleForWriting.close()
-                    let data = output.fileHandleForReading.readDataToEndOfFile()
-                    process.waitUntilExit()
-                    guard let envelope = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
-                        throw EngineFailure(message: "The service returned an invalid response")
-                    }
-                    guard envelope["ok"] as? Bool == true, let result = envelope["result"] as? [String: Any] else {
-                        throw EngineFailure(message: envelope["error"] as? String ?? "The service request failed",
-                                            canActivateService:envelope["can_activate"] as? Bool ?? false)
-                    }
-                    continuation.resume(returning: result)
-                } catch { continuation.resume(throwing: error) }
-            }
-        }
+        try await transport.call(method,params)
     }
 }
 

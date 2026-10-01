@@ -20,6 +20,15 @@ when a clear function is more maintainable. Avoid unrelated formatting churn.
 
 ## Contracts and persistence
 
+- Keep native command encoding/IO/parsing and preview file decoding off the main
+  actor. Reuse the bounded native relay while retaining broker identity checks
+  for every call. Reserve cancellation/control capacity independently of image
+  work, correlate replies by ID, and never replay an uncertain mutation after a
+  pipe failure. Recheck frame generations after background image preparation.
+  Compare polling state before publishing it; unchanged jobs, collection state,
+  orientation state, photo-family/reference summaries and snapshot pages must not
+  invalidate the workspace. Track conditional snapshot reads without toggling
+  published loading state; explicit reads still show progress.
 - Reference and active roles are independent. Keep inspector edits scoped to
   active selection, retain reference identity across source/filter changes, and
   clear an unlocked reference only when leaving the module. The lock is session

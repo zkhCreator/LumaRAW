@@ -61,7 +61,7 @@ struct PhotoPreviewGeometry {
     }
 }
 
-struct PhotoOrientationState {
+struct PhotoOrientationState:Equatable {
     let revision: Int
     let actionID: Int?
     init?(_ result: [String:Any]) {
@@ -83,7 +83,8 @@ extension Store {
         do {
             let result=try await Backend.call("orientation_state")
             guard token == orientationReadGeneration,!orientationBusy else { return }
-            orientationState=PhotoOrientationState(result)
+            let next=PhotoOrientationState(result)
+            if orientationState != next {orientationState=next}
         } catch { if token == orientationReadGeneration { self.error=error.localizedDescription } }
     }
 

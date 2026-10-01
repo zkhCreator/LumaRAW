@@ -49,6 +49,9 @@ Keep the explicit publication allowlist current when adding public documentation
 - Use bounded queries, pages, worker concurrency, caches and memory. Never load
   a whole catalog to filter or sort it. Keep CPU reference/fallback behavior and
   report actual Metal dispatch, not just library availability.
+- Keep command IO and image-file decoding off the native main actor. Reuse the
+  bounded relay, reserve cancellation capacity, and discard stale decoded frames.
+  Unchanged polling state must not republish the entire workspace.
 - Negotiate engine identity before broker commands. Never retire a broker with
   active commands or image work, and never retry an uncertain mutation response.
   Increment `runtime.ENGINE_GENERATION` for a new engine release; build digests

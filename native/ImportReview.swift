@@ -187,7 +187,11 @@ struct ImportItem: Identifiable {
                         "expected_revision":captured.revision,"client_id":previewClient,"generation":token])
                     guard !Task.isCancelled,!closed,token == previewGeneration else { return }
                     if result["item_id"] as? Int == item.id,result["source"] as? String == item.path,
-                       let path=result["thumbnail"] as? String,let image=NSImage(contentsOfFile:path) { images[item.id]=image }
+                       let path=result["thumbnail"] as? String {
+                        let loaded=await PreviewImageLoader.load(path)
+                        guard !Task.isCancelled,!closed,token==previewGeneration else {return}
+                        if let image=loaded {images[item.id]=image}
+                    }
                 } catch { if token == previewGeneration,!closed { previewErrors[item.id]=error.localizedDescription } }
             }
         }
@@ -211,7 +215,9 @@ struct ImportItem: Identifiable {
                 let result=try await Backend.call("preview_import_item",["plan_id":captured.id,"item_id":item.id,
                     "expected_revision":captured.revision,"client_id":detailClient,"generation":token,"detail":true])
                 guard !Task.isCancelled,!closed,token == detailGeneration else { return }
-                if let path=result["preview"] as? String { self.detail=NSImage(contentsOfFile:path) }
+                let loaded=await PreviewImageLoader.load(result["preview"] as? String)
+                guard !Task.isCancelled,!closed,token==detailGeneration else {return}
+                self.detail=loaded
             } catch { if token == detailGeneration,!closed { detailError=error.localizedDescription } }
         }
     }

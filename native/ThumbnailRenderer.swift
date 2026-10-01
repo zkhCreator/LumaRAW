@@ -51,7 +51,8 @@ struct ThumbnailFrame {
                 let entries=result["thumbnails"] as? [[String:Any]] ?? []
                 var cached: Set<Int> = []
                 for entry in entries {
-                    if adopt(entry,wanted:wanted) { cached.insert(entry["photo_id"] as! Int) }
+                    if await adopt(entry,wanted:wanted,token:token) { cached.insert(entry["photo_id"] as! Int) }
+                    guard !Task.isCancelled,token==generation else {return}
                 }
                 // Even unchanged recipe revisions need fresh source-stat checks.
                 // Remove a previous frame if the broker no longer recognizes it.
@@ -70,7 +71,9 @@ struct ThumbnailFrame {
                     let result=try await call("thumbnail",["photo_id":target.id,"kind":"developed",
                         "client_id":client,"generation":token])
                     guard !Task.isCancelled,token == generation else { return }
-                    if !adopt(result,wanted:[target]) {
+                    let accepted=await adopt(result,wanted:[target],token:token)
+                    guard !Task.isCancelled,token==generation else {return}
+                    if !accepted {
                         errors[target.id]="Photo changed while its thumbnail was being generated; refresh the library"
                     }
                 } catch {
@@ -82,13 +85,14 @@ struct ThumbnailFrame {
         }
     }
 
-    private func adopt(_ row: [String:Any], wanted: Set<ThumbnailTarget>) -> Bool {
+    private func adopt(_ row: [String:Any], wanted: Set<ThumbnailTarget>,token:Int) async -> Bool {
         guard let id=row["photo_id"] as? Int,let revision=row["revision"] as? Int,
               row["kind"] as? String == "developed",let path=row["thumbnail"] as? String else { return false }
         guard let target=wanted.first(where: { $0.id == id && $0.revision == revision &&
             ($0.sourcePath.isEmpty || row["source"] as? String == $0.sourcePath) }) else { return false }
         if let existing=frames[id],existing.target == target,existing.path == path { return true }
-        guard let image=NSImage(contentsOfFile:path) else { return false }
+        let loaded=await PreviewImageLoader.load(path)
+        guard !Task.isCancelled,token==generation,let image=loaded else {return false}
         frames[id]=ThumbnailFrame(target:target,path:path,image:image)
         return true
     }

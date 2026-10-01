@@ -19,7 +19,29 @@ for replacement boundaries, migration gates and performance evidence requirement
 | Compute adapter | `lumaraw/accelerators`, `metal/Bridge.mm` | CPU reference with an optional macOS Metal C ABI |
 | Transport | `bridge.py`, `mcp.py` | Local IPC and newline JSON-RPC over stdio; no HTTP listener |
 
-The Swift `Backend` launches an explicit executable through `Process`, without a shell. Short CLI calls connect to a single persistent broker for the selected catalog. App exit does not cancel submitted exports. An idle broker with no unfinished jobs exits after about three minutes; a paused unfinished queue keeps it alive.
+The Swift `Backend` starts one explicit `--native-client` stdio relay through
+`Process`, without a shell, and reuses it for subsequent commands. Request IDs
+correlate out-of-order replies. The relay delegates every call to the existing
+broker adapter, including its engine-identity preflight; it owns no catalog or
+pixels. Eight ordinary workers admit at most 32 calls; two control workers admit
+eight cancellation/connection calls independently. This prevents image waits
+from serializing unrelated controls. Both ends bound newline frames to 1 MiB.
+The CLI and MCP retain their original entry points and service contracts.
+
+Native request encoding, pipe IO and response parsing run on background queues.
+A stream failure fails all pending callers with an unknown-outcome message. A
+later new call may open a relay, but the failed calls are never replayed. Closing
+the stream drains already admitted service calls. App exit does not cancel
+submitted exports. An idle broker with no unfinished jobs exits after about
+three minutes; a paused unfinished queue keeps it alive.
+
+The Mac image loader prepares engine PNG/JPEG output through ImageIO on at most
+two background operations. Immediate decoding retains the embedded color space;
+the native shell performs no grading or color conversion. File/pixel admission
+bounds reject malformed or excessive inputs. Frame owners recheck their captured
+generation after the asynchronous load, so stale decodes cannot repaint a new
+selection. Unchanged polling receipts retain existing Store values instead of
+publishing another invalidation of the whole workspace.
 
 On macOS/Linux, IPC uses a Unix socket in a user-only temporary directory (0700). Bounded JSON crosses `send_bytes`/`recv_bytes`; no pickle deserialization is used. A startup lock prevents competing brokers. Windows has AF_PIPE and msvcrt locking branches, but these have not been validated on Windows.
 

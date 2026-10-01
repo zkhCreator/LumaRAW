@@ -3,6 +3,7 @@
 // revision-bound service commands and ordinary Develop restores/Before copies.
 // Catalog owns shared-family identity, recipes, ordering and conflict checks.
 // Native forms never adopt newer photo/snapshot revisions automatically.
+// Conditional background reads coalesce without publishing unchanged UI state.
 import SwiftUI
 
 struct SnapshotEntry:Identifiable {
@@ -83,7 +84,7 @@ extension Store {
     }
     func readVersions(after:Int?=nil,onlyChanged:Bool=false) async {
         guard let p=photo,p.id==selected,!loading,!snapshotBusy else {return}
-        if onlyChanged && snapshotLoading {return}
+        if onlyChanged && (snapshotLoading || snapshotPolling) {return}
         var params:[String:Any]=["photo_id":p.id]
         if let after {
             guard let page=snapshotPage,page.photoID==p.id else {return}
@@ -92,15 +93,21 @@ extension Store {
             params["known_revision"]=page.revision
         }
         snapshotRequest+=1;let request=snapshotRequest
-        snapshotLoading=true
-        defer {if request==snapshotRequest {snapshotLoading=false}}
+        snapshotPolling=onlyChanged
+        if !onlyChanged {snapshotLoading=true}
+        defer {
+            if request==snapshotRequest {
+                snapshotPolling=false
+                if snapshotLoading {snapshotLoading=false}
+            }
+        }
         do {
             let reply=try await Backend.call("list_versions",params)
             guard request==snapshotRequest,photo?.id==p.id,selected==p.id,photo?.revision==p.revision else {return}
             if reply["unchanged"] as? Bool == true {
                 guard var page=snapshotPage,page.sourceID==p.sourceID,
                       page.revision==reply["snapshots_revision"] as? Int else {return}
-                page.photoRevision=p.revision;snapshotPage=page
+                if page.photoRevision != p.revision {page.photoRevision=p.revision;snapshotPage=page}
             } else {
                 guard let page=SnapshotPage(reply),page.sourceID==p.sourceID else {
                     throw EngineFailure(message:"Invalid snapshot page")
@@ -110,11 +117,13 @@ extension Store {
             // Background polling must not erase a captured mutation conflict.
             if !onlyChanged {snapshotError=nil}
         } catch {
-            if request==snapshotRequest,selected==p.id {snapshotError=error.localizedDescription}
+            if request==snapshotRequest,selected==p.id,snapshotError != error.localizedDescription {
+                snapshotError=error.localizedDescription
+            }
         }
     }
     func refreshSnapshotsIfVisible() {
-        guard showVersions || snapshotExpanded,let p=photo,!snapshotBusy,!snapshotLoading else {return}
+        guard showVersions || snapshotExpanded,let p=photo,!snapshotBusy,!snapshotLoading,!snapshotPolling else {return}
         Task {
             guard photo?.id==p.id,photo?.revision==p.revision,!snapshotLoading else {return}
             await readVersions(onlyChanged:true)

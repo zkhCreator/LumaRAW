@@ -89,7 +89,9 @@ extension Store {
                 referenceRenderer.stop();referenceError="The reference photo was removed from the catalog. Choose another reference."
                 return
             }
-            referencePhoto=p;referenceError=nil;updateReferenceRequest(force:force)
+            if !p.sameSummary(as:current) {referencePhoto=p}
+            if referenceError != nil {referenceError=nil}
+            updateReferenceRequest(force:force)
         } catch {if token==referenceReadGeneration {referenceError=error.localizedDescription}}
     }
 

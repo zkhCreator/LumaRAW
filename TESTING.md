@@ -11,6 +11,39 @@ LUMARAW_TEST_NEF=/absolute/nikon.NEF uv run --frozen pytest -q
 
 The two `test_core.py` real-RAW tests skip if that environment variable is absent. `test_service.py` verifies revision conflicts, invalid edit atomicity, all-target sync, immutable export snapshots, deduplication keys, bounded queue pages and specific receipts, memory stopping, cancellation while a worker slot is occupied, superseded UI previews, cold job recovery and newline MCP framing through real subprocesses.
 
+## Native responsiveness
+
+`test_native_client.py` verifies bounded relay admission, reserved control
+capacity, out-of-order correlation, malformed frames, duplicate IDs, EOF draining
+and failure responses without mutation replay. `NativeTransportRegression`
+exercises the Swift pipe client against an adversarial peer and the real broker,
+including split UTF-8 responses, relay replacement and a deliberately lost
+mutation response. Its warm-call timings exclude image processing and rendering.
+
+`NativeResponsivenessRegression` subscribes to Store invalidations: unchanged
+job, photo, reference and snapshot polls must publish zero changes, while real
+catalog and snapshot changes still propagate.
+It checks background image preparation, dimensions/color-space retention, main
+actor progress, and unchanged recipes/originals. A heartbeat is evidence that
+the actor can run during decoding, not a desktop frame-rate measurement.
+
+```sh
+.venv/bin/python -m pytest -q tests/test_native_client.py
+.venv/bin/python tests/native_transport_probe.py --work work/new-native-transport \
+  --engine /absolute/LumaRAW.app/Contents/Resources/Engine/LumaRAWEngine --samples 30
+.venv/bin/python tests/run_native.py --work work/new-native-responsiveness \
+  --engine /absolute/LumaRAW.app/Contents/Resources/Engine/LumaRAWEngine \
+  --suite NativeTransportRegression --suite NativeResponsivenessRegression \
+  --suite NativeStateRegression --suite NativeConnectionRegression \
+  --suite NativeThumbnailRegression --suite NativeReferenceRegression \
+  --suite NativeSnapshotsRegression
+```
+
+For latency comparisons, run probes without competing tests/builds, use the same
+packaged engine and an explicit fresh catalog, and separate first launch from
+warm calls. Preserve unverified desktop scrolling/slider/keyboard interaction,
+VoiceOver and macOS 14 acceptance in the evidence log.
+
 ## Develop Reference View
 
 `test_reference_preview.py` checks revision-bound ordinary previews, rejection

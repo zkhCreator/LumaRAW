@@ -79,8 +79,10 @@ gaps. Nothing below is full Lightroom parity merely because historical tests pas
 
 ## Active increment
 
-Develop Reference/Active comparison, followed by further import, Library and
-Develop workflows. The full feature inventory above remains the acceptance scope.
+Native interaction responsiveness, including command startup overhead, unchanged
+poll invalidation and main-thread preview file loading; then continue Develop
+Reference/Active readouts and further import, Library and Develop workflows.
+The full feature inventory above remains the acceptance scope.
 Rendered Mac/reference acceptance,
 Copy/Move/DNG, complete IPTC, Adobe exchange, unified Undo/Redo and the full inventory
 stay in scope. This does not complete product parity.
@@ -2918,3 +2920,116 @@ Current source/index and the extracted strict source archive cover **363 public
 files with zero findings**. A remote refresh found no unmerged local or remote
 branches; main remains an ancestor. Generated photographs, catalogs, packaged
 binaries and private receipts stay ignored and excluded from the module commit.
+
+## Native interaction responsiveness (September 30, 2026)
+
+The app no longer launches a fresh engine executable for every button action,
+poll, cancellation or preview command. A persistent correlated stdio relay keeps
+the existing broker preflight and command contracts, and permits out-of-order
+replies. Ordinary requests and cancellation/connection controls have separate
+bounded admission and worker capacity. No failed or uncertain mutation is replayed
+when a stream closes; a later new call can establish a replacement relay.
+
+Native command serialization, pipe IO and JSON parsing occur on background queues.
+There is one bounded watchdog for pending commands, not one long-lived timer per
+call. Service version activation and active-work handoff retain the existing
+broker rules. Engine generation is **34**, catalog schema remains **25**, and
+the public command/MCP inventory remains **120 tools**.
+
+Preview, Before, reference, Library comparison, thumbnail and import-review images
+now load through a shared ImageIO preparation queue with two active decodes. The
+[immediate decode option](https://developer.apple.com/documentation/imageio/kcgimagesourceshouldcacheimmediately)
+is set before images reach the main actor; the embedded color space is preserved.
+An explicit bitmap representation retains actual raster dimensions on Retina.
+Frame owners validate their generation again after loading, preventing a late
+decode from painting a different selected photo. Oversized or malformed images
+are rejected without downsampling or silently changing 1:1 geometry.
+
+Unchanged jobs/pause state, collection target/membership state, orientation state,
+photo-family summaries and reference summaries retain their current presentation
+values. Real catalog revisions and membership changes still publish updates.
+Conditional snapshot reads coalesce without toggling published loading state or
+reassigning an unchanged page. Explicit snapshot reads retain visible progress;
+new family versions and changed photo revision captures still propagate.
+Polling cadence and conflict barriers are preserved.
+
+### Responsiveness regression evidence
+
+The first transport probe exposed that macOS `read(upToCount:)` can wait to fill
+its requested pipe length. A one-second stack sample confirmed the blocking read;
+that isolated probe was deliberately stopped and the reader changed to consume
+available bytes. The next probe passed transport checks but detected that
+`NSImage(cgImage:size:)` reported a 2400 by 1800 fixture as 4800 by 3600 through
+its snapshot representation on Retina. An explicit `NSBitmapImageRep` fixes the
+representation; the assertion was retained. Neither initial probe is counted as
+a passing run.
+
+Before the final snapshot-poll refinement, the corrected source run passes
+**65 native state/IPC assertions**: Responsiveness
+14, Transport 26, State 15 and Connection 10. Ten unchanged background poll cycles
+publish **zero Store updates**, while an external rating change still propagates.
+Five unchanged reference refreshes also publish zero changes. The image checks
+cover five generated 2400 by 1800 rasters, retained dimensions/color-space data,
+invalid files, main-actor progress during loading and unchanged recipes/originals.
+These simple solid-color fixtures establish behavior, not photographic decode
+throughput or a frame-rate guarantee.
+
+The Swift transport checks one reused relay PID, split UTF-8 frames, out-of-order
+response IDs, typed activation errors, malformed/oversized replies, replacement
+after failure and a simulated mutation committed immediately before process exit.
+That mutation is recorded once and never resubmitted. The final source warm-status
+probe records 30 samples: median **1.635 ms**, p95 **1.847 ms**, excluding pixels
+and desktop rendering. Final packaged-engine measurements are separate evidence.
+
+The full Python run passes **684 tests in 61.26 seconds with no skips**, with
+required Metal dispatch and the fixed public Nikon D3S NEF. The final snapshot
+refinement changes native polling only; it does not change the tested engine.
+
+The final packaged generation-34 engine was measured without concurrent builds
+or tests on macOS 26.6.2, Apple M3 Max, 128 GiB RAM. A new disposable catalog holds
+one generated 160 by 100 PNG, with image jobs paused. Thirty sequential warm
+samples per method alternate one-shot CLI and the persistent relay against the
+same negotiated broker; no pixel work is included:
+
+| Command | One-shot median / p95 | Persistent median / p95 |
+| --- | --- | --- |
+| Status | 54.481 / 62.541 ms | 2.182 / 2.384 ms |
+| Photo read | 53.991 / 55.667 ms | 2.346 / 2.603 ms |
+
+Median command overhead falls by about **96%**. The test uses one relay process
+versus 62 CLI launches including setup. First CLI plus cold broker startup takes
+805.977 ms; first relay command against the warm broker takes 59.106 ms. Relay RSS
+at the end is 29.05 MiB; this is a point-in-time reading, not peak memory. Original
+bytes and photo responses match. These numbers do not establish desktop frame
+rate, slider-to-preview latency or RAW processing throughput.
+
+The final Mac app builds for the macOS 14 deployment target and passes deep/strict
+local code-signature verification. Packaged MCP initialization and all **120 full
+tool schemas** match source, and the bundled guide is byte-identical. The manifest
+matches the source identity:
+
+- Source digest: `e67a3d5a47ae3a6529a9161b2aec5b305a307f1fbb8d56f19331659970c514b0`
+- Engine SHA-256: `5fd02e075d7ab9746ac175371ae49b6fb58fd214391aef822561330a7301475e`
+- Native executable SHA-256: `75f6e1a7b437401c94ede85e12c32586f57aaa2ccd4595d9f0767f6e3001e1e1`
+
+The prior optional PyInstaller `scipy.special._cdflib` collection warning remains;
+no new Swift compiler warnings or errors were reported. Actual desktop scrolling,
+slider/zoom input, display rendering, VoiceOver and macOS 14 runtime acceptance
+remain **not verified**. Desktop automation was previously denied and was not
+retried. Native state/IPC checks cannot establish that the user's particular
+installed app or photo library is now smooth.
+
+The final packaged-engine run passes **268 native state/IPC assertions across
+11 suites**: Transport 26, Responsiveness 16, State 15, Connection 10, Thumbnail
+14, Reference 51, Review 20, Comparison Layout 42, Before/After 19, Import 22 and
+Snapshots 33. The completed runner exits successfully with no Swift warnings.
+The final responsiveness run retains zero publications for unchanged job/photo,
+reference and snapshot polls, with real external rating and snapshot changes
+still visible. Snapshot conflict, pagination and captured-photo revision checks
+pass after the polling change. These are current state/IPC results, not desktop
+screenshots or interaction acceptance.
+
+The source/index and extracted strict source archive cover **371 public files
+with zero findings**. Generated test photos, catalogs, app bundles, private
+receipts and the separate unfinished RGB/LAB prototype remain excluded from this
+performance module. No pixel algorithm or existing recipe is changed by it.

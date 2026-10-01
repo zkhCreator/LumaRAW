@@ -38,7 +38,9 @@ extension Store {
                       updated.revision >= photos[index].revision,
                       updated.metadataRevision >= photos[index].metadataRevision else { continue }
                 if !updated.sameSummary(as:photos[index]) { photos[index]=updated }
-                if var current=photo,current.id == updated.id,current.sourceRevision <= updated.sourceRevision {
+                if var current=photo,current.id == updated.id,current.sourceRevision <= updated.sourceRevision,
+                   (current.sourceID != updated.sourceID || current.sourceRevision != updated.sourceRevision ||
+                    current.masterID != updated.masterID || current.isVirtual != updated.isVirtual) {
                     // Family structure may change without an edit revision. Keep
                     // the inspector's recipe/metadata conflict barriers intact.
                     current.sourceID=updated.sourceID;current.sourceRevision=updated.sourceRevision

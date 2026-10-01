@@ -57,9 +57,12 @@ struct ReferenceFrame {
                       let geometry=PhotoPreviewGeometry(reply),geometry.orientation==request.context.orientation,
                       geometry.detail==request.context.detail,
                       let region=BeforeAfterFrame(reply,context:request.context),
-                      let path=reply["preview"] as? String,let image=NSImage(contentsOfFile:path) else {
+                      let path=reply["preview"] as? String else {
                     throw EngineFailure(message:"The reference preview changed or could not be loaded. Refresh the reference photo.")
                 }
+                let loaded=await PreviewImageLoader.load(path)
+                guard !Task.isCancelled,token==generation else {return}
+                guard let image=loaded else {throw EngineFailure(message:"The reference preview could not be loaded. Refresh the reference photo.")}
                 frame=ReferenceFrame(request:request,image:image,region:region)
             } catch {
                 guard !Task.isCancelled,token==generation else {return}
