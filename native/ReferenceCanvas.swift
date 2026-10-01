@@ -38,7 +38,7 @@ struct ReferenceCanvas:View {
             .onChange(of:s.referenceRequest) {_,_ in clearDrag()}
             .onChange(of:s.currentBeforeContext) {_,_ in clearDrag()}
             .onChange(of:s.referenceVertical) {_,_ in clearDrag()}
-            .onDisappear {clearDrag()}
+            .onDisappear {clearDrag();s.clearColorReadout()}
             .accessibilityElement(children:.contain).accessibilityLabel("Reference and Active photos")
     }
 
@@ -75,9 +75,16 @@ struct ReferenceCanvas:View {
                 } else if renderer.loading {ProgressView("Loading reference…")}
                 else {Text("Drag a photo here, or choose Set as Reference Photo in the filmstrip.").font(.callout).foregroundStyle(.secondary).multilineTextAlignment(.center).padding()}
             }.frame(width:size.width,height:canvasSize(size).height).clipped().contentShape(Rectangle())
+                .onContinuousHover {phase in
+                    if case .active(let location)=phase,referenceDrag == .zero,
+                       let frame=renderer.frame,frame.request==s.referenceRequest {
+                        s.hoverColors(point(location,image:frame.image,size:canvasSize(size),detail:s.referenceDetail),role:.reference)
+                    } else {s.clearColorReadout()}
+                }
                 .gesture(DragGesture(minimumDistance:3).onChanged {value in
                     guard s.referenceDetail,!renderer.loading,let frame=renderer.frame,frame.request==s.referenceRequest else {return}
                     if capturedReference==nil {capturedReference=frame}
+                    s.clearColorReadout()
                     referenceDrag=value.translation
                 }.onEnded {value in
                     defer {clearDrag()}
@@ -122,10 +129,17 @@ struct ReferenceCanvas:View {
                 } else if s.rendering || s.loading {ProgressView("Loading active photo…")}
                 if s.rendering {VStack {HStack {Spacer();ProgressView().controlSize(.small)};Spacer()}.padding(8)}
             }.frame(width:size.width,height:canvasSize(size).height).clipped().contentShape(Rectangle())
+                .onContinuousHover {phase in
+                    if case .active(let location)=phase,activeDrag == .zero,
+                       let image=s.compare ? s.before:s.preview {
+                        s.hoverColors(point(location,image:image,size:canvasSize(size),detail:s.detail),role:.active)
+                    } else {s.clearColorReadout()}
+                }
                 .gesture(DragGesture(minimumDistance:3).onChanged {value in
                     guard s.detail,!s.rendering,!s.hasPendingEdits,let frame=s.activeViewportFrame,
                           frame.context==s.currentBeforeContext else {return}
                     if capturedActive==nil {capturedActive=frame}
+                    s.clearColorReadout()
                     activeDrag=value.translation
                 }.onEnded {value in
                     defer {clearDrag()}

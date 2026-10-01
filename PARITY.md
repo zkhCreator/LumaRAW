@@ -59,14 +59,14 @@ gaps. Nothing below is full Lightroom parity merely because historical tests pas
 | Import and catalogs | Partial: durable Add review with checked selection, Grid/Loupe source previews, subfolder choice, suspected duplicates, bounded sorting/filtering, XMP descriptions, captured import-time Develop/metadata presets and keyword additions, cancellation/restart, durable Previous Import source with automatic navigation preference, referenced originals and backup/restore | Copy/Move/Copy as DNG, destinations/rename/backup, saved import configurations, preview policies, cards/tethering, progressive Current Import, catalog switching/merge and desktop/reference acceptance |
 | Library navigation | Partial: bounded grid/filmstrip, folder tree/search/favorites/labels, durable missing-folder relocation and folder synchronization, direct/recursive sources, filters/sorting including live snapshot status, regular/smart/Quick collections and nested sets | Multi-source selection, complete sync Import Dialog/duplicate policy, folder move/rename, relocation overlap/collision handling, collection drag/drop/color labels, full smart criteria/import-export, source-selection memory, desktop acceptance |
 | Organization | Partial: duplicate/missing detection, hierarchical keywords/synonyms/export flags/Will Export preview, text/CSV vocabulary exchange and manual person tags, custom nine-slot keyword sets/recent entries/shared or catalog storage, multi-keyword shortcuts and keyword/rating/flag/label/target-collection/rotation/Develop-preset/metadata-preset Painter strokes, independent catalog rotation/flips, title/caption/copyright plus thirty IPTC fields, selective metadata presets, labels, batch metadata, virtual copies, manual/split/capture-time scoped stacks | Keyword policy/file and preset reference acceptance, built-in sets/suggestions/undo, Painter desktop acceptance, IPTC Extension and complete metadata parity, stack interaction acceptance, rename and sidecars |
-| Culling | Partial: Loupe/Compare/Survey, linked detail, anchored page selection, Develop Reference/Active pairs with independent Fit/1:1 viewports and session lock | Desktop acceptance, reference RGB/LAB readouts and scrubby/box zoom, cross-page selection, auto advance, persistent workspace state |
+| Culling | Partial: Loupe/Compare/Survey, linked detail, anchored page selection, Develop Reference/Active pairs with independent Fit/1:1 viewports, session lock and RGB/LAB readouts | Desktop and numerical reference acceptance, HDR readouts, scrubby/box zoom, cross-page selection, auto advance, persistent workspace state |
 | Basic development | Partial: light/WB/color, eight-band HSL and B&W Mix with photo-targeted adjustment and selective resets/sync | Calibrated absolute WB, eyedropper, texture/clarity/dehaze, Point Color, Auto B&W mix, color grading and Adobe processing/reference acceptance |
 | Curves and profiles | Partial: four-region parametric curves with movable splits and photo-targeted adjustment, interactive RGB/channel point curves, shared temporary previews, legacy luminance curve, LUT/ICC | Point/channel targeting, curve exchange, camera/profile browser, Adobe processing and rendered/reference acceptance |
 | Detail and optics | Partial: noise/sharpen, manual lens | Complete manual detail controls, automatic lens profiles, bounded full-resolution acceptance |
 | Geometry | Partial: crop/straighten/perspective, independent rotation/flips with attached masks and displayed crop ratios | Interactive retained handles, guided transforms, full crop state and rendered/reference parity |
 | Local editing | Partial: radial/gradient/brush/luma | Mask list/edit/reorder/intersection, range masks, clone/heal, red-eye (non-AI) |
 | History and presets | Partial: durable paged Develop history with undo/redo, state selection/rename/clear, persistent Before assignment/copy/swap, separate 50-batch orientation undo, alphabetical shared snapshots with current/history capture, rename/update/delete and Before copy, partial Develop presets/groups/favorites/shared or local storage, batch/Painter and reviewed-import application | Unified application Undo/Redo, history/snapshot hover, preset hover preview/Amount/ISO adaptation/Adobe exchange and rendered reference acceptance |
-| Preview/performance | Partial: Metal, proxies, 1:1 viewport, developed thumbnail fast path, on-demand Before with independent cache, four paired layouts and shared detail zoom/pan | Real-RAW catalog/slider latency, offline previews, cache controls and desktop/reference acceptance |
+| Preview/performance | Partial: Metal, proxies, 1:1 viewport, developed thumbnail fast path, on-demand Before with independent cache, four paired layouts, persistent command relay, background image preparation, quiet polling and local readout maps | Real-RAW catalog/slider latency, offline previews, cache controls and desktop/reference acceptance |
 | Export | Partial: JPEG/16-bit TIFF, ICC, durable jobs with frozen catalog/rights IPTC XMP and keyword hierarchy options | Presets, complete EXIF/IPTC Extension/GPS metadata policies, watermark, additional formats, publish workflows |
 | External editing and video | Missing | External-editor setup and derivative round trips; supported video import/playback, frame capture, trimming and export |
 | Merge | Missing | Non-AI HDR merge and panorama with bounded resources and reference acceptance |
@@ -79,9 +79,9 @@ gaps. Nothing below is full Lightroom parity merely because historical tests pas
 
 ## Active increment
 
-Native interaction responsiveness, including command startup overhead, unchanged
-poll invalidation and main-thread preview file loading; then continue Develop
-Reference/Active readouts and further import, Library and Develop workflows.
+Optimize the measured first-map processing cost of Develop RGB/LAB readouts,
+preserving the completed command/preview responsiveness changes; then further
+import, Library and Develop workflows.
 The full feature inventory above remains the acceptance scope.
 Rendered Mac/reference acceptance,
 Copy/Move/DNG, complete IPTC, Adobe exchange, unified Undo/Redo and the full inventory
@@ -3033,3 +3033,122 @@ The source/index and extracted strict source archive cover **371 public files
 with zero findings**. Generated test photos, catalogs, app bundles, private
 receipts and the separate unfinished RGB/LAB prototype remain excluded from this
 performance module. No pixel algorithm or existing recipe is changed by it.
+
+## Develop RGB/LAB readouts (September 30, 2026)
+
+The native inspector now presents RGB percentages or Lab below the histogram,
+with the histogram's Show Lab Color Values context action. Ordinary Fit/1:1,
+Before-only, paired/split Before/After and Reference/Active canvases supply photo
+coordinates. Equal full-resolution cropped dimensions show both Reference/Active
+roles at the matching position; otherwise the other role remains `--`. Active
+Before follows its stored snapshot. These interaction rules follow
+[Adobe's readout documentation](https://helpx.adobe.com/lightroom-classic/desktop/process-and-develop-photos/image-tone-color.html).
+
+Optional engine maps carry RGB percentages with ProPhoto D50 primaries and the
+sRGB transfer curve, plus CIELAB D50 using the documented
+[XYZ/Lab conversion](https://www.w3.org/TR/css-color-4/#color-conversion-code).
+The SDR ProPhoto cube is clipped before conversion. Sampling precedes soft proof
+and gamut overlays; it does not inspect display pixels. These explicit LumaRAW
+equations do not prove Adobe numerical equivalence. Fit samples the fitted
+preview; 1:1 samples full-resolution processed pixels. HDR readouts remain open.
+
+Maps use six float32 channels, explicit dimensions/format/white-point metadata,
+bounded geometry and atomic cache publication. Full cropped dimensions derive
+from decoder dimensions rather than rounded proxy sizes. Before maps have an
+independent cache identity; source/recipe/LUT/geometry changes invalidate them.
+The optional flag leaves the public inventory at 120 commands. Engine generation
+is 35 and catalog schema remains 25; no catalog migration or recipe edit is needed.
+
+Background loaders validate and read maps before use. Pointer movement reads
+retained memory and publishes only a dedicated readout view's state. A 160-ms
+settled-pointer request samples a single counterpart pixel only when an independent
+detail viewport does not contain it. Its captured result is reused, and generation
+checks discard replies after hover/selection/revision changes. Cache trimming caps
+both bytes and 4096 entries, preserving current receipts, so small point requests
+cannot leave an unbounded number of artifacts.
+
+Ordinary Metal grading can return linear work once for display and readout
+conversion, with CPU output work explicitly counted as hybrid execution. Complex
+recipes retain the CPU-graded work already needed by masks/LUTs and keep the actual
+Metal output conversion. The feature does not repeat full grading merely to obtain
+RGB/Lab values. Warm maps bypass the additional conversion.
+
+Initial focused Python checks pass 108 cases. The first full run passes 706 tests
+with required Metal and the fixed NEF, before the final cache-count refinement.
+Initial native Color Readout and Responsiveness probes pass 17 and 16 assertions;
+the refined native readout probe passes 18, including repeated off-viewport sample
+reuse. These source state/IPC checks do not constitute desktop mouse acceptance.
+Final full-suite, packaged-engine and real-RAW evidence follows after validation.
+
+The final full Python run passes **707 tests in 72.75 seconds, with no skips**,
+requiring real Metal and the fixed public NEF. It includes preservation of pinned
+cache receipts and originals when many tiny files exceed the new count bound.
+
+### Packaged real-RAW measurements
+
+The isolated packaged probe uses the same Nikon D3S NEF (4284 by 2844 decoded
+pixels, 10,656,312 bytes; SHA-256
+`5922721d13f11795557d97fdeb0a60b900086c402bc82a848ff280d15b99ffd4`)
+on macOS 26.6.2, Apple M3 Max, 128 GiB RAM. No competing builds/tests run during
+measurement. Sequential single samples include persistent negotiated IPC and
+worker startup; they exclude native display and do not clear the OS file cache.
+Both After and Before are requested. Fit is 1680 by 1115; detail is 800 by 600.
+
+| Backend / view | First ordinary, cold application cache | First maps, warm decoded source | Warm maps | Warm ordinary |
+| --- | ---: | ---: | ---: | ---: |
+| CPU Fit | 1631.960 ms | 1662.252 ms | 953.564 ms | 974.671 ms |
+| CPU detail | 1075.982 ms | 669.309 ms | 489.246 ms | 485.797 ms |
+| Metal Fit | 1211.427 ms | 1380.235 ms | 486.729 ms | 498.175 ms |
+| Metal detail | 1097.168 ms | 617.938 ms | 376.871 ms | 370.611 ms |
+
+The first-map cases create both role maps and must generate Before samples even
+when a Before display image was already cached. They are not cold-decode speed
+comparisons. Readout conversion itself totals about 251–252 ms for both fitted
+maps and 62–63 ms for both detail maps. First-map worker peaks are 329.0/176.4 MiB
+for CPU Fit/detail and 368.4/202.1 MiB for Metal. Warm-map peaks are respectively
+137.8/103.9 and 141.8/107.2 MiB. These are sampled worker peaks, not native app or
+whole-system peak memory. First-map CPU conversion and file generation remain
+processing optimization candidates; warm-map reuse removes that conversion stage.
+
+All 16 cases pass. Ordinary/readout previews differ by at most one 8-bit code,
+and cached maps retain exact float32 values. CPU/Metal readout maxima are below
+0.000218 percentage points for RGB and 0.000691 Lab units; Before maxima are below
+0.000008. Originals remain byte-identical. Metal first-map runs record actual
+18/10 grading dispatches for Fit/detail and explicit CPU readout/output conversion
+counts; warm-map runs record 9/5 grading dispatches without readout conversion.
+None of these measurements establishes Lightroom color accuracy or UI frame rate.
+
+The RGB and Lab components were separately rendered with synthetic paired values
+at 280 by 84 points, 2x scale, and visually inspected. Role labels, negative Lab
+values and paired numbers are visible without overlap or truncation. These are
+offscreen component checks, not desktop screenshots or actual hover acceptance.
+
+### Final package checks
+
+The final packaged-engine run passes **189 assertions across seven native
+state/IPC/component suites**: Color Readout 20, Responsiveness 16, Reference 51,
+Comparison Layout 42, Before/After 19, Transport 26 and State 15. Repeated local
+hover and RGB/Lab mode changes publish no Store invalidations. Identical values
+do not republish the small readout component; 300 repeated off-viewport samples
+reuse the retained matching value without another worker. Unchanged background
+polls remain quiet, while real external changes still propagate.
+
+The Mac app builds for macOS 14 and passes deep/strict local code-signature
+verification. MCP initialization and all 120 full schemas match source. A guide
+wording clarification was copied into the bundle after testing and its root
+resource seal refreshed; the tested engine bytes stayed identical. The final
+bundled guide matches source byte for byte. The source identity matches the
+generation-35 manifest:
+
+- Source digest: `0e5b0bbbd5f2b06648da448304f4deb1bcbd6b4663aef50b21b44d6e29c1b5a5`
+- Engine SHA-256: `4e97eee0685c0f33c9c86027dd905647912461f817c303c8f41ac5cc6dc80bee`
+- Native executable SHA-256: `7103ec57ac39ee54810c428b28af86e7c02005b1150f59a1c7958e619a8601bb`
+
+The known optional PyInstaller `scipy.special._cdflib` collection warning remains;
+native compilation reports no new warnings or errors. Current source/index and
+the extracted strict source archive cover **376 public files with zero findings**.
+Generated photos, catalogs, app bundles, screenshots and private receipts are
+excluded from the commit. Desktop automation was not retried after its earlier
+denial; actual hover/keyboard/VoiceOver, full-window rendering, macOS 14 runtime
+and Adobe numerical/visual equivalence remain **not verified**. The full non-AI
+feature inventory remains incomplete.

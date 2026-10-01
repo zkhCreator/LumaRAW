@@ -45,6 +45,37 @@ publishing another invalidation of the whole workspace.
 
 On macOS/Linux, IPC uses a Unix socket in a user-only temporary directory (0700). Bounded JSON crosses `send_bytes`/`recv_bytes`; no pickle deserialization is used. A startup lock prevents competing brokers. Windows has AF_PIPE and msvcrt locking branches, but these have not been validated on Windows.
 
+## Develop color readouts
+
+`preview_photo(include_color_readouts=true)` returns disposable, geometry-aligned
+RGB percentage and CIELAB D50 maps, including a separate Before map when requested.
+Each map has a versioned 16-byte header and six little-endian float32 channels per
+pixel, bounded to 2048 by 1536 pixels in either orientation. Cache identity includes
+the source, complete recipe/LUT identity and rendered geometry; display proofing
+and gamut overlays do not change photographic readout values. Atomic publication
+and `cache_keep` protect returned files through ordinary cache trimming.
+Cache trimming also caps entry count at 4096, preserving current receipt files,
+so small one-pixel artifacts cannot accumulate indefinitely below the byte budget.
+
+The portable pipeline samples final graded linear work before display conversion.
+It adapts the LibRaw working space to ProPhoto D50, clips to its SDR cube, then
+computes RGB percentages with the sRGB transfer function and Lab against D50.
+These explicit equations describe LumaRAW's SDR implementation; they do not prove
+Adobe RAW processing or numerical equivalence. HDR readouts remain a separate gap.
+Metal can return its graded linear work once for both conversions; receipt counters
+report CPU output work and mark such execution hybrid instead of calling it pure GPU.
+
+Native map files load on two background operations into immutable data. Mouse
+movement samples retained maps in constant time and publishes only the dedicated
+readout view's state, never Store. Equal full-resolution cropped image dimensions
+permit Reference/Active pairing at the same normalized pixel center; mismatched
+dimensions leave the other value absent. Independent detail viewports use a
+160-ms settled-pointer, one-pixel request only when the counterpart is outside
+its retained map. Cancellation generations and captured photo revisions prevent
+late replies from repainting a newer hover or edit. Before follows its retained
+snapshot. One captured matching pixel is reused until its context changes.
+Readouts neither write recipes nor enter Develop history.
+
 ## Broker compatibility
 
 `runtime.py` identifies an engine by broker protocol, ordered generation, source/

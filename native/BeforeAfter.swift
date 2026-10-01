@@ -69,6 +69,7 @@ extension Store {
         setComparisonMode(value)
     }
     func setComparisonMode(_ mode:BeforeAfterMode) {
+        clearColorReadout()
         guard photo != nil,!loading,!browsing else {return}
         let hadDraft=curveTargetGesture != nil || mixerTargetGesture != nil
         let oldDetailSize=(detailPixelWidth,detailPixelHeight)

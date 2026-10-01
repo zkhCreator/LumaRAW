@@ -25,7 +25,7 @@ def configure(mode='auto',budget_mb=4096):
     if mode not in ('auto','cpu','metal'):raise ValueError('Compute backend must be auto, cpu or metal')
     if _context is not None:_context.close()
     _context=None;_mode=mode;_limit=min(100*1024**2,int(budget_mb*1024**2*.15));_disabled=''
-    _stats={'requested':mode,'metal_grade_tiles':0,'metal_output_tiles':0,'cpu_tiles':0,'gpu_seconds':0.,'dispatch_seconds':0.,'initialization_seconds':0.,'shared_buffer_peak_mb':0.,'fallback_reasons':[]}
+    _stats={'requested':mode,'metal_grade_tiles':0,'metal_output_tiles':0,'cpu_tiles':0,'cpu_readout_output_tiles':0,'gpu_seconds':0.,'dispatch_seconds':0.,'initialization_seconds':0.,'shared_buffer_peak_mb':0.,'fallback_reasons':[]}
 
 class Metal:
     def __init__(self):
@@ -61,7 +61,7 @@ class Metal:
         if rc:raise RuntimeError(error.value.decode(errors='replace') or f'Metal error {rc}')
         return out,mask.astype(bool)
 
-def packed(recipe,space,output_only=False):
+def packed(recipe,space,output_only=False,capture_work=False):
     from ..imaging import LUMA
     from ..model import MIXER_BANDS,POINT_CURVE_FIELDS
     from ..curves import is_identity,packed_curve
@@ -71,6 +71,7 @@ def packed(recipe,space,output_only=False):
     p[:12]=[int(output_only),2**r.exposure,r.shadows/100,r.highlights/100,r.blacks/100,r.whites/100,r.contrast/200,1+r.saturation/100,r.vibrance/100,int(r.monochrome),int(any([r.curve_shadows,r.curve_midtones,r.curve_lights])),len(r.curve_points) if r.curve_points!=[[0.,0.],[1.,1.]] else 0]
     p[12:15]=LUMA;p[16:25]=np.asarray(r.camera_profile.get('matrix',np.eye(3)),np.float32).ravel()
     p[28:37]=output_matrix(space).ravel();p[38]=['srgb','adobe','p3','prophoto'].index(space)
+    p[54]=int(capture_work)
     for i,name in enumerate(MIXER_BANDS):
         p[176+4*i:180+4*i]=[getattr(r,name+'_hue'),getattr(r,name+'_sat'),
                             getattr(r,name+'_lum'),getattr(r,name+'_bw')]
@@ -93,7 +94,7 @@ def packed(recipe,space,output_only=False):
 def reason(text):
     if text not in _stats['fallback_reasons']:_stats['fallback_reasons'].append(text)
 
-def grade_output(a,recipe,space,x=0,y=0,total_w=None,total_h=None):
+def grade_output(a,recipe,space,x=0,y=0,total_w=None,total_h=None,capture_work=False):
     global _context,_disabled
     from ..render import grade_tile
     from ..color import to_output
@@ -101,7 +102,9 @@ def grade_output(a,recipe,space,x=0,y=0,total_w=None,total_h=None):
     if not _stats:configure(_mode)
     def cpu():
         _stats['cpu_tiles']+=1
-        return to_output(grade_tile(a,recipe,x,y,total_w,total_h),space)
+        work=grade_tile(a,recipe,x,y,total_w,total_h)
+        output=to_output(work,space)
+        return (*output,work) if capture_work else output
     if _mode=='cpu':return cpu()
     count=a.shape[0]*a.shape[1]
     if count*25>_limit or count>4000000:
@@ -119,12 +122,21 @@ def grade_output(a,recipe,space,x=0,y=0,total_w=None,total_h=None):
         if sharp_curve:reason('steep_point_curve_uses_cpu_grade')
         complex_recipe=sharp_curve or any(m.get('enabled',True) for m in recipe.masks) or (bool(recipe.lut) and recipe.lut_amount!=0)
         data=grade_tile(a,recipe,x,y,total_w,total_h) if complex_recipe else a
-        params=packed(recipe,space,complex_recipe)
+        params=packed(recipe,space,complex_recipe,capture_work and not complex_recipe)
         start=time.perf_counter();out=_context.run(data,params)
         _stats['dispatch_seconds']+=time.perf_counter()-start
         _stats['gpu_seconds']+=_context.lib.lr_metal_seconds(_context.handle)
         _stats['shared_buffer_peak_mb']=max(_stats['shared_buffer_peak_mb'],_context.lib.lr_metal_allocated(_context.handle)/1024**2)
         _stats['metal_output_tiles' if complex_recipe else 'metal_grade_tiles']+=1
+        # One GPU grade supplies both the display conversion and readout map.
+        # Do not repeat CPU grading or allocate a second shared GPU output.
+        if capture_work:
+            if complex_recipe:
+                # Complex grading already produced linear work on CPU. Retain
+                # it while Metal performs its ordinary output conversion.
+                return (*out,data)
+            _stats['cpu_readout_output_tiles']+=1
+            return (*to_output(out[0],space),out[0])
         return out
     except (OSError,RuntimeError) as error:
         if _mode=='metal':raise RuntimeError(f'Metal requested but failed: {error}') from error
@@ -135,7 +147,7 @@ def grade_output(a,recipe,space,x=0,y=0,total_w=None,total_h=None):
 def report():
     if not _stats:configure(_mode)
     gpu=_stats['metal_grade_tiles']+_stats['metal_output_tiles']
-    result={**_stats,'backend':'hybrid' if gpu and (_stats['cpu_tiles'] or _stats['metal_output_tiles']) else 'metal' if gpu else 'cpu','device':_context.device if _context else None,'raw_decode_backend':'LibRaw CPU','gpu_buffer_limit_mb':round(_limit/1024**2,2)}
+    result={**_stats,'backend':'hybrid' if gpu and (_stats['cpu_tiles'] or _stats['metal_output_tiles'] or _stats['cpu_readout_output_tiles']) else 'metal' if gpu else 'cpu','device':_context.device if _context else None,'raw_decode_backend':'LibRaw CPU','gpu_buffer_limit_mb':round(_limit/1024**2,2)}
     return {k:round(v,6) if isinstance(v,float) else v for k,v in result.items()}
 
 def availability():

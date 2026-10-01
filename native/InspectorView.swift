@@ -17,6 +17,8 @@ struct InspectorView:View {
             VStack(alignment:.leading,spacing:18){
                 HStack{Text("Adjustments").font(.title3.weight(.semibold));Spacer();Menu{Button("Snapshots…"){s.showVersions=true};Button("Export Recipe Bundle…"){s.recipeFile(save:true)};Button("Import Recipe Bundle…"){s.recipeFile(save:false)};Button("Full Recipe Editor…"){s.showRecipe=true};Divider();Button("Reset All Adjustments",role:.destructive){reset=true}}label:{Image(systemName:"ellipsis.circle")}.menuStyle(.borderlessButton).frame(width:25)}
                 HistogramView(data:s.histogram)
+                    .contextMenu {ColorReadoutModeMenu(state:s.colorReadouts)}
+                if s.develop {ColorReadoutView(state:s.colorReadouts)}
                 if let p=s.photo {
                     VStack(alignment:.leading,spacing:6) {
                         if p.isVirtual { Label(p.copyName.isEmpty ? "Virtual Copy":p.copyName,systemImage:"doc.on.doc") }

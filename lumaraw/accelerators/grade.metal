@@ -1,6 +1,7 @@
 // Purpose: fuse linear ProPhoto D65 grading and ICC output encoding per RGB pixel.
 // Inputs mirror the CPU equations (FP32, fast math disabled); never decode RAW.
 // Geometry, neighborhood filters, masks and LUTs remain separate CPU stages.
+// Optional p[54] returns graded linear work for display plus readout conversion.
 #include <metal_stdlib>
 using namespace metal;
 float3 mat(float3 v,constant float *p,int offset) {
@@ -113,6 +114,9 @@ kernel void grade_output(device const float *input [[buffer(0)]],device float *o
             }
             a=float3(gray);
         }
+    }
+    if(p[54]!=0){
+        output[3*i]=a.x;output[3*i+1]=a.y;output[3*i+2]=a.z;gamut[i]=0;return;
     }
     float3 linear=mat(a,p,28);
     gamut[i]=any(linear<float3(-1e-5f)) || any(linear>float3(1.00001f));

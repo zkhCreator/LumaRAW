@@ -24,6 +24,13 @@ import UniformTypeIdentifiers
         self?.thumbnails=images;self?.thumbnailErrors=errors
     })
     @Published var preview: NSImage?
+    let colorReadouts=ColorReadoutState()
+    var colorReadoutFrame:ColorReadoutFrame?
+    var colorReadoutTask:Task<Void,Never>?
+    var colorReadoutGeneration=0
+    var colorReadoutRequestRunning=false
+    var colorReadoutCached:(target:ColorReadoutTarget,values:[Double])?
+    let colorReadoutClient=UUID().uuidString
     @Published var previewGeometry: PhotoPreviewGeometry?
     @Published var curveTargetFrame:CurveTargetFrame?
     @Published var curveTargetSample:CurveTargetSample?
@@ -334,6 +341,7 @@ import UniformTypeIdentifiers
         } catch {self.error=error.localizedDescription}
     }
     func clearPhoto() {
+        clearColorReadout();colorReadoutFrame=nil
         snapshotRequest+=1;snapshotPolling=false;snapshotPage=nil;snapshotAfter=nil;snapshotLoading=false;snapshotError=nil
         beforeLabel="Before";beforePreviewContext=nil;comparisonFrame=nil;activeViewportFrame=nil
         historyRequest+=1;historyPage=nil;historyBefore=nil;historyError=nil;historyLoading=false
@@ -402,6 +410,7 @@ import UniformTypeIdentifiers
     }
     func render(curveDraft:CurvePreviewDraft?=nil,mixerDraft:MixerPreviewDraft?=nil,debounce:Bool=true) {
         guard curveDraft == nil || mixerDraft == nil else {return}
+        clearColorReadout();colorReadoutFrame=nil
         let isDraft=curveDraft != nil || mixerDraft != nil
         if !isDraft {
             if curveTargetGesture != nil {cancelCurveTarget(restore:false)} else {curveTargetPreviews.cancel()}
@@ -427,6 +436,7 @@ import UniformTypeIdentifiers
             guard !Task.isCancelled,token==generation else{return}
             rendering=true
             var params:[String:Any]=["photo_id":p.id,"client_id":previewClient,"generation":token]
+            if develop && !isDraft {params["include_color_readouts"]=true;params["expected_revision"]=p.revision}
             params["include_before"]=needsBeforePreview && !isDraft
             let beforeContext=currentBeforeContext
             let toneContext=curveTargetActive ? curveTargetContext:nil
@@ -451,7 +461,8 @@ import UniformTypeIdentifiers
                 guard r["revision"] as? Int == p.revision else { rendering=false;return }
                 async let loadedPreview=PreviewImageLoader.load(r["preview"] as? String)
                 async let loadedBefore=PreviewImageLoader.load(r["before"] as? String)
-                let (nextPreview,nextBefore)=await (loadedPreview,loadedBefore)
+                async let loadedColors=ColorReadoutLoader.frame(r,context:beforeContext)
+                let (nextPreview,nextBefore,nextColors)=await (loadedPreview,loadedBefore,loadedColors)
                 guard !Task.isCancelled,token==generation,selected==p.id else {return}
                 if r["preview"] as? String != nil {preview=nextPreview}
                 if r["before"] as? String != nil {
@@ -463,6 +474,7 @@ import UniformTypeIdentifiers
                 metadata=r["metadata"] as? [String:Any] ?? [:]
                 previewGeometry=PhotoPreviewGeometry(r)
                 activeViewportFrame=beforeContext.flatMap {BeforeAfterFrame(r,context:$0)}
+                colorReadoutFrame=nextColors
                 if let toneContext {acceptCurveTones(r,context:toneContext)} else {curveTargetFrame=nil}
                 if let mixerContext {acceptMixerTarget(r,context:mixerContext,mode:mixerMode)} else {mixerTargetFrame=nil}
                 message=isDraft ? (mixerDraft != nil ? "Mixer preview · Release to save, Escape to cancel":"Curve preview · Release to save, Escape to cancel") : (detail ? "Full-resolution viewport · 1 image pixel = 1 screen pixel" : "Preview · Originals are read-only · Edits save automatically")
@@ -472,6 +484,8 @@ import UniformTypeIdentifiers
     }
     func set(_ key:String,_ value:Any) {
         guard !loading,!browsing,!orientationBusy,!developPresetBusy,!historyBusy,!snapshotBusy,let p=photo,p.id==selected else{return}
+        clearColorReadout()
+        clearColorReadout()
         saveFailed=false;recipe[key]=value;pendingPatch[key]=value
         if !editing {scheduleCommit()}
     }

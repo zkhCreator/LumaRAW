@@ -49,6 +49,25 @@ while copy/swap always transfers the complete stored recipe. Set `include_before
 false` when only After is needed. The service captures the stored Before; clients
 cannot inject another baseline into the preview contract.
 
+## Develop RGB / Lab readouts
+
+Set `include_color_readouts: true` on a revision-bound `preview_photo` to request
+SDR Develop samples. Receipts describe bounded binary maps: the six ASCII bytes
+`LRCOL1` followed by two zero bytes, little-endian uint32 width/height, then six float32
+values per pixel in R/G/B/L/a/b order. RGB percentages use ProPhoto D50 primaries
+and the sRGB transfer curve; Lab uses D50. Both are computed before display
+proofing and overlays, with SDR clipping explicitly declared in the receipt.
+Treat this as LumaRAW's documented calculation, not verified Adobe equivalence.
+
+`image_width`/`image_height` describe full-resolution cropped dimensions. Pair
+Reference/Active readings only when those dimensions match; otherwise leave the
+other role absent. Use `before_color_readouts` for Active Before. Ordinary Fit
+maps sample the fitted preview; detail maps use full-resolution pixels. Validate
+map metadata/length and capture context before using a file. Local maps support
+pointer movement without more commands. A missing counterpart outside its retained
+viewport can request a one-pixel detail with a separate cancellable client and
+captured `expected_revision`; never create edits or history for a color reading.
+
 ## Named snapshots
 
 `list_versions(photo_id)` returns sixty alphabetical summaries without recipes.

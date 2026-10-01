@@ -37,7 +37,7 @@ from .parametric import apply as apply_parametric
 from .imaging import load_source, fingerprint, cache_key, write_thumbnail, LUMA
 from .source_identity import thumbnail_path, cached_thumbnail
 from .orientation import validate as validate_orientation, inverse_rect, apply_array
-from . import curve_tones, mixer_targets
+from . import curve_tones, mixer_targets, color_readouts
 
 ROWS=128
 HALO=32
@@ -51,7 +51,7 @@ def atomic_json(path,data):
 def base_image(path,recipe,cache,budget_mb,full=False):
     cache=Path(cache);cache.mkdir(parents=True,exist_ok=True)
     base_recipe=Recipe(temperature=recipe.temperature,tint=recipe.tint,highlight_recovery=recipe.highlight_recovery)
-    key=cache_key(path,base_recipe,'full-linear-v3' if full else 'proxy-linear-v3')
+    key=cache_key(path,base_recipe,'full-linear-v4' if full else 'proxy-linear-v4')
     pixels=cache/(key+'.npy');metadata=cache/(key+'.json')
     if pixels.exists() and metadata.exists():
         try:
@@ -265,10 +265,12 @@ def render_strip(plan,x,y,w,h,space='srgb',output_sharpen=0):
     return pixels,gamut
 
 
-def _render_strip(plan,x,y,w,h,space='srgb',output_sharpen=0,capture_tones=False,mixer_mode=None):
+def _render_strip(plan,x,y,w,h,space='srgb',output_sharpen=0,capture_tones=False,mixer_mode=None,readouts=None):
     if isinstance(plan,OrientedPlan):
         rect=inverse_rect(x,y,w,h,plan.base.width,plan.base.height,plan.orientation)
-        pixels,gamut,tones,mixer=_render_strip(plan.base,*rect,space,output_sharpen,capture_tones,mixer_mode)
+        capture=[] if readouts is not None else None
+        pixels,gamut,tones,mixer=_render_strip(plan.base,*rect,space,output_sharpen,capture_tones,mixer_mode,capture)
+        if capture is not None:readouts.append(apply_array(capture[0],plan.orientation))
         return (apply_array(pixels,plan.orientation),apply_array(gamut,plan.orientation),
                 apply_array(tones,plan.orientation) if tones is not None else None,
                 apply_array(mixer,plan.orientation) if mixer is not None else None)
@@ -279,8 +281,12 @@ def _render_strip(plan,x,y,w,h,space='srgb',output_sharpen=0,capture_tones=False
     with stage("detail_filters"):
         a=detail_filter(a,plan.recipe,plan.pixel_scale,output_sharpen)
     with stage("grade_and_output"):
-        pixels,gamut=grade_output(a,plan.recipe,space,left,start,plan.width,plan.height)
+        result=grade_output(a,plan.recipe,space,left,start,plan.width,plan.height,capture_work=readouts is not None)
+        pixels,gamut=result[:2]
     region=np.s_[y-start:y-start+h,x-left:x-left+w]
+    if readouts is not None:
+        with stage('color_readouts'):
+            readouts.append(color_readouts.values(result[2][region]))
     tones=None
     if capture_tones:
         with stage("curve_input_tones"):
@@ -296,13 +302,15 @@ def _render_strip(plan,x,y,w,h,space='srgb',output_sharpen=0,capture_tones=False
     return pixels[region],gamut[region],tones,mixer
 
 
-def render_u8(plan,rect=None,display=None,tones=None,mixer=None,mixer_mode=None):
+def render_u8(plan,rect=None,display=None,tones=None,mixer=None,mixer_mode=None,readouts=None):
     display=display or {}
     x,y,w,h=rect or (0,0,plan.width,plan.height)
     pixels=np.empty((h,w,3),np.uint8);hist=np.zeros((3,64),np.int64);out_count=0
     for row in range(0,h,ROWS):
+        capture=[] if readouts is not None else None
         data,gamut,input_tones,input_mixer=_render_strip(plan,x,y+row,w,min(ROWS,h-row),'srgb',capture_tones=tones is not None,
-            mixer_mode=mixer_mode if mixer is not None else None)
+            mixer_mode=mixer_mode if mixer is not None else None,readouts=capture)
+        if capture is not None:readouts[row:row+len(data)]=capture[0]
         if tones is not None:
             tones[row:row+len(data)]=input_tones
         if mixer is not None:
@@ -337,8 +345,8 @@ def make_thumbnail(path, recipe, cache, budget_mb, orientation=0):
             'cache_keep':[base,str(Path(base).with_suffix('.json')),str(target)]}
 
 
-def make_preview(path,recipe,cache,budget_mb,detail=None,display=None,include_before=True,max_edge=None,orientation=0,include_curve_tones=False,mixer_target=None,before_recipe=None):
-    source_identity=fingerprint(path) if include_before or include_curve_tones or mixer_target else None
+def make_preview(path,recipe,cache,budget_mb,detail=None,display=None,include_before=True,max_edge=None,orientation=0,include_curve_tones=False,mixer_target=None,before_recipe=None,include_color_readouts=False):
+    source_identity=fingerprint(path) if include_before or include_curve_tones or mixer_target or include_color_readouts else None
     if detail and max_edge is not None:
         raise ValueError('A detail viewport cannot also request a fitted preview size')
     if max_edge is not None and (isinstance(max_edge,bool) or not isinstance(max_edge,int) or not 128 <= max_edge <= 1680):
@@ -359,6 +367,11 @@ def make_preview(path,recipe,cache,budget_mb,detail=None,display=None,include_be
         rect=(x,y,w,h)
     width,height=(rect[2],rect[3]) if rect else (plan.width,plan.height)
     geometry=[full,rect,plan.width,plan.height,plan.pixel_scale,orientation]
+    readout_path=None;readouts=None;readout_hit=False
+    if include_color_readouts:
+        readout_path=color_readouts.target_path(path,recipe,cache,geometry)
+        readout_hit=color_readouts.cached(readout_path,width,height)
+        if not readout_hit:readouts=np.empty((height,width,6),np.float32)
     mixer_path=None;mixer=None;mixer_hit=False
     if mixer_target:
         mixer_path=mixer_targets.target_path(path,recipe,cache,geometry,mixer_target)
@@ -371,7 +384,11 @@ def make_preview(path,recipe,cache,budget_mb,detail=None,display=None,include_be
         tone_hit=curve_tones.cached(tone_target,width,height)
         if not tone_hit:
             tones=np.empty((height,width),np.float32)
-    pixels,hist,gamut=render_u8(plan,rect,display,tones,mixer,mixer_target)
+    pixels,hist,gamut=render_u8(plan,rect,display,tones,mixer,mixer_target,readouts)
+    if readout_path is not None:
+        if fingerprint(path) != source_identity or color_readouts.target_path(path,recipe,cache,geometry) != readout_path:
+            raise ValueError('Source changed during color readout; reload the photograph')
+        if readouts is not None:color_readouts.write(readout_path,readouts)
     if mixer_path is not None:
         if fingerprint(path) != source_identity or mixer_targets.target_path(path,recipe,cache,geometry,mixer_target) != mixer_path:
             raise ValueError('Source changed during color sampling; reload the photograph')
@@ -390,6 +407,10 @@ def make_preview(path,recipe,cache,budget_mb,detail=None,display=None,include_be
     result={'preview':str(target),'metadata':meta,'histogram':hist,
             'clipped_percent':round(gamut,2),'width':w,'height':h,'full_width':plan.width,'full_height':plan.height,
             'detail':full,'roi':rect,'cache_keep':[base,str(Path(base).with_suffix('.json')),str(target)]}
+    if readout_path is not None:
+        result['color_readouts']=color_readouts.receipt(readout_path,w,h,readout_hit)
+        result['image_width'],result['image_height']=color_readouts.image_dimensions(meta,recipe,orientation)
+        result['cache_keep'].append(str(readout_path))
     if tone_target is not None:
         result['curve_tones']=curve_tones.receipt(tone_target,w,h,tone_hit)
         result['cache_keep'].append(str(tone_target))
@@ -408,10 +429,14 @@ def make_preview(path,recipe,cache,budget_mb,detail=None,display=None,include_be
                      **{k:getattr(recipe,k) for k in keep})
     before_key=hashlib.sha256((cache_key(path,baseline,'before-v1')+json.dumps([detail,display,max_edge,orientation],sort_keys=True)).encode()).hexdigest()
     before_path=cache/(before_key+'-before.png')
+    before_readout=None;before_readout_hit=False
+    if include_color_readouts:
+        before_readout=color_readouts.target_path(path,baseline,cache,geometry)
+        before_readout_hit=color_readouts.cached(before_readout,w,h)
     hit=False
     try:
         with Image.open(before_path) as cached:
-            hit=cached.format=='PNG' and cached.size==(w,h)
+            hit=cached.format=='PNG' and cached.size==(w,h) and (not include_color_readouts or before_readout_hit)
             cached.verify()
     except (OSError,ValueError,SyntaxError):
         hit=False
@@ -420,6 +445,9 @@ def make_preview(path,recipe,cache,budget_mb,detail=None,display=None,include_be
             raise ValueError('Source changed during comparison; reload the photograph')
         result.update(before=str(before_path),before_cache_hit=True)
         result['cache_keep'].append(str(before_path))
+        if before_readout is not None:
+            result['before_color_readouts']=color_readouts.receipt(before_readout,w,h,True)
+            result['cache_keep'].append(str(before_readout))
         return result
     base_source,_,base_before=base_image(path,baseline,cache,budget_mb,full=full)
     validate_camera(baseline,meta)
@@ -427,7 +455,8 @@ def make_preview(path,recipe,cache,budget_mb,detail=None,display=None,include_be
     if not full:
         before_plan.pixel_scale *= max(base_source.shape[:2])/max(meta['width'],meta['height'])
     with stage('before_render'):
-        before,_,_=render_u8(before_plan,rect,display)
+        before_values=np.empty((h,w,6),np.float32) if before_readout is not None and not before_readout_hit else None
+        before,_,_=render_u8(before_plan,rect,display,readouts=before_values)
     if fingerprint(path) != source_identity:
         raise ValueError('Source changed during comparison; reload the photograph')
     with tempfile.NamedTemporaryFile(dir=cache,prefix='.before-',suffix='.png',delete=False) as temporary:
@@ -439,6 +468,12 @@ def make_preview(path,recipe,cache,budget_mb,detail=None,display=None,include_be
         temporary_path.unlink(missing_ok=True)
     result['before']=str(before_path)
     result['before_cache_hit']=False
+    if before_readout is not None:
+        if color_readouts.target_path(path,baseline,cache,geometry) != before_readout:
+            raise ValueError('Source changed during Before color readout; reload the photograph')
+        if before_values is not None:color_readouts.write(before_readout,before_values)
+        result['before_color_readouts']=color_readouts.receipt(before_readout,w,h,before_readout_hit)
+        result['cache_keep'].append(str(before_readout))
     result['cache_keep'].extend([base_before,str(Path(base_before).with_suffix('.json')),str(before_path)])
     return result
 

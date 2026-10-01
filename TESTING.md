@@ -46,6 +46,30 @@ VoiceOver and macOS 14 acceptance in the evidence log.
 
 ## Develop Reference View
 
+`test_color_readouts.py` covers analytic D50 neutrals, SDR endpoints, bounded binary
+maps, eight orientations with crop/geometry, full-resolution viewports, proofing
+isolation, Before cache reuse, real revision-bound workers and CPU/Metal values.
+`NativeColorReadoutRegression` checks RGB/Lab switching, both Reference/Active
+directions, mismatched cropped dimensions, Before assignment, settled off-viewport
+samples and late cancellation. Its repeated pointer tests require zero Store
+publications; repeated identical values must not republish the readout view either.
+
+```sh
+LUMARAW_REQUIRE_METAL=1 .venv/bin/python -m pytest -q tests/test_color_readouts.py
+.venv/bin/python tests/run_native.py --work work/new-color-readouts-native \
+  --engine /absolute/LumaRAW.app/Contents/Resources/Engine/LumaRAWEngine \
+  --suite NativeColorReadoutRegression --suite NativeResponsivenessRegression
+.venv/bin/python tests/color_readout_probe.py --work work/new-color-readouts-raw \
+  --engine /absolute/LumaRAW.app/Contents/Resources/Engine/LumaRAWEngine \
+  --fixture /absolute/nikon.NEF
+```
+
+The RAW readout probe compares ordinary/readout previews, first/warm map caches,
+both color-map roles and CPU/Metal values through the persistent native relay.
+Run without other builds/tests. Record actual execution counters, elapsed time,
+dimensions and sampled worker peak RSS. Synthetic and real-RAW numerical agreement
+does not establish Adobe color equivalence or rendered hover behavior.
+
 `test_reference_preview.py` checks revision-bound ordinary previews, rejection
 before and after worker execution, metadata-only changes, bounded geometry,
 legacy reads, ICC-tagged output and preserved recipes/history/original bytes.
@@ -68,8 +92,8 @@ revision receipt rejection separately from actual engine renders.
 
 Native state probes do not establish actual drag/drop, keyboard dispatch, alert
 presentation, rendered overlay alignment, VoiceOver or macOS 14 runtime behavior.
-Keep those explicit acceptance gaps. Reference readouts and expanded zoom tools
-remain part of the full parity scope.
+Keep those explicit acceptance gaps. Readout numerical/reference acceptance, HDR
+readouts and expanded zoom tools remain part of the full parity scope.
 
 Run the RAW probe with other builds/tests stopped. It includes packaged CLI/IPC,
 captured ordinary-preview revisions and sequential CPU/Metal workers for two

@@ -46,6 +46,7 @@ extension Store {
     }
 
     func endReferenceView() {
+        clearColorReadout()
         referenceEnabled=false;referenceCropPhotoID=nil
         referenceRenderer.stop()
     }
@@ -57,6 +58,7 @@ extension Store {
     }
 
     func clearReferencePhoto() {
+        clearColorReadout()
         referenceReadGeneration+=1;referencePhoto=nil;referenceError=nil
         referenceDetail=false;referenceCX=0.5;referenceCY=0.5
         referenceRenderer.stop()
@@ -64,6 +66,7 @@ extension Store {
 
     func setReferencePhoto(_ id:Int) async {
         guard photos.contains(where:{$0.id==id}) else {return}
+        clearColorReadout()
         referenceReadGeneration+=1;let token=referenceReadGeneration
         guard await flushEdits(),token==referenceReadGeneration else {return}
         do {
@@ -96,7 +99,10 @@ extension Store {
     }
 
     func updateReferenceRequest(force:Bool=false) {
-        if let request=referenceRequest {referenceRenderer.request(request,force:force)}
+        if let request=referenceRequest {
+            if force || referenceRenderer.frame?.request != request {clearColorReadout()}
+            referenceRenderer.request(request,force:force)
+        }
     }
 
     func setReferencePane(_ size:CGSize,scale:Double) {

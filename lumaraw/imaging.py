@@ -8,6 +8,7 @@ Boundaries: LibRaw uses full-frame native allocations, not a streaming RAW decod
 Memory preflight plus a parent RSS watchdog bound risk; 128-row edits avoid multiple
 full-frame float buffers. Preview uses half-size demosaic, exports full resolution.
 No claim of Nikon Picture Control equivalence or recovery of clipped sensor data.
+Cache eviction bounds both bytes and entry count while retaining current receipts.
 """
 import gc
 import hashlib
@@ -131,6 +132,10 @@ def load_source(path, recipe, budget_mb, preview=False):
             with stage("raw_unpack"):
                 raw.unpack()
             meta = raw_metadata(raw, path)
+            # LibRaw applies the camera orientation before returning pixels.
+            dw,dh=raw.sizes.width,raw.sizes.height
+            if raw.sizes.flip in (5,6):dw,dh=dh,dw
+            meta.update(decoded_width=dw,decoded_height=dh)
             wb = relative_wb(raw.camera_whitebalance, recipe.temperature, recipe.tint)
             with stage("raw_demosaic_color"):
                 data = raw.postprocess(
@@ -158,6 +163,7 @@ def load_source(path, recipe, budget_mb, preview=False):
                 raise ValueError('Only 8-bit PNG import is supported; high-bit-depth PNG is rejected to avoid silent precision loss')
         icc = opened.info.get('icc_profile')
         img = ImageOps.exif_transpose(opened)
+        decoded_size=img.size
         if preview:
             img.thumbnail((PREVIEW_EDGE, PREVIEW_EDGE), Image.Resampling.LANCZOS)
         if icc:
@@ -169,6 +175,7 @@ def load_source(path, recipe, budget_mb, preview=False):
         a *= np.array([2 ** (recipe.temperature / 120), 2 ** (-recipe.tint / 180),
                        2 ** (-recipe.temperature / 120)], dtype=np.float32)
         return a, {'width': opened.width, 'height': opened.height, 'kind': opened.format,
+                   'decoded_width':decoded_size[0],'decoded_height':decoded_size[1],
                    'profile': 'ICC → sRGB → linear ProPhoto D65' if icc else 'Assumed sRGB → linear ProPhoto D65',
                    'input': 'Rendered image (not RAW)', 'warnings': [] if icc else ['No ICC profile; interpreted as sRGB']}
 
@@ -279,15 +286,21 @@ def export_image(path, recipe, destination, fmt, budget_mb, job_id, **kwargs):
     return render(path,recipe,destination,fmt,budget_mb,job_id,**kwargs)
 
 
-def trim_cache(directory, maximum_mb=512, keep=()):
-    """Keep cache bounded on disk; never follows symlinks or touches originals."""
+def trim_cache(directory, maximum_mb=512, keep=(), maximum_files=4096):
+    """Bound bytes and file count; retain current receipts and ignore symlinks.
+
+    A count bound prevents settled one-pixel reads from accumulating unbounded
+    tiny files below the byte budget. Only this explicit cache directory is owned.
+    """
     folder = Path(directory)
     files = [p for p in folder.iterdir() if p.is_file() and not p.is_symlink()]
     total = sum(p.stat().st_size for p in files)
     pinned = {str(p) for p in keep}
+    count = len(files)
     for p in sorted(files, key=lambda x: x.stat().st_mtime):
-        if total <= maximum_mb * 1024 * 1024:
+        if total <= maximum_mb * 1024 * 1024 and count <= maximum_files:
             break
         if str(p) not in pinned:
             total -= p.stat().st_size
             p.unlink(missing_ok=True)
+            count -= 1

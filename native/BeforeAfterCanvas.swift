@@ -61,7 +61,7 @@ struct BeforeAfterCanvas:View {
         }
         .onChange(of:s.currentBeforeContext) {_,_ in clearDrag()}
         .onChange(of:mode) {_,_ in clearDrag()}
-        .onDisappear {clearDrag()}
+        .onDisappear {clearDrag();s.clearColorReadout()}
         .accessibilityElement(children:.contain)
         .accessibilityLabel("Before and After, \(mode.title), \(s.detail ? "one to one":"fit")")
     }
@@ -74,13 +74,13 @@ struct BeforeAfterCanvas:View {
                     split(before:before,after:after,size:pane)
                 } else if mode.vertical {
                     VStack(spacing:ComparisonLayout.gap) {
-                        whole(before,title:"Before · \(s.beforeLabel)",size:pane)
-                        whole(after,title:"After",size:pane)
+                        whole(before,title:"Before · \(s.beforeLabel)",size:pane,role:.before)
+                        whole(after,title:"After",size:pane,role:.active)
                     }
                 } else {
                     HStack(spacing:ComparisonLayout.gap) {
-                        whole(before,title:"Before · \(s.beforeLabel)",size:pane)
-                        whole(after,title:"After",size:pane)
+                        whole(before,title:"Before · \(s.beforeLabel)",size:pane,role:.before)
+                        whole(after,title:"After",size:pane,role:.active)
                     }
                 }
             }.frame(width:size.width,height:size.height).clipped()
@@ -92,6 +92,7 @@ struct BeforeAfterCanvas:View {
                         captured=frame;capturedMode=mode
                     }
                     guard captured?.context==s.currentBeforeContext,capturedMode==mode else {clearDrag();return}
+                    s.clearColorReadout()
                     drag=value.translation
                 }.onEnded {value in
                     defer {clearDrag()}
@@ -109,13 +110,14 @@ struct BeforeAfterCanvas:View {
         }
     }
 
-    private func whole(_ image:NSImage,title:String,size:CGSize)->some View {
+    private func whole(_ image:NSImage,title:String,size:CGSize,role:ColorReadoutRole)->some View {
         let rect=imageRect(image,size:size)
         return ZStack(alignment:.topLeading) {
             Color(white:0.06)
             imageLayer(image,rect:rect)
             caption(title)
         }.frame(width:size.width,height:size.height).clipped()
+            .onContinuousHover {phase in hover(phase,rect:rect,role:role)}
             .accessibilityLabel(title)
     }
 
@@ -141,6 +143,19 @@ struct BeforeAfterCanvas:View {
             caption("Before · \(s.beforeLabel)")
         }.frame(width:size.width,height:size.height).clipped()
             .overlay(alignment:mode.vertical ? .bottomTrailing:.topTrailing) {caption("After")}
+            .onContinuousHover {phase in
+                let before:Bool
+                if case .active(let location)=phase {
+                    before=(mode.vertical ? location.y:location.x)<boundary
+                } else {before=false}
+                hover(phase,rect:rect,role:before ? .before:.active)
+            }
+    }
+
+    private func hover(_ phase:HoverPhase,rect:CGRect,role:ColorReadoutRole) {
+        guard captured==nil,case .active(let location)=phase,rect.width>0,rect.height>0,
+              rect.contains(location) else {s.clearColorReadout();return}
+        s.hoverColors(CGPoint(x:(location.x-rect.minX)/rect.width,y:(location.y-rect.minY)/rect.height),role:role)
     }
 
     private func imageLayer(_ image:NSImage,rect:CGRect)->some View {

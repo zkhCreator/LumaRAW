@@ -256,6 +256,10 @@ struct PhotoCanvas:View {
                             let pixels=image.representations.first
                             Image(nsImage:image).resizable().frame(width:CGFloat(pixels?.pixelsWide ?? 1600)/scale,height:CGFloat(pixels?.pixelsHigh ?? 1100)/scale)
                                 .overlay {
+                                    GeometryReader {frame in
+                                        Color.clear.contentShape(Rectangle())
+                                            .modifier(ColorReadoutHover(imageSize:image.size,available:frame.size,fitted:false))
+                                    }
                                     if s.curveTargetActive {
                                         GeometryReader {frame in CurveTargetOverlay(imageSize:image.size,available:frame.size,fitted:false)}
                                     }
@@ -267,6 +271,10 @@ struct PhotoCanvas:View {
                         }
                     } else {
                         Image(nsImage:image).resizable().aspectRatio(contentMode:.fit).padding(26)
+                        if s.develop,s.canvasTool=="view" {
+                            Color.clear.contentShape(Rectangle())
+                                .modifier(ColorReadoutHover(imageSize:image.size,available:geo.size))
+                        }
                         if s.curveTargetActive {CurveTargetOverlay(imageSize:image.size,available:geo.size)}
                         if s.mixerTargetActive {MixerTargetOverlay(imageSize:image.size,available:geo.size)}
                         if s.develop,!["view","curve","mixer"].contains(s.canvasTool),!s.compare {DrawingOverlay(image:image,available:geo.size)}

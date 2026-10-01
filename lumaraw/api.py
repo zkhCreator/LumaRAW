@@ -155,6 +155,8 @@ CURVE_PATCH['minProperties']=1
 TOOLS['preview_photo']['inputSchema']['properties'].update(curve_patch=CURVE_PATCH,expected_revision=REV)
 TOOLS['preview_photo']['description']+=' expected_revision also binds ordinary previews before and after processing; a changed photo fails visibly without returning stale pixels.'
 TOOLS['preview_photo']['inputSchema']['properties']['include_curve_tones']=BOOL
+TOOLS['preview_photo']['inputSchema']['properties']['include_color_readouts']=BOOL
+TOOLS['preview_photo']['description']+=' include_color_readouts returns bounded float32 SDR Develop RGB percent/CIELAB D50 maps before display proofing, with cropped full-image dimensions and optional Before maps.'
 TOOLS['preview_photo']['description']+=' include_curve_tones returns a bounded, geometry-aligned pre-parametric input-tone map for targeted adjustment.'
 TOOLS['preview_photo']['inputSchema']['dependentRequired']={'curve_patch':['expected_revision']}
 TOOLS['preview_photo']['description']+=' curve_patch previews temporary point or parametric curves at expected_revision without saving edits or history.'

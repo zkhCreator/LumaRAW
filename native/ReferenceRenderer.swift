@@ -11,7 +11,7 @@ struct ReferenceRequest:Equatable {
     let proofPath:String
     var params:[String:Any] {
         var result:[String:Any]=["photo_id":context.photoID,"expected_revision":context.revision,
-                                "include_before":false,"display":["gamut":context.gamut]]
+                                "include_before":false,"include_color_readouts":true,"display":["gamut":context.gamut]]
         if !proofPath.isEmpty {
             result["display"]=["gamut":context.gamut,"proof_path":proofPath,"proof_sha":context.proofSHA]
         }
@@ -26,6 +26,7 @@ struct ReferenceFrame {
     let request:ReferenceRequest
     let image:NSImage
     let region:BeforeAfterFrame
+    let colors:ColorReadoutFrame?
 }
 
 @MainActor final class ReferenceRenderer:ObservableObject {
@@ -60,10 +61,12 @@ struct ReferenceFrame {
                       let path=reply["preview"] as? String else {
                     throw EngineFailure(message:"The reference preview changed or could not be loaded. Refresh the reference photo.")
                 }
-                let loaded=await PreviewImageLoader.load(path)
+                async let loadedImage=PreviewImageLoader.load(path)
+                async let loadedColors=ColorReadoutLoader.frame(reply,context:request.context)
+                let (loaded,colors)=await (loadedImage,loadedColors)
                 guard !Task.isCancelled,token==generation else {return}
                 guard let image=loaded else {throw EngineFailure(message:"The reference preview could not be loaded. Refresh the reference photo.")}
-                frame=ReferenceFrame(request:request,image:image,region:region)
+                frame=ReferenceFrame(request:request,image:image,region:region,colors:colors)
             } catch {
                 guard !Task.isCancelled,token==generation else {return}
                 self.error=error.localizedDescription

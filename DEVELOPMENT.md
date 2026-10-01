@@ -38,6 +38,12 @@ when a clear function is more maintainable. Avoid unrelated formatting churn.
   both before and after workers. Discard stale pane/photo/viewport drags and
   request only bounded physical-pixel ROIs. Cropping requires a captured exit
   confirmation; local drawing and targeting stay attached to the active image.
+- Develop readouts sample engine data before proofing/overlays. Keep SDR RGB/Lab
+  equations, white point, precision and clipping explicit. Do not derive values
+  from screen pixels. Compare full cropped dimensions before pairing roles and
+  follow Before state. Load maps off the main actor and isolate hover publications
+  from Store. Local pointer movement must not start workers; an off-viewport
+  counterpart may use a debounced, cancellable, revision-bound one-pixel request.
 - Snapshot names and recipes are shared by original/virtual-copy families. Keep
   stable non-reused IDs, independent snapshot revisions and a family list token.
   Read summaries through indexed alphabetical pages; never load all recipes for
