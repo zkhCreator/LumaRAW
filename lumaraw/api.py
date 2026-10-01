@@ -154,6 +154,7 @@ CURVE_PATCH['properties']['parametric_splits']={'type':'array','items':{'type':'
 CURVE_PATCH['minProperties']=1
 TOOLS['preview_photo']['inputSchema']['properties'].update(curve_patch=CURVE_PATCH,expected_revision=REV)
 TOOLS['preview_photo']['description']+=' expected_revision also binds ordinary previews before and after processing; a changed photo fails visibly without returning stale pixels.'
+TOOLS['preview_photo']['description']+=' Completed previews may be reused after bounded artifact integrity checks; preview_cache_hit and worker_spawned distinguish reuse from processing.'
 TOOLS['preview_photo']['inputSchema']['properties']['include_curve_tones']=BOOL
 TOOLS['preview_photo']['inputSchema']['properties']['include_color_readouts']=BOOL
 TOOLS['preview_photo']['description']+=' include_color_readouts returns bounded float32 SDR Develop RGB percent/CIELAB D50 maps before display proofing, with cropped full-image dimensions and optional Before maps.'

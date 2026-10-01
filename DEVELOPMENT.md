@@ -50,6 +50,13 @@ when a clear function is more maintainable. Avoid unrelated formatting churn.
   Count every optional GPU buffer in admission and layout changes. Do not expose
   any partial output after failure, repeat grading for readouts, or count a
   skipped CPU stage as the total user-visible speed improvement.
+- Completed preview reuse must bind engine/backend, source/assets, both recipes,
+  geometry, display and all requested auxiliary maps. Validate bounded artifact
+  contents outside SQL locks and repeat revision/source/generation checks before
+  returning. A cache hit cannot wait behind image work or claim a new GPU dispatch.
+  Serialize corruption repairs with image writers; a normal LRU touch or atomic
+  replacement is not evidence that valid maps should be removed. Publish PNGs
+  and receipts atomically and preserve ordinary rendering when a cache is absent.
 - Snapshot names and recipes are shared by original/virtual-copy families. Keep
   stable non-reused IDs, independent snapshot revisions and a family list token.
   Read summaries through indexed alphabetical pages; never load all recipes for

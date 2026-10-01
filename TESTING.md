@@ -13,6 +13,15 @@ The two `test_core.py` real-RAW tests skip if that environment variable is absen
 
 ## Native responsiveness
 
+`test_preview_cache.py` uses real workers for completed Fit/detail/Before replies,
+histograms and every auxiliary map. It checks restart/base-cache eviction,
+render-option/engine/backend/source/asset keys, revision and cancellation races,
+busy-worker bypass, corrupt/truncated/symlink/traversal rejection and genuine map
+body reconstruction. Concurrent LRU touches and atomic file replacement must not
+purge valid maps. A separate process proves the cache adapter imports no pixel
+libraries. `preview_cache_hit` and `worker_spawned` distinguish lookup from image
+processing; zero worker peak/work on a hit is not zero broker memory/CPU use.
+
 `test_native_client.py` verifies bounded relay admission, reserved control
 capacity, out-of-order correlation, malformed frames, duplicate IDs, EOF draining
 and failure responses without mutation replay. `NativeTransportRegression`

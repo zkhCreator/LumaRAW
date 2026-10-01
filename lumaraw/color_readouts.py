@@ -35,10 +35,12 @@ def values(work):
 
 
 def target_path(path, recipe, cache, geometry):
-    # Include external LUT bytes through the ordinary recipe cache identity.
+    # The recipe carries the expected LUT SHA; stat identity additionally rejects
+    # a replaced external asset before a completed map can be reused.
     from .source_identity import cache_key
+    asset = fingerprint(recipe.lut['path']) if recipe.lut else ''
     key = hashlib.sha256(json.dumps([STAGE, fingerprint(path),
-        cache_key(path, recipe, STAGE), geometry], sort_keys=True).encode()).hexdigest()
+        cache_key(path, recipe, STAGE), geometry, asset], sort_keys=True).encode()).hexdigest()
     return Path(cache)/(key+'.readouts')
 
 

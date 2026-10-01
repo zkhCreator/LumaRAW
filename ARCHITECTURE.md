@@ -45,6 +45,28 @@ publishing another invalidation of the whole workspace.
 
 On macOS/Linux, IPC uses a Unix socket in a user-only temporary directory (0700). Bounded JSON crosses `send_bytes`/`recv_bytes`; no pickle deserialization is used. A startup lock prevents competing brokers. Windows has AF_PIPE and msvcrt locking branches, but these have not been validated on Windows.
 
+## Completed preview reuse
+
+Completed `preview_photo` replies can be reused by the broker without worker
+admission. A bounded receipt identifies the engine build, compute policy, source,
+external LUT/proof assets, complete After/Before recipes and every requested
+render option. Client IDs and visual revisions remain caller-side conflict and
+cancellation checks; they are not pixel identities. Lookup hashes bounded PNG/map
+artifacts in chunks outside catalog locks, without importing pixel libraries.
+Missing or corrupt artifacts cause ordinary processing. Cached replies report
+`preview_cache_hit=true`, `worker_spawned=false`, zero worker/GPU work and a
+separate lookup duration. They do not replay a past processing report as new work.
+
+Workers atomically publish After PNGs and completed receipts after input identity
+revalidation. Receipts are disposable, subject to the existing byte/count cache
+budget and do not require decoded-source arrays to survive. Hits preserve their
+requested Before, histogram, geometry, curve/mixer maps and readout outputs.
+Revision/source/generation checks still run before returning a cached result.
+Corruption repair removes only associated disposable maps under the image-writer
+lock, preventing older header-only caches from blessing a damaged body. Valid
+reads never wait for that lock. Concurrent LRU touches are harmless; an atomic
+file replacement is a transient miss and does not trigger destructive repair.
+
 ## Develop color readouts
 
 `preview_photo(include_color_readouts=true)` returns disposable, geometry-aligned

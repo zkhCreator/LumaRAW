@@ -4,6 +4,7 @@ Reads bounded JSON from stdin, returns one JSON result; no pixel buffers cross I
 The catalog service owns scheduling, cancellation, and RSS monitoring. Process exit releases
 LibRaw/NumPy native allocations even after failure. Original files are read-only.
 The engine identity must match its broker before any pixels or outputs are opened.
+Successful previews publish bounded completed receipts for later broker reuse.
 """
 import json
 import sys
@@ -38,7 +39,16 @@ def main():
         recipe = Recipe.parse(request.get('recipe', {}))
         operation = request['operation']
         if operation in ('preview','detail','reference'):
+            from . import preview_cache
+            from .runtime import engine_identity
+            preview_key=preview_cache.key(request,engine_identity(),request.get('compute_backend','auto'))
             result = make_preview(request['path'], recipe, request['cache'], request['budget_mb'],detail=request.get('detail'),display=request.get('display'),include_before=request.get('include_before',True),max_edge=request.get('max_edge'),orientation=request.get('orientation',0),include_curve_tones=request.get('include_curve_tones',False),mixer_target=request.get('mixer_target'),before_recipe=request.get('before_recipe'),include_color_readouts=request.get('include_color_readouts',False))
+            if preview_key!=preview_cache.key(request,engine_identity(),request.get('compute_backend','auto')):
+                raise ValueError('Source or rendering asset changed during preview; reload the photograph')
+            with performance.stage('preview_cache_publish'):
+                receipt=preview_cache.save(request['cache'],preview_key,request,result)
+            if receipt:result.setdefault('cache_keep',[]).append(receipt)
+            result.update(preview_cache_hit=False,worker_spawned=True)
         elif operation == 'calibrate':
             from .calibration import calibrate
             result = calibrate(request['path'],request['reference'],request['source_rect'],request['reference_rect'],request['cache'],request['budget_mb'],request['name'],request['lighting'])

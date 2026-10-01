@@ -66,7 +66,7 @@ gaps. Nothing below is full Lightroom parity merely because historical tests pas
 | Geometry | Partial: crop/straighten/perspective, independent rotation/flips with attached masks and displayed crop ratios | Interactive retained handles, guided transforms, full crop state and rendered/reference parity |
 | Local editing | Partial: radial/gradient/brush/luma | Mask list/edit/reorder/intersection, range masks, clone/heal, red-eye (non-AI) |
 | History and presets | Partial: durable paged Develop history with undo/redo, state selection/rename/clear, persistent Before assignment/copy/swap, separate 50-batch orientation undo, alphabetical shared snapshots with current/history capture, rename/update/delete and Before copy, partial Develop presets/groups/favorites/shared or local storage, batch/Painter and reviewed-import application | Unified application Undo/Redo, history/snapshot hover, preset hover preview/Amount/ISO adaptation/Adobe exchange and rendered reference acceptance |
-| Preview/performance | Partial: Metal, proxies, 1:1 viewport, developed thumbnail fast path, on-demand Before with independent cache, four paired layouts, persistent command relay, background image preparation, quiet polling and local readout maps | Real-RAW catalog/slider latency, offline previews, cache controls and desktop/reference acceptance |
+| Preview/performance | Partial: Metal, proxies, 1:1 viewport, developed thumbnail fast path, on-demand Before with independent cache, four paired layouts, persistent command relay, background image preparation, quiet polling, fused readout maps and validated completed-preview reuse | Real-RAW catalog/slider latency, offline previews, cache controls and desktop/reference acceptance |
 | Export | Partial: JPEG/16-bit TIFF, ICC, durable jobs with frozen catalog/rights IPTC XMP and keyword hierarchy options | Presets, complete EXIF/IPTC Extension/GPS metadata policies, watermark, additional formats, publish workflows |
 | External editing and video | Missing | External-editor setup and derivative round trips; supported video import/playback, frame capture, trimming and export |
 | Merge | Missing | Non-AI HDR merge and panorama with bounded resources and reference acceptance |
@@ -3247,3 +3247,126 @@ The known optional PyInstaller `scipy.special._cdflib` warning remains, with no
 new native warnings/errors. Desktop automation was not retried after its earlier
 denial. Real slider/scroll/hover interaction, VoiceOver, macOS 14 runtime and Adobe
 processing equivalence remain **not verified**. Full non-AI parity is incomplete.
+
+
+## Completed preview reuse (October 1, 2026)
+
+Previously every After preview started an image worker and repeated grading and
+PNG encoding, even when the source, recipe and viewport were unchanged. The
+broker now reuses a completed preview after bounded integrity checks. This covers
+Fit/detail, Before, histogram/geometry, curve input maps, mixer weights and RGB/Lab
+maps, including captured temporary recipes. Hits bypass image-worker admission,
+so an existing preview is available while an unrelated export holds that slot.
+
+The receipt key includes engine build, compute policy, source and external asset
+stat identities, full After/Before recipes and every render option. Stat identity
+is not a content hash of the original. Artifact checksums cover full contents in
+1-MiB chunks, with cancellation checkpoints, bounded receipt/file sizes, recognized
+filenames and no symlink/path traversal. The broker imports no pixel libraries.
+Revisions, source/asset identity and request generations are checked again before
+returning; metadata-only changes do not create false visual conflicts.
+
+Workers publish After PNGs and receipts atomically. Corrupt map bodies cause
+associated disposable maps to be removed under the image-writer lock, preventing
+the older header-only map caches from reusing bad data during regeneration.
+Originals/images are not removed by this repair. Valid reads never acquire that
+lock. Concurrent LRU touches remain valid, while atomic file replacement causes a
+transient miss without deleting valid maps. Missing decoded-source arrays do not
+prevent a completed hit. Cache files remain bounded by the existing byte/count
+policy; this is not offline-preview support or a cache-management UI.
+
+A replaced Before-only LUT now invalidates its independent image/readout cache
+before immutable-asset validation, instead of showing old Before pixels. The
+portable service owns reuse; SwiftUI has no new SQL, file hashing or pixel logic.
+The engine generation is **37**, catalog schema **25**, with **120 commands**.
+Cached replies report `preview_cache_hit=true`, `worker_spawned=false`, backend
+`cache`, zero worker/GPU work and measured lookup time. They never replay old GPU
+counters as evidence of new dispatch. The last actual processing report remains
+available in settings.
+
+### Regression scope
+
+The initial focused run passes 110 checks. A full run exposes two compatibility
+issues: cached replies omitted the legacy success field, and direct workers with
+an omitted recipe failed. Both are corrected. Map-body recovery and concurrency
+checks then bring the full run to **773 tests in 80.10 seconds, with no skips**,
+requiring actual Metal and the fixed NEF. Adding the final publication timing
+stage changes no rendering/cache behavior; the affected cache/service/reference
+suites subsequently pass **56 tests in 23.89 seconds**.
+
+Tests exercise restart, decoded-base eviction, all render-option keys, engine and
+backend changes, source/LUT/proof changes, revision/Before/source/cancellation
+races, busy-worker bypass, corrupt/missing/truncated/symlink/traversal cases, actual
+map reconstruction, concurrent touches/replacement and pixel-library isolation.
+Original bytes and catalog recipes/history remain unchanged by preview reuse.
+
+### Packaged RAW measurements
+
+The initial candidate is compared with generation 36 in three alternating rounds
+(old/new, new/old, old/new), with fresh catalogs and no competing builds/test runs.
+All **96 scenarios** pass. The final candidate adds only the publication timing
+stage and independently passes **16 further scenarios**. All use the same Nikon
+D3S NEF, 4284 by 2844 decoded pixels, 10,656,312 bytes, SHA-256
+`5922721d13f11795557d97fdeb0a60b900086c402bc82a848ff280d15b99ffd4`,
+on macOS 26.6.2, Apple M3 Max, 128 GiB RAM. Fit is 1680 by 1115 and detail is
+800 by 600. After and Before are both requested. Measurements include persistent
+negotiated IPC and any worker startup, excluding native rendering and cold OS/GPU
+cache guarantees. Three samples are not general latency percentiles.
+
+| Repeated request | Previous median / range | Completed-cache median / range |
+| --- | ---: | ---: |
+| Metal Fit with readouts | 472.313 / 471.733–490.592 ms | 51.084 / 50.631–52.735 ms |
+| Metal detail with readouts | 374.150 / 361.602–415.456 ms | 24.193 / 24.092–54.389 ms |
+| Metal ordinary Fit | 473.243 / 465.941–482.446 ms | 17.149 / 16.424–17.213 ms |
+| Metal ordinary detail | 360.966 / 343.757–379.015 ms | 14.891 / 14.699–15.459 ms |
+| CPU Fit with readouts | 1004.956 / 914.818–1004.961 ms | 50.528 / 50.307–53.824 ms |
+| CPU detail with readouts | 489.888 / 479.755–514.332 ms | 23.402 / 22.917–25.133 ms |
+| CPU ordinary Fit | 989.702 / 946.515–1006.686 ms | 16.635 / 16.135–18.896 ms |
+| CPU ordinary detail | 473.420 / 469.774–485.095 ms | 13.910 / 13.840–14.271 ms |
+
+All repeated candidate requests hit completed receipts and start no worker. The
+final timing candidate independently measures 50.319/23.401 ms for Metal Fit/detail
+with readouts and 17.010/13.261 ms without them. Cache lookup itself takes about
+36.8/9.9 ms with readouts; full map hashing accounts for most of that work.
+
+First generation has a cost and is not claimed faster. In the initial comparison,
+Metal first-map medians increase from 880.597 to 1145.492 ms for Fit and 489.864 to
+548.797 ms for detail; CPU first-map medians increase from 1766.514 to 1999.981 ms
+and 653.495 to 722.463 ms. First-map sources are already decoded; ordinary first
+previews separately pay decoding. Instrumenting the final package measures
+publication at **37.379 ms for Metal Fit and 10.008 ms for detail** (CPU 37.661 and
+9.932 ms). Its first-map wall times are 692.708/477.280 ms for Metal, demonstrating
+substantial other cold-path variation. The earlier increases cannot all be
+attributed to checksum publication. No first-interaction or slider-speed claim
+is inferred from warm cache results; new recipes/viewports still need processing.
+
+Broker RSS is sampled every 5 ms, separately from worker RSS. In the three-round
+comparison, warm candidate broker peaks span 49.4–60.2 MiB, versus 46.0–51.9 MiB
+previously. The final candidate's warm broker peaks span 49.8–55.8 MiB. Cached
+worker peaks are zero because no worker exists, not because total app memory is
+zero. Previous warm Metal workers peak at 98.0–153.8 MiB; first generation still
+requires ordinary worker memory. Neither measure is whole-app/system peak RSS.
+
+Cached values remain exact across repeat reads. Final CPU/Metal map differences
+stay below 0.000218 RGB percentage points and 0.000687 Lab units; ordinary/readout
+previews differ by at most one 8-bit code. Originals remain byte-identical.
+
+### Final package identity
+
+The final app builds for macOS 14 and passes deep/strict local signature checks.
+MCP initialization and all 120 full schemas match source, as does the bundled
+guide. The final packaged-engine run passes **132 native assertions**: Color
+Readout 20, Responsiveness 16, Reference 51, Before/After 19 and Transport 26.
+All suite checks pass, including quiet unchanged polling, local hover, stale
+reply rejection and persistent command correlation. These remain state/IPC and
+offscreen component checks, not desktop input acceptance.
+The publication timing stage is present in the tested generation-37 build:
+
+- Source digest: `907a84ada4a13c3b421b43d37172e9e8fc23435006ca501dbe38f6b0734e5638`
+- Engine SHA-256: `7a35c8be5ad4da33a8f4b69df4645d05a3a8e5004d4ec1df42f00056fece8dde`
+- Native executable SHA-256: `eb09c4265531f71301ed448cbbd53a05df2c0ca6d50f8305d3ba87f3aeb2b8b3`
+
+The known optional PyInstaller `scipy.special._cdflib` warning remains. Desktop
+automation was not retried after its earlier denial. Actual desktop input, macOS
+14 runtime, VoiceOver and Adobe rendering equivalence remain **not verified**.
+Full non-AI parity remains incomplete.

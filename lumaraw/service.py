@@ -4,6 +4,8 @@ Purpose: keep UI and agents on one transactional domain boundary. Each command
 opens its own SQLite connection under a short catalog lock. Expensive pixels run
 outside that lock, in one child at a time, with sampled RSS and time limits.
 Inputs: validated API commands. Outputs: JSON, file-backed previews, durable jobs.
+Completed preview receipts are checked outside catalog locks without starting an
+image worker; source identity, revisions and cancellation still bind each reply.
 No GUI, HTTP listener, telemetry or original-file writes. Interrupted exports are
 never automatically replayed. Optimistic revisions prevent lost recipe updates.
 """
@@ -42,6 +44,7 @@ from .develop_history import DevelopHistory, adjustment_label
 from .before_after import BeforeAfter
 from .snapshots import Snapshots
 from .snapshot_status import revision as snapshot_filter_revision
+from . import preview_cache
 
 class ConflictError(ValueError): pass
 
@@ -214,7 +217,17 @@ class Service:
             if before_state:
                 request['before_recipe']=before_state[0].dict()
             source_fingerprint=fingerprint(row['path']) if 'expected_revision' in p else None
-            result=self.run_worker(request)
+            result=None
+            if method=='preview_photo':
+                cache_key=preview_cache.key(request,self.worker_identity,self.compute_backend)
+                result=preview_cache.load(self.cache,cache_key,request,self.compute_backend,
+                                          lambda:self.check_preview_current(request),repair_lock=self.image_lock)
+                if result is not None and cache_key!=preview_cache.key(request,self.worker_identity,self.compute_backend):
+                    raise ValueError('Source or rendering asset changed during preview; reload the photograph')
+            if result is None:
+                result=self.run_worker(request)
+            if method=='preview_photo':
+                self.check_preview_current(request)
             if 'expected_revision' in p:
                 if fingerprint(row['path']) != source_fingerprint:
                     raise ValueError('Source changed during preview; reload the photograph')
@@ -454,6 +467,13 @@ class Service:
             if image_admitted:self.image_lock.release()
             with self.state_lock:self.relocation_cancel.pop(plan_id,None)
             self.relocation_lock.release()
+
+    def check_preview_current(self,request):
+        with self.state_lock:
+            if self.stopping.is_set():raise InterruptedError('Processing stopped')
+            client=request.get('client_id')
+            if client and self.preview_versions.get(client)!=request.get('generation'):
+                raise InterruptedError('Preview is superseded')
 
     def run_worker(self,request):
         with self.image_lock:

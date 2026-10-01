@@ -14,6 +14,7 @@ internal recipes, source names and asset paths are never embedded as description
 Independent catalog orientation maps output strips back to canonical Develop
 coordinates, then losslessly rotates/flips each tile. Masks/crops stay attached.
 Readout maps share the grade/output dispatch, before proofing or overlay pixels.
+After PNG publication is atomic so completed-cache readers cannot see partial writes.
 """
 from dataclasses import replace
 import hashlib
@@ -403,7 +404,14 @@ def make_preview(path,recipe,cache,budget_mb,detail=None,display=None,include_be
     if source_identity is not None and fingerprint(path) != source_identity:
         raise ValueError('Source changed during preview; reload the photograph')
     key=hashlib.sha256((cache_key(path,recipe,'render-v5')+json.dumps([detail,display,include_before,max_edge,orientation],sort_keys=True)).encode()).hexdigest()
-    target=cache/(key+'.png');Image.fromarray(pixels).save(target,icc_profile=icc_profile('srgb'))
+    target=cache/(key+'.png')
+    fd,name=tempfile.mkstemp(dir=cache,prefix='.preview-',suffix='.png')
+    try:
+        with os.fdopen(fd,'wb') as output:
+            Image.fromarray(pixels).save(output,format='PNG',icc_profile=icc_profile('srgb'))
+        os.replace(name,target)
+    finally:
+        Path(name).unlink(missing_ok=True)
     h,w=pixels.shape[:2]
     result={'preview':str(target),'metadata':meta,'histogram':hist,
             'clipped_percent':round(gamut,2),'width':w,'height':h,'full_width':plan.width,'full_height':plan.height,
@@ -428,7 +436,8 @@ def make_preview(path,recipe,cache,budget_mb,detail=None,display=None,include_be
     keep=('rotation','crop','crop_box','straighten','perspective_h','perspective_v','geometry_scale','distortion','ca_red','ca_blue')
     baseline=replace(Recipe.parse(before_recipe) if before_recipe is not None else Recipe(),
                      **{k:getattr(recipe,k) for k in keep})
-    before_key=hashlib.sha256((cache_key(path,baseline,'before-v1')+json.dumps([detail,display,max_edge,orientation],sort_keys=True)).encode()).hexdigest()
+    before_asset=fingerprint(baseline.lut['path']) if baseline.lut else ''
+    before_key=hashlib.sha256((cache_key(path,baseline,'before-v2'+before_asset)+json.dumps([detail,display,max_edge,orientation],sort_keys=True)).encode()).hexdigest()
     before_path=cache/(before_key+'-before.png')
     before_readout=None;before_readout_hit=False
     if include_color_readouts:

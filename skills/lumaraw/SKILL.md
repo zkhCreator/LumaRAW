@@ -5,6 +5,14 @@ description: Develop and organize local RAW photographs with LumaRAW through MCP
 
 # LumaRAW local darkroom
 
+Repeated `preview_photo` calls may return a validated completed preview without
+starting image work. `preview_cache_hit=true` and `worker_spawned=false` identify
+this path; processing backend `cache` reports lookup time and zero worker/GPU
+work. Continue to pass captured revisions and honor stale/cancelled replies.
+Reuse includes requested Before, geometry, histogram and targeting/readout maps;
+missing, changed or damaged cache data causes normal rendering. This is a local
+processing optimization, not evidence of Adobe pixel parity or UI frame rate.
+
 ## Develop history
 
 Read `get_photo` and capture its revision before calling `list_history`. Every

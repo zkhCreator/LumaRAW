@@ -1,7 +1,7 @@
 """Compare bounded RGB/Lab readouts with ordinary previews on a packaged engine.
 
 Inputs: explicit read-only RAW, engine and fresh work directory. Outputs: cold
-application/warm-map timings, sampled worker peak RSS, numerical/display parity.
+application/warm-map timings, sampled worker/broker peak RSS, numerical/display parity.
 Uses the native persistent relay. No cold-OS-cache, desktop or Adobe parity claim.
 """
 import argparse
@@ -12,9 +12,11 @@ from pathlib import Path
 import platform
 import select
 import subprocess
+import threading
 import time
 
 import numpy as np
+import psutil
 from PIL import Image
 
 
@@ -30,17 +32,29 @@ def main():
             stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=subprocess.DEVNULL,
             env={**os.environ,'LUMARAW_PRESETS_ROOT':str(root/'presets'/backend)})
         counter=0
+        broker=None;active_peak=[0.];last_broker_peak=0.
+        stop=threading.Event();sampler=None
+        def sample_broker():
+            while not stop.wait(.005):
+                target=active_peak
+                try:target[0]=max(target[0],broker.memory_info().rss/1024**2)
+                except psutil.NoSuchProcess:return
         def call(method,params=None):
-            nonlocal counter
+            nonlocal counter,active_peak,last_broker_peak
+            active_peak=[broker.memory_info().rss/1024**2 if broker else 0.]
             counter+=1;start=time.perf_counter()
             relay.stdin.write(json.dumps({'id':counter,'method':method,'params':params or {}}).encode()+b'\n')
             relay.stdin.flush()
             assert select.select([relay.stdout],[],[],180)[0],'Native relay timed out'
             envelope=json.loads(relay.stdout.readline(1024*1024+1))
             assert envelope.get('ok') and envelope['id']==counter,envelope
+            last_broker_peak=round(active_peak[0],1)
             return envelope['result'],(time.perf_counter()-start)*1000
         try:
             call('queue_control',{'action':'pause'});call('settings',{'compute_backend':backend})
+            connection,_=call('service_connection',{'action':'status'})
+            broker=psutil.Process(connection['pid'])
+            sampler=threading.Thread(target=sample_broker,daemon=True);sampler.start()
             call('import_photos',{'paths':[str(fixture)]})
             call('edit_photo',{'photo_id':1,'expected_revision':0,'patch':{'exposure':.35,'shadows':20,'blue_hue':-9}})
             for detail in (False,True):
@@ -57,10 +71,17 @@ def main():
                     baseline=display.setdefault((backend,mode),pixels)
                     error=int(np.abs(baseline.astype(np.int16)-pixels.astype(np.int16)).max())
                     assert error<=1
-                    if backend=='metal':assert result['processing']['metal_grade_tiles']>0
+                    if result.get('preview_cache_hit'):
+                        assert result['worker_spawned'] is False
+                        assert result['processing']['backend']=='cache'
+                        assert result['processing']['metal_grade_tiles']==result['processing']['cpu_tiles']==0
+                    elif backend=='metal':assert result['processing']['metal_grade_tiles']>0
                     record={'backend':backend,'case':case,'wall_ms':round(elapsed,3),
                         'worker_peak_mib':result['peak_mb'],'width':result['width'],'height':result['height'],
-                        'roi':result['roi'],'processing':result['processing'],'display_max_code_difference':error}
+                        'broker_peak_mib':last_broker_peak,
+                        'roi':result['roi'],'processing':result['processing'],'display_max_code_difference':error,
+                        'preview_cache_hit':result.get('preview_cache_hit',False),
+                        'worker_spawned':result.get('worker_spawned',True)}
                     if enabled:
                         for key in ('color_readouts','before_color_readouts'):
                             receipt=result[key];data=Path(receipt['path']).read_bytes()
@@ -73,6 +94,8 @@ def main():
                         record['image_dimensions']=[result['image_width'],result['image_height']]
                     runs.append(record)
         finally:
+            stop.set()
+            if sampler:sampler.join(timeout=2)
             relay.stdin.close();relay.wait(timeout=30);relay.stdout.close()
     differences={}
     for _,mode,key in maps:
@@ -84,7 +107,7 @@ def main():
         differences[case]={'maximum_by_channel':maximum.tolist(),'mean':float(delta.mean())}
     assert hashlib.sha256(fixture.read_bytes()).hexdigest()==digest
     report={'system':platform.platform(),'fixture_sha256':digest,'fixture_bytes':fixture.stat().st_size,
-        'scope':'Sequential single samples, persistent negotiated IPC; cold application caches, not cold OS cache or desktop latency',
+        'scope':'Sequential single samples, persistent negotiated IPC; cold application caches, not cold OS cache or desktop latency. Broker RSS sampled every 5 ms, separately from worker RSS; neither is whole-app peak memory.',
         'runs':runs,'cpu_metal_readout_differences':differences,'original_unchanged':True}
     (root/'report.json').write_text(json.dumps(report,indent=2)+'\n');print(json.dumps(report,indent=2))
 
