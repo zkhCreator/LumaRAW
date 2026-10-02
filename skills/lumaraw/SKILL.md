@@ -5,12 +5,13 @@ description: Develop and organize local RAW photographs with LumaRAW through MCP
 
 # LumaRAW local darkroom
 
-`list_photos` returns its count, bounded page and revision/state fields from one
-committed read-only catalog snapshot. It can return the pre-commit state while a
-catalog write is still running; a later request sees the committed result. Keep
-captured revision checks for every mutation. This guarantee is per response,
-not a retained snapshot across multiple commands. Schema mismatches fail rather
-than migrating from the read path; normal service startup owns migrations.
+`list_photos`, `library_state`, `photo_summaries`, `collection_state` and
+`orientation_state` each return data and revision/state fields from one committed
+read-only catalog snapshot. They can return the pre-commit state while a catalog
+write is still running; a later request sees the committed result. Keep captured
+revision checks for every mutation. This guarantee is per response, not a retained
+snapshot across multiple commands. Schema mismatches fail rather than migrating
+from the read path; normal service startup owns migrations.
 
 Repeated `preview_photo` calls may return a validated completed preview without
 starting image work. `preview_cache_hit=true` and `worker_spawned=false` identify

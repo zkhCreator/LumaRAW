@@ -14,7 +14,7 @@ for replacement boundaries, migration gates and performance evidence requirement
 | Command contracts | `lumaraw/api.py` | Shared JSON schemas for app, CLI, and MCP; `api_version=1` |
 | Service | `lumaraw/service.py` | Validation, optimistic revisions, atomic batch edits, idempotent submission, and a shared queue |
 | Catalog | `lumaraw/catalog.py` | SQLite WAL; photos, recipes, history, versions, and jobs; v1 recipes migrate to v2 |
-| Library reads | `catalog_read.py`, `library_queries.py` | One read-only snapshot per photo list, shared bounded filter/count/page SQL; no writes or migrations |
+| Library reads | `catalog_read.py`, `library_queries.py` | One read-only snapshot per photo list or compact refresh-state reply, shared bounded filter/count/page/summary SQL; no writes or migrations |
 | Scheduling | `Service.run_worker` / `queue_loop` | One image subprocess per catalog; JSON and file paths cross the process boundary |
 | Image core | `imaging.py`, `render.py`, `color.py`, `calibration.py` | Portable decoding and image algorithms, independent of SwiftUI, AppKit, and Qt |
 | Compute adapter | `lumaraw/accelerators`, `metal/Bridge.mm` | CPU reference with an optional macOS Metal C ABI |
@@ -138,9 +138,12 @@ the manifest; binaries remain subject to release signing/notarization controls.
 
 ## Consistency and recovery
 
-`list_photos` opens an independent `mode=ro`, `query_only` SQLite connection and
-pins one explicit read transaction. Count, page clamping, photo/stack rows and
-all returned revision/state fields come from that same committed snapshot.
+`list_photos`, `library_state`, `photo_summaries`, `collection_state` and
+`orientation_state` each open an independent `mode=ro`, `query_only` SQLite
+connection and pin one explicit read transaction. Count, page clamping,
+photo/stack rows and all returned revision/state fields in one response come
+from that same committed snapshot. Separate commands may observe different
+commits; native generation and revision guards still govern adoption.
 It can read during a serialized catalog write; a subsequent request sees the
 newly committed state. The query layer is shared with ordinary Catalog callers.
 This follows SQLite's [WAL snapshot isolation](https://www.sqlite.org/isolation.html).
@@ -150,8 +153,9 @@ validation happens inside the snapshot; incompatible schemas fail explicitly.
 Startup retains migration ownership and broker admission still covers the read.
 All other catalog commands retain their existing lock and connection behavior.
 Long counts can hold a WAL snapshot and delay checkpoint progress, so there is
-no connection pool or retained snapshot across commands. Native refresh tails,
-summary polling and thumbnail requests can still wait on the catalog lock.
+no connection pool or retained snapshot across commands. Folder/keyword pages,
+photo details and thumbnail requests can still wait on the catalog lock. Reads
+with filesystem work are intentionally outside this compact snapshot path.
 
 Develop Reference View keeps two distinct roles in the Mac presentation layer.
 Only the active photo owns inspector commands; reference assignment retains a

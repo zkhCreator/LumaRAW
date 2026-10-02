@@ -2,9 +2,10 @@
 
 Inputs: a catalog-like object with a SQLite connection and validated filters,
 source, sort, and page parameters. Outputs: parameterized predicates, exact
-counts, and at most sixty photo rows. Responsibilities: preserve the existing
-Library filter, dense-page, folder, collection, and stack semantics for both
-the write Catalog and the independent read snapshot.
+counts, at most sixty photo rows, and at most sixty photo summaries.
+Responsibilities: preserve the existing Library filter, dense-page, summary,
+folder, collection, and stack semantics for both the write Catalog and the
+independent read snapshot.
 Boundaries: no connection lifecycle, migrations, writes, unbounded photo loads,
 or UI decisions. Stack and collection domain helpers remain the source of their
 own predicates and projections.
@@ -22,6 +23,13 @@ class LibraryQueries:
         return self.db.execute(
             'SELECT count(*) FROM photos' + (' WHERE rating>=3' if stars else '')
         ).fetchone()[0]
+
+    def summaries(self, ids):
+        if not 1 <= len(ids) <= 60:
+            raise ValueError('Summary reads require 1 to 60 photo IDs')
+        placeholders = ','.join('?' for _ in ids)
+        return [dict(row) for row in self.db.execute(
+            f'SELECT {SUMMARY_COLUMNS} FROM photos WHERE id IN ({placeholders}) ORDER BY id', ids)]
 
     def filter_sql(self, mode='all', search='', filters=None, collection_id=None,
                    folder_id=None, include_subfolders=True, *, ordered_page=False):

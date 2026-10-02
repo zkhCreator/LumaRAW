@@ -1,9 +1,10 @@
 """Single-owner catalog service and bounded disposable-worker supervisor.
 
 Purpose: keep UI and agents on one transactional domain boundary. Mutations and
-most catalog commands open their own SQLite connection under a short catalog
-lock; list_photos uses an independent read-only snapshot. Expensive pixels run
-outside the write lock, in one child at a time, with sampled RSS and time limits.
+other catalog commands open their own SQLite connection under a short catalog
+lock; bounded Library page and refresh-state reads use independent read-only
+snapshots. Expensive pixels run outside the write lock, in one child at a time,
+with sampled RSS and time limits.
 Inputs: validated API commands. Outputs: JSON, file-backed previews, durable jobs,
 revision-bound shared/catalog export preset workflows, catalog-local Previous
 settings and immutable, pageable multi-preset export batches. Same-policy batch
@@ -69,6 +70,18 @@ def unpack(row):
         for key in ('recipe','metadata','options','processing','export_metadata','iptc'):
             if key in row and isinstance(row[key],str): row[key]=json.loads(row[key])
     return row
+
+
+def library_read_state(snapshot):
+    """Read the compact revision envelope shared by Library refresh replies."""
+    return {
+        'stack_revision': Stacks(snapshot).revision(),
+        'folder_revision': Folders(snapshot).revision(),
+        'keyword_revision': Keywords(snapshot).revision(),
+        'previous_import': previous_import_state(snapshot.db),
+        'snapshot_filter_revision': snapshot_filter_revision(snapshot.db),
+    }
+
 
 class Service:
     def __init__(self,root,identity=None,presets_root=None):
@@ -448,29 +461,35 @@ class Service:
                             offset,mode,search,filters,collection,p.get('sort','imported'),
                             p.get('descending',True),stacked,folder,subfolders,match_count=total),
                         'total':total,'offset':offset,'page_size':60,
-                        'stack_revision':Stacks(snapshot).revision(),
-                        'folder_revision':Folders(snapshot).revision(),
-                        'keyword_revision':Keywords(snapshot).revision(),
-                        'previous_import':previous_import_state(snapshot.db),
-                        'snapshot_filter_revision':snapshot_filter_revision(snapshot.db)}
+                        **library_read_state(snapshot)}
+        if method in (
+            'library_state',
+            'photo_summaries',
+            'collection_state',
+            'orientation_state',
+        ):
+            with CatalogReadSnapshot(self.root) as snapshot:
+                if method == 'collection_state':
+                    return Collections(snapshot).state(p.get('photo_ids', ()))
+                if method == 'orientation_state':
+                    from .orientation import Orientations
+                    return Orientations(snapshot).state()
+                state = library_read_state(snapshot)
+                if method == 'photo_summaries':
+                    state['photos'] = LibraryQueries(snapshot).summaries(p['photo_ids'])
+                return state
         if method=='queue_control':return self.control(p)
         with self.catalog() as c:
-            if method in ('orientation_state','orient_photos','undo_orientation'):
+            if method in ('orient_photos','undo_orientation'):
                 from .orientation import Orientations
                 orientations=Orientations(c)
-                return {'orientation_state':orientations.state,'orient_photos':orientations.apply,'undo_orientation':orientations.undo}[method](**p)
+                return {'orient_photos':orientations.apply,'undo_orientation':orientations.undo}[method](**p)
             if method=='prepare_folder_relocation':return Relocations(c).prepare(**p)
             if method in ('get_keyword_shortcut','set_keyword_shortcut','paint_library'):
                 from .library_painter import LibraryPainter
                 painter=LibraryPainter(c)
                 return {'get_keyword_shortcut':painter.read,'set_keyword_shortcut':painter.save,'paint_library':painter.paint}[method](**p)
             if method=='get_folder_relocation':return Relocations(c).get(**p)
-            if method in ('photo_summaries','library_state'):
-                state={'stack_revision':Stacks(c).revision(),'folder_revision':Folders(c).revision(),
-                       'keyword_revision':Keywords(c).revision(),'previous_import':previous_import_state(c.db),
-                       'snapshot_filter_revision':snapshot_filter_revision(c.db)}
-                if method=='photo_summaries':state['photos']=c.summaries(p['photo_ids'])
-                return state
             if method=='list_keywords':return Keywords(c).list(**p)
             if method=='get_keyword':return Keywords(c).details(**p)
             if method=='save_keyword':return Keywords(c).save(**p)
@@ -500,7 +519,6 @@ class Service:
                 store=Collections(c);row=store.get(p['collection_id'])
                 return {**row,'ancestors':list(reversed(store.ancestors(row['parent_id'])))}
             if method=='duplicate_collection':return Collections(c).duplicate(**p)
-            if method=='collection_state':return Collections(c).state(p.get('photo_ids',()))
             if method=='set_target_collection':return Collections(c).set_target(**p)
             if method=='target_membership':return Collections(c).target_membership(**p)
             if method=='quick_collection':return Collections(c).quick(**p)

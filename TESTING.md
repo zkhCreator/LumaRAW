@@ -1650,6 +1650,30 @@ Its concurrent list reader sees either the full pre-commit or post-commit count;
 record request median/p95/maximum, sample count, complete apply and atomic SQL
 timings, cache conditions and process RSS. Synthetic missing originals and empty
 new PNG placeholders exercise SQL/stat work, without hashes, pixels, IPC or UI.
-Do not describe reduced list waiting as a fix for every native refresh: subsequent
-collection/orientation/folder/keyword reads, summary polling and image work still
-use their existing locks. Slow filters and broker admission can also delay reads.
+Do not describe reduced list waiting as a fix for every native refresh: conditional
+folder/keyword pages, photo details and image work still use their existing locks.
+Slow filters and broker admission can also delay reads.
+
+`tests/test_library_state_read.py` extends the snapshot checks to `library_state`,
+`photo_summaries`, `collection_state` and `orientation_state`. Each must read the
+old committed state while a writer holds Service.lock, then see the new state
+after commit. Real import, rating, membership and rotation commits between response
+components must not mix revision fields, summaries, membership or undo history.
+Summary ID bounds, ascending order, duplicate handling and response keys remain
+compatible with ordinary Catalog callers.
+
+```sh
+.venv/bin/python -m pytest -q tests/test_catalog_read.py tests/test_library_state_read.py \
+  tests/test_collections.py tests/test_orientation.py tests/test_previous_import.py
+.venv/bin/python tests/library_state_probe.py --work work/new-library-state-scale --rows 100000
+```
+
+The rotation suite requires access to the selected CPU/Metal backends. Run the
+refresh-chain probe alone against a frozen engine. It times photo list, collection
+state, orientation state, photo summaries and Library state sequentially during
+the same synthetic folder scan/apply. Each response is checked independently;
+separate commands may see different commits. JSON receipts retain the first 1,000
+chains with per-command timings and revision vectors, and explicitly count any
+omitted chains. Reported statistics cover only retained chains; do not present a
+truncated run as full-phase coverage. This is not Store.refresh timing: conditional
+detail/folder/keyword loads, thumbnail tasks, IPC and desktop rendering are absent.

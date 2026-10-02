@@ -69,7 +69,7 @@ gaps. Nothing below is full Lightroom parity merely because historical tests pas
 | Geometry | Partial: crop/straighten/perspective, independent rotation/flips with attached masks and displayed crop ratios | Interactive retained handles, guided transforms, full crop state and rendered/reference parity |
 | Local editing | Partial: radial/gradient/brush/luma | Mask list/edit/reorder/intersection, range masks, clone/heal, red-eye (non-AI) |
 | History and presets | Partial: durable paged Develop history with undo/redo, state selection/rename/clear, persistent Before assignment/copy/swap, separate 50-batch orientation undo, alphabetical shared snapshots with current/history capture, rename/update/delete and Before copy, partial Develop presets/groups/favorites/shared or local storage, batch/Painter and reviewed-import application | Unified application Undo/Redo, history/snapshot hover, preset hover preview/Amount/ISO adaptation/Adobe exchange and rendered reference acceptance |
-| Preview/performance | Partial: Metal, proxies, 1:1 viewport, developed thumbnail fast path, on-demand Before with independent cache, four paired layouts, persistent command relay, background image preparation, quiet polling, fused readout maps and validated completed-preview reuse | Real-RAW catalog/slider latency, offline previews, cache controls and desktop/reference acceptance |
+| Preview/performance | Partial: Metal, proxies, 1:1 viewport, developed thumbnail fast path, on-demand Before with independent cache, four paired layouts, persistent command relay, snapshot-based Library reads, background image preparation, quiet polling, fused readout maps and validated completed-preview reuse | Real-RAW catalog/slider latency, offline previews, cache controls and desktop/reference acceptance |
 | Export | Partial: JPEG/16-bit TIFF, ICC, shared or catalog-local saved export settings with optional destinations, multiple-preset batches with individual/parent destinations and paged receipts, catalog-local Export with Previous, durable jobs with frozen catalog/rights IPTC XMP and keyword hierarchy options | Full batch naming/reference acceptance, Adobe preset exchange, complete EXIF/IPTC Extension/GPS metadata policies, watermark, additional formats, publish workflows |
 | External editing and video | Missing | External-editor setup and derivative round trips; supported video import/playback, frame capture, trimming and export |
 | Merge | Missing | Non-AI HDR merge and panorama with bounded resources and reference acceptance |
@@ -4895,3 +4895,62 @@ and expensive filters may delay readers independently of the service lock.
 Those waits, desktop interaction/frame rate, VoiceOver and macOS 14 runtime remain
 open acceptance work. This does not complete the interface-lag investigation or
 the full non-AI Lightroom Classic inventory.
+
+## Compact refresh-state reads during catalog writes (October 2, 2026)
+
+`library_state`, `photo_summaries`, `collection_state` and `orientation_state`
+now use one independent read-only snapshot per response, following the photo-list
+path. Revision envelopes, bounded photo summaries, Quick/target membership and
+orientation undo state remain internally coherent when another connection commits
+between statements. The shared summary query retains its 1–60 ID bound, ascending
+ID order and SQL-IN duplicate handling; existing Catalog callers reuse it.
+Separate commands can observe different commits, so native generation/revision
+guards remain necessary. Engine generation is **55**, schema **37** and the
+**149** command contracts are unchanged.
+
+The new isolated refresh-chain probe runs `list_photos`, `collection_state`,
+`orientation_state`, `photo_summaries` and `library_state` sequentially during
+the same synthetic 100,000-original Folder Sync workload described above. It uses
+Apple M3 Max, 128 GiB, macOS 26.6.2, Python 3.12.0 and SQLite 3.42.0, with warm
+catalog/directory caches, 99,999 missing paths and 10,000 new empty PNG placeholders.
+One run per engine generation records 526 before and 690 after chains, with no
+omitted samples. Per-command revisions are recorded independently, not required
+to match across requests.
+
+| Measurement | Generation 54 | Generation 55 |
+| --- | --- | --- |
+| Refresh chains during apply | 143 | 226 |
+| Apply-phase chain median / p95 | 21.810 / 25.383 ms | 15.461 / 19.808 ms |
+| Longest apply-phase chain | 2,982.828 ms | 159.052 ms |
+| Longest collection-state request during apply | 2,969.797 ms | 7.778 ms |
+| Scan-phase chain median / maximum | 22.137 / 767.808 ms | 15.453 / 55.910 ms |
+| Atomic apply | 2,968.904 ms | 3,197.269 ms |
+| Complete apply, including verification | 10,130.687 ms | 10,116.407 ms |
+| Process peak RSS, including setup and retained samples | 95.95 MiB | 109.12 MiB |
+
+The pair establishes reduced waits in these read commands, not faster catalog
+mutation or a repeatable maximum-latency guarantee. More completed samples and
+their retained revision records also contribute to process memory; RSS is not a
+per-command allocation measurement. Both runs retain correct photo/folder counts,
+clear staging, restore maintenance and start no image workers. This measures
+in-process SQL/stat/control work with empty synthetic files, not valid-image/RAW
+processing, IPC, broker admission, actual Store.refresh completion or UI frames.
+
+Targeted regression passes **68 tests in 8.38 s**, including all four commands
+reading the old state while a writer holds Service.lock, followed by the new
+committed state. Real import, rating, membership and orientation commits inserted
+between response components preserve whole-response snapshots. Response keys,
+summary ordering/limits and collection membership sets remain compatible.
+The full Python suite passes **1,038 tests in 155.77 s**, with actual Metal required
+and the read-only Nikon D3S NEF fixture enabled; no tests are skipped.
+The final packaged engine passes **199 native state/IPC assertions**: Library 13,
+Collections 42, Orientation 51, Snapshot Filter 25, Reference 52 and Responsiveness
+16. The Mac app builds for macOS 14 and passes deep strict ad-hoc signature
+verification; source/client/broker identities, all 149 MCP schemas and the bundled
+guide match. These generated-fixture checks run on macOS 26.6.2 and do not dispatch
+desktop input or establish rendered interaction acceptance.
+
+Conditional folder/keyword pages, selected-photo details and thumbnail work still
+use their previous paths. Saturated broker admission and expensive queries can
+also delay reads. Desktop input/scrolling, VoiceOver and macOS 14 runtime acceptance
+remain open, together with the broader non-AI Lightroom Classic inventory.

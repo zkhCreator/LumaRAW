@@ -2,7 +2,7 @@
 
 Inputs: explicit local paths and validated recipes. Outputs: paginated rows/jobs.
 Responsibilities: store references, edits, undo history, and export snapshots;
-delegate bounded Library filter/count/page SQL to the shared query module.
+delegate bounded Library filter/count/page/summary SQL to the shared query module.
 Library orientation is independent of Develop recipes and frozen in each job.
 Photo details keep complete keyword IDs; large display paths use explicit pages.
 Stack-enabled page rows carry true scoped ordinals; raw unstacked pages expose a
@@ -279,11 +279,7 @@ class Catalog:
             folder_id, include_subfolders, match_count=match_count)
 
     def summaries(self, ids):
-        if not 1 <= len(ids) <= 60:
-            raise ValueError('Summary reads require 1 to 60 photo IDs')
-        placeholders=','.join('?' for _ in ids)
-        return [dict(row) for row in self.db.execute(
-            f'SELECT {SUMMARY_COLUMNS} FROM photos WHERE id IN ({placeholders}) ORDER BY id',ids)]
+        return self._library_queries().summaries(ids)
 
     def filtered_count(self, mode='all', search='', filters=None, collection_id=None,
                        stacked=True, folder_id=None, include_subfolders=True):
