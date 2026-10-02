@@ -10,6 +10,8 @@ New imports reference files in place. Removal is catalog-only and includes a
 missing original's variants; descriptive XMP updates apply to its master only.
 Catalog sequence allocation is part of the same transaction for new originals;
 metadata-only synchronization and removal do not consume import/image numbers.
+Application keyset-pages the indexed candidate states; unchanged rows only take
+a bounded missing-flag repair path for library-index updates made after scanning.
 Duplicate identity follows reviewed-import matching: original name, bytes and
 known camera capture time, never filesystem time. Direct Adobe Sync behavior is
 not implied by this additional review step.
@@ -419,34 +421,50 @@ class FolderSync:
                     'SELECT path,folder_name(path),bytes,mtime,?,?,?,?+row_number() OVER (ORDER BY id)-1 '
                     'FROM folder_sync_files WHERE '+new_filter,
                     (json.dumps(Recipe().dict()),time.time(),allocation['import_number'],allocation['image_number'],*new_params))
-            # Source stats are refreshed for every existing original. XMP edits
-            # are separately selected and never replace a virtual copy's metadata.
-            for rows in self.pages(plan_id):
+            # Existing sources still refresh stats even when their import row
+            # was deselected. Metadata stays selected independently. Unchanged
+            # staged rows have no scanned metadata or stat delta, so the indexed
+            # apply page excludes them; a separate sparse pass repairs the one
+            # catalog-only missing flag that index_library can change meanwhile.
+            after = 0
+            while rows := self.apply_pages(plan_id,import_new,include_duplicates,after):
                 for row in rows:
+                    # Errors are rejected by start_apply; keep them in the
+                    # indexed predicate only so SQLite can use its full index.
+                    if row['state'] == 'error':
+                        continue
                     is_new_import = row['state'] == 'new' or row['state'] == 'duplicate' and include_duplicates
-                    if row['state'] in ('new','duplicate') and (not import_new or not row['selected'] or not is_new_import):
-                        continue
-                    current = self.db.execute('SELECT id,source_id,bytes,mtime,missing FROM photos WHERE path=? AND is_virtual=0',(row['path'],)).fetchone()
-                    if current is None:
-                        continue
-                    fingerprints = json.loads(row['fingerprints']);fingerprint = fingerprints.get(row['path'])
-                    missing = fingerprint is None
-                    size,mtime = (current['bytes'],current['mtime']) if missing else fingerprint[2:]
-                    changed = (current['bytes'],current['mtime'],current['missing']) != (size,mtime,int(missing))
+                    missing = row['state'] == 'missing'
+                    size,mtime = ((row['live_bytes'],row['live_mtime']) if missing else
+                                  (row['staged_bytes'],row['staged_mtime']))
+                    changed = (row['live_bytes'],row['live_mtime'],row['live_missing']) != (size,mtime,int(missing))
                     if changed:
-                        self.db.execute('UPDATE photo_sources SET revision=revision+1 WHERE id=?',(current['source_id'],))
+                        self.db.execute('UPDATE photo_sources SET revision=revision+1 WHERE id=?',(row['live_source_id'],))
                         self.db.execute("UPDATE photos SET sha256=CASE WHEN bytes!=? OR mtime!=? THEN '' ELSE sha256 END,"
-                            "bytes=?,mtime=?,missing=?,error='' WHERE source_id=?",(size,mtime,size,mtime,int(missing),current['source_id']))
+                            "bytes=?,mtime=?,missing=?,error='' WHERE source_id=?",
+                            (size,mtime,size,mtime,int(missing),row['live_source_id']))
                     if not missing and (is_new_import or read_metadata and row['selected']):
                         clock = json.loads(row['clock'])
                         if clock:
                             self.db.execute('UPDATE photos SET '+','.join(key+'=?' for key in clock)+' WHERE source_id=?',
-                                            [*clock.values(),current['source_id']])
+                                            [*clock.values(),row['live_source_id']])
                         patch = json.loads(row['patch'])
                         if patch:
-                            self.apply_metadata(current['id'],patch)
+                            self.apply_metadata(row['photo_id'],patch)
                         if row['state'] not in ('new','duplicate') and (clock or patch):
                             modified += 1
+                after = rows[-1]['id']
+            after = 0
+            while rows := self.unchanged_missing_pages(plan_id,after):
+                for row in rows:
+                    size,mtime = row['staged_bytes'],row['staged_mtime']
+                    changed = (row['live_bytes'],row['live_mtime'],row['live_missing']) != (size,mtime,0)
+                    if changed:
+                        self.db.execute('UPDATE photo_sources SET revision=revision+1 WHERE id=?',(row['live_source_id'],))
+                        self.db.execute("UPDATE photos SET sha256=CASE WHEN bytes!=? OR mtime!=? THEN '' ELSE sha256 END,"
+                            "bytes=?,mtime=?,missing=0,error='' WHERE source_id=?",
+                            (size,mtime,size,mtime,row['live_source_id']))
+                after = rows[-1]['id']
             self.db.execute('UPDATE catalog_folders SET direct_count=direct_count+COALESCE('
                 '(SELECT sum(delta) FROM sync_deltas WHERE sync_deltas.path=catalog_folders.path),0) WHERE path IN (SELECT path FROM sync_deltas)')
             self.db.execute('WITH RECURSIVE changes(path,delta) AS (SELECT path,delta FROM sync_deltas UNION ALL '
@@ -466,14 +484,28 @@ class FolderSync:
             self.discard(plan_id)
         return self.get(plan_id)
 
-    def pages(self,plan_id):
-        after = 0
-        while True:
-            rows = self.db.execute('SELECT * FROM folder_sync_files WHERE plan_id=? AND id>? ORDER BY id LIMIT 60',(plan_id,after)).fetchall()
-            if not rows:
-                break
-            yield rows
-            after = rows[-1]['id']
+    def apply_pages(self,plan_id,import_new,include_duplicates,after=0):
+        """Read one bounded, indexed page of rows that can affect application."""
+        return [dict(row) for row in self.db.execute(
+            "SELECT f.id,f.state,f.selected,"
+            "f.bytes AS staged_bytes,f.mtime AS staged_mtime,f.clock,f.patch,"
+            "p.id AS photo_id,p.source_id AS live_source_id,p.bytes AS live_bytes,"
+            "p.mtime AS live_mtime,p.missing AS live_missing "
+            "FROM folder_sync_files f JOIN photos p ON p.path=f.path AND p.is_virtual=0 "
+            "WHERE f.plan_id=? AND f.id>? AND f.state IN ('new','duplicate','missing','updated','error') "
+            "AND (f.state IN ('updated','missing','error') OR (f.state='new' AND f.selected=1 AND ?) "
+            "OR (f.state='duplicate' AND f.selected=1 AND ?)) ORDER BY f.id LIMIT 60",
+            (plan_id,after,int(import_new),int(import_new and include_duplicates)))]
+
+    def unchanged_missing_pages(self,plan_id,after=0):
+        """Read sparse unchanged masters marked missing by a later library index."""
+        return [dict(row) for row in self.db.execute(
+            "SELECT f.id,f.bytes AS staged_bytes,f.mtime AS staged_mtime,"
+            "p.source_id AS live_source_id,p.bytes AS live_bytes,"
+            "p.mtime AS live_mtime,p.missing AS live_missing "
+            "FROM folder_sync_files f JOIN photos p ON p.path=f.path AND p.is_virtual=0 "
+            "WHERE f.plan_id=? AND f.id>? AND f.state='unchanged' AND p.missing!=0 "
+            "ORDER BY f.id LIMIT 60",(plan_id,after))]
 
     def apply_metadata(self,photo_id,patch):
         fields = {key:value for key,value in patch.items() if key not in ('keyword_paths','iptc')}

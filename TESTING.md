@@ -764,6 +764,27 @@ different folders. It checks default exclusion, explicit inclusion, preserved
 selection, the new-photo gate and stale readback without retry. Its sheet snapshot
 is offscreen evidence; it does not exercise desktop input or VoiceOver.
 
+`test_folder_sync_apply.py` checks mixed selected/unselected state updates,
+unchanged-photo availability recovery after indexing, full source/file conflict
+guards, and bounded apply candidates over a large synthetic plan. Changes-page
+query plans must use the partial index without sorting the whole plan.
+
+Run the apply-only probe separately from checks/builds, before and after changing
+the transaction. It seeds real SQLite catalog/staging rows with absent image paths,
+simulates completed observations, and calls the actual domain transaction. It
+deliberately excludes filesystem scanning/revalidation, IPC and image processing.
+Each case measures one first and five warm applications of new plans; seeding and
+plan preparation are outside the timer. Process-wide peak RSS includes setup and
+earlier trials. Pair it with the existing sync probe for the broader scan/apply
+path using synthetic missing originals and empty discovered files.
+
+```sh
+.venv/bin/python tests/folder_sync_apply_probe.py --work work/new-sync-apply-scale \
+  --rows 10000 100000
+.venv/bin/python tests/folder_sync_probe.py --work work/new-sync-mixed-scale \
+  --rows 100000
+```
+
 The sync metadata detail checks exercise complete long descriptions, twenty-path
 paging, wrong-item/plan/revision rejection and full application. The two
 `test_folder_sync_metadata.py` cases reproduce 60 long Unicode descriptions through

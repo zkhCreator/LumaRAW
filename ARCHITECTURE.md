@@ -779,6 +779,16 @@ folder totals, Import/Image numbering, capture/XMP initialization and Previous
 Import. Excluding duplicates never clears the user's checked selection or changes
 the existing missing-photo removal and metadata-refresh policies.
 
+Apply keeps full source-snapshot and filesystem revalidation, then reads bounded
+change pages joined to surviving catalog masters. It avoids materializing every
+unchanged staged row or decoding its fingerprint JSON inside the write transaction;
+the scan's captured byte size and nanosecond mtime provide the same stat values.
+Unselected existing changes still refresh availability/stat state, while metadata
+replacement remains explicitly selected. A separate bounded read repairs unchanged
+masters that indexing marked missing without advancing their source revision.
+That exception preserves family-wide availability recovery. It must not be lost
+when optimizing the common unchanged case.
+
 `xmp_read.py` limits packets to 2 MiB, header reads to 4 MiB and XML depth/node
 counts; document types/entities are rejected. Sidecar properties override standard
 TIFF/JPEG/PNG XMP. Missing properties leave catalog data unchanged. Titles, captions,

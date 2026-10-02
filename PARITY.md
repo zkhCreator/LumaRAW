@@ -4634,3 +4634,67 @@ All **149 MCP schemas**, source/client/broker identity, bundled guide bytes and
 deep strict ad-hoc signature verification matched. The app targets macOS 14 and
 was checked on macOS 26.6.2; macOS 14 runtime, desktop input, VoiceOver and Lightroom
 reference acceptance remain unverified. Desktop automation was not retried.
+
+### Reducing folder-sync transaction work
+
+The generation-52 apply path paged every staged file, queried its current master
+individually and decoded its fingerprint JSON inside the catalog write transaction.
+That included unchanged originals and missing originals already removed earlier
+in the same transaction. An isolated direct-domain probe measured about one second
+for 100,000 unchanged originals; a separate missing/import probe measured a
+2,996.2 ms transaction and a 3,005.4 ms concurrent browse wait.
+
+Generation 53 retains complete source-snapshot and filesystem identity checks,
+then reads at most sixty indexed change candidates joined to surviving masters.
+It uses the scan's stored byte size and mtime instead of decoding per-file identity
+JSON again. Deselected existing changes still refresh stat/availability fields;
+metadata and new/duplicate imports retain their explicit selection gates. Indexing
+can change a master's missing flag without advancing its source revision, so a
+separate keyset query repairs those unchanged masters and their virtual-copy
+families. SQLite still inspects that unchanged range, and the full conflict checks
+and staging cleanup still scale with plan size; this is not constant-time apply.
+Schema 37 and all 149 service contracts remain unchanged.
+
+An isolated before/after run on Apple M3 Max / 128 GiB / macOS 26.6.2 used
+actual SQLite originals, source families, folder membership and staged rows,
+with absent synthetic original paths and no image dimensions or pixel backend.
+Each case used a fresh plan, one first apply and five subsequent warm applies;
+OS caches were not flushed. These CPU/SQLite timings include the atomic apply,
+conflict checks and staging cleanup, but exclude prepare, filesystem validation,
+IPC, image decoding and desktop rendering:
+
+| Originals | Changed stat rows | First apply, before → after | Warm median, before → after |
+| --- | --- | --- | --- |
+| 10,000 | 0 | 95.8 → 57.7 ms | 95.0 → 47.4 ms |
+| 10,000 | 10 | 99.2 → 49.1 ms | 93.9 → 48.5 ms |
+| 100,000 | 0 | 1,042.0 → 677.2 ms | 1,018.3 → 575.1 ms |
+| 100,000 | 10 | 1,036.1 → 573.4 ms | 1,032.1 → 572.5 ms |
+
+The process-wide RSS high-water mark was 80.9 → 85.2 MiB, including seed work
+and previous cases; it is not an apply-only memory measurement. All catalog,
+source revision, folder count and original-absence assertions passed.
+
+The broader warm service/stat probe used 100,000 catalog originals, 99,999 missing
+originals and 10,000 new empty PNG placeholders. Its single before/after run
+measured atomic commit 2,996.2 → 2,816.5 ms, complete apply 9,111.9 → 9,057.1 ms,
+and maximum concurrent browse wait 3,005.4 → 2,812.0 ms. Browse p95 remained
+8.6 ms; process peak RSS was 86.7 → 85.0 MiB. This workload remains dominated
+by actual catalog mutations and complete filesystem validation. It does not
+establish desktop smoothness or a repeatable end-to-end speedup, and the remaining
+multi-second write hold is an explicit performance gap.
+
+Validation: **91 focused Python tests passed**. The full suite with required actual
+Metal dispatch and the retained real NEF fixture passed **1,023 tests in 149.62 s**,
+without skips. New regressions cover deselected stat refresh, selected XMP scope,
+missing-flag recovery across original/virtual-copy families, late source-version
+and file conflicts without partial import, and a real 10,000-master catalog whose
+single changed row uses the production partial index with bounded result pages.
+The apply-only probe also asserts exact final counts, stats and source revisions.
+
+The packaged application passed **102 native assertions**: Folder Sync 41, Import
+Sequence 26, Previous Import 19 and Responsiveness 16. All **149 MCP schemas**,
+source/client/broker identity, bundled guide bytes and deep strict ad-hoc signature
+verification matched. The app targets macOS 14 and was checked on macOS 26.6.2.
+macOS 14 runtime, desktop input, VoiceOver and Lightroom reference acceptance
+remain unverified; desktop automation was not retried. This change reduces
+catalog work and does not change image processing or complete Lightroom parity.

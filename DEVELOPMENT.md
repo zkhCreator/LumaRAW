@@ -209,6 +209,10 @@ when a clear function is more maintainable. Avoid unrelated formatting churn.
   predicate for imports, numbering and Previous Import. Recheck catalog conflicts
   inside the final transaction before writes; do not silently reclassify a ready
   review or overwrite another photo's state.
+- Avoid a per-photo apply pass over unchanged synchronization rows. Keep complete
+  preflight validation and bounded change pages, retain stat refresh for deselected
+  existing items, and handle indexing's missing-only changes without relying on a
+  source revision bump. The optimization must preserve virtual-copy family state.
 - Add indexes for common query paths. Use a deterministic ID tie-breaker for
   pagination and never decode image pixels merely to search the library.
   Bound serialized response bytes as well as row counts: a 60-row page containing
