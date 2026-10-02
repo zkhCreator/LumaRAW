@@ -1,9 +1,10 @@
 """Service orchestration for responsive, recoverable folder synchronization.
 
 Inputs: validated commands and the owning service's locks/cancellation lifecycle.
-Outputs: durable plan receipts; bounded filesystem work occurs outside catalog
-locks. A single directory iterator and one scan/apply run are admitted at a time.
-No background auto-apply, original writes, image decoding or uncertain retries.
+Outputs: durable plan receipts, including reviewed suspected-duplicate imports;
+bounded filesystem work occurs outside catalog locks. A single directory
+iterator and one scan/apply run are admitted at a time. No background auto-apply,
+original writes, image decoding or uncertain retries.
 """
 import json
 import threading
@@ -84,7 +85,8 @@ class FolderSyncRunner:
                 with self.service.catalog() as catalog:
                     return FolderSync(catalog).finish_files(plan_id,plan['revision'],observations)
             with self.service.catalog() as catalog:
-                plan = FolderSync(catalog).start_apply(plan_id,params['expected_revision'],params.get('read_metadata',True))
+                plan = FolderSync(catalog).start_apply(plan_id,params['expected_revision'],params.get('read_metadata',True),
+                    params.get('import_new',True),params.get('include_duplicates',False))
             check_root()
             for kind in ('directories','files'):
                 after = 0
@@ -113,7 +115,8 @@ class FolderSyncRunner:
                 raise RelocationBusy('Image processing is active; synchronize after it finishes')
             with self.service.catalog() as catalog:
                 return FolderSync(catalog).apply(plan_id,plan['revision'],params.get('import_new',True),
-                                                params.get('remove_missing',False),params.get('read_metadata',True))
+                                                params.get('remove_missing',False),params.get('read_metadata',True),
+                                                params.get('include_duplicates',False))
         except RelocationBusy as error:
             with self.service.catalog() as catalog:
                 return FolderSync(catalog).defer_apply(plan_id,plan['revision'],str(error))

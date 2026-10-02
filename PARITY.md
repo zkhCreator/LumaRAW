@@ -32,7 +32,7 @@ Official references checked September 2026:
 - [Keyboard shortcuts](https://helpx.adobe.com/lightroom-classic/desktop/introduction-to-lightroom-classic/keyboard-shortcuts.html)
 - [Photo stacks and source boundaries](https://helpx.adobe.com/lightroom-classic/desktop/organize-photos-in-lightroom-classic/grouping-photos-stacks.html)
 - [Stacking shortcuts, Adobe's Julieanne Kost](https://jkost.com/blog/2024/07/stacking-similar-photos-in-lightroom-classic.html)
-- [Folder hierarchy, subfolder inclusion and synchronization](https://helpx.adobe.com/lightroom-classic/desktop/manage-catalogs-and-files/create-folders.html)
+- [Folder hierarchy, subfolder inclusion and synchronization](https://helpx.adobe.com/lightroom-classic/desktop/manage-catalogs-and-files/create-folders.html) (reviewed-import distinction rechecked October 2026)
 - [Missing-photo and missing-folder relinking](https://helpx.adobe.com/lightroom-classic/desktop/manage-catalogs-and-files/locate-missing-photos.html)
 - [Metadata storage and supported workflows](https://helpx.adobe.com/lightroom-classic/desktop/organize-photos-in-lightroom-classic/metadata-basics-actions.html)
 - [Metadata presets, selective fields and Painter application](https://helpx.adobe.com/lightroom-classic/desktop/organize-photos-in-lightroom-classic/advanced-metadata-actions.html)
@@ -60,7 +60,7 @@ gaps. Nothing below is full Lightroom parity merely because historical tests pas
 | Area | Current implementation | Remaining acceptance / work |
 | --- | --- | --- |
 | Import and catalogs | Partial: durable Add/Copy review with checked selection, Grid/Loupe source previews with on-demand Fit/100% regions and completed-preview reuse, suspected duplicates, bounded sorting/filtering, captured import-time presets and keywords, Copy destination/subfolder and flat/source/date organization with three numeric date layouts and paged destination photo counts, filename token editor and catalog-local templates with checked-sequence and catalog Import/Image numbering, byte-verified original/XMP transfers, optional original-state second copies, catalog-local saved import configurations with explicit rescans, explicit crash recovery and retained-copy cancellation, Previous Import navigation and catalog backup/restore | Move/Copy as DNG, destination-tree grouping and more date formats, numbering edge-case reference acceptance and wider EXIF/shared templates, shared/Adobe import-preset exchange and interaction acceptance, preview policies, cards/tethering, progressive Current Import, catalog switching/merge and desktop/reference acceptance |
-| Library navigation | Partial: bounded grid/filmstrip, folder tree/search/favorites/labels, durable missing-folder relocation and folder synchronization, direct/recursive sources, filters/sorting including live snapshot status, regular/smart/Quick collections and nested sets, single/batch collection color labels and global color filtering | Multi-source selection, complete sync Import Dialog/duplicate policy, folder move/rename, relocation overlap/collision handling, collection drag/drop, custom label names/sets and sidebar multi-selection interaction, full smart criteria/import-export, source-selection memory, desktop acceptance |
+| Library navigation | Partial: bounded grid/filmstrip, folder tree/search/favorites/labels, durable missing-folder relocation and folder synchronization with reviewed suspected-duplicate inclusion, direct/recursive sources, filters/sorting including live snapshot status, regular/smart/Quick collections and nested sets, single/batch collection color labels and global color filtering | Multi-source selection, complete sync Import Dialog, folder move/rename, relocation overlap/collision handling, collection drag/drop, custom label names/sets and sidebar multi-selection interaction, full smart criteria/import-export, source-selection memory, desktop/reference acceptance |
 | Organization | Partial: duplicate/missing detection, hierarchical keywords/synonyms/export flags/Will Export preview, text/CSV vocabulary exchange and manual person tags, custom nine-slot keyword sets/recent entries/shared or catalog storage, multi-keyword shortcuts and keyword/rating/flag/label/target-collection/rotation/Develop-preset/metadata-preset Painter strokes, independent catalog rotation/flips, title/caption/copyright plus thirty IPTC fields, selective metadata presets, labels, batch metadata, virtual copies, manual/split/capture-time scoped stacks | Keyword policy/file and preset reference acceptance, built-in sets/suggestions/undo, Painter desktop acceptance, IPTC Extension and complete metadata parity, stack interaction acceptance, rename and sidecars |
 | Culling | Partial: Loupe/Compare/Survey, linked detail, anchored page selection, Develop Reference/Active pairs with independent Fit/1:1 viewports, session lock and RGB/LAB readouts | Desktop and numerical reference acceptance, HDR readouts, scrubby/box zoom, cross-page selection, auto advance, persistent workspace state |
 | Basic development | Partial: light/WB/color, eight-band HSL and B&W Mix with photo-targeted adjustment and selective resets/sync | Calibrated absolute WB, eyedropper, texture/clarity/dehaze, Point Color, Auto B&W mix, color grading and Adobe processing/reference acceptance |
@@ -832,8 +832,10 @@ about 3.2 seconds at this scale. This remains a performance gap; short scan page
 do not establish nonblocking application. Reproduce with tests/folder_sync_probe.py.
 These are metadata/stat/SQLite timings, not RAW decode speed, IPC or desktop latency.
 
-Remaining synchronization parity includes the full Import Dialog with thumbnail
-selection and duplicate policy, missing-empty-folder removal, all supported image
+Remaining synchronization parity includes the complete Adobe Import Dialog with
+thumbnail selection and its duplicate-policy workflow; the later suspected-duplicate
+increment below adds that review policy to LumaRAW's existing sheet. Other gaps are
+missing-empty-folder removal, all supported image
 containers, extended JPEG XMP, complete IPTC/ACR/Adobe Develop metadata, custom label
 sets and XMP writing. Extreme metadata payloads across broker pages still need
 acceptance. Rendered desktop, keyboard/VoiceOver and macOS 14 runtime remain
@@ -4580,3 +4582,55 @@ macOS 14 runtime and current desktop/VoiceOver/Lightroom reference acceptance
 remain unverified; desktop automation was not retried. This optimization changes
 submission preparation, not image algorithms, processing throughput or product
 parity status.
+
+### Suspected duplicates in folder synchronization review
+
+Engine generation 52 / schema 37 adds a separate suspected-duplicate classification
+to new Folder Sync reviews. Matching uses original filename, byte size and known
+capture time, including clock provenance and fractions beyond microseconds. It
+checks catalog originals and earlier candidates in the same plan through indexes;
+an earlier unchecked item still participates in identity matching. Unknown capture
+time is never inferred from modification time. Both change pages and duplicate
+pages stay bounded to sixty summaries; large metadata remains a separate read.
+
+The Mac review sheet shows duplicate counts, possible matching paths, a dedicated
+filter and item/folder selection. Duplicate inclusion starts off. Turning it off
+preserves individual checks; disabling new-photo import excludes both new and
+duplicate files. An explicit inclusion request initializes capture/XMP metadata,
+Import/Image numbering, folder counts and Previous Import with the same eligibility
+as ordinary new imports. Original files stay in place and are not written.
+
+New candidates are checked for newly cataloged duplicates inside the final write
+transaction, before number allocation, removal or metadata mutations. A conflict
+requires a fresh scan. Additive migration keeps saved pre-feature plans on their
+original rules through resume; they are not silently reclassified. A fresh plan
+is required to adopt duplicate review.
+
+Adobe's [folder synchronization documentation](https://helpx.adobe.com/lightroom-classic/desktop/manage-catalogs-and-files/create-folders.html)
+distinguishes direct synchronization from its optional Import dialog, where
+suspected-duplicate exclusion is available. LumaRAW places this policy in its
+existing mandatory review sheet. The complete Adobe Import dialog and direct
+workflow equivalence remain gaps; this increment does not complete Library or
+product parity.
+
+Validation: **86 focused Python tests passed**. The full Python suite with
+required actual Metal dispatch and the retained real NEF fixture passed
+**1,018 tests in 145.38 s**, without skips. New cases cover original-name matching,
+nanosecond fractions, unknown clocks, within-plan predecessors independent of
+selection, explicit inclusion and backup/restore, metadata/counter/Previous Import
+provenance, and a late catalog conflict before removal or number allocation.
+Genuine schema-36 fixtures exercise rollback and a saved pending plan's scan and
+application after upgrade; the matching candidate retains its legacy classification.
+Query-plan checks verify indexed change pages, duplicate pages and identity lookups.
+These are correctness and access-path checks, not a new latency benchmark.
+
+The packaged engine passed **102 native assertions**: Folder Sync 41, Import
+Sequence 26, Previous Import 19 and Responsiveness 16. The sync fixture waits for
+the library's preceding preview work before beginning another apply; a busy-image
+refusal remains visible and is not automatically retried. Its inspected offscreen
+sheet shows the default-off inclusion control, retained item check, duplicate
+filter and matching path. This is layout evidence, not desktop interaction.
+All **149 MCP schemas**, source/client/broker identity, bundled guide bytes and
+deep strict ad-hoc signature verification matched. The app targets macOS 14 and
+was checked on macOS 26.6.2; macOS 14 runtime, desktop input, VoiceOver and Lightroom
+reference acceptance remain unverified. Desktop automation was not retried.

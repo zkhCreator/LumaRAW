@@ -760,6 +760,25 @@ survive removal. SQL trigger guards suppress repeated ancestor counts during the
 batch; folder membership remains maintained and aggregated deltas restore counts
 before commit. Failed transactions restore guards and all catalog changes.
 
+Schema 37 adds suspected-duplicate review to new synchronization plans. A captured
+`duplicate_detection` marker keeps legacy plans on their original classification
+rules through resume; only a fresh plan enables the new policy. New-file scans
+already read bounded capture-time headers. Matching uses original filename, byte
+size, precise capture time and clock provenance, with indexed catalog lookup and
+an earlier-item lookup in the same plan. Unknown capture time is never replaced
+by mtime. A plan's first matching item wins independently of manual selection.
+
+Duplicate rows remain separately selectable; an explicit `include_duplicates`
+apply option defaults to false and is also gated by `import_new`. This adds an
+import-review policy to LumaRAW's existing review sheet: Adobe's direct Synchronize
+command delegates duplicate exclusion to its optional Import dialog. The complete
+Adobe dialog is still outside this increment. The final catalog write transaction
+rechecks new candidates before any mutation, rejecting newly conflicting catalog
+state with a fresh-scan error. The same eligibility predicate governs insertion,
+folder totals, Import/Image numbering, capture/XMP initialization and Previous
+Import. Excluding duplicates never clears the user's checked selection or changes
+the existing missing-photo removal and metadata-refresh policies.
+
 `xmp_read.py` limits packets to 2 MiB, header reads to 4 MiB and XML depth/node
 counts; document types/entities are rejected. Sidecar properties override standard
 TIFF/JPEG/PNG XMP. Missing properties leave catalog data unchanged. Titles, captions,

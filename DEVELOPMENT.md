@@ -203,6 +203,12 @@ when a clear function is more maintainable. Avoid unrelated formatting churn.
 - Keep capture-time provenance and fractional precision. Unknown metadata is not
   file modification time. Read bounded headers separately from hashing/pixels;
   source-wide replacements require a preview bound to the data being replaced.
+- Folder-sync duplicate review uses the same original-name/size/precise-clock
+  identity as reviewed import. Keep legacy active plans on their captured rules,
+  preserve checked selections when inclusion is toggled, and use one eligibility
+  predicate for imports, numbering and Previous Import. Recheck catalog conflicts
+  inside the final transaction before writes; do not silently reclassify a ready
+  review or overwrite another photo's state.
 - Add indexes for common query paths. Use a deterministic ID tie-breaker for
   pagination and never decode image pixels merely to search the library.
   Bound serialized response bytes as well as row counts: a 60-row page containing

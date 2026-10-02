@@ -1,6 +1,7 @@
 // Purpose: review, selection and explicit application of durable folder sync plans.
 // Inputs: one catalog folder, bounded service pages and revision-bound actions.
-// Outputs: progress, file/subfolder selection and refreshed native library state.
+// Outputs: progress, file/subfolder selection, reviewed duplicate inclusion and
+// refreshed native library state.
 // No SQL, filesystem scans, metadata parsing or original writes. Closing retains
 // a plan; cancelled/uncertain application is read back, never automatically retried.
 import SwiftUI
@@ -10,6 +11,7 @@ struct FolderSyncPlan {
     var id: Int { number("id") }
     var revision: Int { number("revision") }
     var state: String { text("state") }
+    var supportsDuplicateReview: Bool { number("duplicate_detection") == 1 }
     var active: Bool { ["planning","scanning","ready","verifying","interrupted"].contains(state) }
     func number(_ key: String) -> Int { values[key] as? Int ?? 0 }
     func text(_ key: String) -> String { values[key] as? String ?? "" }
@@ -24,12 +26,16 @@ struct FolderSyncItem: Identifiable {
     let state: String
     let selected: Bool
     let photos: Int
+    let duplicateOfPath: String
     let patch: [String:Any]
     let clock: [String:Any]
     let notes: [String]
     let error: String
     let metadataDeferred: Bool
-    var selectable: Bool { ["new","missing","updated"].contains(state) }
+    func selectable(in plan: FolderSyncPlan?) -> Bool {
+        if state == "duplicate" { return plan?.supportsDuplicateReview == true }
+        return ["new","missing","updated"].contains(state)
+    }
     var folder: String { URL(fileURLWithPath:path).deletingLastPathComponent().path }
     var metadataKeys: [String] { patch.keys.sorted() + ["taken","camera"].filter { clock[$0] != nil } }
     func label(_ key: String) -> String {
@@ -55,6 +61,7 @@ struct FolderSyncItem: Identifiable {
     init?(_ row: [String:Any]) {
         guard let id=row["id"] as? Int,let path=row["path"] as? String,let state=row["state"] as? String else { return nil }
         self.id=id;self.path=path;self.state=state;selected=(row["selected"] as? Int ?? 0) != 0
+        duplicateOfPath=row["duplicate_of_path"] as? String ?? ""
         photos=row["catalog_photos"] as? Int ?? 0;patch=row["patch"] as? [String:Any] ?? [:]
         clock=row["clock"] as? [String:Any] ?? [:]
         notes=row["notes"] as? [String] ?? [];error=row["error"] as? String ?? ""
@@ -74,6 +81,7 @@ struct FolderSyncItem: Identifiable {
     @Published var cancelling=false
     @Published var error: String?
     @Published var importNew=true
+    @Published var includeDuplicates=false
     @Published var removeMissing=false
     @Published var scanMetadata=true
     @Published var readMetadata=true
@@ -86,10 +94,13 @@ struct FolderSyncItem: Identifiable {
     func receive(_ result: [String:Any]) {
         guard let values=result["plan"] as? [String:Any] else { plan=nil;items=[];total=0;offset=0;return }
         let next=FolderSyncPlan(values:values)
+        let changedPlan=plan?.id != next.id
         if let previous=plan,previous.id == next.id {
             guard next.revision >= previous.revision else { return }
             if next.revision == previous.revision && next.number("checked") < previous.number("checked") { return }
         }
+        if changedPlan { includeDuplicates=false;kind="changes";offset=0 }
+        if !next.supportsDuplicateReview { includeDuplicates=false }
         plan=next;items=(result["items"] as? [[String:Any]] ?? []).compactMap(FolderSyncItem.init)
         total=result["total"] as? Int ?? 0;offset=result["offset"] as? Int ?? 0
         if next.number("scan_metadata") == 0 { readMetadata=false }
@@ -132,6 +143,8 @@ struct FolderSyncItem: Identifiable {
 
     func select(_ selected: Bool,kind requested: String,item: FolderSyncItem?=nil,folder: String?=nil) async {
         guard !busy,!loading,let captured=plan,captured.state == "ready" else { return }
+        guard requested != "duplicate" || captured.supportsDuplicateReview else { return }
+        if let item, !item.selectable(in:captured) { return }
         generation+=1;let token=generation;busy=true;error=nil
         let page=offset;let filter=kind
         defer { if token == generation { busy=false } }
@@ -157,8 +170,9 @@ struct FolderSyncItem: Identifiable {
     func apply(using store: Store) async {
         guard canApply,let captured=plan else { return }
         generation+=1;let token=generation;busy=true;error=nil
-        let options: [String:Any]=["plan_id":captured.id,"expected_revision":captured.revision,"import_new":importNew,
-                                  "remove_missing":removeMissing,"read_metadata":readMetadata]
+        var options: [String:Any]=["plan_id":captured.id,"expected_revision":captured.revision,"import_new":importNew,
+                                   "remove_missing":removeMissing,"read_metadata":readMetadata]
+        if captured.supportsDuplicateReview { options["include_duplicates"]=importNew && includeDuplicates }
         defer { if token == generation { busy=false } }
         guard await store.flushEdits(),token == generation else { return }
         let polling=Task { [weak self] in
@@ -208,7 +222,9 @@ struct FolderSyncSheet: View {
     @Environment(\.dismiss) private var dismiss
     @StateObject private var model: FolderSyncModel
     @State private var metadataItem: FolderSyncItem?
-    init(folder: LibraryFolder?) { _model=StateObject(wrappedValue:FolderSyncModel(folder:folder)) }
+    init(folder: LibraryFolder?, model: FolderSyncModel?=nil) {
+        _model=StateObject(wrappedValue:model ?? FolderSyncModel(folder:folder))
+    }
     var body: some View {
         VStack(alignment:.leading,spacing:14) {
             Text("Synchronize Folder").font(.title2)
@@ -226,12 +242,25 @@ struct FolderSyncSheet: View {
                                 Text("\(plan.state == "verifying" ? "Verifying":"Scanned") \(plan.number(plan.state == "verifying" ? "checked":"scanned")) of \(plan.number("file_count")) originals")
                             }
                         }
-                        Text("\(plan.count("new")) new · \(plan.count("missing")) missing · \(plan.count("updated")) changed · \(plan.count("error")) scan errors")
+                        Text("\(plan.count("new")) new · \(plan.count("missing")) missing · \(plan.count("updated")) changed" +
+                             (plan.supportsDuplicateReview ? " · \(plan.count("duplicate")) suspected duplicates":"") +
+                             " · \(plan.count("error")) scan errors")
+                        if !plan.supportsDuplicateReview && ["ready","interrupted"].contains(plan.state) {
+                            Text("This saved plan predates suspected-duplicate review. Cancel it and start a new scan to review duplicate candidates.")
+                                .font(.caption).foregroundStyle(.secondary)
+                        }
                         if plan.count("with_notes")>0 {
                             Text("\(plan.count("with_notes")) originals contain metadata notes. Review All Files for unsupported fields or Adobe Develop settings.").font(.caption).foregroundStyle(.secondary)
                         }
                         if plan.state == "ready" {
                             Toggle("Import New Photos (\(plan.count("new",selected:true)) selected)",isOn:$model.importNew).disabled(model.busy || model.loading)
+                            if plan.supportsDuplicateReview {
+                                Toggle("Include Suspected Duplicates (\(plan.count("duplicate",selected:true)) selected)",
+                                       isOn:$model.includeDuplicates)
+                                    .disabled(model.busy || model.loading || !model.importNew)
+                                Text("LumaRAW flags suspected duplicates in this reviewed plan. They are imported only when this option and Import New Photos are enabled; turning this off keeps each item's checkmark.")
+                                    .font(.caption).foregroundStyle(.secondary)
+                            }
                             Toggle("Remove Missing Photos From Catalog (\(plan.count("missing",selected:true)) originals)",isOn:$model.removeMissing)
                                 .disabled(model.busy || model.loading || plan.count("missing")==0)
                             if model.removeMissing {
@@ -247,8 +276,9 @@ struct FolderSyncSheet: View {
                         Picker("Review Files",selection:$model.kind) {
                             Text("Changes").tag("changes");Text("New").tag("new");Text("Missing").tag("missing")
                             Text("Changed").tag("updated");Text("Errors").tag("error");Text("All Files").tag("all")
+                            if plan.supportsDuplicateReview { Text("Suspected Duplicates").tag("duplicate") }
                         }.disabled(model.busy || model.loading).onChange(of:model.kind) { _,_ in Task { await model.reload() } }
-                        if ["new","missing","updated"].contains(model.kind),plan.state == "ready" {
+                        if (["new","missing","updated"].contains(model.kind) || model.kind == "duplicate" && plan.supportsDuplicateReview),plan.state == "ready" {
                             HStack {
                                 Button("Select All") { Task { await model.select(true,kind:model.kind) } }
                                 Button("Select None") { Task { await model.select(false,kind:model.kind) } }
@@ -257,7 +287,7 @@ struct FolderSyncSheet: View {
                         LazyVStack(alignment:.leading,spacing:10) {
                             ForEach(model.items) { item in
                                 HStack(alignment:.top) {
-                                    if item.selectable {
+                                    if item.selectable(in:model.plan) {
                                         Toggle("Include \(URL(fileURLWithPath:item.path).lastPathComponent)",isOn:Binding(get:{item.selected},set:{ value in
                                             Task { await model.select(value,kind:item.state,item:item) }
                                         })).labelsHidden().disabled(model.busy || model.loading || model.plan?.state != "ready")
@@ -265,6 +295,9 @@ struct FolderSyncSheet: View {
                                     VStack(alignment:.leading,spacing:3) {
                                         Text(item.path).textSelection(.enabled)
                                         Text(item.state.capitalized+(item.photos>1 ? " · \(item.photos) catalog photos":"")).foregroundStyle(.secondary)
+                                        if item.state == "duplicate", !item.duplicateOfPath.isEmpty {
+                                            Text("Possible match: \(item.duplicateOfPath)").foregroundStyle(.secondary)
+                                        }
                                         if item.metadataDeferred {
                                             Button("Review Complete Metadata…") { metadataItem=item }
                                                 .disabled(model.busy || model.loading)
@@ -279,7 +312,7 @@ struct FolderSyncSheet: View {
                                         if !item.error.isEmpty { Text(item.error).foregroundStyle(.red) }
                                     }.font(.caption)
                                 }.contextMenu {
-                                    if item.selectable {
+                                    if item.selectable(in:model.plan) {
                                         Button("Select This Folder and Subfolders") { Task { await model.select(true,kind:item.state,folder:item.folder) } }
                                         Button("Deselect This Folder and Subfolders") { Task { await model.select(false,kind:item.state,folder:item.folder) } }
                                     }
@@ -322,7 +355,7 @@ struct FolderSyncSheet: View {
             .sheet(item:$metadataItem) { item in
                 if let plan=model.plan { FolderSyncMetadataSheet(planID:plan.id,itemID:item.id,revision:plan.revision) }
             }
-            .task { await model.reload() }
+            .task { if model.plan == nil { await model.reload() } }
             .onDisappear { model.invalidate() }
     }
 }

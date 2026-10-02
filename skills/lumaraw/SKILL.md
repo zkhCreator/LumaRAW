@@ -13,6 +13,28 @@ Reuse includes requested Before, geometry, histogram and targeting/readout maps;
 missing, changed or damaged cache data causes normal rendering. This is a local
 processing optimization, not evidence of Adobe pixel parity or UI frame rate.
 
+## Reviewed folder synchronization
+
+`prepare_folder_sync` captures a folder revision and metadata-scan choice.
+Continue `scan_folder_sync` explicitly with the returned plan revision, then
+review bounded `get_folder_sync` pages before `apply_folder_sync`. Source files
+stay in place; missing-photo removal is an explicit catalog-only choice.
+
+New plans expose `duplicate_detection: 1`. Their `duplicate` rows match a catalog
+original or an earlier plan item by original filename, byte size and precise
+capture-time provenance. Unknown capture time is not file modification time.
+Use `kind: "duplicate"` to review/select those rows. `counts` and
+`selected_counts` keep duplicate totals separate from new-file totals.
+
+`apply_folder_sync` accepts `include_duplicates`, defaulting to false. Set it only
+when the user explicitly chooses to import the selected suspected duplicates;
+`import_new: false` excludes both new and duplicate rows. Inclusion does not alter
+stored item selections. Keep the captured plan revision and existing explicit
+`remove_missing` / `read_metadata` choices. A late catalog conflict fails before
+catalog mutations; create and review a fresh scan instead of retrying blindly.
+Plans with `duplicate_detection: 0` retain their legacy classification: omit the
+new inclusion option and create a fresh plan when duplicate review is needed.
+
 ## Export presets
 
 `list_export_presets` returns thirty name/identity summaries with optional `search`

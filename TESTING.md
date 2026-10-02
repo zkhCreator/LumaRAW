@@ -742,6 +742,28 @@ migration. `test_xmp_read.py` verifies supported RDF fields, sidecar precedence,
 standard embedded TIFF/JPEG/PNG packets, bounded XML/headers, unsupported values
 and unchanged source hashes. These fixtures do not prove Adobe pixel equivalence.
 
+`test_folder_sync_duplicates.py` adds catalog and within-plan suspected duplicates,
+precise/unknown clocks, original-name identity, selection/inclusion gates, final
+transaction conflict rejection and unchanged import provenance. Genuine schema-36
+plans exercise additive migration and legacy-plan behavior instead of relabeling
+current tables as old. Use the existing sync suites for removal, metadata refresh,
+cancel/recovery and source-file preservation alongside these checks.
+
+```sh
+.venv/bin/python -m pytest -q tests/test_folder_sync_duplicates.py \
+  tests/test_folder_sync.py tests/test_folder_sync_metadata.py \
+  tests/test_import_sequence.py tests/test_import_review.py tests/test_xmp_read.py
+.venv/bin/python tests/run_native.py --work work/new-folder-sync-native \
+  --engine /absolute/LumaRAW.app/Contents/Resources/Engine/LumaRAWEngine \
+  --suite NativeFolderSyncRegression --suite NativeImportSequenceRegression \
+  --suite NativePreviousImportRegression --suite NativeResponsivenessRegression
+```
+
+The native sync fixture contains a same-name/size/capture-time JPEG pair in
+different folders. It checks default exclusion, explicit inclusion, preserved
+selection, the new-photo gate and stale readback without retry. Its sheet snapshot
+is offscreen evidence; it does not exercise desktop input or VoiceOver.
+
 The sync metadata detail checks exercise complete long descriptions, twenty-path
 paging, wrong-item/plan/revision rejection and full application. The two
 `test_folder_sync_metadata.py` cases reproduce 60 long Unicode descriptions through

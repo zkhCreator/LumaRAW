@@ -1,14 +1,18 @@
 """Durable folder synchronization plans and atomic catalog application.
 
 Inputs: a catalog folder, captured revisions, bounded filesystem observations and
-explicit import/remove/read-metadata selections. Outputs: review pages and one
-transaction preserving existing edits, copies and frozen export jobs. Large
-metadata stays out of list queries and is read explicitly in bounded detail pages.
+explicit import/remove/read-metadata selections. Outputs: review pages, suspected
+duplicate classifications for new originals and one transaction preserving
+existing edits, copies and frozen export jobs. Large metadata stays out of list
+queries and is read explicitly in bounded detail pages.
 Filesystem I/O belongs to folder_sync_io/runner; this module never opens or deletes originals.
 New imports reference files in place. Removal is catalog-only and includes a
 missing original's variants; descriptive XMP updates apply to its master only.
 Catalog sequence allocation is part of the same transaction for new originals;
 metadata-only synchronization and removal do not consume import/image numbers.
+Duplicate identity follows reviewed-import matching: original name, bytes and
+known camera capture time, never filesystem time. Direct Adobe Sync behavior is
+not implied by this additional review step.
 """
 import json
 import os
@@ -21,7 +25,7 @@ from .organization import folded
 from .relocations import RelocationBusy
 
 ACTIVE = ('planning','scanning','ready','verifying','interrupted')
-STATES = ('new','missing','updated','error','unchanged')
+STATES = ('new','duplicate','missing','updated','error','unchanged')
 
 
 def migrate(db):
@@ -67,6 +71,34 @@ def migrate(db):
             db.execute(row[0].replace(marker,f'AFTER {event} ON folder_photos WHEN (SELECT enabled FROM folder_maintenance WHERE id=1)=1 BEGIN'))
 
 
+def migrate_suspected_duplicates(db):
+    """Schema 37: add reviewed duplicate identity to new Folder Sync plans."""
+    version = db.execute('PRAGMA user_version').fetchone()[0]
+    if version >= 37:
+        return
+    if version != 36:
+        raise ValueError('Folder Sync duplicate review requires catalog schema 36')
+    db.execute('BEGIN IMMEDIATE')
+    try:
+        db.execute("ALTER TABLE folder_sync_plans ADD COLUMN duplicate_detection INTEGER NOT NULL DEFAULT 0 CHECK(duplicate_detection IN (0,1))")
+        db.execute("ALTER TABLE folder_sync_files ADD COLUMN name TEXT NOT NULL DEFAULT ''")
+        db.execute('ALTER TABLE folder_sync_files ADD COLUMN taken_us INTEGER')
+        db.execute("ALTER TABLE folder_sync_files ADD COLUMN taken_submicro TEXT NOT NULL DEFAULT ''")
+        db.execute("ALTER TABLE folder_sync_files ADD COLUMN capture_clock TEXT NOT NULL DEFAULT 'unknown'")
+        db.execute("ALTER TABLE folder_sync_files ADD COLUMN duplicate_match TEXT NOT NULL DEFAULT '' CHECK(duplicate_match IN ('','catalog','plan'))")
+        db.execute("ALTER TABLE folder_sync_files ADD COLUMN duplicate_of_path TEXT NOT NULL DEFAULT ''")
+        db.execute("CREATE INDEX folder_sync_file_duplicate ON folder_sync_files(plan_id,name,bytes,capture_clock,taken_us,taken_submicro,id) WHERE state IN ('new','duplicate')")
+        # The changes page is bounded by this partial index; duplicate rows are
+        # now first-class changes, while unchanged rows stay outside the scan.
+        db.execute('DROP INDEX folder_sync_changes')
+        db.execute("CREATE INDEX folder_sync_changes ON folder_sync_files(plan_id,id) WHERE state IN ('new','duplicate','missing','updated','error')")
+        db.execute('PRAGMA user_version=37')
+        db.commit()
+    except BaseException:
+        db.rollback()
+        raise
+
+
 class FolderSync:
     def __init__(self,catalog):
         self.catalog, self.db = catalog, catalog.db
@@ -101,13 +133,13 @@ class FolderSync:
             plan[key] = json.loads(plan[key])
         if kind not in ('all','changes',*STATES):
             raise ValueError('Unsupported synchronization item filter')
-        clause = '' if kind == 'all' else " AND state IN ('new','missing','updated','error')" if kind == 'changes' else ' AND state=?'
+        clause = '' if kind == 'all' else " AND state IN ('new','duplicate','missing','updated','error')" if kind == 'changes' else ' AND state=?'
         params = [plan_id] if kind in ('all','changes') else [plan_id,kind]
         total = plan['file_count'] if kind == 'all' else sum(plan['counts'].get(key,0) for key in STATES[:-1]) if kind == 'changes' else plan['counts'].get(kind,0)
         if plan['state'] not in ACTIVE:
             total = 0
         offset = min(offset,max(0,(total-1)//60*60))
-        rows = self.db.execute('SELECT id,path,source_id,state,selected,'
+        rows = self.db.execute('SELECT id,path,source_id,state,selected,duplicate_match,duplicate_of_path,'
             'CASE WHEN length(CAST(patch AS BLOB))<=4096 THEN patch ELSE NULL END AS patch,clock,notes,error,'
             '(SELECT count(*) FROM folder_sync_photos p WHERE p.plan_id=f.plan_id AND p.source_id=f.source_id) AS catalog_photos '
             'FROM folder_sync_files f WHERE plan_id=?'+clause+' ORDER BY id LIMIT 60 OFFSET ?',[*params,offset]) if total else []
@@ -151,14 +183,14 @@ class FolderSync:
             if self.db.execute("SELECT 1 FROM folder_sync_plans WHERE state IN ('planning','scanning','ready','verifying','interrupted')").fetchone():
                 raise ValueError('Finish or cancel the existing synchronization plan first')
             self.db.execute('DELETE FROM folder_sync_plans WHERE id NOT IN (SELECT id FROM folder_sync_plans ORDER BY id DESC LIMIT 31)')
-            plan_id = self.db.execute('INSERT INTO folder_sync_plans(folder_id,path,fingerprint,folder_revision,scan_metadata,created) '
-                'VALUES(?,?,?,?,?,?)',(folder_id,folder['path'],json.dumps(fingerprint),expected_revision,int(scan_metadata),time.time())).lastrowid
+            plan_id = self.db.execute('INSERT INTO folder_sync_plans(folder_id,path,fingerprint,folder_revision,scan_metadata,created,duplicate_detection) '
+                'VALUES(?,?,?,?,?,?,1)',(folder_id,folder['path'],json.dumps(fingerprint),expected_revision,int(scan_metadata),time.time())).lastrowid
             self.db.execute('INSERT INTO folder_sync_directories(plan_id,path,fingerprint) VALUES(?,?,?)',
                             (plan_id,folder['path'],json.dumps(fingerprint)))
             self.db.execute('INSERT INTO folder_sync_photos SELECT ?,p.id,p.source_id,s.revision,p.revision,p.metadata_revision,'
                 'p.rating,p.flag,p.bytes,p.mtime,p.sha256 FROM photos p JOIN photo_sources s ON s.id=p.source_id '
                 'WHERE p.id IN (SELECT photo_id FROM folder_photos WHERE folder_path IN ('+descendants('?')+'))',(plan_id,folder['path']))
-            self.db.execute('INSERT INTO folder_sync_files(plan_id,path,source_id) SELECT ?,p.path,p.source_id FROM photos p '
+            self.db.execute('INSERT INTO folder_sync_files(plan_id,path,name,source_id) SELECT ?,p.path,p.name,p.source_id FROM photos p '
                 'JOIN folder_sync_photos s ON s.photo_id=p.id WHERE s.plan_id=? AND p.is_virtual=0',(plan_id,plan_id))
             self.db.execute('UPDATE folder_sync_plans SET file_count=(SELECT count(*) FROM folder_sync_files WHERE plan_id=?) WHERE id=?',(plan_id,plan_id))
         return self.get(plan_id)
@@ -179,7 +211,8 @@ class FolderSync:
             self.db.execute('BEGIN IMMEDIATE');self.check(plan_id,revision,('scanning',))
             added_files = added_directories = 0
             for path in result['files']:
-                added_files += self.db.execute('INSERT OR IGNORE INTO folder_sync_files(plan_id,path) VALUES(?,?)',(plan_id,path)).rowcount
+                added_files += self.db.execute('INSERT OR IGNORE INTO folder_sync_files(plan_id,path,name) VALUES(?,?,?)',
+                                               (plan_id,path,os.path.basename(path))).rowcount
             for path,fingerprint in result['directories']:
                 added_directories += self.db.execute('INSERT OR IGNORE INTO folder_sync_directories(plan_id,path,fingerprint) VALUES(?,?,?)',
                                                      (plan_id,path,json.dumps(fingerprint))).rowcount
@@ -190,20 +223,42 @@ class FolderSync:
                 ('directories' if more else 'files',added_files,added_directories,int(result['done']),plan_id))
         return self.get(plan_id)
 
+    def duplicate(self,plan_id,file_id,name,size,clock):
+        """Return the first reviewed-import identity match, if capture time is known."""
+        taken_us = clock.get('taken_us')
+        if taken_us is None:
+            return None
+        key = (name,size,clock.get('capture_clock','unknown'),taken_us,
+               clock.get('taken_submicro',''))
+        catalog = self.db.execute('SELECT path FROM photos WHERE is_virtual=0 AND original_name=? AND bytes=? '
+            'AND capture_clock=? AND taken_us=? AND taken_submicro=? ORDER BY id LIMIT 1',key).fetchone()
+        if catalog:
+            return 'catalog',catalog['path']
+        previous = self.db.execute("SELECT path FROM folder_sync_files WHERE plan_id=? AND name=? AND bytes=? "
+            "AND capture_clock=? AND taken_us=? AND taken_submicro=? AND id<? AND state IN ('new','duplicate') "
+            'ORDER BY id LIMIT 1',(plan_id,*key,file_id)).fetchone()
+        return ('plan',previous['path']) if previous else None
+
     def finish_files(self,plan_id,revision,observations):
         with self.db:
             self.db.execute('BEGIN IMMEDIATE');plan = self.check(plan_id,revision,('scanning',))
             counts = json.loads(plan['counts'])
             for row,result in observations:
                 patch,clock,notes = result.get('patch',{}),result.get('clock',{}),result.get('notes',[])
+                duplicate_clock = clock
                 if clock.get('taken_us') is None:
                     clock = {'camera':clock['camera']} if clock.get('camera') else {}
+                name = row['name'] or os.path.basename(row['path'])
+                fingerprint = result.get('fingerprints',{}).get(row['path'])
+                size,mtime = fingerprint[2:] if fingerprint else (0,0)
+                match = None
                 if result.get('error'):
                     state = 'error'
                 elif result['missing']:
                     state = 'missing'
                 elif not row['source_id']:
-                    state = 'new'
+                    match = self.duplicate(plan_id,row['id'],name,size,duplicate_clock) if plan['duplicate_detection'] else None
+                    state = 'duplicate' if match else 'new'
                 else:
                     # Most scans only need availability/stat fields. Never load
                     # recipes or decoder JSON, especially for missing originals.
@@ -236,10 +291,14 @@ class FolderSync:
                 counts[state] = counts.get(state,0)+1
                 if notes:
                     counts['with_notes'] = counts.get('with_notes',0)+1
-                fingerprint = result['fingerprints'].get(row['path'])
-                size,mtime = fingerprint[2:] if fingerprint else (0,0)
-                self.db.execute('UPDATE folder_sync_files SET state=?,bytes=?,mtime=?,fingerprints=?,patch=?,clock=?,notes=?,error=? WHERE id=?',
-                    (state,size,mtime,json.dumps(result['fingerprints']),json.dumps(patch),json.dumps(clock),json.dumps(notes),result.get('error',''),row['id']))
+                match_kind,match_path = match if match and not row['source_id'] and not result.get('error') and not result['missing'] and plan['duplicate_detection'] else ('','')
+                taken_us = duplicate_clock.get('taken_us')
+                taken_submicro = duplicate_clock.get('taken_submicro','')
+                capture_clock = duplicate_clock.get('capture_clock','unknown')
+                self.db.execute('UPDATE folder_sync_files SET state=?,name=?,bytes=?,mtime=?,taken_us=?,taken_submicro=?,capture_clock=?,'
+                                'duplicate_match=?,duplicate_of_path=?,fingerprints=?,patch=?,clock=?,notes=?,error=? WHERE id=?',
+                    (state,name,size,mtime,taken_us,taken_submicro,capture_clock,match_kind,match_path,
+                     json.dumps(result['fingerprints']),json.dumps(patch),json.dumps(clock),json.dumps(notes),result.get('error',''),row['id']))
             more = self.db.execute("SELECT 1 FROM folder_sync_files WHERE plan_id=? AND state='pending' LIMIT 1",(plan_id,)).fetchone()
             self.db.execute('UPDATE folder_sync_plans SET state=?,scanned=scanned+?,counts=?,selected_counts=?,revision=revision+1 WHERE id=?',
                             ('planning' if more else 'ready',len(observations),json.dumps(counts),
@@ -249,7 +308,7 @@ class FolderSync:
     def select(self,plan_id,expected_revision,selected,kind='new',item_ids=None,folder=None):
         with self.db:
             self.db.execute('BEGIN IMMEDIATE');plan = self.check(plan_id,expected_revision,('ready',))
-            if kind not in ('new','updated','missing') or item_ids is not None and folder is not None:
+            if kind not in ('new','duplicate','updated','missing') or item_ids is not None and folder is not None:
                 raise ValueError('Choose one synchronization selection scope')
             clause,params = 'plan_id=? AND state=?',[plan_id,kind]
             if item_ids is not None:
@@ -266,13 +325,17 @@ class FolderSync:
             self.db.execute('UPDATE folder_sync_plans SET selected_counts=?,revision=revision+1 WHERE id=?',(json.dumps(counts),plan_id))
         return self.get(plan_id,kind)
 
-    def start_apply(self,plan_id,expected_revision,read_metadata):
+    def start_apply(self,plan_id,expected_revision,read_metadata,import_new=True,include_duplicates=False):
         with self.db:
             self.db.execute('BEGIN IMMEDIATE');plan = self.check(plan_id,expected_revision,('ready',))
             if json.loads(plan['counts']).get('error',0):
                 raise ValueError('Resolve the reported scan errors before synchronizing')
             if read_metadata and not plan['scan_metadata']:
                 raise ValueError('Metadata was not scanned; create a new metadata plan')
+            if include_duplicates and not import_new:
+                raise ValueError('Including suspected duplicates requires importing new photos')
+            if include_duplicates and not plan['duplicate_detection']:
+                raise ValueError('This saved plan predates suspected-duplicate review; create a fresh synchronization plan')
             self.db.execute("UPDATE folder_sync_plans SET state='verifying',checked=0,error='',revision=revision+1 WHERE id=?",(plan_id,))
         return self.row(plan_id)
 
@@ -299,9 +362,13 @@ class FolderSync:
                 self.db.execute("UPDATE folder_sync_plans SET state='ready',error=?,revision=revision+1 WHERE id=?",(error,plan_id))
         return self.get(plan_id)
 
-    def apply(self,plan_id,revision,import_new,remove_missing,read_metadata):
+    def apply(self,plan_id,revision,import_new,remove_missing,read_metadata,include_duplicates=False):
         with self.db:
             self.db.execute('BEGIN IMMEDIATE');plan = self.check(plan_id,revision,('verifying',))
+            if include_duplicates and not import_new:
+                raise ValueError('Including suspected duplicates requires importing new photos')
+            if include_duplicates and not plan['duplicate_detection']:
+                raise ValueError('This saved plan predates suspected-duplicate review; create a fresh synchronization plan')
             if self.db.execute('SELECT 1 FROM folder_sync_photos s LEFT JOIN photos p ON p.id=s.photo_id '
                 'LEFT JOIN photo_sources f ON f.id=s.source_id WHERE s.plan_id=? AND (p.id IS NULL OR p.source_id!=s.source_id '
                 'OR f.revision!=s.source_revision OR p.bytes!=s.bytes OR p.mtime!=s.mtime OR p.sha256!=s.sha256)',(plan_id,)).fetchone():
@@ -315,9 +382,16 @@ class FolderSync:
             if self.db.execute("SELECT 1 FROM jobs WHERE state='running' AND source_id IN "
                 '(SELECT source_id FROM folder_sync_files WHERE plan_id=?) LIMIT 1',(plan_id,)).fetchone():
                 raise RelocationBusy('Wait for affected exports to finish before synchronizing')
-            new_filter = "plan_id=? AND state='new' AND selected=1 AND ?"
+            if plan['duplicate_detection'] and import_new and self.db.execute(
+                'SELECT 1 FROM folder_sync_files f WHERE f.plan_id=? AND f.state=\'new\' AND f.selected=1 '
+                'AND ? AND f.taken_us IS NOT NULL AND EXISTS (SELECT 1 FROM photos p WHERE p.is_virtual=0 '
+                'AND p.original_name=f.name AND p.bytes=f.bytes AND p.capture_clock=f.capture_clock '
+                'AND p.taken_us=f.taken_us AND p.taken_submicro=f.taken_submicro) LIMIT 1',
+                (plan_id,int(import_new))).fetchone():
+                raise ValueError('A suspected duplicate appeared after review; create a fresh synchronization plan')
+            new_filter = "plan_id=? AND selected=1 AND ((state='new' AND ?) OR (state='duplicate' AND ?))"
             remove_filter = "plan_id=? AND state='missing' AND selected=1 AND ?"
-            new_params,remove_params = (plan_id,int(import_new)),(plan_id,int(remove_missing))
+            new_params,remove_params = (plan_id,int(import_new),int(import_new and include_duplicates)),(plan_id,int(remove_missing))
             sources = 'SELECT source_id FROM folder_sync_files WHERE '+remove_filter
             removed = self.db.execute('SELECT count(*) FROM photos WHERE source_id IN ('+sources+')',remove_params).fetchone()[0]
             imported = self.db.execute('SELECT count(*) FROM folder_sync_files WHERE '+new_filter,new_params).fetchone()[0]
@@ -349,7 +423,8 @@ class FolderSync:
             # are separately selected and never replace a virtual copy's metadata.
             for rows in self.pages(plan_id):
                 for row in rows:
-                    if row['state'] == 'new' and (not import_new or not row['selected']):
+                    is_new_import = row['state'] == 'new' or row['state'] == 'duplicate' and include_duplicates
+                    if row['state'] in ('new','duplicate') and (not import_new or not row['selected'] or not is_new_import):
                         continue
                     current = self.db.execute('SELECT id,source_id,bytes,mtime,missing FROM photos WHERE path=? AND is_virtual=0',(row['path'],)).fetchone()
                     if current is None:
@@ -362,7 +437,7 @@ class FolderSync:
                         self.db.execute('UPDATE photo_sources SET revision=revision+1 WHERE id=?',(current['source_id'],))
                         self.db.execute("UPDATE photos SET sha256=CASE WHEN bytes!=? OR mtime!=? THEN '' ELSE sha256 END,"
                             "bytes=?,mtime=?,missing=?,error='' WHERE source_id=?",(size,mtime,size,mtime,int(missing),current['source_id']))
-                    if not missing and (row['state']=='new' or read_metadata and row['selected']):
+                    if not missing and (is_new_import or read_metadata and row['selected']):
                         clock = json.loads(row['clock'])
                         if clock:
                             self.db.execute('UPDATE photos SET '+','.join(key+'=?' for key in clock)+' WHERE source_id=?',
@@ -370,7 +445,7 @@ class FolderSync:
                         patch = json.loads(row['patch'])
                         if patch:
                             self.apply_metadata(current['id'],patch)
-                        if row['state'] != 'new' and (clock or patch):
+                        if row['state'] not in ('new','duplicate') and (clock or patch):
                             modified += 1
             self.db.execute('UPDATE catalog_folders SET direct_count=direct_count+COALESCE('
                 '(SELECT sum(delta) FROM sync_deltas WHERE sync_deltas.path=catalog_folders.path),0) WHERE path IN (SELECT path FROM sync_deltas)')
@@ -384,7 +459,8 @@ class FolderSync:
             self.db.execute('UPDATE folder_state SET revision=revision+1')
             from .previous_import import replace
             replace(self.db,'SELECT p.source_id FROM folder_sync_files f JOIN photos p ON p.path=f.path AND p.is_virtual=0 '
-                    "WHERE f.plan_id=? AND f.state='new' AND f.selected=1 AND ?",new_params,'folder_sync',imported)
+                    "WHERE f.plan_id=? AND f.state IN ('new','duplicate') AND f.selected=1 "
+                    'AND ((f.state=\'new\' AND ?) OR (f.state=\'duplicate\' AND ?))',new_params,'folder_sync',imported)
             self.db.execute("UPDATE folder_sync_plans SET state='applied',imported=?,removed=?,modified=?,revision=revision+1,error='' WHERE id=?",
                             (imported,removed,modified,plan_id))
             self.discard(plan_id)

@@ -384,7 +384,17 @@ override standard embedded TIFF/JPEG/PNG XMP; virtual copies retain independent
 descriptive metadata and Develop recipes are preserved. Review unsupported-field
 notes and errors before applying. **Folder Options → Resume Folder Synchronization…**
 restores a saved scan or review. This is not yet the complete Lightroom Import
-Dialog, duplicate policy, full IPTC/XMP/ACR support or missing-empty-folder removal.
+Dialog, full IPTC/XMP/ACR support or missing-empty-folder removal.
+
+Fresh synchronization reviews also identify suspected duplicates by original
+filename, file size and precise capture time. Unknown capture time stays unknown.
+Duplicate rows are excluded by default; explicitly include the selected duplicates
+when needed. Turning inclusion off preserves their checkboxes, while disabling
+new-photo import excludes both new and duplicate files. Reviews created before
+this feature keep their original rules; create a fresh scan to review duplicates.
+If a new duplicate appears in the catalog after review, synchronization requires a
+fresh scan. This option lives in LumaRAW's review sheet; Lightroom Classic exposes
+duplicate exclusion through its optional Import dialog during synchronization.
 
 The **Keyword List** supports nested keywords, synonyms, search and 60-item pages.
 Its checkboxes add/remove tags on the Grid selection, or just the active photo in

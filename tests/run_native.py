@@ -65,11 +65,14 @@ def main():
         fixtures=work/'fixtures'/suite
         fixtures.mkdir(parents=True)
         paths=[]
+        duplicate_incoming=None
         for index,color in enumerate(('navy','orange','green','purple','teal')):
             path=fixtures/f'photo-{index}.png'
             if suite in ('NativeFolderRegression','NativeFolderRelocationRegression','NativeFolderSyncRegression'):
                 path=fixtures / ('Parent/direct.png','Parent/child/a.png','Parent/child/b.png','Elsewhere/c.png','Elsewhere/d.png')[index]
                 path.parent.mkdir(parents=True,exist_ok=True)
+            if suite=='NativeFolderSyncRegression' and index==4:
+                path=path.with_suffix('.jpg')
             if suite=='NativeImportLoupeRegression':
                 picture=Image.new('RGB',(2400,1800));draw=ImageDraw.Draw(picture)
                 for y in range(0,1800,100):
@@ -87,6 +90,12 @@ def main():
                 exif=Image.Exif()
                 exif[34665]={36867:'2026:09:28 00:15:00',36881:'+14:00'}
                 Image.new('RGB',(160,100),color).save(path,exif=exif)
+            elif suite=='NativeFolderSyncRegression' and index==4:
+                exif=Image.Exif()
+                exif[34665]={36867:'2026:09:28 12:30:00',36881:'+00:00'}
+                Image.new('RGB',(160,100),color).save(path,quality=95,exif=exif)
+                duplicate_incoming=fixtures/'Parent/child'/path.name
+                duplicate_incoming.write_bytes(path.read_bytes())
             else:Image.new('RGB',(2400,1800) if suite in ('NativeComparisonLayoutRegression','NativeReferenceRegression','NativeResponsivenessRegression','NativeColorReadoutRegression') else (160,100),color).save(path)
             paths.append(str(path))
         executable=work/suite
@@ -100,6 +109,7 @@ def main():
         if suite=='NativeReferenceRegression':env['LUMARAW_TEST_FIXTURES']='|'.join(paths)
         if suite=='NativeImportNamingRegression':env['LUMARAW_TEST_FIXTURES']='|'.join(paths)
         if suite=='NativeExportBatchRegression':env['LUMARAW_TEST_FIXTURES']='|'.join(paths)
+        if suite=='NativeFolderSyncRegression':env['LUMARAW_TEST_DUPLICATE_INCOMING']=str(duplicate_incoming)
         if suite in ('NativeImportBackupRegression','NativeImportPresetRegression','NativeImportSequenceRegression','NativeImportDateRegression','NativeImportDestinationRegression','NativeImportLoupeRegression'):env['LUMARAW_TEST_FIXTURES']='|'.join(paths)
         if suite=='NativeResponsivenessRegression':env['LUMARAW_TEST_FIXTURES']='|'.join(paths)
         if suite=='NativeTransportRegression':
