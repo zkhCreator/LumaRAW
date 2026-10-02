@@ -300,6 +300,15 @@ before reading the page's summaries and family fields. Unfiltered All Photos
 counts use maintained stack sizes; empty stack sources retain the indexed flat
 query path. No pixel worker or recipe JSON participates.
 
+Stack positions are sparse ordering labels and can be negative after a move to
+the top. They are not display ordinals. The page's `stack_ordinal` is one-based
+within the complete scoped stack, independent of filtering and page offsets.
+Only the returned rows are grouped in memory; indexed disjoint count ranges
+compute their ranks without rescanning a full prefix for each row. Deep pages
+can still count a large prefix once per stack; this is not constant-time random
+access. Collapsed covers use their known first position. Flat/unsupported scopes
+return a null ordinal without introducing stack membership reads.
+
 A catalog-wide stack revision is intentionally conservative: every stack mutation
 requires the captured revision and rejects concurrent changes atomically. Collection
 stack edits also advance collection/ancestor revisions. Cleanup triggers remove

@@ -137,7 +137,7 @@ whole-desktop latency, or performance guarantees on other hardware. Reproduce vi
 
 ### Next work
 
-Continue with bounded vocabulary-browser metadata, keyword sets and vocabulary exchange, complete synchronization import options, relocation edge cases, stack ordinal badges and
+Continue with bounded vocabulary-browser metadata, keyword sets and vocabulary exchange, complete synchronization import options, relocation edge cases and
 cross-page cover focus. Offline preview caches,
 cache-size controls and native polling/process-startup costs remain pending. Then close Develop and
 export gaps in the inventory. Preserve pending desktop/older-OS acceptance rather
@@ -4059,3 +4059,87 @@ The official MCP SDK, macOS 14 runtime, actual desktop interaction/VoiceOver and
 Lightroom reference acceptance were not run. Desktop automation was not retried.
 Import preview policies, offline assets and the wider non-AI parity inventory
 remain incomplete.
+
+### Full-stack member ordinals in Library badges
+
+Engine generation 46 / schema 32 adds `stack_ordinal` to Library page rows.
+Expanded Grid and Filmstrip badges display the photograph's one-based position
+within its entire source-scoped stack; collapsed covers retain the total count.
+Help and accessibility text distinguish the visibility action from Photo X of Y.
+Filtering or paging does not renumber members. Folder and regular/Quick collection
+stacks remain independent; flat/unsupported scopes return a null ordinal.
+
+The existing sparse ordering labels can be negative after moving a photo to the
+top, or have gaps after removal. They remain unchanged. Only the current page's
+at-most-60 rows are grouped in memory. Each stack uses one indexed prefix and
+disjoint intervening ranges to calculate true ranks, instead of independently
+recounting the prefix for every visible photo. Collapsed covers use their known
+ordinal 1. Deep pages still scan the needed prefix once per stack; arbitrary-size
+stack navigation is not claimed to be constant-time.
+
+Reference: Adobe's [stacking documentation](https://helpx.adobe.com/lightroom-classic/desktop/organize-photos-in-lightroom-classic/grouping-photos-stacks.html)
+distinguishes collapsed total-count badges from expanded sequential member
+numbers. Pixel styling, actual desktop clicks/keyboard and VoiceOver still need
+reference acceptance. Cross-page cover-focus behavior is a separate remaining gap.
+
+Focused stack/virtual-copy regression passed **44 tests**. The complete suite
+passed **953 tests in 126.90 s**, with required Metal and the real NEF fixture and
+no skips. New cases cover negative top positions, up/down, removal holes, split,
+virtual-copy insertion, auto-stack, independent collection ordering, tied labels,
+null flat/smart/unstacked rows, 130 members across three pages and sparse filters.
+A 100,000-member case guards SQL VM work against repeatedly counting each row's
+entire prefix. Query plans confirm covering `stack_order` searches for prefix,
+equal-position and intervening-position ranges. Scope ownership is checked once
+per returned stack. Inner and outer page order use photo ID as the final tie-break.
+
+Synthetic scale evidence on Apple M3 Max / 128 GiB / macOS 26.6.2 uses one expanded
+stack with intentionally negative and sparse labels. Each case has one first
+request and five repeats after opening a new SQL connection; storage/OS caches
+remain warm from seeding. No photographs, pixels, IPC or native frames are timed.
+Full-page results exclude total-count queries; isolated ordinal timing uses the
+already-fetched page of at most 60 rows.
+
+| Members / page | Full page first / warm median | Ordinals warm median / max |
+| --- | ---: | ---: |
+| 10,000 / first | 4.225 / 3.988 ms | 0.168 / 0.177 ms |
+| 10,000 / middle | 4.720 / 4.551 ms | 0.266 / 0.313 ms |
+| 10,000 / last | 5.330 / 5.261 ms | 0.346 / 0.367 ms |
+| 100,000 / first | 42.875 / 40.957 ms | 0.180 / 0.234 ms |
+| 100,000 / middle | 49.461 / 48.556 ms | 1.125 / 1.154 ms |
+| 100,000 / last | 58.856 / 59.064 ms | 1.995 / 2.096 ms |
+
+Ordinal-only VM work was about 4,100 instructions on the first page at either
+size, 19,200 / 154,200 in the middle and 34,000 / 304,000 on the last page. This is
+consistent with one prefix scan, not sixty overlapping scans. Full-page VM work
+reached about 439,700 / 4,309,700 on the last page; the pre-existing stack sorting
+and offset cost remains significant. Full-page warm maxima were 5.322 / 59.675 ms.
+
+With only every hundredth member matching a rating filter, first/last-page warm
+medians were 0.667 / 0.741 ms at 10,000 members and 1.770 / 3.765 ms at 100,000.
+Corresponding isolated ordinal medians were 0.301 / 0.367 and 0.328 / 2.063 ms.
+Reply payloads stayed between 28,704 and 29,520 bytes. Process RSS sampled every
+5 ms after seeding peaked at **33.359 / 47.609 MiB**. A collapsed cover's ordinal
+annotation took 0.003 ms at both sizes; its existing complete page query took
+2.843 / 35.420 ms. These measurements do not establish desktop frame rate or
+constant-time queries for arbitrary stack sizes.
+
+Five packaged-engine native suites passed **94 assertions**: stacks 27,
+auto-stack 19, virtual copies 19, Library 13 and responsiveness 16. Native evidence
+covers collapsed total count, expanded member ordinals, moving the cover,
+splitting and a filtered page retaining ordinal 2 for its sole displayed member.
+Inspected offscreen badge renders show collapsed count 3 and expanded ordinal 2.
+These are layout/model/IPC checks, not actual desktop input or VoiceOver testing.
+
+The app builds for the macOS 14 deployment target without Swift warnings and
+passes deep/strict local ad-hoc signature verification. Packaged initialization,
+all **138 MCP schemas**, identity negotiation and the bundled guide match source.
+Build identities:
+
+- Source digest: `cfc51d8e3cc31d523e537689fba98d930a06e29c208ecb1e51952d7c288d01bc`
+- Engine SHA-256: `16d66ae247c3e2dc1c14de70ea9d71bc7953f612d3815e6401668a4015d2ef2f`
+- Native SHA-256: `3b583d2ba969996a1ef974179d6155fbd93281661a20690b5351e79ffe076d4a`
+
+macOS 14 runtime, the official MCP SDK, desktop interaction/VoiceOver and Adobe
+reference acceptance remain unverified; no desktop automation was retried.
+Cross-page cover focus, large-stack page sorting cost and the remaining parity
+inventory are still open.

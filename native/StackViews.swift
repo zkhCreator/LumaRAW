@@ -1,5 +1,6 @@
-// Purpose: source-scoped stack commands and visible cover/count controls.
-// Inputs: Store page metadata. Outputs: explicit stack actions only.
+// Purpose: source-scoped stack commands and visible cover/ordinal controls.
+// Inputs: Store page metadata. Outputs: explicit stack actions and photo X of Y context.
+// Collapsed badges show member count; expanded badges show the full-stack ordinal.
 // Hidden photos are not selected by clicking a collapsed stack's badge.
 import SwiftUI
 
@@ -50,12 +51,13 @@ struct StackBadge: View {
             Button { Task { await s.changeStack("toggle",ids:[photoID]) } } label: {
                 HStack(spacing:3) {
                     Image(systemName:stack.collapsed ? "square.stack.fill":"square.stack")
-                    Text("\(stack.count)").monospacedDigit()
+                    Text(stack.badgeValue.map{String($0)} ?? "–").monospacedDigit()
                 }.font(.caption2).padding(4).foregroundStyle(.white)
                     .background(.black.opacity(0.75),in:RoundedRectangle(cornerRadius:3))
             }.buttonStyle(.plain).disabled(!s.canStack)
-                .help("\(stack.collapsed ? "Expand":"Collapse") stack of \(stack.count) photos")
-                .accessibilityLabel("\(stack.collapsed ? "Expand":"Collapse") stack of \(stack.count) photos\(stack.top == photoID ? ", top photo":"")")
+                .help("\(stack.visibilityAction) · \(stack.memberDescription)")
+                .accessibilityLabel("\(stack.visibilityAction), \(stack.memberDescription)")
+                .accessibilityHint(stack.collapsed ? "Expands the stack to reveal all photos.":"Collapses the stack to its top photo.")
         }
     }
 }

@@ -2,7 +2,8 @@
 
 Inputs: bounded JSON objects. Outputs: JSON schemas and validated domain commands,
 including bounded full-resolution import viewport requests. No transport, pixels or
-UI dependencies. IDs refer only to the selected catalog.
+UI dependencies. Library pages may include true 1-based ordinals for scoped stack
+members. IDs refer only to the selected catalog.
 Tool annotations describe effects; they never substitute for user authorization.
 """
 from .model import LIMITS, Recipe, SYNC_GROUPS, POINT_CURVE_FIELDS, PARAMETRIC_FIELDS, MIXER_FIELDS, BW_FIELDS
@@ -77,7 +78,7 @@ TOOLS['preview_import_item']['inputSchema']['then']={'required':['detail'],'prop
 IMPORT_PRESET={'anyOf':[obj({'preset_id':PRESET_ID,'expected_revision':PRESET_TOKEN},['preset_id','expected_revision']),{'type':'null'}]}
 tool('get_import_processing','Read captured import preset names and additional keyword text without full preset payloads.',{'plan_id':ID},['plan_id'],True)
 tool('set_import_processing','Capture Develop/metadata presets or additional keywords for a ready import. Later preset edits do not change the captured values. Null clears a preset; omitted settings are preserved.',{'plan_id':ID,'expected_revision':REV,'develop_preset':IMPORT_PRESET,'metadata_preset':IMPORT_PRESET,'keywords':{'type':'array','maxItems':100,'items':string()}},['plan_id','expected_revision'])
-tool('list_photos','Read at most 60 summaries with SQL filters, collection membership and stable sorting. has_snapshots filters shared source-family presence; recipes are never loaded for filtering.',{'offset':integer(),'mode':{'enum':['all','stars','keepers','rejects','missing','duplicates','previous_import']},'search':{'type':'string','maxLength':200},'filters':FILTER_SCHEMA,'collection_id':ID,'sort':{'enum':list(SORTS)},'descending':BOOL},read=True)
+tool('list_photos','Read at most 60 summaries with SQL filters, collection membership and stable sorting. With stack projection enabled, member rows include a 1-based ordinal across the complete scoped stack, independent of filters and pagination. has_snapshots filters shared source-family presence; recipes are never loaded for filtering.',{'offset':integer(),'mode':{'enum':['all','stars','keepers','rejects','missing','duplicates','previous_import']},'search':{'type':'string','maxLength':200},'filters':FILTER_SCHEMA,'collection_id':ID,'sort':{'enum':list(SORTS)},'descending':BOOL},read=True)
 tool('list_collections','Read at most 60 collections/sets, excluding Quick. Omit parent_id for flat compatibility; null selects roots, an ID selects children.',{'offset':integer(),'parent_id':OPTIONAL_ID},read=True)
 TOOLS['list_photos']['inputSchema']['properties']['stacked']=BOOL
 TOOLS['list_photos']['inputSchema']['properties'].update(folder_id=ID,include_subfolders=BOOL)

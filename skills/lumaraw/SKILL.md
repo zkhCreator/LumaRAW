@@ -744,6 +744,13 @@ are hidden from filtering and selection. Use `stacked: false` to inspect all
 matching photos without changing saved visibility. Never assume selecting a cover
 authorizes editing or exporting its hidden members.
 
+Visible stack members include `stack_ordinal`, their one-based position in the
+entire scoped stack. Filters and page boundaries do not restart numbering.
+Collapsed covers have ordinal 1, while their badge shows `stack_count`.
+`stack_position` is an internal sorting label that can be negative or have gaps;
+never display it as an ordinal. Unstacked rows and flat `stacked: false` or
+unsupported sources return a null ordinal.
+
 `stack_photos` takes `photo_ids` (1–60 distinct IDs), `expected_revision` captured
 from the page, an optional `collection_id`, and an action: group, unstack, remove,
 expand, collapse, toggle, split, top, up or down. For a new group, order IDs as displayed

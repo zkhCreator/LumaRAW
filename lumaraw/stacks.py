@@ -1,11 +1,14 @@
 """Portable, source-scoped photo stacks with bounded library projection.
 
 Inputs: ordered selections (at most 60), a captured stack revision and an optional
-regular collection. Outputs: atomic grouping, visibility and ordering changes.
-Folder stacks and collection stacks are independent. Collapsed members never
-implicitly become mutation targets. No pixels, original writes or recipe edits.
-The catalog-wide revision deliberately rejects concurrent structural changes;
-SQLite triggers preserve stack integrity when photos or memberships disappear.
+regular collection. Outputs: atomic grouping, visibility and ordering changes,
+plus bounded page projections with true 1-based member ordinals. Ordinals use
+the complete scoped stack order, not sparse position values or filtered pages;
+disjoint indexed ranges avoid repeating each row's full prefix count. A deep page
+still scans its prefix once per stack on that page. Folder and collection stacks
+remain independent. Collapsed members never become implicit mutation targets.
+No pixels, original writes or recipe edits. The catalog-wide revision rejects
+concurrent structural changes; SQLite triggers preserve stack integrity.
 """
 import os
 
@@ -236,8 +239,98 @@ class Stacks:
                 Collections(self.catalog).touch_ancestors(row['parent_id'])
         return {'revision':self.revision(),'changed':count}
 
+    def annotate_ordinals(self, rows, scope):
+        """Add full-stack ordinals to at most one already-fetched page of rows.
+
+        The caller owns presentation scope and has already bounded `rows` to 60.
+        Rows without stack membership receive null. For each expanded stack, a
+        strict prefix before its first visible member and non-overlapping intervals
+        between later visible members cover the needed index range once; filters
+        may omit members, which are still counted. Collapsed covers are ordinal 1
+        by the maintained top_id invariant. Each stack ID is checked against the
+        requested scope once; range counts then use only the covering order index.
+        No member rows are materialized.
+        """
+        if len(rows) > 60:
+            raise ValueError('Stack ordinal projection is limited to one 60-row page')
+        for row in rows:
+            row['stack_ordinal'] = None
+
+        if not scope:
+            return rows
+
+        groups = {}
+        for row in rows:
+            stack_id = row.get('stack_id')
+            if stack_id is None or row.get('stack_position') is None:
+                continue
+            groups.setdefault(stack_id, []).append(row)
+
+        def count_before(stack_id, position, photo_id):
+            # Two disjoint ranges preserve the composite stack_order index and
+            # implement the strict lexicographic prefix (position, photo_id).
+            # The stack's scope is checked once before ranking; stack_id is the
+            # leading index key and uniquely identifies that scoped stack.
+            return self.db.execute(
+                'SELECT (SELECT count(*) FROM stack_members WHERE stack_id=? AND position<?) '
+                '+ (SELECT count(*) FROM stack_members WHERE stack_id=? AND position=? AND photo_id<?)',
+                (stack_id, position, stack_id, position, photo_id)).fetchone()[0]
+
+        def count_interval(stack_id, previous, current):
+            before_position, before_id = previous
+            position, photo_id = current
+            if before_position == position:
+                return self.db.execute(
+                    'SELECT count(*) FROM stack_members WHERE stack_id=? AND position=? '
+                    'AND photo_id>? AND photo_id<=?',
+                    (stack_id, position, before_id, photo_id)).fetchone()[0]
+            # These ranges are disjoint: the remainder of the previous position,
+            # all intervening positions, and the prefix through the current row.
+            return self.db.execute(
+                'SELECT (SELECT count(*) FROM stack_members WHERE stack_id=? '
+                'AND position=? AND photo_id>?) '
+                '+ (SELECT count(*) FROM stack_members WHERE stack_id=? '
+                'AND position>? AND position<?) '
+                '+ (SELECT count(*) FROM stack_members WHERE stack_id=? '
+                'AND position=? AND photo_id<=?)',
+                (stack_id, before_position, before_id,
+                 stack_id, before_position, position,
+                 stack_id, position, photo_id)).fetchone()[0]
+
+        for stack_id, members in groups.items():
+            # Page projection already joined membership on this scope. Verify
+            # the globally unique stack ID belongs to that same scope once, then
+            # let stack_order cover every scalar range count without table reads.
+            if not self.db.execute('SELECT 1 FROM photo_stacks WHERE id=? AND scope=?',
+                                   (stack_id, scope)).fetchone():
+                continue
+            members = [row for row in members if not (
+                row.get('stack_collapsed') and row.get('stack_top') == row.get('id'))]
+            if not members:
+                # A collapsed projection contains only its cover; top_id is
+                # maintained as the first (position, photo_id) member.
+                for row in groups[stack_id]:
+                    if row.get('stack_collapsed') and row.get('stack_top') == row.get('id'):
+                        row['stack_ordinal'] = 1
+                continue
+            members.sort(key=lambda row: (row['stack_position'], row['id']))
+            first = members[0]
+            first_key = (first['stack_position'], first['id'])
+            # top_id is always the first member in canonical stack order. This
+            # avoids a prefix count when the visible page includes the cover.
+            ordinal = 1 if first.get('stack_top') == first['id'] else count_before(
+                stack_id, *first_key) + 1
+            first['stack_ordinal'] = ordinal
+            previous = first_key
+            for row in members[1:]:
+                current = (row['stack_position'], row['id'])
+                ordinal += count_interval(stack_id, previous, current)
+                row['stack_ordinal'] = ordinal
+                previous = current
+        return rows
+
     def projection(self, where, params, collection_id, sort='imported', descending=True, offset=None):
-        """SQL-only filtering/grouping; even a large expanded stack stays paged."""
+        """SQL-page stack members, then annotate the returned rows with ordinals."""
         from .organization import SORTS
         from .catalog import SUMMARY_COLUMNS
         if sort not in SORTS:
@@ -248,7 +341,7 @@ class Stacks:
             if offset is None:
                 return self.db.execute('SELECT count(*) FROM photos'+where,params).fetchone()[0]
             return [dict(row) for row in self.db.execute('SELECT '+SUMMARY_COLUMNS+
-                ',NULL AS stack_id,NULL AS stack_count,NULL AS stack_collapsed,NULL AS stack_top,NULL AS stack_position '
+                ',NULL AS stack_id,NULL AS stack_count,NULL AS stack_collapsed,NULL AS stack_top,NULL AS stack_position,NULL AS stack_ordinal '
                 f'FROM photos{where} ORDER BY {SORTS[sort]} {direction},id {direction} LIMIT 60 OFFSET ?',
                 [*params,max(0,offset)])]
         if offset is None:
@@ -271,10 +364,11 @@ class Stacks:
                   'LEFT JOIN stack_members m ON m.photo_id=photos.id AND m.scope=? '
                   'LEFT JOIN photo_stacks s ON s.id=m.stack_id LEFT JOIN photos top ON top.id=s.top_id '
                   'WHERE s.id IS NULL OR s.collapsed=0 OR s.top_id=photos.id '
-                  f'ORDER BY stack_sort{collation} {direction},stack_sort_id {direction},stack_position ASC LIMIT 60 OFFSET ?) AS page')
+                  f'ORDER BY stack_sort{collation} {direction},stack_sort_id {direction},stack_position ASC,photos.id ASC LIMIT 60 OFFSET ?) AS page')
         params = [*params,scope]
         columns = SUMMARY_COLUMNS+',stack_id,stack_count,stack_collapsed,stack_top,stack_position'
-        return [dict(row) for row in self.db.execute('SELECT '+columns+' FROM '+source+
+        rows = [dict(row) for row in self.db.execute('SELECT '+columns+' FROM '+source+
             ' JOIN photos ON photos.id=page.photo_id'+
-            f' ORDER BY stack_sort{collation} {direction},stack_sort_id {direction},stack_position ASC',
+            f' ORDER BY stack_sort{collation} {direction},stack_sort_id {direction},stack_position ASC,page.photo_id ASC',
             [*params,max(0,offset)])]
+        return self.annotate_ordinals(rows, scope)

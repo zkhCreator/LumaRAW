@@ -76,6 +76,12 @@ when a clear function is more maintainable. Avoid unrelated formatting churn.
   query shape must preserve source restrictions, all/any logic, stable ordering
   and stack projection; measure dense, sparse and empty cases before changing it.
 
+- Stack display ordinals come from all members of the current source's stack,
+  not the filtered page or its sparse sorting labels. Preserve ordering across
+  negative labels, holes, ties, virtual copies and splitting. Bound returned rows
+  and rank queries; group page members and count disjoint indexed ranges instead
+  of repeating whole prefixes. Record deep-page costs for oversized stacks.
+
 - Before snapshots are independent of the Develop timeline. Preserve imported
   presets and inherited virtual-copy settings, and never retarget Before when
   history is cleared or branched. Validate revisions for copy/swap/history

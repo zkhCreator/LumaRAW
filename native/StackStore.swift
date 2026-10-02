@@ -8,10 +8,17 @@ struct PhotoStack {
     let id: Int
     let count: Int
     let top: Int
+    let ordinal: Int?
     let collapsed: Bool
+    var badgeValue: Int? { collapsed ? count:ordinal }
+    var memberDescription: String {
+        ordinal.map { "Photo \($0) of \(count)" } ?? "Position unavailable in stack of \(count) photos"
+    }
+    var visibilityAction: String { collapsed ? "Expand stack":"Collapse stack" }
     init?(_ row: [String:Any]) {
         guard let id=row["stack_id"] as? Int,let top=row["stack_top"] as? Int else { return nil }
         self.id=id;self.top=top;count=row["stack_count"] as? Int ?? 0
+        ordinal=row["stack_ordinal"] as? Int
         collapsed=(row["stack_collapsed"] as? Int ?? 0) != 0
     }
 }

@@ -4,6 +4,8 @@ Inputs: explicit local paths and validated recipes. Outputs: paginated rows/jobs
 Responsibilities: store references, edits, undo history, and export snapshots.
 Library orientation is independent of Develop recipes and frozen in each job.
 Photo details keep complete keyword IDs; large display paths use explicit pages.
+Stack-enabled page rows carry true scoped ordinals; raw unstacked pages expose a
+null ordinal without adding membership reads.
 Boundaries: never copy/write original photos; never eagerly load full catalogs.
 Each connection belongs to its creating thread. Bulk insertion commits in batches.
 Direct imports number successful new originals with item savepoints and retain a
@@ -297,7 +299,7 @@ class Catalog:
         order = 'DESC' if descending else 'ASC'
         # Keep large recipe/decoder metadata JSON out of the grid query entirely.
         return [dict(r) for r in self.db.execute(
-            f'SELECT {SUMMARY_COLUMNS} FROM photos{where} ORDER BY {SORTS[sort]} {order},id {order} LIMIT 60 OFFSET ?',
+            f'SELECT {SUMMARY_COLUMNS},NULL AS stack_ordinal FROM photos{where} ORDER BY {SORTS[sort]} {order},id {order} LIMIT 60 OFFSET ?',
             params+[max(0,offset)])]
 
     def summaries(self, ids):

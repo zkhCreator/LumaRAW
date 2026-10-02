@@ -828,7 +828,27 @@ without returning more than 60 summaries or loading recipes.
 
 `NativeStackRegression` checks the actual Store, scoped badges, visible selection,
 cover changes, external polling, empty-page refresh, collection revisions and flat
-views against a real engine. It does not validate rendered controls or key routing.
+views against a real engine. Expanded badges use full-stack ordinals through
+reordering, splitting and filtering. Two offscreen renders cover collapsed count
+and expanded ordinal presentation; desktop key/pointer routing is not verified.
+
+`tests/test_stack_ordinals.py` covers negative/sparse positions, filtering and
+paging, source scopes and membership changes. Rank work is checked with SQLite
+VM steps, not a fragile elapsed-time assertion. The scale probe compares full
+60-row pages with isolated ordinal annotation for 10,000 and 100,000-member stacks,
+including first/middle/last pages and sparse matches. It reports first/warm times,
+VM steps, reply bytes and RSS sampled every 5 ms. Deep pages may count a large
+prefix once; no constant-time rank claim is made.
+
+```sh
+.venv/bin/python -m pytest -q tests/test_stack_ordinals.py tests/test_stacks.py tests/test_auto_stacks.py
+.venv/bin/python tests/stack_ordinals_probe.py --work work/new-stack-ordinals-scale --rows 10000 100000
+```
+
+The scale probe uses a fresh SQL connection after seeding with warm OS caches.
+It times no photographs, image processing, broker IPC or desktop rendering.
+Run without competing tests or builds; the full page timing excludes total-count
+queries. Isolated annotation timing excludes page retrieval.
 
 ```sh
 .venv/bin/python tests/stack_probe.py --work work/stack-probe-01 --rows 10000 --samples 30

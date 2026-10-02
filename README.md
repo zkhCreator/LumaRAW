@@ -292,7 +292,9 @@ equivalence and rendered/reference parity remain unfinished.
 Use **Photo → Stacking** to group, unstack, remove members, choose a cover or
 reorder photos. **⌘G / ⇧⌘G** group/unstack; with a photo surface focused, **S**
 expands/collapses, **⇧S** moves to the top, and **⇧[ / ⇧]** move up/down. The count
-badge also expands/collapses. Folder stacks require the same physical folder;
+badge also expands/collapses. A collapsed badge shows the member count; expanded
+badges show each photo's position in the entire stack, including when a filter
+hides other members. Folder stacks require the same physical folder;
 regular and Quick collections have independent stacks. Smart collections and
 collection sets show individual photos. A collapsed stack selects only its cover,
 so ratings, edits and collection additions do not silently include hidden members.
