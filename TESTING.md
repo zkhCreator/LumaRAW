@@ -2,6 +2,32 @@
 
 All probes use explicit read-only input photographs and new disposable catalog/output directories. They never use a personal photo library by default.
 
+## Raster conversion allocation
+
+`test_raster_decode.py` compares the bounded 8-bit conversion with the previous
+full-frame float expression, requiring bitwise equality. It covers all input
+codes, mixed channels and a final partial strip; full/preview decoding with and
+without ICC across all eight EXIF orientations; actual preview downsampling;
+and the existing grayscale/alpha-to-RGB behavior. It preserves metadata and
+checks original bytes. These are conversion regressions, not RAW calibration.
+
+```sh
+.venv/bin/python -m pytest -q tests/test_raster_decode.py tests/test_core.py \
+  tests/test_white_balance.py tests/test_white_balance_service.py
+.venv/bin/python tests/raster_decode_probe.py --work work/new-raster-comparison \
+  --old-engine /absolute/previous/LumaRAWEngine \
+  --new-engine /absolute/current/LumaRAWEngine
+```
+
+Run the paired probe alone, after builds/tests finish. It reuses the white-balance
+probe on a generated 4,000 × 3,000 RGB PNG with fresh catalogs in five alternating
+old/new pairs. Each trial checks source/catalog safety, repeatable candidates and
+full-source versus cached processing stages. Compare engine identity, fixture
+hash, first-full-source wall time and sampled worker peak RSS. Full decoded-array
+equality is covered by the regression, not the service reply. Pillow and the
+linear output still retain full images; OS caches are not flushed. No desktop
+latency, RAW throughput or Lightroom equivalence is established.
+
 ## White Balance Selector
 
 `test_white_balance.py` checks known relative candidates, current-gain reversal,

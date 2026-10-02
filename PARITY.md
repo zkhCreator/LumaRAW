@@ -5180,3 +5180,46 @@ runtime are unavailable. The complete packaged native run passes **245
 state/IPC assertions**: white balance 39, Before/After 19, Reference 52, curve
 targeting 33, mixer targeting 48, responsiveness 16, general state 15 and history
 23. A fresh fetch finds no unmerged local or remote branches.
+
+## Bounded raster color conversion (October 2, 2026)
+
+The raster selector probe exposed high cold-worker memory use. The supported
+8-bit raster path previously converted the full image to float32 and evaluated
+both sRGB transfer branches over that frame. It now uses a read-only 256-entry
+transfer table computed by the same float32 formula, then applies the existing
+ProPhoto matrix and relative gains in 128-row strips. EXIF orientation, preview
+resizing and ICC conversion retain their order. Pillow's decoded pixels and the
+random-access linear output remain full-frame allocations; RAW decoding is
+unchanged, and existing memory admission/watchdog limits remain in force.
+
+The new decoded-array regressions require bitwise equality with the former
+expression across transfer values, mixed channels and strip boundaries. Full
+and preview paths cover all eight EXIF orientations, ICC/no-ICC, actual resizing,
+grayscale/alpha conversion, metadata and original-byte preservation. The targeted
+decode/core/white-balance suites pass **104 tests in 10.99 s**, with actual Metal
+required and the public Nikon D3S NEF supplied. Engine generation advances to
+**58**; schema **37** and **150** command contracts remain unchanged.
+
+The full Python suite passes **1,122 tests in 186.55 s**, with required actual
+Metal execution and the read-only public Nikon D3S fixture; no tests are skipped.
+The Mac app builds for macOS 14 and passes deep strict ad-hoc signature checks.
+Source/client/broker identity, all commands and bundled guide bytes match on
+macOS 26.6.2. The packaged engine passes **55 native state/IPC assertions**:
+white balance 39 and responsiveness 16. macOS 14 runtime, desktop interaction
+and Lightroom acceptance remain unavailable.
+
+Five alternating old/new pairs use a generated **4,000 × 3,000 RGB PNG**, CPU
+processing and independent fresh catalogs/preset roots through each packaged
+native relay. All ten trials preserve original/catalog state, reproduce the same
+fixture bytes and return identical white-balance candidates. Each trial primes
+Fit separately, then samples once with a cold full-linear cache and four times
+with that cache warm. OS caches are not flushed; fixture hashing and Fit setup
+make file pages likely warm before the full decode.
+
+Median first-full-source worker peak is **971.0 → 561.6 MiB**, approximately
+**42% lower**, while command-wall medians are **2,002.556 → 1,921.118 ms**.
+The new cold sample is slower in two of the five pairs; the retained evidence
+is reduced sampled worker memory with bitwise-preserved source pixels, not a guaranteed
+latency improvement. Pillow decode, ICC transforms and the full linear result
+still allocate full frames. These generated-raster measurements do not establish
+RAW throughput, whole-app memory, desktop interaction speed or Lightroom parity.

@@ -20,6 +20,13 @@ for replacement boundaries, migration gates and performance evidence requirement
 | Compute adapter | `lumaraw/accelerators`, `metal/Bridge.mm` | CPU reference with an optional macOS Metal C ABI |
 | Transport | `bridge.py`, `mcp.py` | Local IPC and newline JSON-RPC over stdio; no HTTP listener |
 
+Raster decoding preserves EXIF orientation, preview downsampling and ICC-to-sRGB
+conversion before entering the working space. Its supported 8-bit RGB values use
+an immutable 256-entry float32 sRGB transfer table and 128-row matrix/gain strips.
+Pillow's decoded image and the random-access linear result remain full frames;
+this bounds conversion temporaries, not the entire decoder allocation. RAW
+processing keeps the separate LibRaw path and memory admission/watchdog policy.
+
 The Swift `Backend` starts one explicit `--native-client` stdio relay through
 `Process`, without a shell, and reuses it for subsequent commands. Request IDs
 correlate out-of-order replies. The relay delegates every call to the existing

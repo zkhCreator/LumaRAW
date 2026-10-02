@@ -78,6 +78,13 @@ when a clear function is more maintainable. Avoid unrelated formatting churn.
   Count every optional GPU buffer in admission and layout changes. Do not expose
   any partial output after failure, repeat grading for readouts, or count a
   skipped CPU stage as the total user-visible speed improvement.
+- Keep supported 8-bit raster conversion bitwise compatible when changing its
+  allocation strategy. Apply EXIF orientation, preview resizing and ICC conversion
+  in their existing order. Bound float temporaries by strips and preserve the
+  full random-access output; never imply Pillow or LibRaw streams the source.
+  Compare full and preview outputs against the former conversion, including
+  transfer-code boundaries, RGB mixtures, profiles and orientations, before
+  claiming an allocation reduction. Measure old/new packaged workers separately.
 - Completed preview reuse must bind engine/backend, source/assets, both recipes,
   geometry, display and all requested auxiliary maps. Validate bounded artifact
   contents outside SQL locks and repeat revision/source/generation checks before

@@ -1,12 +1,13 @@
-"""Color-managed RAW development and strip-wise export, used only in child workers.
+"""Color-managed RAW/raster development and strip-wise export, used in child workers.
 
 Purpose: decode read-only originals into linear ProPhoto RGB, apply float32 edits,
 then convert LibRaw ProPhoto D65 with the exact inverse LibRaw matrix to sRGB.
 Inputs: source path, validated recipe, memory budget. Outputs: cached previews or
 new exports. Never write originals. Never substitute embedded JPEGs for RAW export.
 Boundaries: LibRaw uses full-frame native allocations, not a streaming RAW decoder.
-Memory preflight plus a parent RSS watchdog bound risk; 128-row edits avoid multiple
-full-frame float buffers. Preview uses half-size demosaic, exports full resolution.
+Memory preflight plus a parent RSS watchdog bound risk; 128-row raster conversion
+and edits avoid multiple full-frame float temporaries. RAW preview uses half-size
+demosaic; raster preview downsizes before color conversion; exports use full resolution.
 No claim of Nikon Picture Control equivalence or recovery of clipped sensor data.
 Cache eviction bounds both bytes and entry count while retaining current receipts.
 """
@@ -60,6 +61,10 @@ def srgb_decode(a):
     return np.where(a <= .04045, a / 12.92, ((a + .055) / 1.055) ** 2.4).astype(np.float32)
 
 
+SRGB_DECODE_U8 = srgb_decode(np.arange(256, dtype=np.float32) / 255)
+SRGB_DECODE_U8.setflags(write=False)
+
+
 def srgb_encode(a):
     a = np.clip(a, 0, 1)
     return np.where(a <= .0031308, a * 12.92, 1.055 * a ** (1 / 2.4) - .055).astype(np.float32)
@@ -89,6 +94,28 @@ def resize_linear(image, edge):
             channel /= 65535
         result[:, :, c] = np.asarray(Image.fromarray(channel).resize(size, Image.Resampling.BILINEAR))
     return result
+
+
+def _raster_to_linear_prophoto(rgb_image, temperature, tint):
+    """Convert 8-bit sRGB in strips while retaining a full random-access source.
+
+    ICC conversion, EXIF orientation and preview resizing remain upstream in
+    load_source. Pillow still decodes the complete image; only the float32
+    transfer, matrix and gain temporaries are bounded to TILE_ROWS rows.
+    """
+    source = np.asarray(rgb_image)
+    if source.dtype != np.uint8 or source.ndim != 3 or source.shape[2] != 3:
+        raise ValueError('Raster conversion requires an 8-bit RGB image')
+    height, width = source.shape[:2]
+    converted = np.empty((height, width, 3), dtype=np.float32)
+    gains = np.array([2 ** (temperature / 120), 2 ** (-tint / 180),
+                      2 ** (-temperature / 120)], dtype=np.float32)
+    for y in range(0, height, TILE_ROWS):
+        end = min(height, y + TILE_ROWS)
+        pixels = SRGB_DECODE_U8[source[y:end]] @ SRGB_TO_PROPHOTO.T
+        pixels *= gains
+        converted[y:end] = pixels
+    return converted
 
 
 def raw_metadata(raw, path):
@@ -171,9 +198,7 @@ def load_source(path, recipe, budget_mb, preview=False):
                                            ImageCms.createProfile('sRGB'), outputMode='RGB')
         else:
             img = img.convert('RGB')
-        a = srgb_decode(np.asarray(img, dtype=np.float32) / 255) @ SRGB_TO_PROPHOTO.T
-        a *= np.array([2 ** (recipe.temperature / 120), 2 ** (-recipe.tint / 180),
-                       2 ** (-recipe.temperature / 120)], dtype=np.float32)
+        a = _raster_to_linear_prophoto(img, recipe.temperature, recipe.tint)
         return a, {'width': opened.width, 'height': opened.height, 'kind': opened.format,
                    'decoded_width':decoded_size[0],'decoded_height':decoded_size[1],
                    'profile': 'ICC → sRGB → linear ProPhoto D65' if icc else 'Assumed sRGB → linear ProPhoto D65',
