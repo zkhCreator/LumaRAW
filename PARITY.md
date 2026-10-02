@@ -70,7 +70,7 @@ gaps. Nothing below is full Lightroom parity merely because historical tests pas
 | Local editing | Partial: radial/gradient/brush/luma | Mask list/edit/reorder/intersection, range masks, clone/heal, red-eye (non-AI) |
 | History and presets | Partial: durable paged Develop history with undo/redo, state selection/rename/clear, persistent Before assignment/copy/swap, separate 50-batch orientation undo, alphabetical shared snapshots with current/history capture, rename/update/delete and Before copy, partial Develop presets/groups/favorites/shared or local storage, batch/Painter and reviewed-import application | Unified application Undo/Redo, history/snapshot hover, preset hover preview/Amount/ISO adaptation/Adobe exchange and rendered reference acceptance |
 | Preview/performance | Partial: Metal, proxies, 1:1 viewport, developed thumbnail fast path, on-demand Before with independent cache, four paired layouts, persistent command relay, background image preparation, quiet polling, fused readout maps and validated completed-preview reuse | Real-RAW catalog/slider latency, offline previews, cache controls and desktop/reference acceptance |
-| Export | Partial: JPEG/16-bit TIFF, ICC, shared or catalog-local saved export settings with optional destinations, catalog-local Export with Previous, durable jobs with frozen catalog/rights IPTC XMP and keyword hierarchy options | Multi-preset batch export, Adobe preset exchange, complete EXIF/IPTC Extension/GPS metadata policies, watermark, additional formats, publish workflows |
+| Export | Partial: JPEG/16-bit TIFF, ICC, shared or catalog-local saved export settings with optional destinations, multiple-preset batches with individual/parent destinations and paged receipts, catalog-local Export with Previous, durable jobs with frozen catalog/rights IPTC XMP and keyword hierarchy options | Full batch naming/reference acceptance, Adobe preset exchange, complete EXIF/IPTC Extension/GPS metadata policies, watermark, additional formats, publish workflows |
 | External editing and video | Missing | External-editor setup and derivative round trips; supported video import/playback, frame capture, trimming and export |
 | Merge | Missing | Non-AI HDR merge and panorama with bounded resources and reference acceptance |
 | Map | Missing | GPS metadata, map navigation, track import, location editing with explicit persistence |
@@ -4426,8 +4426,100 @@ strict local ad-hoc signature verification. Packaged MCP initialization and all
 - Engine SHA-256: `fca9bcde890834c1a63b2f4b6fe3e8e7e9764478d8240f04f08457d8a19788af`
 - Native SHA-256: `4287cd895b2d4d9260eaeb0191c979b6e74e612e9a1ab8f30c3f1e71cde90f13`
 
-Multi-preset batch export, Adobe preset exchange/built-ins, complete output metadata,
+Multi-preset batch export follows in the next increment below. Adobe preset
+exchange/built-ins, complete output metadata,
 watermarking, additional formats, plugins/postprocessing and publish services remain
 open. The macOS 14 runtime, current desktop input, VoiceOver, official MCP SDK and
 Lightroom reference acceptance were not tested; desktop automation was not retried.
 This increment does not complete the full Lightroom parity inventory.
+
+### Multiple-preset export batches
+
+Adobe's documented batch workflow selects preset checkboxes, fixes their output
+settings during batch setup and exports one variant per photo/preset combination.
+It supports individual destinations or one parent with child folders, and appends
+the preset name when filenames conflict. LumaRAW adds those paths for its existing
+JPEG/16-bit TIFF settings through a separate batch sheet, rather than Adobe's
+checkbox sidebar. Custom-text/start-number overrides from Adobe's broader filename
+template system remain outside the existing export options.
+
+Engine generation 50 / schema 36 adds a shared-contract multi-preset read, atomic
+batch submission and durable batch list/detail commands. Thirty distinct presets
+and a product of at most one thousand jobs bound each submission. Library tokens
+include both storage revisions and mode; concurrent preset changes require an
+explicit refresh and reselection. The final transaction captures current recipes,
+metadata, orientation, destinations and output values. Later edits or deletion of
+presets do not alter accepted jobs. Batch export preserves Previous as an explicit
+LumaRAW policy; Adobe's referenced documentation does not specify this interaction.
+
+Individual mode retains saved destinations unless explicitly overridden. Parent
+mode replaces them with validated child components. All target/configuration checks
+precede directory creation; batch/job/request receipts commit together. Directory
+creation is outside SQLite rollback, so a failed submission can leave empty folders
+while accepting no partial batch. Exact request replay precedes revision validation
+and returns the original batch identity after later preset changes; cross-command
+or changed-argument request-key reuse fails.
+
+Batch job names first try the ordinary template output. A collision adds the exact
+captured preset suffix, then a number. Suffixes have a 120-byte UTF-8 limit; the base
+stem is shortened on character boundaries when necessary to keep the complete
+filename within 255 bytes. Existing files remain protected by atomic hard links.
+Invalid suffixes require an explicit override; user suffixes are never silently
+rewritten. Parent child components preserve accepted spelling and reject normalized,
+case-folded duplicates.
+
+The native workflow keeps output settings read-only during batch setup, captures
+the selection and overrides before pending-edit waits, and shares the ordinary
+submission guard. A batch browser pages through thirty summaries and sixty jobs at
+a time; scoped cancellation/retry leaves unrelated work alone. Pause/resume remains
+global. Processing retains the same bounded, one-photo-at-a-time worker.
+
+An isolated submission probe used 100 generated 8×8 PNG sources, each with 100
+direct keyword assignments, on Apple M3 Max / 128 GiB / macOS 26.6.2. Each case
+accepted six new batches (distinct request keys); the table separates the first
+call from the median of five repeated calls. Destinations were pre-created and
+SQLite/OS caches were already warm after fixture seeding. The queue stayed paused;
+no CPU/Metal image worker ran. RSS was sampled every 5 ms in the service process.
+
+| Jobs per batch | First submit | Warm median | Catalog transaction median | Peak RSS / rise |
+| --- | ---: | ---: | ---: | ---: |
+| 100 (1 preset) | 120.9 ms | 123.0 ms | 113.3 ms | 47.6 / 9.1 MiB |
+| 500 (5 presets) | 513.0 ms | 510.9 ms | 495.9 ms | 53.3 / 2.9 MiB |
+| 1,000 (10 presets) | 1,005.0 ms | 1,018.1 ms | 996.0 ms | 64.5 / 6.5 MiB |
+
+Preset capture medians were 1.8–2.1 ms with replies of 363–2,811 bytes; submission
+receipts were 99–101 bytes. These are in-process service/SQLite measurements,
+including validation, path checks and frozen metadata creation. They exclude IPC,
+desktop rendering, cold storage, source decoding and export throughput. RSS rises
+use each series' starting process size; memory can remain allocated between cases.
+The largest batch still holds the catalog transaction for about one second;
+repeated metadata preparation across equivalent preset policies remains an
+optimization opportunity, not a demonstrated responsiveness improvement.
+
+Validation on the same Mac:
+
+- Focused export/previous/preset/metadata/service tests: **75 passed**. Full Python
+  suite with required actual Metal dispatch and the retained real NEF fixture:
+  **1,005 passed in 143.16 s**, no skips.
+- Five packaged-engine native suites passed **140 assertions**: Batch 46,
+  Previous 24, Export Presets 38, Export Metadata 16 and Responsiveness 16.
+  After increasing the captured-preset card height, a fresh app build and all
+  **46 Batch assertions** passed again. Native compilation targeted macOS 14.
+- Checks include shared/catalog token conflicts, genuine schema-35 migration and
+  rollback, transactional fault injection, all-target path preflight, late edits,
+  backup/restore, exact replay, scoped active-worker cancellation and Unicode
+  collision output. Generated raster workers preserve originals and existing
+  destinations; these outputs do not establish Adobe camera/pixel equivalence.
+- Offscreen picker/history/receipt images were inspected. The receipt's clipped
+  setting cards were corrected. AppKit List rows were absent in the offscreen
+  images, so list-row desktop rendering remains unverified; no desktop automation
+  was retried. State/paging checks are separate from rendered acceptance.
+- Packaged/source/broker identities, all **149 MCP schemas**, bundled guide bytes
+  and deep strict ad-hoc signature verification matched. This is local packaging
+  evidence, not notarization or an official MCP SDK interoperability test.
+
+macOS 14 runtime, real desktop interactions, folder panels, VoiceOver and Lightroom
+reference acceptance remain unavailable or unverified. Full filename templates,
+custom-text/start-number batch overrides, additional formats, complete metadata,
+watermarks and publish workflows remain open. This increment does not complete
+the full Lightroom parity inventory.

@@ -326,6 +326,17 @@ when a clear function is more maintainable. Avoid unrelated formatting churn.
   availability polls must not republish the workspace. Fail stale or uncertain
   submissions visibly without automatic retry.
 
+- Multi-preset export validates all selected presets, photos, destinations and
+  naming components before filesystem writes, then freezes one atomic queue batch.
+  Bound the photo/preset product as well as both input lists. Preserve the
+  shared-store-before-catalog lock order and receipt-before-revision replay rule.
+  Parent-folder mode explicitly replaces stored destinations; do not mix it with
+  per-preset destination overrides. Preset context and output settings become
+  immutable at submission, and batch export does not replace Previous. Batch
+  cancellation/retry must stay within indexed membership; pause/resume is global.
+  Keep collision publication atomic and preserve existing files. A failed batch
+  may leave created empty directories, never partial jobs or receipts.
+
 ## Engine changes and handoff
 
 `runtime.ENGINE_GENERATION` orders portable-engine releases. Increment it when

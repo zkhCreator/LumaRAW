@@ -290,6 +290,49 @@ Queue polling includes only Previous's availability and revision alongside the
 existing job response. The shell publishes an availability change once and keeps
 equal polling state quiet; full settings are read only for explicit reuse.
 
+## Multiple-preset export batches
+
+Batch export composes existing saved output settings with one captured photo
+selection. It does not introduce another renderer or worker pool. A bounded
+multi-preset read captures all selected settings at one library/storage token;
+submitting later rechecks that token under the shared-store then catalog lock
+order. A batch contains at most thirty distinct presets and one thousand jobs
+after photo-ID deduplication. The photo/preset product, rather than just either
+input list, determines the bound.
+
+Each preset can retain its destination or use an explicit override. Parent-folder
+mode instead requires one validated child-folder component per preset and ignores
+saved destinations; mixing both modes is rejected. A separate captured filename
+suffix defaults to the preset name and can be explicitly replaced when that name
+is unsuitable for filenames. Destination folders are created only after every
+configuration and target photo passes validation. Filesystem directory creation
+cannot roll back with SQLite, so a failed submission can leave empty folders but
+must leave no partial batch, jobs or request receipt.
+
+Collision suffixes preserve their exact spelling and are limited to 120 UTF-8
+bytes. Child-folder components are limited to 255 bytes; normalized case-folded
+duplicates are rejected while accepted spelling is retained. Neither permits
+traversal, separators, controls or portable reserved components. After a plain
+filename collides, publication tries the captured suffix and then a numeric
+extension to it. Only the base stem is shortened on Unicode boundaries as needed
+to keep the complete filename within 255 bytes; the suffix and extension remain
+intact. Existing-file protection still uses atomic hard links.
+
+Schema 36 stores durable batch summaries and captured preset context, with indexed
+job membership. Queue submission freezes current recipes, metadata, orientation
+and output values in the same transaction. Preset edits/deletion after acceptance
+cannot change the batch. Batch submissions do not replace Previous because one
+batch has multiple configurations; this is an explicit LumaRAW policy. New request
+digests include the command name, and receipt lookup precedes revision validation.
+
+Batch lists and job details remain paged; they do not expose recipe or metadata
+packets. Cancellation/retry can target the captured batch without affecting other
+jobs, while pause/resume retains its global scheduling meaning. The existing
+single worker, cancellation reservation and explicit crash recovery still apply.
+The native shell captures selection and form values before awaiting pending edits,
+uses the common submission guard, and never automatically retries an uncertain
+response. Batch state polling exists only while its native browser is open.
+
 ## Memory and performance
 
 Library pages contain at most 60 summaries; full recipes are fetched on demand. Preview and export share strip processing, with overlap for neighborhood filters. Full-resolution viewports are limited to 2048 × 1536. LibRaw still decodes a complete RAW frame; linear pixel caches live on disk.

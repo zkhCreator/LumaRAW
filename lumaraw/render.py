@@ -11,6 +11,8 @@ Persistent Before snapshots retain their own adjustments, with current After
 geometry for aligned comparison. Their independent cache avoids repeated grading.
 Export metadata is a frozen catalog snapshot encoded separately from pixels;
 internal recipes, source names and asset paths are never embedded as descriptions.
+Batch outputs try ordinary names first, then preserve a captured preset suffix on
+collision; numeric fallback keeps generated components within 255 UTF-8 bytes.
 Independent catalog orientation maps output strips back to canonical Develop
 coordinates, then losslessly rotates/flips each tile. Masks/crops stay attached.
 Readout maps share the grade/output dispatch, before proofing or overlay pixels.
@@ -495,9 +497,26 @@ def estimate_export_bytes(width,height,options,fmt):
     return int(width*height*(6 if fmt=='tiff16' else 9)+4*1024**2)
 
 
-def export_image(path,recipe,destination,fmt,budget_mb,job_id,options=None,cache=None,metadata_snapshot=None,orientation=0):
+def _utf8_prefix(value,maximum_bytes):
+    if maximum_bytes < 1:
+        raise ValueError('Export filename leaves no room for the source name')
+    if len(value.encode('utf-8')) <= maximum_bytes:
+        return value
+    result=[];size=0
+    for char in value:
+        width=len(char.encode('utf-8'))
+        if size+width>maximum_bytes:break
+        result.append(char);size+=width
+    return ''.join(result)
+
+
+def export_image(path,recipe,destination,fmt,budget_mb,job_id,options=None,cache=None,metadata_snapshot=None,orientation=0,
+                 collision_suffix=''):
     options=ExportOptions.parse(options) if not isinstance(options,ExportOptions) else options
     if fmt not in ('tiff16','jpeg'): raise ValueError('Unknown export format')
+    if collision_suffix != '':
+        from .export_batches import validate_component, MAX_FILENAME_SUFFIX_BYTES
+        collision_suffix=validate_component(collision_suffix,'filename_suffix',MAX_FILENAME_SUFFIX_BYTES)
     from .export_metadata import xmp_packet, jpeg_segments
     snapshot=metadata_snapshot or {}
     packet=xmp_packet(snapshot)
@@ -536,11 +555,27 @@ def export_image(path,recipe,destination,fmt,budget_mb,job_id,options=None,cache
         stem=''.join('_' if c in '/\\:<>"|?*' or ord(c)<32 else c for c in stem)[:180].strip('. ')
         if not stem: stem=f'Luma-{job_id}'
         if stem.split('.')[0].upper() in {'CON','PRN','AUX','NUL',*[f'COM{i}' for i in range(1,10)],*[f'LPT{i}' for i in range(1,10)]}:stem='Luma-'+stem
-        suffix='.tif' if fmt=='tiff16' else '.jpg';index=0
-        while True:
-            target=dest/(stem+(f'-{index}' if index else '')+suffix)
-            try: os.link(temp,target);break
-            except FileExistsError: index+=1
+        suffix='.tif' if fmt=='tiff16' else '.jpg'
+
+        def component(collision_label='',number=0):
+            tail=('-'+collision_label if collision_label else '')+(f'-{number}' if number else '')+suffix
+            base=_utf8_prefix(stem,255-len(tail.encode('utf-8'))).rstrip('. ')
+            if not base:base='Luma'
+            return base+tail
+
+        # Preserve the existing ordinary filename when it is available. Batch
+        # jobs append the captured preset label only after that first collision.
+        target=dest/component()
+        try:
+            os.link(temp,target)
+        except FileExistsError:
+            number=0 if collision_suffix else 1
+            while True:
+                target=dest/component(collision_suffix,number)
+                try:
+                    os.link(temp,target);break
+                except FileExistsError:
+                    number+=1
         return {'output':str(target),'width':w,'height':h,'metadata':meta,'space':options.space}
     finally:
         if temp: temp.unlink(missing_ok=True)

@@ -11,6 +11,7 @@ struct ExportSheet:View {
     @Environment(\.dismiss) var dismiss
     @State private var draft=ExportDraft()
     @State private var showPresets=false
+    @State private var showBatchExport=false
     @State private var metadataPhoto: Int?
     @State private var submitting=false
     var body:some View {
@@ -22,6 +23,9 @@ struct ExportSheet:View {
                 }
                 Spacer()
                 Button("Presets…") { showPresets=true }
+                Button("Batch Export…") { showBatchExport=true }
+                    .disabled(s.selection.isEmpty || s.selection.count>1000)
+                    .sheet(isPresented:$showBatchExport) { ExportBatchSheet().environmentObject(s) }
             }
             if let preset=draft.loadedPreset {
                 Text("Loaded preset: \(preset.name)").font(.caption).foregroundStyle(.secondary)
@@ -81,14 +85,15 @@ struct ExportSheet:View {
 }
 struct QueueView:View {
     @EnvironmentObject var s:Store
+    @State private var showBatches=false
     func state(_ job:[String:Any])->String{["pending":"Pending","running":"Exporting","done":"Completed","failed":"Failed","interrupted":"Interrupted","cancelled":"Cancelled"][job["state"] as? String ?? ""] ?? "Unknown"}
     var body:some View {
         VStack(alignment:.leading,spacing:18){
-            HStack{VStack(alignment:.leading,spacing:5){Text("Export Queue").font(.largeTitle.weight(.semibold));Text(s.paused ? "Paused; the current photo will finish first":"One photo at a time · Each job uses its submitted edit snapshot").foregroundStyle(.secondary)};Spacer();Button(s.paused ? "Resume":"Pause"){s.queue(s.paused ? "resume":"pause")};Menu("Retry"){Button("Failed and Interrupted Jobs"){s.queue("retry")};Button("Cancelled Jobs"){s.queue("retry_cancelled")}}}
+            HStack{VStack(alignment:.leading,spacing:5){Text("Export Queue").font(.largeTitle.weight(.semibold));Text(s.paused ? "Paused; the current photo will finish first":"One photo at a time · Each job uses its submitted edit snapshot").foregroundStyle(.secondary)};Spacer();Button("Batches…"){showBatches=true}.sheet(isPresented:$showBatches){ExportBatchHistorySheet().environmentObject(s)};Button(s.paused ? "Resume":"Pause"){s.queue(s.paused ? "resume":"pause")};Menu("Retry"){Button("Failed and Interrupted Jobs"){s.queue("retry")};Button("Cancelled Jobs"){s.queue("retry_cancelled")}}}
             if s.jobs.isEmpty{ContentUnavailableView("No Export Jobs Yet",systemImage:"square.and.arrow.up",description:Text("Select photos, then press ⇧⌘E to export."))}
             else{List(Array(s.jobs.enumerated()),id:\.offset){_,job in
                 HStack(spacing:14){Image(systemName:job["state"] as? String == "done" ? "checkmark.circle.fill":"photo").foregroundStyle(job["state"] as? String == "done" ? .green:.secondary).font(.title2)
-                    VStack(alignment:.leading,spacing:4){Text(URL(fileURLWithPath:job["source"] as? String ?? "").lastPathComponent).font(.headline);Text("\(state(job)) · \(job["format"] as? String ?? "")").font(.caption).foregroundStyle(.secondary);if let e=job["error"] as? String,!e.isEmpty{Text(e).font(.caption).foregroundStyle(.red)}}
+                    VStack(alignment:.leading,spacing:4){Text(URL(fileURLWithPath:job["source"] as? String ?? "").lastPathComponent).font(.headline);Text("\(state(job)) · \(job["format"] as? String ?? "")").font(.caption).foregroundStyle(.secondary);if let name=job["preset_name"] as? String,!name.isEmpty{Text("Batch preset: \(name)").font(.caption).foregroundStyle(.secondary)};if let e=job["error"] as? String,!e.isEmpty{Text(e).font(.caption).foregroundStyle(.red)}}
                     Spacer()
                     if let output=job["output"] as? String,!output.isEmpty{Button("Show File"){NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath:output)])}}
                     if ["pending","running"].contains(job["state"] as? String ?? ""){Button("Cancel"){s.queue("cancel",job["id"] as? Int)}}

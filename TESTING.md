@@ -2,6 +2,42 @@
 
 All probes use explicit read-only input photographs and new disposable catalog/output directories. They never use a personal photo library by default.
 
+## Multiple-preset export batches
+
+`test_export_batch.py` covers captured shared/catalog preset revisions, individual
+and parent-folder destinations, the photo/preset product limit, all-target
+preflight, transactional batch/job/receipt insertion, replay after preset changes
+and method-separated request keys. Migration starts from genuine schema 35;
+rollback and product backup/restore preserve prior jobs and Previous settings.
+Batch pages and scoped cancellation/retry must remain independent of unrelated
+jobs. Generated raster outputs check multiple preset variants, immutable snapshots,
+Unicode filename bounds and collision preservation.
+
+`NativeExportBatchRegression` uses the packaged service for captured across-page
+preset selection, destination forms, stale rejection, guarded submission and batch
+history/details. Any generated view snapshots are offscreen layout evidence only.
+Desktop input, native folder panels and VoiceOver require separate acceptance.
+
+```sh
+.venv/bin/python -m pytest -q tests/test_export_batch.py tests/test_previous_export.py \
+  tests/test_export_presets.py tests/test_export_metadata.py tests/test_service.py
+.venv/bin/python tests/run_native.py --work work/new-export-batch-native \
+  --engine /absolute/LumaRAW.app/Contents/Resources/Engine/LumaRAWEngine \
+  --suite NativeExportBatchRegression --suite NativePreviousExportRegression \
+  --suite NativeExportPresetRegression --suite NativeResponsivenessRegression
+```
+
+Run `tests/export_batch_probe.py` separately from tests/builds. The probe measures
+bounded in-process submission and SQL work on generated catalogs with keyword
+load, recording first/repeated calls and sampled process RSS. It excludes image
+processing and desktop rendering; these figures cannot establish UI frame rate or
+end-to-end photo export throughput.
+
+```sh
+.venv/bin/python tests/export_batch_probe.py --work work/new-export-batch-scale \
+  --photos 100 --preset-counts 1 5 10 --keywords-per-photo 100
+```
+
 ## Export with Previous
 
 `test_previous_export.py` exercises genuine schema-34 upgrades, initial absence,

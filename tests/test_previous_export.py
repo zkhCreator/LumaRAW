@@ -22,7 +22,7 @@ from lumaraw.export_previous import state as previous_state
 from lumaraw.model import ExportOptions
 from lumaraw.runtime import CATALOG_VERSION
 from lumaraw.service import Service
-from legacy_catalog import migrate_to, seed_photo
+from legacy_catalog import migrate_to, seed_job, seed_photo
 
 
 def options(**overrides):
@@ -428,11 +428,9 @@ def test_genuine_schema34_upgrade_adds_empty_previous_without_inference_or_parti
         patch.setattr(catalog_module, "migrate", lambda db: migrate_to(db, 34))
         catalog = Catalog(root)
         photo_id = seed_photo(catalog.db, source)
+        historical_job = seed_job(catalog.db, photo_id, historical_destination, "jpeg")
         historical_params["photo_ids"] = [photo_id]
         with catalog.db:
-            historical_job = catalog.enqueue_one(
-                catalog.photo(photo_id), historical_destination, "jpeg", ExportOptions()
-            )
             # Schema 34 installations that have used the service already own
             # this runtime receipt table. Seed its exact pre-35 digest/result so
             # the upgraded implementation must replay the historical receipt.

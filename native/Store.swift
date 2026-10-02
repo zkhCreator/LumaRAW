@@ -658,6 +658,50 @@ import UniformTypeIdentifiers
         if rememberPrevious { params["remember_previous"]=true }
         do{_=try await Backend.call("enqueue_exports",params);error=nil;showExport=false;workspace="exports";await refreshJobs()}catch{self.error=error.localizedDescription}
     }
+    func exportBatch(_ submission:ExportBatchPresetSubmission) async -> ExportBatchSubmissionResult {
+        guard !exportSubmissionBusy else { return .rejected("Another export submission is already in progress.") }
+        let photoIDs=selection.sorted()
+        guard !photoIDs.isEmpty else { return .rejected("Select photos before starting a batch export.") }
+        guard photoIDs.count<=1000 else { return .rejected("A batch can include at most 1,000 selected photos.") }
+        guard !submission.expectedRevision.isEmpty,
+              let presetRows=submission.payloadPresets,!presetRows.isEmpty else {
+            return .rejected("Review each preset’s destination, subfolder, and filename suffix before continuing.")
+        }
+        guard photoIDs.count*presetRows.count<=1000 else {
+            return .rejected("A batch cannot contain more than 1,000 photo and preset jobs.")
+        }
+        if let parent=submission.parentDestination,parent.trimmingCharacters(in:.whitespacesAndNewlines).isEmpty {
+            return .rejected("Choose a shared parent folder before continuing.")
+        }
+        let requestKey=UUID().uuidString
+        var params:[String:Any]=[
+            "photo_ids":photoIDs,"presets":presetRows,
+            "expected_revision":submission.expectedRevision,"request_key":requestKey
+        ]
+        if let parent=submission.parentDestination { params["parent_destination"]=parent }
+
+        exportSubmissionBusy=true
+        defer { exportSubmissionBusy=false }
+        guard await flushEdits() else {
+            return .rejected("Finish saving the current photo edit before starting this batch.")
+        }
+        do {
+            let result=try await Backend.call("enqueue_export_batch",params)
+            guard let batchID=result["batch_id"] as? String,
+                  UUID(uuidString:batchID)?.uuidString.lowercased()==batchID,
+                  result["queued"] as? Int==photoIDs.count*presetRows.count,
+                  result["photo_count"] as? Int==photoIDs.count,
+                  result["preset_count"] as? Int==presetRows.count else {
+                return .uncertain("The batch submission may have been accepted, but its receipt was incomplete. Open Export Queue and check Batches before starting another batch.")
+            }
+            error=nil
+            workspace="exports"
+            await refreshJobs()
+            return .accepted(batchID)
+        } catch {
+            return .uncertain("Batch submission could not be confirmed. Open Export Queue and check Batches before starting another batch. \(error.localizedDescription)")
+        }
+    }
     func exportWithPrevious() async {
         let photoIDs=Array(selection).sorted()
         guard !exportSubmissionBusy else { return }

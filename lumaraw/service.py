@@ -4,8 +4,8 @@ Purpose: keep UI and agents on one transactional domain boundary. Each command
 opens its own SQLite connection under a short catalog lock. Expensive pixels run
 outside that lock, in one child at a time, with sampled RSS and time limits.
 Inputs: validated API commands. Outputs: JSON, file-backed previews, durable jobs,
-revision-bound shared/catalog export preset workflows, and catalog-local Previous
-export settings committed with accepted manual queue submissions.
+revision-bound shared/catalog export preset workflows, catalog-local Previous
+settings and immutable, pageable multi-preset export batches.
 Completed preview receipts are checked outside catalog locks without starting an
 image worker; source identity, revisions and cancellation still bind each reply.
 No GUI, HTTP listener, telemetry or original-file writes. Interrupted exports are
@@ -21,13 +21,14 @@ import sys
 import tempfile
 import threading
 import time
+import uuid
 
 import jsonschema
 import psutil
 from .api import TOOLS
 from .catalog import Catalog, walk_images
 from .model import Recipe, ExportOptions, LIMITS, PRESETS, SYNC_GROUPS, POINT_CURVE_PRESETS
-from . import export_previous
+from . import export_previous, export_batches, export_presets as export_preset_domain
 from .organization import Organization
 from .collections import Collections
 from .virtual_copies import VirtualCopies
@@ -147,6 +148,142 @@ class Service:
     def enqueue_export_rows(c,rows,destination,fmt,options):
         return [c.enqueue_one(row,destination,fmt,options) for row in rows]
 
+    def enqueue_export_batch(self,p):
+        method='enqueue_export_batch'
+        digest=self.export_request_digest(method,p)
+        # Receipt replay precedes storage-token validation so an accepted request
+        # remains recoverable after a later preset mutation or storage switch.
+        with self.catalog() as c:
+            digest,replay=self.export_request_replay(c,method,p,digest)
+            if replay is not None:return replay
+
+        photo_ids=list(dict.fromkeys(p['photo_ids']))
+        targets=p['presets']
+        if not 1 <= len(targets) <= export_batches.MAX_PRESET_IDS:
+            raise ValueError(f'Select between 1 and {export_batches.MAX_PRESET_IDS} export presets')
+        if len({item['preset_id'] for item in targets}) != len(targets):
+            raise ValueError('Export preset IDs must be unique')
+        if len(photo_ids)*len(targets) > export_batches.MAX_BATCH_JOBS:
+            raise ValueError(f'A batch cannot contain more than {export_batches.MAX_BATCH_JOBS} photo/preset jobs')
+        parent_requested='parent_destination' in p
+        parent_value=p.get('parent_destination')
+
+        # Validate the submitted target shape before acquiring shared/catalog
+        # write locks; stored settings and destinations are validated again under
+        # the captured preset token below.
+        allowed={'preset_id','destination','subfolder','filename_suffix'}
+        for item in targets:
+            if not isinstance(item,dict) or set(item)-allowed or 'preset_id' not in item:
+                raise ValueError('Each batch preset must contain only its ID and optional destination fields')
+            if parent_requested:
+                if 'destination' in item or 'subfolder' not in item:
+                    raise ValueError('Parent-folder batches require a subfolder for each preset and forbid destination overrides')
+            elif 'subfolder' in item:
+                raise ValueError('Per-preset subfolders are only valid with a parent destination')
+
+        with self.export_presets.transaction() as (shared,c,db,local):
+            digest,replay=self.export_request_replay(c,method,p,digest)
+            if replay is not None:return replay
+            revision=self.export_presets.token(shared,c)
+            if revision != p['expected_revision']:
+                raise ValueError('Export presets or storage changed; refresh before continuing')
+
+            parent_destination=(export_batches.resolve_directory(parent_value,'parent_destination')
+                                if parent_requested else None)
+            resolved=[]
+            seen_subfolders=set()
+            for item in targets:
+                row=self.export_presets.row(db,item['preset_id'])
+                settings=export_preset_domain.validate_settings(json.loads(row['settings']))
+                suffix=export_batches.validate_component(
+                    item.get('filename_suffix',row['name']),'filename_suffix',
+                    export_batches.MAX_FILENAME_SUFFIX_BYTES)
+                if parent_requested:
+                    subfolder=export_batches.validate_component(
+                        item['subfolder'],'subfolder',export_batches.MAX_SUBFOLDER_BYTES)
+                    key=export_batches.component_key(subfolder)
+                    if key in seen_subfolders:
+                        raise ValueError('Parent export subfolders must be unique after Unicode normalization and case folding')
+                    seen_subfolders.add(key)
+                    destination=str(export_batches.preflight_child(parent_destination,subfolder))
+                else:
+                    if 'subfolder' in item:
+                        raise ValueError('Per-preset subfolders are only valid with a parent destination')
+                    raw_destination=item.get('destination',settings['destination'])
+                    if raw_destination is None:
+                        raise ValueError(f"Export preset '{row['name']}' has no destination; choose one before batching")
+                    destination=export_batches.resolve_directory(raw_destination,'preset destination')
+                    subfolder=None
+                resolved.append({'preset_id':row['id'],'name':row['name'],'format':settings['format'],
+                                 'options':settings['options'],'destination':destination,
+                                 'subfolder':subfolder,'filename_suffix':suffix})
+
+            # Snapshot all target rows before the first directory is created.
+            rows=[self.require(c,photo_id) for photo_id in photo_ids]
+            destinations=list(dict.fromkeys(item['destination'] for item in resolved))
+            if parent_requested:
+                export_batches.preflight_directory(parent_destination,'parent_destination')
+                for item in resolved:
+                    export_batches.preflight_child(parent_destination,item['subfolder'])
+                if len(destinations)!=len(resolved):
+                    raise ValueError('Parent export subfolders resolve to the same destination')
+            else:
+                for destination in destinations:
+                    export_batches.preflight_directory(destination,'preset destination')
+
+            parent_identity=None
+            if parent_requested:
+                Path(parent_destination).mkdir(parents=True,exist_ok=True)
+                parent_identity=export_batches.directory_identity(parent_destination,'parent_destination')
+            destination_identities={}
+            for destination in destinations:
+                Path(destination).mkdir(parents=True,exist_ok=True)
+                destination_identities[destination]=export_batches.directory_identity(destination,'batch destination')
+
+            # Recheck identities and canonical containment after mkdir to detect
+            # observed path changes before rows are inserted. Filesystem changes
+            # cannot be made atomic with the catalog transaction.
+            if parent_requested:
+                current_parent=export_batches.directory_identity(parent_destination,'parent_destination')
+                if current_parent!=parent_identity:
+                    raise ValueError('parent_destination changed during batch preflight')
+                if str(Path(parent_destination).resolve(strict=True))!=parent_destination:
+                    raise ValueError('parent_destination changed through a symbolic link during batch preflight')
+            for destination,identity in destination_identities.items():
+                current=export_batches.directory_identity(destination,'batch destination')
+                if current!=identity:
+                    raise ValueError('A batch destination changed during directory creation')
+                resolved_path=Path(destination).resolve(strict=True)
+                if parent_requested:
+                    if resolved_path.parent!=Path(parent_destination).resolve(strict=True):
+                        raise ValueError('A batch subfolder escaped its selected parent')
+                elif str(resolved_path)!=destination:
+                    raise ValueError('A preset destination changed through a symbolic link')
+
+            batch_id=str(uuid.uuid4())
+            created=time.time()
+            destination_mode='parent' if parent_requested else 'individual'
+            c.db.execute('INSERT INTO export_batches(batch_id,created,revision,photo_count,preset_count,queued,'
+                          'destination_mode,parent_destination) VALUES(?,?,?,?,?,?,?,?)',
+                          (batch_id,created,revision,len(rows),len(resolved),len(rows)*len(resolved),
+                           destination_mode,parent_destination))
+            for order,item in enumerate(resolved):
+                c.db.execute('INSERT INTO export_batch_presets(batch_id,preset_order,preset_id,name,format,options,'
+                             'destination,subfolder,filename_suffix) VALUES(?,?,?,?,?,?,?,?,?)',
+                             (batch_id,order,item['preset_id'],item['name'],item['format'],
+                              json.dumps(item['options'],ensure_ascii=False,sort_keys=True,separators=(',',':')),
+                              item['destination'],item['subfolder'],item['filename_suffix']))
+                options=ExportOptions.parse(item['options'])
+                for row in rows:
+                    c.enqueue_one(row,item['destination'],item['format'],options,batch_id=batch_id,
+                                  preset_name=item['name'],collision_suffix=item['filename_suffix'])
+            result={'batch_id':batch_id,'queued':len(rows)*len(resolved),
+                    'photo_count':len(rows),'preset_count':len(resolved)}
+            c.db.execute('INSERT INTO requests VALUES(?,?,?)',
+                         (p['request_key'],digest,json.dumps(result)))
+        self.wake.set()
+        return result
+
     def memory_status(self):
         """Keep the user's cap distinct from the currently affordable cap."""
         available=psutil.virtual_memory().available / 1024**2
@@ -183,8 +320,13 @@ class Service:
                         'get_filename_template':domain.read,'save_filename_template':domain.save,'delete_filename_template':domain.delete}[method](**p)
         if method in ('list_metadata_presets','get_metadata_preset','save_metadata_preset','metadata_preset_action','apply_metadata_preset'):
             return self.metadata_presets.dispatch(method,p)
-        if method in ('list_export_presets','get_export_preset','save_export_preset','export_preset_action'):
+        if method in ('list_export_presets','get_export_preset','get_export_presets','save_export_preset','export_preset_action'):
             return self.export_presets.dispatch(method,p)
+        if method=='enqueue_export_batch':return self.enqueue_export_batch(p)
+        if method=='list_export_batches':
+            with self.catalog() as c:return export_batches.list_batches(c.db,**p)
+        if method=='get_export_batch':
+            with self.catalog() as c:return export_batches.get_batch(c.db,**p)
         if method in ('list_develop_presets','get_develop_preset','save_develop_preset','develop_preset_action','apply_develop_preset'):
             return self.develop_presets.dispatch(method,p)
         if method in ('list_keyword_sets','get_keyword_set','save_keyword_set','keyword_set_action','apply_keyword_set'):
@@ -625,7 +767,8 @@ class Service:
             try:
                 result=self.run_worker({'operation':'export','path':job['source'],'recipe':json.loads(job['recipe']),
                     'destination':job['destination'],'format':job['format'],'job_id':job['id'],'options':json.loads(job['options']),
-                    'metadata_snapshot':json.loads(job['metadata_snapshot']),'orientation':job['orientation']})
+                    'metadata_snapshot':json.loads(job['metadata_snapshot']),'orientation':job['orientation'],
+                    'collision_suffix':job.get('collision_suffix','')})
                 with self.catalog() as c:
                     c.finish_job(job['id'],'done',peak_mb=result['peak_mb'],output=result['output'])
                     with c.db:c.db.execute('UPDATE jobs SET processing=? WHERE id=?',(json.dumps(result.get('processing',{})),job['id']))
@@ -638,8 +781,43 @@ class Service:
             self.last_activity=time.monotonic()
 
     def control(self,p):
-        action=p['action'];id_=p.get('job_id')
+        action=p['action'];id_=p.get('job_id');batch_id=p.get('batch_id')
+        if id_ is not None and batch_id is not None:
+            raise ValueError('Choose either one job or one export batch')
+        if batch_id is not None and action not in ('cancel','retry','retry_cancelled'):
+            raise ValueError('Batch scope supports cancel, retry, or retry_cancelled only')
         with self.catalog() as c:
+            if batch_id is not None:
+                try:
+                    if str(uuid.UUID(batch_id)) != batch_id:raise ValueError
+                except (ValueError,TypeError,AttributeError):
+                    raise ValueError('batch_id must be a canonical UUID')
+                if not c.db.execute('SELECT 1 FROM export_batches WHERE batch_id=?',(batch_id,)).fetchone():
+                    raise ValueError('Export batch does not exist')
+                states=('pending','running') if action=='cancel' else (('failed','interrupted') if action=='retry' else ('cancelled',))
+                placeholders=','.join('?' for _ in states)
+                targets=[row[0] for row in c.db.execute(
+                    f'SELECT id FROM jobs WHERE batch_id=? AND state IN ({placeholders})',
+                    (batch_id,*states))]
+                if action=='cancel':
+                    with c.db:
+                        c.db.execute(f"UPDATE jobs SET state='cancelled' WHERE batch_id=? AND state IN ({placeholders})",
+                                     (batch_id,*states))
+                    with self.state_lock:
+                        self.cancel_jobs.update(targets)
+                        if (self.active and self.active['operation']=='export'
+                                and self.active.get('job_id') in targets):
+                            self.cancelled=True
+                            if self.process.poll() is None:self.process.kill()
+                else:
+                    with self.state_lock:
+                        self.cancel_jobs.difference_update(targets)
+                    with c.db:
+                        c.db.execute(f"UPDATE jobs SET state='pending',error='' WHERE batch_id=? AND state IN ({placeholders})",
+                                     (batch_id,*states))
+                self.wake.set()
+                return {'paused':self.paused,'counts':c.job_counts(),'batch_id':batch_id,
+                        'batch_counts':export_batches.batch_counts(c.db,batch_id)}
             if action in ('pause','resume'):
                 self.paused=action=='pause';c.set_setting('paused',self.paused)
             elif action=='cancel':

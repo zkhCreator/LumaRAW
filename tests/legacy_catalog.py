@@ -37,6 +37,7 @@ from lumaraw.import_dates import migrate as import_dates
 from lumaraw.import_destinations import migrate as import_destinations
 from lumaraw.export_presets import migrate as export_presets
 from lumaraw.export_previous import migrate as export_previous
+from lumaraw.export_batches import migrate as export_batches
 import json
 from pathlib import Path
 from lumaraw.model import Recipe
@@ -50,8 +51,19 @@ def seed_photo(db, path):
                           (str(path),path.name,stat.st_size,stat.st_mtime_ns,json.dumps(Recipe().dict()),0)).lastrowid
 
 
+def seed_job(db, photo_id, destination, fmt='jpeg', created=0):
+    """Insert a queue row using columns available before export-batch schema 36."""
+    photo=db.execute('SELECT path,recipe FROM photos WHERE id=?',(photo_id,)).fetchone()
+    if photo is None:
+        raise ValueError('Unknown legacy photo')
+    with db:
+        return db.execute('INSERT INTO jobs(photo_id,source,recipe,destination,format,created) '
+                          'VALUES(?,?,?,?,?,?)',
+                          (photo_id,photo[0],photo[1],str(destination),fmt,created)).lastrowid
+
+
 def migrate_to(db, version):
-    migrations = (migrate_metadata, collections, copies, stacks, migrate_identities, capture, folders, keywords, relocations, folder_sync, keyword_exports, keyword_exchange, keyword_sets, painter, orientation, develop_presets, iptc, metadata_presets, import_review, import_processing, previous_import, develop_history, before_after, snapshots, snapshot_status, import_copy, import_naming, import_backup, import_presets, import_sequence, import_dates, import_destinations, migrate_labels, export_presets, export_previous)
+    migrations = (migrate_metadata, collections, copies, stacks, migrate_identities, capture, folders, keywords, relocations, folder_sync, keyword_exports, keyword_exchange, keyword_sets, painter, orientation, develop_presets, iptc, metadata_presets, import_review, import_processing, previous_import, develop_history, before_after, snapshots, snapshot_status, import_copy, import_naming, import_backup, import_presets, import_sequence, import_dates, import_destinations, migrate_labels, export_presets, export_previous, export_batches)
     if not 0 <= version <= len(migrations):
         raise ValueError('Unsupported legacy fixture version')
     for migration in migrations[:version]:

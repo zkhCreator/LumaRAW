@@ -11,7 +11,8 @@ Each connection belongs to its creating thread. Bulk insertion commits in batche
 Direct imports number successful new originals with item savepoints and retain a
 single import number across the invocation's bounded commit batches.
 Last accepted manual export settings are catalog-local and commit atomically with
-their queue submission; export workers never rewrite that session state.
+their queue submission; immutable batch-export provenance and every corresponding
+job are catalog-local, and export workers never rewrite those captured settings.
 """
 from contextlib import contextmanager
 import json
@@ -205,15 +206,18 @@ class Catalog:
                     count += 1
         return count
 
-    def enqueue_one(self, row, destination, fmt, options):
+    def enqueue_one(self, row, destination, fmt, options, *, batch_id=None,
+                    preset_name='', collision_suffix=''):
         """Insert one complete snapshot inside the caller's batch transaction."""
         from .keyword_exports import KeywordExports, encode, receipt
         snapshot = KeywordExports(self).snapshot(row['id'], options)
         return self.db.execute(
             'INSERT INTO jobs(photo_id,source,recipe,destination,format,created,options,priority,source_id,'
-            'metadata_snapshot,export_metadata,orientation) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)',
+            'metadata_snapshot,export_metadata,orientation,batch_id,preset_name,collision_suffix) '
+            'VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
             (row['id'],row['path'],row['recipe'],str(destination),fmt,time.time(),json.dumps(options.dict()),
-             options.priority,row['source_id'],encode(snapshot),json.dumps(receipt(snapshot)),row['orientation'])).lastrowid
+             options.priority,row['source_id'],encode(snapshot),json.dumps(receipt(snapshot)),row['orientation'],
+             batch_id,preset_name,collision_suffix)).lastrowid
 
     def all_ids(self, stars=False):
         for row in self.db.execute('SELECT id FROM photos' + (' WHERE rating>=3' if stars else '') + ' ORDER BY id'):

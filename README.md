@@ -17,8 +17,8 @@ LumaRAW preserves your originals. Add references files in place; Copy imports by
 | Local adjustments | Radial, gradient, luminance-range, and brush masks; manual lens distortion, vignette, and chromatic-aberration correction |
 | Library | Folder tree/search/favorites/labels, ratings, flags, catalog metadata/keywords, regular/live smart collections, nested sets, Quick/target collections, SQL filters/sorting, manual/capture-time stacks, duplicate/missing indexing, virtual copies/shared snapshots, selective sync, and backup/restore |
 | Culling | Grid/Loupe/Compare/Survey, anchored page selections, active-photo review actions, linked or independent full-resolution comparison viewports |
-| Export | JPEG and 16-bit TIFF with embedded sRGB, Display P3, Adobe RGB, or ProPhoto RGB ICC profiles; shared or catalog-local export presets, Export with Previous, frozen catalog XMP/keyword policies, persistent queue, pause/cancel/retry, and collision-safe filenames |
-| Agents | 145 MCP tools, equivalent JSON CLI commands, and a bundled skill; app and agent edits share conflict detection |
+| Export | JPEG and 16-bit TIFF with embedded sRGB, Display P3, Adobe RGB, or ProPhoto RGB ICC profiles; shared or catalog-local export presets, multiple-preset batches, Export with Previous, frozen catalog XMP/keyword policies, persistent queue, pause/cancel/retry, and collision-safe filenames |
+| Agents | 149 MCP tools, equivalent JSON CLI commands, and a bundled skill; app and agent edits share conflict detection |
 
 ## Build and run
 
@@ -65,6 +65,23 @@ Queue acceptance records the settings even if a worker later fails or is cancell
 An older catalog starts without Previous settings until a manual export is accepted.
 If another client changes the configuration during submission, review the error
 and invoke the action again explicitly.
+
+**Batch Export…** in the Export sheet exports the captured selection once for each
+checked preset. Select up to thirty presets, with a maximum of one thousand output
+jobs per submission. Preset output settings remain fixed during batch setup; edit
+the preset separately when those settings need changing. Choose destinations for
+individual presets or use one parent folder with a separate child folder for each.
+Parent-folder mode replaces saved destinations. A missing folder must be supplied
+before submission. If a preset name is unsuitable for filenames, enter an explicit
+collision suffix. Existing output names are preserved; conflicts add that suffix
+and, if necessary, a number.
+
+The Export Queue's batch browser retains each batch after restarting and pages
+through its jobs. Cancel or retry a batch without affecting other queued work.
+Batch exports leave Previous settings unchanged. If validation or queue insertion
+fails, no partial batch is accepted; folders created during that attempt may remain
+empty. Processing uses the same memory limits and one-photo-at-a-time worker as
+ordinary exports.
 
 Press **G / E / C / N** with a photo view focused to open Grid / Loupe / Compare / Survey.
 Compare keeps a Select photo beside a changing Candidate: use arrows to navigate,

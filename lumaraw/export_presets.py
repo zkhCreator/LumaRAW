@@ -1,7 +1,8 @@
 """Saved export settings with shared-default and catalog-local storage.
 
 Inputs: revision-bound preset commands and validated format/options/destination values.
-Outputs: bounded name pages, captured settings, and explicit preset mutations.
+Outputs: bounded name pages, captured settings for one or several presets, and
+explicit preset mutations.
 Presets never contain photos, recipes, request keys, or queue state. Destination
 paths are preserved as literal user data and are never inspected during preset IO.
 Shared storage locks before catalog storage; changing mode never moves records.
@@ -177,6 +178,19 @@ class ExportPresets:
                 row = self.row(db, params['preset_id'])
                 row['settings'] = validate_settings(json.loads(row['settings']))
                 return {'preset': row, 'revision': self.token(shared, catalog)}
+            if method == 'get_export_presets':
+                preset_ids = params['preset_ids']
+                if (not isinstance(preset_ids, list) or not preset_ids or len(preset_ids) > PAGE
+                        or any(not isinstance(value, str) or not value for value in preset_ids)):
+                    raise ValueError(f'Select between 1 and {PAGE} export presets')
+                if len(set(preset_ids)) != len(preset_ids):
+                    raise ValueError('Export preset IDs must be unique')
+                presets = []
+                for preset_id in preset_ids:
+                    row = self.row(db, preset_id)
+                    presets.append({'id': row['id'], 'name': row['name'],
+                                    'settings': validate_settings(json.loads(row['settings']))})
+                return {'presets': presets, 'revision': self.token(shared, catalog)}
             if method == 'save_export_preset':
                 result['preset_id'] = self.save(db, params)
             elif method == 'export_preset_action':

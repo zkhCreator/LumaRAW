@@ -39,7 +39,46 @@ Loading copies settings into a draft. Null destination clears the draft folder;
 choose one before submitting. Queue with explicit captured settings and a new
 request key only on an export request. Preset CRUD never queues work, and later
 preset changes do not affect already loaded values or frozen jobs. Additional
-formats, multi-preset batch export and Adobe preset exchange remain unsupported.
+formats and Adobe preset exchange remain unsupported.
+
+## Multiple-preset export batches
+
+For an explicit multi-preset export, capture one library token and call
+`get_export_presets(preset_ids,expected_revision)`. It returns `presets` with each
+`id`, `name`, and canonical `settings`, plus the unchanged `revision`. Select up to
+thirty distinct presets. This read neither creates folders nor queues images.
+
+Submit once with `enqueue_export_batch(photo_ids,presets,expected_revision,request_key)`.
+Each entry in `presets` requires `preset_id` and can include `destination` and
+`filename_suffix`. Without an override, the saved destination must be present.
+Alternatively add `parent_destination` and supply one `subfolder` per preset;
+that mode replaces saved destinations and forbids per-entry `destination`.
+Subfolders must be unique single components, including after Unicode normalization
+and case folding. Destination paths must be absolute. The engine validates every
+target before creating directories and accepting jobs.
+
+`filename_suffix` defaults to the preset name. Supply an explicit portable filename
+component when that display name is unsuitable. Suffixes preserve exact spelling
+and are limited to 120 UTF-8 bytes; child-folder components allow 255 bytes. A file
+name conflict appends the captured suffix, then a number if necessary, preserving
+existing outputs. Do not silently alter user-provided suffixes or child names.
+
+The deduplicated photo count multiplied by preset count must not exceed one thousand.
+The response contains a UUID-string `batch_id`, `queued`, `photo_count`, and
+`preset_count`. The accepted transaction freezes all current photo and output
+values; later preset changes do not affect the jobs. Batch export never replaces
+Previous settings. Exact request replay returns the original batch even after a
+library change, but uncertain mutations must never be retried automatically.
+Failed acceptance creates no partial jobs or receipt; created empty folders may
+remain when filesystem operations preceded a later failure.
+
+Use `list_export_batches(offset)` for thirty compact batch summaries, and
+`get_export_batch(batch_id,offset)` for `batch`, captured `presets`, up to sixty
+`jobs`, `total`, `offset`, `page_size`, and state `counts`. Detail pages omit recipe
+and metadata packets; `get_job` remains available for a specific full receipt.
+`queue_control` accepts either `batch_id` or `job_id`, never both. Batch scope
+supports `cancel`, `retry` for failed/interrupted jobs, or explicit `retry_cancelled`.
+Pause/resume is global. Inspect uncertain outputs before an explicit retry.
 
 ## Export with Previous
 

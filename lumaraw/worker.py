@@ -4,6 +4,7 @@ Reads bounded JSON from stdin, returns one JSON result; no pixel buffers cross I
 The catalog service owns scheduling, cancellation, and RSS monitoring. Process exit releases
 LibRaw/NumPy native allocations even after failure. Original files are read-only.
 The engine identity must match its broker before any pixels or outputs are opened.
+Batch export requests may carry a captured collision suffix for safe output naming.
 Successful previews publish bounded completed receipts for later broker reuse.
 """
 import json
@@ -58,7 +59,8 @@ def main():
         elif operation == 'export':
             result = export_image(request['path'], recipe, request['destination'], request['format'],
                                   request['budget_mb'], request['job_id'],options=request.get('options'),cache=request['cache'],
-                                  metadata_snapshot=request.get('metadata_snapshot'),orientation=request.get('orientation',0))
+                                  metadata_snapshot=request.get('metadata_snapshot'),orientation=request.get('orientation',0),
+                                  collision_suffix=request.get('collision_suffix',''))
         else:
             raise ValueError('Unknown worker operation')
         if 'cache' in request:
