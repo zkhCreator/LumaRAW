@@ -306,6 +306,17 @@ when a clear function is more maintainable. Avoid unrelated formatting churn.
   Native editors and loaded Painter presets retain their original revisions after
   refresh; name conflicts require an explicit duplicate/replacement policy.
 
+- Export presets are configuration values, never photo selections, recipes,
+  request keys or queue references. Normalize through the same `ExportOptions`
+  validator used by submission. Keep name-only pages bounded and reject duplicate
+  normalized names instead of silently replacing a record. Save destination paths
+  only through an explicit choice; preserve literal absolute paths without file
+  checks or directory creation. Loading a preset without a folder clears the old
+  draft folder. Capture form/library revisions, reject late reads and stale writes,
+  and never rebase forms or retry uncertain mutations. Shared storage precedes the
+  catalog lock; storage switches neither copy records nor alter loaded values.
+  Existing numeric output sharpening is not Adobe's screen/matte/glossy behavior.
+
 ## Engine changes and handoff
 
 `runtime.ENGINE_GENERATION` orders portable-engine releases. Increment it when

@@ -13,6 +13,34 @@ Reuse includes requested Before, geometry, histogram and targeting/readout maps;
 missing, changed or damaged cache data causes normal rendering. This is a local
 processing optimization, not evidence of Adobe pixel parity or UI frame rate.
 
+## Export presets
+
+`list_export_presets` returns thirty name/identity summaries with optional `search`
+and `offset`, an opaque `revision`, and `store_with_catalog`. Capture that revision
+for `get_export_preset(preset_id,expected_revision)` or any mutation. A get returns
+`preset` with `id`, `name`, and `settings`, plus the unchanged library revision.
+
+`save_export_preset(name,settings,expected_revision)` creates a preset; include
+`preset_id` only for an explicit update. Names are unique after normalization.
+Settings require exactly `format`, `options`, and `destination`. Formats are `jpeg`
+and `tiff16`; options use the same contract as `enqueue_exports`, with omitted
+options normalized to defaults. Canonical reads contain `space`, `max_edge`,
+`quality`, `output_sharpen`, `name`, `priority`, `metadata`, and `keyword_hierarchy`.
+Destination is null or a literal absolute local path. Preset IO neither inspects
+that location nor creates directories. Only include a destination when requested.
+
+`export_preset_action` takes `action` and `expected_revision`, with exactly these
+additional fields: `rename` needs `preset_id` and `name`; `delete` needs `preset_id`;
+`storage` needs `store_with_catalog`. Storage switches libraries without moving
+records. Mutations return a fresh list; saves/renames also return `preset_id`.
+Refresh explicitly after a conflict; never retry stale or uncertain mutations.
+
+Loading copies settings into a draft. Null destination clears the draft folder;
+choose one before submitting. Queue with explicit captured settings and a new
+request key only on an export request. Preset CRUD never queues work, and later
+preset changes do not affect already loaded values or frozen jobs. Additional
+formats, multi-preset batch export and Adobe preset exchange remain unsupported.
+
 ## Develop history
 
 Read `get_photo` and capture its revision before calling `list_history`. Every

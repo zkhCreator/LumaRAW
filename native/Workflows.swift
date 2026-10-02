@@ -1,49 +1,71 @@
-// Purpose: native export, recipe, batch, calibration, settings and agent workflows.
+// Purpose: native export presets, queue, recipe, batch, calibration, settings and agent workflows.
 // Inputs: explicit native panels and user-entered settings. Outputs: domain calls.
 // Exports retain snapshots; app never overwrites an original or existing output.
 // Calibration rectangles address full decoded sources before catalog/Develop edits.
-// Import sequence settings are revision-bound catalog commands; views own no SQL.
+// Preset and import-counter settings are revision-bound catalog commands; views own no SQL.
 import SwiftUI
 import AppKit
 
 struct ExportSheet:View {
     @EnvironmentObject var s:Store
     @Environment(\.dismiss) var dismiss
-    @State private var format="tiff16"
-    @State private var space="srgb"
-    @State private var name="{stem}-Luma-{seq}"
-    @State private var destination=""
-    @State private var edge=0
-    @State private var quality=96
-    @State private var metadata="catalog"
-    @State private var keywordHierarchy=false
+    @State private var draft=ExportDraft()
+    @State private var showPresets=false
     @State private var metadataPhoto: Int?
     @State private var submitting=false
     var body:some View {
-        VStack(alignment:.leading,spacing:20){
-            Text("Export Photos").font(.title2.weight(.semibold))
-            Text("Save current adjustments to new files. Originals remain unchanged.").foregroundStyle(.secondary)
+        VStack(alignment:.leading,spacing:16){
+            HStack {
+                VStack(alignment:.leading,spacing:4) {
+                    Text("Export Photos").font(.title2.weight(.semibold))
+                    Text("Save current adjustments to new files. Originals remain unchanged.").foregroundStyle(.secondary)
+                }
+                Spacer()
+                Button("Presets…") { showPresets=true }
+            }
+            if let preset=draft.loadedPreset {
+                Text("Loaded preset: \(preset.name)").font(.caption).foregroundStyle(.secondary)
+            }
             Form {
                 LabeledContent("Photo Count",value:"\(max(s.selection.count,1))")
-                Picker("File Format",selection:$format){Text("16-bit TIFF").tag("tiff16");Text("JPEG").tag("jpeg")}
-                Picker("Color Space",selection:$space){Text("sRGB").tag("srgb");Text("Display P3").tag("p3");Text("Adobe RGB").tag("adobe");Text("ProPhoto RGB").tag("prophoto")}
-                Picker("Size",selection:$edge){Text("Full Size").tag(0);Text("Long Edge: 4096 px").tag(4096);Text("Long Edge: 2048 px").tag(2048);Text("Long Edge: 1280 px").tag(1280)}
-                if format=="jpeg"{Stepper("JPEG Quality: \(quality)",value:$quality,in:1...100)}
-                TextField("Filename Template",text:$name)
-                Picker("Metadata",selection:$metadata) {
+                Picker("File Format",selection:$draft.format){Text("16-bit TIFF").tag("tiff16");Text("JPEG").tag("jpeg")}
+                Picker("Color Space",selection:$draft.space){Text("sRGB").tag("srgb");Text("Display P3").tag("p3");Text("Adobe RGB").tag("adobe");Text("ProPhoto RGB").tag("prophoto")}
+                LabeledContent("Maximum Long Edge") {
+                    HStack(spacing:8) {
+                        TextField("Pixels",value:$draft.maxEdge,format:.number)
+                            .labelsHidden().accessibilityLabel("Maximum long edge in pixels").frame(width:100)
+                        Text("px · 0 = full size").font(.caption).foregroundStyle(.secondary)
+                    }
+                }.onChange(of:draft.maxEdge) { _,value in draft.maxEdge=min(16000,max(0,value)) }
+                LabeledContent("JPEG Quality") {
+                    Stepper("\(draft.quality)",value:$draft.quality,in:1...100)
+                }.disabled(draft.format != "jpeg")
+                LabeledContent("Output Sharpen") {
+                    HStack(spacing:8) {
+                        TextField("Amount",value:$draft.outputSharpen,format:.number)
+                            .labelsHidden().accessibilityLabel("Output sharpening amount").frame(width:96)
+                        Stepper("",value:$draft.outputSharpen,in:0...150,step:1).labelsHidden()
+                            .accessibilityLabel("Output sharpening")
+                    }
+                }.onChange(of:draft.outputSharpen) { _,value in draft.outputSharpen=min(150,max(0,value)) }
+                Stepper("Queue Priority: \(draft.priority)",value:$draft.priority,in:0...9)
+                TextField("Filename Template",text:$draft.name)
+                Picker("Metadata",selection:$draft.metadata) {
                     Text("None").tag("none");Text("Copyright Only").tag("copyright");Text("Catalog Descriptions and Keywords").tag("catalog")
                 }
-                Toggle("Write Keywords as Lightroom Hierarchy",isOn:$keywordHierarchy).disabled(metadata != "catalog")
+                Toggle("Write Keywords as Lightroom Hierarchy",isOn:$draft.keywordHierarchy).disabled(draft.metadata != "catalog")
                 Text("Includes supported catalog fields and keyword export rules. Camera EXIF, GPS and Develop settings are not copied.").font(.caption).foregroundStyle(.secondary)
-                Button("Preview Metadata for Active Photo…") { metadataPhoto=s.selected ?? s.selection.sorted().first }.disabled(s.selected == nil && s.selection.isEmpty)
+                Button("Preview Metadata for Active Photo…") { metadataPhoto=s.selected ?? s.selection.sorted().first }
+                    .disabled(s.selected == nil && s.selection.isEmpty)
+                    .sheet(isPresented:Binding(get:{metadataPhoto != nil},set:{if !$0 { metadataPhoto=nil }})) {
+                        if let metadataPhoto { ExportMetadataSheet(photoID:metadataPhoto,metadata:draft.metadata,hierarchy:draft.keywordHierarchy) }
+                    }
                 Text("Available: {stem} {seq} {width} {height} {space}").font(.caption).foregroundStyle(.secondary)
-                HStack{Text(destination.isEmpty ? "Choose an export folder":destination).lineLimit(2).font(.callout).textSelection(.enabled);Spacer();Button("Choose…"){let panel=NSOpenPanel();panel.canChooseDirectories=true;panel.canChooseFiles=false;panel.canCreateDirectories=true;if panel.runModal() == .OK{destination=panel.url?.path ?? ""}}}
+                HStack{Text(draft.destination.isEmpty ? "Choose an export folder":draft.destination).lineLimit(2).font(.callout).textSelection(.enabled);Spacer();Button("Choose…"){let panel=NSOpenPanel();panel.canChooseDirectories=true;panel.canChooseFiles=false;panel.canCreateDirectories=true;if panel.runModal() == .OK{draft.destination=panel.url?.path ?? ""}}}
             }.formStyle(.grouped)
-            HStack{Text("Existing files are preserved · ICC embedded").font(.caption).foregroundStyle(.secondary);Spacer();Button("Cancel"){dismiss()}.keyboardShortcut(.cancelAction);Button(submitting ? "Submitting…":"Add to Queue"){submitting=true;Task{await s.export(destination,format,["space":space,"max_edge":edge,"quality":quality,"name":name,"metadata":metadata,"keyword_hierarchy":keywordHierarchy]);submitting=false}}.buttonStyle(.borderedProminent).keyboardShortcut(.defaultAction).disabled(destination.isEmpty || submitting)}
+            HStack{Text("Existing files are preserved · ICC embedded").font(.caption).foregroundStyle(.secondary);Spacer();Button("Cancel"){dismiss()}.keyboardShortcut(.cancelAction);Button(submitting ? "Submitting…":"Add to Queue"){submitting=true;Task{await s.export(draft.destination,draft.format,draft.options);submitting=false}}.buttonStyle(.borderedProminent).keyboardShortcut(.defaultAction).disabled(draft.destination.isEmpty || s.selection.isEmpty || submitting)}
         }.padding(24).frame(width:660)
-            .sheet(isPresented:Binding(get:{metadataPhoto != nil},set:{if !$0 { metadataPhoto=nil }})) {
-                if let metadataPhoto { ExportMetadataSheet(photoID:metadataPhoto,metadata:metadata,hierarchy:keywordHierarchy) }
-            }
+            .sheet(isPresented:$showPresets) { ExportPresetBrowserSheet(draft:$draft) }
     }
 }
 struct QueueView:View {
@@ -165,6 +187,7 @@ struct SettingsView:View {
                 })).disabled(s.metadataPresetPage == nil || s.metadataPresetBusy)
                 Text("Existing presets remain in their original location. Metadata preset storage is independent of Develop and keyword presets.").font(.caption).foregroundStyle(.secondary)
             }
+            ExportPresetSettingsSection()
             Section("Library"){Text(Backend.catalog).font(.caption).textSelection(.enabled);Button("Show in Finder"){NSWorkspace.shared.open(URL(fileURLWithPath:Backend.catalog))}}
             Section("Background Service") {
                 Button(s.connectingService ? "Connecting…":"Connect with This Version") { Task { await s.activateCurrentService() } }.disabled(s.connectingService)

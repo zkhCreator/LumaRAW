@@ -485,7 +485,7 @@ def test_schema32_migration_is_additive_atomic_idempotent_and_preserves_dependen
         assert db.execute("SELECT count(*) FROM collection_photos").fetchone()[0] == len(old_members)
 
     catalog = Catalog(root)
-    assert catalog.db.execute("PRAGMA user_version").fetchone()[0] == CATALOG_VERSION == 33
+    assert catalog.db.execute("PRAGMA user_version").fetchone()[0] == CATALOG_VERSION
     assert tuple(catalog.db.execute(
         "SELECT quick_id,target_id,revision FROM collection_state WHERE id=1"
     ).fetchone()) == old_state[1:]
@@ -516,7 +516,7 @@ def test_schema32_migration_is_additive_atomic_idempotent_and_preserves_dependen
 
     # Reopening is a no-op: labels, revisions, identities and trigger count stay stable.
     catalog = Catalog(root)
-    assert catalog.db.execute("PRAGMA user_version").fetchone()[0] == 33
+    assert catalog.db.execute("PRAGMA user_version").fetchone()[0] == CATALOG_VERSION
     assert dict(catalog.db.execute("SELECT id,color_label FROM collections")) == labels
     assert catalog.db.execute(
         "SELECT count(*) FROM sqlite_master WHERE type='trigger' AND name LIKE 'collection_tree_%'"

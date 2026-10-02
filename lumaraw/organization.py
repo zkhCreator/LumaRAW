@@ -2,7 +2,8 @@
 
 Purpose: persist descriptive metadata, delegate collection hierarchy workflows, and compile
 bounded library queries. Inputs are schema-validated commands plus a catalog-owned
-SQLite connection. Outputs are rows, parameterized predicates and transactions.
+SQLite connection. Outputs are rows, parameterized predicates, transactions, and
+the ordered additive catalog migration chain, including local export preset state.
 Non-goals: no original/sidecar writes, EXIF rewriting, image decoding or UI state.
 Metadata revisions are separate from recipes; smart membership is evaluated live.
 """
@@ -141,6 +142,8 @@ def migrate(db):
     migrate_import_destinations(db)
     from .collections import migrate_labels
     migrate_labels(db)
+    from .export_presets import migrate as migrate_export_presets
+    migrate_export_presets(db)
 
 
 def text_predicate(text):

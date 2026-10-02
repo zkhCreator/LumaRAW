@@ -243,6 +243,26 @@ The shell does not reimplement processing or persist presentation in recipes.
 
 The native store clears photo-specific state when selection changes and intersects selected IDs with the visible page. Recipe mutations hold the editing barrier until a reply arrives. Rating replies update only rating/flag, preserving the revision used for recipe conflict detection. Asset imports verify their captured photo target before applying.
 
+## Saved export settings
+
+`export_presets.py` owns schema 34's catalog-local preset records and revision.
+An independently versioned SQLite repository under `preset_paths.py` provides the
+default shared library and its storage preference. Shared storage locks before the
+catalog; switching storage selects another repository without copying records.
+Opaque revision tokens bind the catalog and shared-store roots, storage mode and
+both library revisions.
+Lists contain thirty name/identity summaries, with literal normalized substring
+search; settings are read separately against the captured token.
+
+Presets contain only the format, canonical `ExportOptions` and an optional literal
+absolute destination. Saving or loading a path performs no destination filesystem
+inspection or creation. A loaded preset becomes independent draft values; a null
+destination clears the previous draft folder. Queue submission still requires an
+explicit destination and freezes the ordinary recipe/options/metadata snapshot.
+Preset update/deletion cannot change a draft already loaded or a submitted job.
+The Mac shell owns folder panels and captured forms, while app, CLI and MCP share
+the same validation and revision contract. No Adobe preset code is executed.
+
 ## Memory and performance
 
 Library pages contain at most 60 summaries; full recipes are fetched on demand. Preview and export share strip processing, with overlap for neighborhood filters. Full-resolution viewports are limited to 2048 × 1536. LibRaw still decodes a complete RAW frame; linear pixel caches live on disk.

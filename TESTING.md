@@ -2,6 +2,39 @@
 
 All probes use explicit read-only input photographs and new disposable catalog/output directories. They never use a personal photo library by default.
 
+## Saved export settings
+
+`test_export_presets.py` exercises complete/default settings, literal destinations
+without destination filesystem IO, normalized unique names, captured revisions,
+shared/local storage boundaries, additive schema-33 upgrades and frozen queue
+snapshots. Generated raster exports check dimensions, formats, ICC profiles and
+collision preservation; they do not establish camera accuracy or Adobe processing
+equivalence. All shared preset storage uses disposable injected roots.
+
+`NativeExportPresetRegression` uses the real packaged relay for preset management,
+independent loaded drafts, stale updates, storage and explicit queue submission.
+Its offscreen renders establish layout only; desktop input, native folder panels
+and VoiceOver require separate acceptance.
+
+```sh
+.venv/bin/python -m pytest -q tests/test_export_presets.py tests/test_service.py
+.venv/bin/python tests/run_native.py --work work/new-export-preset-native \
+  --engine /absolute/LumaRAW.app/Contents/Resources/Engine/LumaRAWEngine \
+  --suite NativeExportPresetRegression --suite NativeExportMetadataRegression \
+  --suite NativeResponsivenessRegression
+.venv/bin/python tests/export_preset_probe.py --work work/new-export-preset-scale \
+  --rows 10000 100000
+```
+
+Run the scale probe after other validation stops. It seeds synthetic shared
+preset rows, then measures an initial call and five warm repeats for first/deep
+pages and a sparse literal search. Timings include Service validation, SQLite
+connections/transactions, token reads and count/page queries. IPC, native UI,
+images and seed work are excluded; OS caches are warm. Separate VM counters cover
+individual SQL components at 100-instruction granularity, with query plans and
+5 ms process RSS samples. Deep OFFSET and substring search still scan index
+entries; bounded replies do not imply constant-time searches.
+
 ## Core and service
 
 ```sh

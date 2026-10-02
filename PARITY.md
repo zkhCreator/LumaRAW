@@ -49,6 +49,7 @@ Official references checked September 2026:
 - [Firsthand dictionary import behavior and preserved existing attributes](https://community.adobe.com/questions-675/importing-keywords-into-lightroom-classic-as-non-exported-keywords-1638903)
 - [Firsthand CSV field layout and tab indentation](https://community.adobe.com/questions-675/lightroom-classique-15-3-unable-to-import-keywords-from-csv-file-1560047)
 - [Export metadata and hierarchy settings](https://helpx.adobe.com/lightroom-classic/desktop/export-photos/export-files-disk-or-cd.html)
+- [Export presets](https://helpx.adobe.com/nz/lightroom-classic/desktop/export-photos/export-presets-settings-plug-ins.html) and [single/multi-preset export workflow](https://helpx.adobe.com/lightroom-classic/desktop/export-photos/exporting-photos-basic-workflow.html) (checked October 2026)
 - [XMP specifications, including Part 3 storage and Extended JPEG](https://developer.adobe.com/xmp/docs/xmp-specifications/)
 
 ## Feature inventory
@@ -69,7 +70,7 @@ gaps. Nothing below is full Lightroom parity merely because historical tests pas
 | Local editing | Partial: radial/gradient/brush/luma | Mask list/edit/reorder/intersection, range masks, clone/heal, red-eye (non-AI) |
 | History and presets | Partial: durable paged Develop history with undo/redo, state selection/rename/clear, persistent Before assignment/copy/swap, separate 50-batch orientation undo, alphabetical shared snapshots with current/history capture, rename/update/delete and Before copy, partial Develop presets/groups/favorites/shared or local storage, batch/Painter and reviewed-import application | Unified application Undo/Redo, history/snapshot hover, preset hover preview/Amount/ISO adaptation/Adobe exchange and rendered reference acceptance |
 | Preview/performance | Partial: Metal, proxies, 1:1 viewport, developed thumbnail fast path, on-demand Before with independent cache, four paired layouts, persistent command relay, background image preparation, quiet polling, fused readout maps and validated completed-preview reuse | Real-RAW catalog/slider latency, offline previews, cache controls and desktop/reference acceptance |
-| Export | Partial: JPEG/16-bit TIFF, ICC, durable jobs with frozen catalog/rights IPTC XMP and keyword hierarchy options | Presets, complete EXIF/IPTC Extension/GPS metadata policies, watermark, additional formats, publish workflows |
+| Export | Partial: JPEG/16-bit TIFF, ICC, shared or catalog-local saved export settings with optional destinations, durable jobs with frozen catalog/rights IPTC XMP and keyword hierarchy options | Multi-preset batch export, Adobe preset exchange, complete EXIF/IPTC Extension/GPS metadata policies, watermark, additional formats, publish workflows |
 | External editing and video | Missing | External-editor setup and derivative round trips; supported video import/playback, frame capture, trimming and export |
 | Merge | Missing | Non-AI HDR merge and panorama with bounded resources and reference acceptance |
 | Map | Missing | GPS metadata, map navigation, track import, location editing with explicit persistence |
@@ -81,7 +82,7 @@ gaps. Nothing below is full Lightroom parity merely because historical tests pas
 
 ## Active increment
 
-Continue complete import, Library and Develop workflows while preserving the
+Continue complete import, Library, Develop and export workflows while preserving the
 validated command/preview responsiveness and fused RGB/LAB processing changes.
 RAW slider/selection latency and desktop interaction remain performance acceptance
 work; the first-map optimization is recorded below rather than treated as full
@@ -4239,3 +4240,112 @@ names, collection drag/drop, remaining smart criteria/exchange and Adobe desktop
 reference acceptance remain open. The macOS 14 runtime, current desktop input,
 VoiceOver and official MCP SDK were not tested; desktop automation was not retried.
 This module does not complete the overall Lightroom parity inventory.
+
+### Captured export presets
+
+Adobe's documented workflow saves the current Export dialog settings as a named
+preset and loads them before an explicit export. Its multi-preset workflow can
+retain each preset's destination or choose replacement locations. This increment
+implements single-preset configuration reuse for the existing JPEG/16-bit TIFF
+pipeline. It does not implement multi-preset batch submission, Adobe preset
+exchange, built-in export presets or Export with Previous.
+
+Engine generation 48 / schema 34 adds shared-default and optional catalog-local
+export preset libraries. Names have stable UUID identities and normalized unique
+names. Thirty-row pages omit settings payloads; a captured token is required to
+read settings, create/update, rename/delete or switch storage. Tokens include the
+catalog and shared-store roots, storage mode and both library revisions. Switching
+storage neither moves records nor changes a previously loaded configuration.
+
+Saved settings contain the format, all eight existing output options, and an
+optional literal absolute destination. The destination is included only by an
+explicit save choice; preset IO does not inspect it or create folders. A preset
+without a destination clears the previous draft folder, requiring a new choice
+before queue submission. Photo IDs, recipes, queue state and request keys are
+excluded. Loaded values and already-submitted job snapshots remain independent of
+subsequent preset edits/deletion.
+
+The Export sheet now opens a searchable, paged preset browser with save, update,
+rename and delete workflows; Settings controls the storage scope. Custom long-edge
+size, numeric output sharpening and queue priority expose existing engine options.
+Sharpening preserves fractional values but does not implement Adobe's distinct
+screen/matte/glossy output classes. Every editor keeps its original token. A
+rename may update a loaded name but cannot advance an older settings token; closing
+the browser invalidates in-flight loads, and later pages/searches reject stale
+responses. Choosing a preset neither changes photo selection nor submits jobs.
+
+Focused export, metadata-preset, collection-migration and service regression passed
+**57 tests in 9.81 s**. The initial run passed 56 and failed an over-specific query
+plan assertion: SQLite selected its unique normalized-name index instead of the
+explicit composite index. Both satisfy the stable ordering without a temporary
+sort. The test now checks indexed access/no temporary sort alongside actual page
+contents; application queries were unchanged. Coverage includes genuine schema-33
+upgrade rollback, custom schema objects and existing photo/job/collection data,
+product backup/restore, cross-catalog/shared-root revision isolation, storage
+switches without copying, stale/missing-target mutations, literal-path no-IO
+guards and independent frozen jobs. Generated 240 x 160 PNG input produced
+120 x 80 JPEG and 16-bit TIFF with exact Display P3 ICC bytes; JPEG quality and
+collision behavior were checked and original bytes remained unchanged.
+
+The isolated scale probe ran on Apple M3 Max / 128 GiB / macOS 26.6.2 with 10,000
+and 100,000 synthetic shared presets. Each measurement includes in-process Service
+validation, shared/catalog connections and transactions, token reads and count/page
+queries. Seeding, IPC, native rendering, photos and pixels are excluded. Each case
+has one first call and five repeats; OS caches are warm after seeding, not cold disk.
+
+| Presets / request | First call | Warm median | Warm maximum | Reply |
+| --- | ---: | ---: | ---: | ---: |
+| 10,000 / first page | 1.978 ms | 1.694 ms | 1.913 ms | 1,508 B |
+| 10,000 / last page | 1.996 ms | 1.770 ms | 1.803 ms | 611 B |
+| 10,000 / sparse search | 2.294 ms | 2.334 ms | 2.453 ms | 199 B |
+| 100,000 / first page | 2.477 ms | 2.162 ms | 3.293 ms | 1,509 B |
+| 100,000 / last page | 3.436 ms | 3.446 ms | 3.644 ms | 613 B |
+| 100,000 / sparse search | 8.274 ms | 8.704 ms | 8.720 ms | 199 B |
+
+First pages return thirty names, last pages ten and exact-name substring searches
+one. Separate SQL VM samples use 100-instruction granularity: first-page selection
+uses about 200 instructions, while deep OFFSET uses about 30,000/300,000 and
+sparse substring count plus selection uses about 90,000/900,000. All plans use
+the normalized-name unique index without a temporary sort. Bounded replies do not
+make deep paging or substring scans constant-time. After-seed process RSS sampled
+every 5 ms peaks at 37.55/43.81 MiB; the larger-case baseline may include memory
+retained from the smaller case. These measurements do not establish desktop latency.
+
+The complete Python suite passed **984 tests in 133.44 s** with required Metal
+and the real 4284 x 2844 Nikon D3S NEF fixture, with no skips. The first Mac build
+then caught two Swift `catch` variable-shadowing errors in preset failure display;
+both assignments now explicitly target the model's error property. This native-only
+repair leaves the validated Python engine unchanged; the failed build log remains
+local with the successful evidence.
+
+Five native suites passed **115 assertions** against the packaged engine: export
+presets 38, export metadata 16, metadata presets 32, Library 13 and responsiveness
+16. Preset coverage includes eight-option round trips, explicit successful updates,
+captured conflicts for every mutation, rename without stale-token rebasing, late
+read rejection, destination clearing, bounded browsing, storage separation and
+unchanged loaded drafts/job settings after deletion. The probe cancels its own
+paused jobs before exit. Existing unchanged polls still publish no Store updates.
+
+Four offscreen renders cover the main Export sheet, preset browser, save editor
+and storage setting. Inspection found a wrapped duplicate label beside the numeric
+sharpening input. The final UI hides redundant numeric-field labels while retaining
+explicit accessibility names; a fresh Mac build and all 38 export-preset native
+assertions then passed, and the updated render was inspected. Other native source,
+engine and tests were unchanged by this layout repair. Offscreen renders establish
+limited layout evidence, not desktop interaction, folder-panel behavior or VoiceOver.
+
+The final macOS 14-target app builds without Swift diagnostics and passes deep/
+strict local ad-hoc signature verification. Packaged MCP initialization and all
+**143 tool schemas**, broker/client/source identities and bundled-guide bytes match:
+
+- Source digest: `eda55470631ea7489bf7fea1abdc1bc4eda15bab218315aa41b74130dd4d6050`
+- Engine SHA-256: `1dc0d8b94a2fb2db8558b9f99c5f1a9feaee153c5243702af3b7b8b2d6a9211e`
+- Native SHA-256: `9ad6cba7d423a122c7010dd66f512022f9a1d7a5e1979f930277bd691dc73259`
+
+Remaining export work includes multi-preset batch submission, Export with Previous,
+Adobe exchange/built-ins, groups and more destination policies, complete metadata,
+watermarking, additional formats, plugins/postprocessing and publish services.
+The separate browser differs from Adobe's Export dialog sidebar. macOS 14 runtime,
+current desktop input, VoiceOver, official MCP SDK and Lightroom reference acceptance
+were not tested; desktop automation was not retried. This remains partial export
+coverage within the full Lightroom parity goal.

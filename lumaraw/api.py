@@ -1,10 +1,10 @@
 """Versioned public command contracts shared by native UI, CLI and MCP.
 
 Inputs: bounded JSON objects. Outputs: JSON schemas and validated domain commands,
-including bounded full-resolution import viewport requests. No transport, pixels or
-UI dependencies. Library pages may include true 1-based ordinals for scoped stack
-members; collection pages expose catalog-local color labels and a separate tree
-revision. IDs refer only to the selected catalog.
+including bounded full-resolution import viewport requests and saved export settings.
+No transport, pixels or UI dependencies. Library pages may include true 1-based
+ordinals for scoped stack members; collection pages expose catalog-local color
+labels and a separate tree revision. IDs refer only to the selected catalog.
 Tool annotations describe effects; they never substitute for user authorization.
 """
 from .model import LIMITS, Recipe, SYNC_GROUPS, POINT_CURVE_FIELDS, PARAMETRIC_FIELDS, MIXER_FIELDS, BW_FIELDS
@@ -50,6 +50,20 @@ tool('get_import_preset','Read import options and compact processing summaries a
 tool('save_import_preset','Save or update a named configuration from a ready review. Freeze naming, processing, keywords and destination options; exclude selected sources, checked rows and transfer identities.',{'name':string(120),'preset_id':string(80),'plan_id':ID,'expected_plan_revision':REV,'expected_revision':REV},['name','plan_id','expected_plan_revision','expected_revision'])
 tool('import_preset_action','Rename or delete an import configuration at the captured library revision. Existing reviews retain their captured values.',{'action':{'enum':['rename','delete']},'name':string(120),'preset_id':string(80),'expected_revision':REV},['action','preset_id','expected_revision'])
 TOOLS['import_preset_action']['annotations']['destructiveHint']=True
+EXPORT_TOKEN={'type':'string','minLength':64,'maxLength':64,'pattern':'^[0-9a-f]{64}$'}
+# Reuse this exact options schema for saved presets and queue submission.
+EXPORT_OPTIONS=obj({'space':{'enum':['srgb','adobe','p3','prophoto']},'max_edge':integer(0,16000),
+                    'quality':integer(1,100),'output_sharpen':{'type':'number','minimum':0,'maximum':150},
+                    'name':string(120),'priority':integer(0,9),
+                    'metadata':{'enum':['none','copyright','catalog']},'keyword_hierarchy':BOOL})
+EXPORT_SETTINGS=obj({'format':{'enum':['jpeg','tiff16']},'options':EXPORT_OPTIONS,
+                     'destination':{'anyOf':[PATH,{'type':'null'}]}},
+                    ['format','options','destination'])
+tool('list_export_presets','Read thirty shared or catalog-local export preset names and the captured storage revision without settings payloads.',{'offset':integer(),'search':{'type':'string','maxLength':200}},read=True)
+tool('get_export_preset','Read captured format, options and optional literal destination at the current preset-library token.',{'preset_id':string(80),'expected_revision':EXPORT_TOKEN},['preset_id','expected_revision'],True)
+tool('save_export_preset','Create or update saved format, existing export options and an optional literal destination. Does not queue work, read photos, or inspect/create the destination folder.',{'name':string(120),'settings':EXPORT_SETTINGS,'preset_id':string(80),'expected_revision':EXPORT_TOKEN},['name','settings','expected_revision'])
+tool('export_preset_action','Rename/delete an export preset or switch between shared and catalog-local storage. Switching never moves saved rows; use the captured library token.',{'action':{'enum':['rename','delete','storage']},'preset_id':string(80),'name':string(120),'store_with_catalog':BOOL,'expected_revision':EXPORT_TOKEN},['action','expected_revision'])
+TOOLS['export_preset_action']['annotations']['destructiveHint']=True
 tool('restart_import_with_preset','Explicitly replace a ready review with a fresh unscanned plan using its source selection and a saved configuration. Reset checked selections. Filesystem validation and revision conflicts preserve the old review on failure; no files are written. Never replay an uncertain response.',{'plan_id':ID,'expected_revision':REV,'preset':IMPORT_CONFIGURATION},['plan_id','expected_revision','preset'])
 tool('set_import_backup','Capture or clear an original-state second-copy destination on a ready Copy review. Null disables it. Sources and both destinations are revalidated before copying; no writes occur now.',{'plan_id':ID,'expected_revision':REV,'destination':{'anyOf':[PATH,{'type':'null'}]}},['plan_id','expected_revision','destination'])
 tool('get_import','Read sixty import review summaries, selection totals and progress without metadata payloads.',{'plan_id':ID,'kind':{'enum':['all','new','duplicate','existing','error','selected']},'offset':integer(),'sort':{'enum':['name','captured','checked','type']},'descending':BOOL},read=True)
@@ -207,9 +221,8 @@ tool('cancel_preview','Invalidate older preview generations for one client and s
 tool('photo_summaries','Read existing photo summaries for at most 60 IDs without recipe or EXIF payloads.',{'photo_ids':array(ID,60)},['photo_ids'],True)
 tool('thumbnail','Create/read a source thumbnail (default) or a developed recipe-aware 320-pixel thumbnail.',{'photo_id':ID,'kind':{'enum':['source','developed']},'client_id':string(128),'generation':integer()},['photo_id'],True)
 tool('cached_thumbnails','Read completed source (default) or developed thumbnail paths for up to 60 photos without image workers. Developed entries include recipe revisions.',{'photo_ids':array(ID,60),'kind':{'enum':['source','developed']}},['photo_ids'],True)
-tool('enqueue_exports','Durably enqueue immutable recipe snapshots. Reusing request_key with the same arguments returns original jobs; different arguments fail.',{'photo_ids':array(ID),'destination':PATH,'format':{'enum':['tiff16','jpeg']},'options':obj({'space':{'enum':['srgb','adobe','p3','prophoto']},'max_edge':integer(0,16000),'quality':integer(1,100),'output_sharpen':{'type':'number','minimum':0,'maximum':150},'name':string(120),'priority':integer(0,9)}),'request_key':string(128)},['photo_ids','destination','format','request_key'])
+tool('enqueue_exports','Durably enqueue immutable recipe snapshots. Reusing request_key with the same arguments returns original jobs; different arguments fail.',{'photo_ids':array(ID),'destination':PATH,'format':{'enum':['tiff16','jpeg']},'options':EXPORT_OPTIONS,'request_key':string(128)},['photo_ids','destination','format','request_key'])
 tool('get_job','Read a specific durable export receipt, including its recipe snapshot.',{'job_id':ID},['job_id'],True)
-TOOLS['enqueue_exports']['inputSchema']['properties']['options']['properties'].update({'metadata':{'enum':['none','copyright','catalog']},'keyword_hierarchy':BOOL})
 tool('list_jobs','Read the latest 60 export jobs and aggregate queue counts.',read=True)
 tool('queue_control','Pause after the current export, resume, cancel, or retry failed/interrupted exports. Cancelled exports require explicit retry_cancelled.',{'action':{'enum':['pause','resume','cancel','retry','retry_cancelled']},'job_id':ID},['action'])
 tool('save_version','Create a named snapshot shared by all variants. Pass expected_revision to capture current settings safely; optional step_id copies a retained history state without selecting it and requires that revision. Duplicate names are rejected, never overwritten.',{'photo_id':ID,'name':string(120),'expected_revision':REV,'step_id':REV},['photo_id','name'])

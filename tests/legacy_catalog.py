@@ -5,7 +5,7 @@ Outputs: only that version's migration chain. Never fake an old catalog by lower
 user_version on current tables or invoking current domain commands before upgrade.
 """
 from lumaraw.organization import migrate_metadata
-from lumaraw.collections import migrate as collections, migrate_identities
+from lumaraw.collections import migrate as collections, migrate_identities, migrate_labels
 from lumaraw.virtual_copies import migrate as copies
 from lumaraw.stacks import migrate as stacks
 from lumaraw.capture_time import migrate as capture
@@ -35,6 +35,7 @@ from lumaraw.import_presets import migrate as import_presets
 from lumaraw.import_sequence import migrate as import_sequence
 from lumaraw.import_dates import migrate as import_dates
 from lumaraw.import_destinations import migrate as import_destinations
+from lumaraw.export_presets import migrate as export_presets
 import json
 from pathlib import Path
 from lumaraw.model import Recipe
@@ -49,7 +50,7 @@ def seed_photo(db, path):
 
 
 def migrate_to(db, version):
-    migrations = (migrate_metadata, collections, copies, stacks, migrate_identities, capture, folders, keywords, relocations, folder_sync, keyword_exports, keyword_exchange, keyword_sets, painter, orientation, develop_presets, iptc, metadata_presets, import_review, import_processing, previous_import, develop_history, before_after, snapshots, snapshot_status, import_copy, import_naming, import_backup, import_presets, import_sequence, import_dates, import_destinations)
+    migrations = (migrate_metadata, collections, copies, stacks, migrate_identities, capture, folders, keywords, relocations, folder_sync, keyword_exports, keyword_exchange, keyword_sets, painter, orientation, develop_presets, iptc, metadata_presets, import_review, import_processing, previous_import, develop_history, before_after, snapshots, snapshot_status, import_copy, import_naming, import_backup, import_presets, import_sequence, import_dates, import_destinations, migrate_labels, export_presets)
     if not 0 <= version <= len(migrations):
         raise ValueError('Unsupported legacy fixture version')
     for migration in migrations[:version]:

@@ -3,7 +3,8 @@
 Purpose: keep UI and agents on one transactional domain boundary. Each command
 opens its own SQLite connection under a short catalog lock. Expensive pixels run
 outside that lock, in one child at a time, with sampled RSS and time limits.
-Inputs: validated API commands. Outputs: JSON, file-backed previews, durable jobs.
+Inputs: validated API commands. Outputs: JSON, file-backed previews, durable jobs,
+and revision-bound shared/catalog export preset workflows.
 Completed preview receipts are checked outside catalog locks without starting an
 image worker; source identity, revisions and cancellation still bind each reply.
 No GUI, HTTP listener, telemetry or original-file writes. Interrupted exports are
@@ -77,6 +78,8 @@ class Service:
         self.develop_presets=DevelopPresets(self,presets_root)
         from .metadata_presets import MetadataPresets
         self.metadata_presets=MetadataPresets(self,presets_root)
+        from .export_presets import ExportPresets
+        self.export_presets=ExportPresets(self,presets_root)
         from .import_runner import ImportRunner
         from .import_review import ImportReview
         self.import_review=ImportRunner(self)
@@ -158,6 +161,8 @@ class Service:
                         'get_filename_template':domain.read,'save_filename_template':domain.save,'delete_filename_template':domain.delete}[method](**p)
         if method in ('list_metadata_presets','get_metadata_preset','save_metadata_preset','metadata_preset_action','apply_metadata_preset'):
             return self.metadata_presets.dispatch(method,p)
+        if method in ('list_export_presets','get_export_preset','save_export_preset','export_preset_action'):
+            return self.export_presets.dispatch(method,p)
         if method in ('list_develop_presets','get_develop_preset','save_develop_preset','develop_preset_action','apply_develop_preset'):
             return self.develop_presets.dispatch(method,p)
         if method in ('list_keyword_sets','get_keyword_set','save_keyword_set','keyword_set_action','apply_keyword_set'):
