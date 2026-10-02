@@ -30,11 +30,11 @@ struct LibraryToolbar: View {
                 }
                 Menu("Add to Collection") {
                     ForEach(s.collections.filter { $0.kind == "regular" }) { collection in
-                        Button(collection.name) { Task { await s.changeMembership(collection,action:"add") } }
+                        Button(collection.name) { s.beginCollectionMembership(collection,action:"add") }
                     }
                 }
                 if let collection=s.activeCollection,collection.id == s.collectionID,["regular","quick"].contains(collection.kind) {
-                    Button("Remove from Collection") { Task { await s.changeMembership(collection,action:"remove") } }
+                    Button("Remove from Collection") { s.beginCollectionMembership(collection,action:"remove") }
                 }
             }.disabled(s.selection.isEmpty)
             Spacer()

@@ -207,7 +207,7 @@ struct ContentView: View {
                     .help(s.thumbnailErrors[p.id] ?? p.displayName)
                     .accessibilityElement(children:.combine).accessibilityLabel("\(p.displayName), \(p.rating) \(p.rating == 1 ? "star" : "stars")")
                     .accessibilityAddTraits(.isButton).accessibilityAction{s.choose(p.id);Task {await s.switchLibraryView(.loupe)}}
-                    .draggable(s.referenceDrag(p.id))
+                    .draggable(s.libraryPhotoDrag(p.id))
                     .contextMenu {ReferencePhotoAction(photoID:p.id);StackActions(photoID:p.id);VirtualCopyActions(photo:p);PhotoFolderAction(photo:p);PhotoKeywordShortcutActions(photoID:p.id);Divider();Button("Develop"){s.choose(p.id);Task {await s.startDevelop()}};Button("Show in Finder"){NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath:p.path)])}}
                 }
             }.padding(24).overlayPreferenceValue(PainterThumbnailAnchors.self) { anchors in

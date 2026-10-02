@@ -151,7 +151,12 @@ reference views cancel that client's work and release its frame. Independent
 physical-pixel viewports are bounded to 2048 by 1536 and pan from returned ROI
 centers. Same-photo roles remain separate because render clients and frames are
 not keyed by a shared native photo-ID dictionary. Custom in-app drag values carry
-only a session token and visible photo ID, never a path or an implicit import.
+a session token, visible anchor photo ID and an optional bounded selection,
+never paths or an implicit import. Reference/Active drops use only the anchor.
+Regular-collection drops validate the captured IDs against the current visible
+page and submit them with the target collection's captured revision. Later
+selection changes do not substitute new photos, and conflicts are never rebased
+or retried automatically. Smart collections and sets do not accept manual drops.
 
 `preview_photo(expected_revision)` now binds ordinary as well as draft previews.
 The service checks before releasing the catalog lock for image work, then checks

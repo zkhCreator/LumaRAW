@@ -60,7 +60,7 @@ gaps. Nothing below is full Lightroom parity merely because historical tests pas
 | Area | Current implementation | Remaining acceptance / work |
 | --- | --- | --- |
 | Import and catalogs | Partial: durable Add/Copy review with checked selection, Grid/Loupe source previews with on-demand Fit/100% regions and completed-preview reuse, suspected duplicates, bounded sorting/filtering, captured import-time presets and keywords, Copy destination/subfolder and flat/source/date organization with three numeric date layouts and paged destination photo counts, filename token editor and catalog-local templates with checked-sequence and catalog Import/Image numbering, byte-verified original/XMP transfers, optional original-state second copies, catalog-local saved import configurations with explicit rescans, explicit crash recovery and retained-copy cancellation, Previous Import navigation and catalog backup/restore | Move/Copy as DNG, destination-tree grouping and more date formats, numbering edge-case reference acceptance and wider EXIF/shared templates, shared/Adobe import-preset exchange and interaction acceptance, preview policies, cards/tethering, progressive Current Import, catalog switching/merge and desktop/reference acceptance |
-| Library navigation | Partial: bounded grid/filmstrip, folder tree/search/favorites/labels, durable missing-folder relocation and folder synchronization with reviewed suspected-duplicate inclusion, direct/recursive sources, filters/sorting including live snapshot status, regular/smart/Quick collections and nested sets, single/batch collection color labels and global color filtering | Multi-source selection, complete sync Import Dialog, folder move/rename, relocation overlap/collision handling, collection drag/drop, custom label names/sets and sidebar multi-selection interaction, full smart criteria/import-export, source-selection memory, desktop/reference acceptance |
+| Library navigation | Partial: bounded grid/filmstrip, folder tree/search/favorites/labels, durable missing-folder relocation and folder synchronization with reviewed suspected-duplicate inclusion, direct/recursive sources, filters/sorting including live snapshot status, regular/smart/Quick collections and nested sets, photo drops into regular collections, single/batch collection color labels and global color filtering | Multi-source selection, complete sync Import Dialog, folder move/rename, relocation overlap/collision handling, collection-node drag/drop, Quick Collection drops, custom label names/sets and sidebar multi-selection interaction, full smart criteria/import-export, source-selection memory, desktop/reference acceptance |
 | Organization | Partial: duplicate/missing detection, hierarchical keywords/synonyms/export flags/Will Export preview, text/CSV vocabulary exchange and manual person tags, custom nine-slot keyword sets/recent entries/shared or catalog storage, multi-keyword shortcuts and keyword/rating/flag/label/target-collection/rotation/Develop-preset/metadata-preset Painter strokes, independent catalog rotation/flips, title/caption/copyright plus thirty IPTC fields, selective metadata presets, labels, batch metadata, virtual copies, manual/split/capture-time scoped stacks | Keyword policy/file and preset reference acceptance, built-in sets/suggestions/undo, Painter desktop acceptance, IPTC Extension and complete metadata parity, stack interaction acceptance, rename and sidecars |
 | Culling | Partial: Loupe/Compare/Survey, linked detail, anchored page selection, Develop Reference/Active pairs with independent Fit/1:1 viewports, session lock and RGB/LAB readouts | Desktop and numerical reference acceptance, HDR readouts, scrubby/box zoom, cross-page selection, auto advance, persistent workspace state |
 | Basic development | Partial: light/WB/color, eight-band HSL and B&W Mix with photo-targeted adjustment and selective resets/sync | Calibrated absolute WB, eyedropper, texture/clarity/dehaze, Point Color, Auto B&W mix, color grading and Adobe processing/reference acceptance |
@@ -4238,8 +4238,9 @@ and bundled-guide bytes match. Build identities:
 
 The independent batch sheet differs from Adobe's sidebar multi-selection gesture.
 Custom label names/sets, full ancestor-path disambiguation for repeated parent
-names, collection drag/drop, remaining smart criteria/exchange and Adobe desktop
-reference acceptance remain open. The macOS 14 runtime, current desktop input,
+names, collection-node drag/drop, remaining smart criteria/exchange and Adobe desktop
+reference acceptance remain open. Photo drops into regular collections are added
+in the later increment below. The macOS 14 runtime, current desktop input,
 VoiceOver and official MCP SDK were not tested; desktop automation was not retried.
 This module does not complete the overall Lightroom parity inventory.
 
@@ -4698,3 +4699,48 @@ verification matched. The app targets macOS 14 and was checked on macOS 26.6.2.
 macOS 14 runtime, desktop input, VoiceOver and Lightroom reference acceptance
 remain unverified; desktop automation was not retried. This change reduces
 catalog work and does not change image processing or complete Lightroom parity.
+
+### Photo drops into regular collections
+
+The Mac Grid and filmstrip now share a session-scoped photo drag value with the
+existing Reference/Active targets. In Grid, dragging a selected photo captures
+the valid visible selection, bounded to sixty IDs. An unselected anchor or a
+photo outside Grid carries only that anchor. Regular collection rows accept
+the captured IDs with their displayed collection revision; existing memberships,
+photo edits and original files are preserved. Menu membership actions also capture
+their existing selection scope before scheduling asynchronous work.
+
+A collection drop rejects foreign sessions, malformed ID lists and photos no
+longer on the visible page. A later selection-only change does not substitute
+different photos. Stale collection revisions fail visibly without refreshing a
+token and replaying the mutation. Reference/Active targets continue to consume
+only the anchor, including legacy single-photo values. No new engine API, catalog
+migration or image work is introduced; generation 53 / schema 37 / 149 contracts
+remain unchanged.
+
+Adobe documents [adding photos by dragging them into a collection](https://helpx.adobe.com/lightroom-classic/desktop/organize-photos-in-lightroom-classic/photo-collections.html)
+as a membership copy; moving between collections requires a separate removal.
+This increment covers regular-collection photo addition. Quick Collection drops,
+collection-node reparenting by drag, manual photo ordering and complete desktop
+gesture/reference acceptance remain open. Smart collections and sets are not
+manual photo-drop targets. Existing menu actions remain available.
+
+The unchanged collection, identity, label, stack and Reference service contracts
+passed **41 focused Python tests in 7.16 s**. The portable engine source identity
+is unchanged from the preceding 1,023-test actual-Metal/real-NEF checkpoint;
+that full result is retained as prior evidence, not reported as a new full run.
+
+The rebuilt Mac application passed **125 native assertions**: Collection Drop 15,
+Collections 42, Reference 52 and Responsiveness 16. Drop checks use the packaged
+service to verify exact membership and preserved photographic state/original
+bytes. They exercise sixty-ID capture, legacy JSON decoding, current-page
+invalidation, selection changes before a scheduled Task runs, regular-only
+admission and stale target rejection without retry. The inspected offscreen
+regular-collection row retains its readable name, parent context and color mark;
+this is layout evidence, not mouse drag or hover acceptance.
+
+All **149 MCP schemas**, source/client/broker identity, bundled guide bytes and
+deep strict ad-hoc signature verification matched. The build targets macOS 14 and
+was checked on macOS 26.6.2. macOS 14 runtime, desktop gestures, VoiceOver and
+Lightroom reference acceptance remain unverified; desktop automation was not
+retried. No new desktop latency or processing-performance claim is made.

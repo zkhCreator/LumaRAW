@@ -108,8 +108,11 @@ import Foundation
             try check(s.referenceRenderer.generation==beforeGeneration,"active_before_toggle_does_not_render_reference")
             s.setComparisonMode(.after)
             let drag=s.referenceDrag(2)
-            try check(s.canDropReference([drag]) && !s.canDropReference([drag,drag]) && !s.canDropReference([CatalogPhotoDrag(session:"foreign",photoID:2)]) && !s.canDropReference([s.referenceDrag(999)]),"drops_are_single_visible_photos_from_same_session")
-            try check(s.dropReference([drag],active:true),"active_drop_is_accepted")
+            let multiSelectionAnchor=CatalogPhotoDrag(session:drag.session,photoID:drag.photoID,photoIDs:[2,3])
+            try check(s.canDropReference([drag]) && s.canDropReference([multiSelectionAnchor]),
+                "reference_drop_keeps_photo_id_anchor_with_multi_photo_payload")
+            try check(!s.canDropReference([drag,drag]) && !s.canDropReference([CatalogPhotoDrag(session:"foreign",photoID:2)]) && !s.canDropReference([s.referenceDrag(999)]),"drops_are_single_visible_photos_from_same_session")
+            try check(s.dropReference([multiSelectionAnchor],active:true),"active_drop_is_accepted")
             try await activeReady(2)
             try check(s.referencePhoto?.id==1,"active_drop_keeps_reference")
             try check(s.dropReference([s.referenceDrag(3)],active:false),"reference_drop_is_accepted")

@@ -54,8 +54,37 @@ extension Store {
         } catch { self.error=error.localizedDescription; return false }
     }
 
-    func changeMembership(_ collection: LibraryCollection, action: String, ids requested: [Int]?=nil) async {
-        let ids=requested ?? selection.sorted()
+    func libraryPhotoDrag(_ id: Int) -> CatalogPhotoDrag {
+        guard workspace == "library", !develop, libraryView == .grid, selection.contains(id) else {
+            return CatalogPhotoDrag(session: referenceDragSession, photoID: id)
+        }
+        let ids = photos.map(\.id).filter(selection.contains).sorted()
+        guard ids.contains(id), !ids.isEmpty, ids.count <= 60 else {
+            return CatalogPhotoDrag(session: referenceDragSession, photoID: id)
+        }
+        return CatalogPhotoDrag(session: referenceDragSession, photoID: id, photoIDs: ids)
+    }
+
+    func canDropInCollection(_ drag: CatalogPhotoDrag, to collection: LibraryCollection) -> Bool {
+        guard workspace == "library", collection.kind == "regular" else { return false }
+        return drag.isValid(session: referenceDragSession, visiblePhotoIDs: Set(photos.map(\.id)))
+    }
+
+    @discardableResult
+    func beginCollectionDrop(_ drag: CatalogPhotoDrag, to collection: LibraryCollection) -> Task<Void, Never>? {
+        guard canDropInCollection(drag, to: collection) else { return nil }
+        let ids = drag.resolvedPhotoIDs
+        return Task { await changeMembership(collection, action: "add", ids: ids) }
+    }
+
+    @discardableResult
+    func beginCollectionMembership(_ collection: LibraryCollection, action: String, ids requested: [Int]? = nil) -> Task<Void, Never>? {
+        let ids = requested ?? selection.sorted()
+        guard !ids.isEmpty else { return nil }
+        return Task { await changeMembership(collection, action: action, ids: ids) }
+    }
+
+    func changeMembership(_ collection: LibraryCollection, action: String, ids: [Int]) async {
         guard !ids.isEmpty else { return }
         do {
             _=try await Backend.call("collection_membership", ["collection_id":collection.id,

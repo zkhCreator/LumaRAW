@@ -133,13 +133,14 @@ struct CollectionTreeRow: View {
     let collection: LibraryCollection
     var allowsExpansion=true
     @State private var deleting=false
+    @State private var dropTargeted=false
     var body: some View {
         Group {
             if collection.kind == "set",allowsExpansion {
                 DisclosureGroup(isExpanded:Binding(get:{s.expandedCollections.contains(collection.id)},set:{ value in
                     if value { s.expandCollection(collection.id) } else { s.collapseCollection(collection.id) }
                 })) { AnyView(CollectionBranch(parent:collection.id)) } label: { openButton }
-            } else { openButton }
+            } else { openCollectionButton }
         }
         .contextMenu {
             Button("Edit / Move…") { s.editCollection(collection) }
@@ -153,8 +154,8 @@ struct CollectionTreeRow: View {
                 Button(s.collectionState?.target.id == collection.id ? "Reset Target to Quick Collection":"Set as Target Collection") {
                     Task { await s.setTargetCollection(s.collectionState?.target.id == collection.id ? nil:collection) }
                 }
-                Button("Add Selected Photos") { Task { await s.changeMembership(collection,action:"add") } }.disabled(s.selection.isEmpty)
-                Button("Remove Selected Photos") { Task { await s.changeMembership(collection,action:"remove") } }.disabled(s.selection.isEmpty)
+                Button("Add Selected Photos") { s.beginCollectionMembership(collection,action:"add") }.disabled(s.selection.isEmpty)
+                Button("Remove Selected Photos") { s.beginCollectionMembership(collection,action:"remove") }.disabled(s.selection.isEmpty)
             }
             Button("Delete…",role:.destructive) { deleting=true }
         }
@@ -185,6 +186,23 @@ struct CollectionTreeRow: View {
             .help("Open \(collection.name) · \(collection.colorLabel == "none" ? "No color label":"\(collection.colorLabel.capitalized) color label")")
             .accessibilityLabel("\(collection.name), \(collection.kind), \(collection.colorLabel == "none" ? "no color label":"\(collection.colorLabel.capitalized) color label")")
             .accessibilityValue(allowsExpansion ? "":collection.parentName.map { "In \($0)" } ?? "Top Level")
+    }
+
+    @ViewBuilder var openCollectionButton: some View {
+        if collection.kind == "regular" {
+            openButton
+                .dropDestination(for: CatalogPhotoDrag.self) { items, _ in
+                    guard items.count == 1,
+                          s.beginCollectionDrop(items[0], to: collection) != nil else { return false }
+                    return true
+                } isTargeted: { dropTargeted = $0 }
+                .background(dropTargeted ? Color.accentColor.opacity(0.14) : Color.clear,
+                            in: RoundedRectangle(cornerRadius: 6))
+                .help("Open \(collection.name) or drop photos to add them")
+                .accessibilityHint("Drop photos from the current Library page to add them. Add Selected Photos remains available in the context menu.")
+        } else {
+            openButton
+        }
     }
 }
 

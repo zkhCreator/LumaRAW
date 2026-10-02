@@ -5,15 +5,6 @@
 // pixels follow saved catalog edits; active selection never retargets the reference.
 // SQL, image processing and persistent photographic state remain in the engine.
 import SwiftUI
-import UniformTypeIdentifiers
-
-struct CatalogPhotoDrag:Codable,Transferable {
-    let session:String
-    let photoID:Int
-    static var transferRepresentation:some TransferRepresentation {
-        CodableRepresentation(contentType:UTType(exportedAs:"local.lumaraw.catalog-photo",conformingTo:.data))
-    }
-}
 
 enum ReferenceLayout {
     static func unitPoint(_ point:CGPoint,pixels:CGSize,available:CGSize,detail:Bool,scale:Double)->CGPoint? {

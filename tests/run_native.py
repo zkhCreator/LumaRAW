@@ -22,6 +22,7 @@ def main():
     parser.add_argument('--work',type=Path,required=True)
     parser.add_argument('--engine',type=Path,default=Path(sys.executable).with_name('lumaraw'))
     suites=('NativeStateRegression','NativeLibraryRegression','NativeSelectionRegression','NativeReviewRegression','NativeThumbnailRegression','NativeCollectionRegression','NativeVirtualCopyRegression','NativeConnectionRegression','NativeStackRegression','NativeAutoStackRegression','NativeFolderRegression','NativeKeywordRegression','NativeFolderRelocationRegression','NativeFolderSyncRegression','NativeExportMetadataRegression','NativeExportPresetRegression','NativePreviousExportRegression','NativeExportBatchRegression','NativeKeywordDetailsRegression','NativeKeywordVocabularyRegression','NativeKeywordExchangeRegression','NativeKeywordSetRegression','NativePainterRegression')
+    suites+=('NativeCollectionDropRegression',)
     suites+=('NativePainterKeywordPickerRegression',)
     suites+=('NativeTargetPainterRegression',)
     suites+=('NativeOrientationRegression',)
@@ -102,7 +103,7 @@ def main():
         subprocess.run(['xcrun','swiftc','-swift-version','5','-parse-as-library',
             '-target','arm64-apple-macosx14.0','-module-cache-path',str(work/'module-cache'),
             *map(str,sources),str(root/'tests'/f'{suite}.swift'),'-o',str(executable)],check=True)
-        suite_paths=paths if suite in ('NativeSelectionRegression','NativeReviewRegression','NativeThumbnailRegression','NativeCollectionRegression','NativeVirtualCopyRegression','NativeStackRegression','NativeAutoStackRegression','NativeFolderRegression','NativeKeywordRegression','NativeFolderRelocationRegression','NativeFolderSyncRegression','NativePainterRegression','NativeTargetPainterRegression','NativeOrientationRegression','NativeDevelopPresetRegression','NativeMetadataPresetRegression','NativeImportRegression','NativeImportProcessingRegression','NativePreviousImportRegression','NativeExportBatchRegression') else paths[:2]
+        suite_paths=paths if suite in ('NativeSelectionRegression','NativeReviewRegression','NativeThumbnailRegression','NativeCollectionRegression','NativeCollectionDropRegression','NativeVirtualCopyRegression','NativeStackRegression','NativeAutoStackRegression','NativeFolderRegression','NativeKeywordRegression','NativeFolderRelocationRegression','NativeFolderSyncRegression','NativePainterRegression','NativeTargetPainterRegression','NativeOrientationRegression','NativeDevelopPresetRegression','NativeMetadataPresetRegression','NativeImportRegression','NativeImportProcessingRegression','NativePreviousImportRegression','NativeExportBatchRegression') else paths[:2]
         env={**os.environ,'LUMARAW_ENGINE':str(args.engine.resolve()),
             'LUMARAW_CATALOG':str(work/'catalogs'/suite),'LUMARAW_TEST_FIXTURES':'|'.join(suite_paths),
             'LUMARAW_PRESETS_ROOT':str(work/'presets'/suite)}

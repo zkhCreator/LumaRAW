@@ -2,6 +2,24 @@
 
 All probes use explicit read-only input photographs and new disposable catalog/output directories. They never use a personal photo library by default.
 
+## Native collection photo drops
+
+`NativeCollectionDropRegression` exercises captured visible-page photo drags,
+regular-collection admission, rejected foreign/malformed/stale-page payloads,
+selection changes after capture and stale collection revisions through the real
+packaged service. Keep original bytes, photographic state and existing memberships
+unchanged while adding the captured IDs. The Reference suite checks that its
+single-anchor behavior is preserved when the shared payload includes a selection.
+Do not infer mouse drag recognition, hover feedback or VoiceOver behavior from
+state checks or offscreen snapshots; those require desktop acceptance separately.
+
+```sh
+.venv/bin/python tests/run_native.py --work work/new-collection-drop-native \
+  --engine /absolute/LumaRAW.app/Contents/Resources/Engine/LumaRAWEngine \
+  --suite NativeCollectionDropRegression --suite NativeCollectionRegression \
+  --suite NativeReferenceRegression --suite NativeResponsivenessRegression
+```
+
 ## Multiple-preset export batches
 
 `test_export_batch.py` covers captured shared/catalog preset revisions, individual

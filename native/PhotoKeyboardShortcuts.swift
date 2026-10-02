@@ -15,11 +15,12 @@ struct PhotoKeyboardShortcuts: ViewModifier {
             guard press.modifiers == .shift,s.keywordShortcut?.ids.isEmpty == false else { return .ignored }
             s.applyKeywordShortcut();return .handled
         }.onKeyPress(.delete) {
-            guard !s.actionPhotoIDs.isEmpty else { return .ignored }
+            let ids=s.actionPhotoIDs
+            guard !ids.isEmpty else { return .ignored }
             if let collection=s.activeCollection,collection.id == s.collectionID,
                ["regular","quick"].contains(collection.kind) {
-                Task { await s.changeMembership(collection,action:"remove",ids:s.actionPhotoIDs) }
-            } else if s.photos.filter({s.actionPhotoIDs.contains($0.id)}).allSatisfy(\.isVirtual) {
+                s.beginCollectionMembership(collection,action:"remove",ids:ids)
+            } else if s.photos.filter({ids.contains($0.id)}).allSatisfy(\.isVirtual) {
                 Task { await s.prepareCopyRemoval() }
             } else { return .ignored }
             return .handled
