@@ -243,8 +243,17 @@ always excluded. Unknown capture metadata never falls back to modification time.
 
 `preview_import_item` takes plan/item IDs, captured `expected_revision`, your own
 `client_id` and monotonically increasing `generation`. It returns a file-backed
-thumbnail or, with `detail: true`, a fitted 1600-pixel preview. Previewing does not
-create a photo. Cancel only your own preview generations through `cancel_preview`.
+thumbnail or, with `detail: true`, a fitted 1600-pixel preview. For a true 1:1
+region, also pass `viewport: {cx, cy, width, height}` with all four fields.
+Centers are normalized 0–1; physical pixel dimensions are 1–2048 by 1–1536.
+A viewport requires explicit `detail: true`. The reply's `width/height` describe
+the output PNG; `full_width/full_height` describe the cropped full-resolution
+canvas for ROI replies, and `roi` gives its actual clamped `[x,y,width,height]`.
+Compute subsequent pans from that actual region, not the unclamped requested center.
+Exact Fit/ROI repeats may return `preview_cache_hit=true` with no worker/GPU work;
+they retain source, asset, plan revision and cancellation checks. Previewing does
+not create a photo or configure import preview policies. Cancel only your own
+preview generations through `cancel_preview`.
 
 `apply_import(plan_id, expected_revision)` verifies selected originals/sidecars
 and scanned directories, then imports the checked eligible rows atomically. Read

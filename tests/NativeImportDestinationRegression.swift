@@ -2,6 +2,7 @@
 // Inputs: five runner photographs expanded into source folders, plus an isolated
 // catalog and packaged Backend IPC. Outputs: page/count assertions and an offscreen
 // sheet snapshot with long Unicode paths. Desktop UI interaction is NOT_VERIFIED.
+// Path-length coverage uses the fixture's relative UTF-8 bytes, independent of checkout/work paths.
 import AppKit
 import Foundation
 import SwiftUI
@@ -101,7 +102,10 @@ import SwiftUI
                 && (folders.backup?.subfolder.hasPrefix("Imported on ") ?? false)
                 && folders.backup?.photoCount == sources.count,
                 "backup_count_is_separate_from_main_checked_photo_count")
-            try check(folders.items.contains(where: { $0.path.count > 180 && $0.path.contains("旅行🌄") }),
+            try check(folders.items.contains(where: {
+                $0.relativePath.utf8.count > 180 && $0.path.contains("旅行🌄")
+                    && $0.path == destination.appendingPathComponent($0.relativePath).path
+            }),
                 "folder_rows_retain_long_unicode_absolute_paths")
 
             let emptyCursor = try await Backend.call("get_import_destinations", [

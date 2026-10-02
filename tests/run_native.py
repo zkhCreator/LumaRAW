@@ -13,7 +13,7 @@ import subprocess
 import sys
 import time
 
-from PIL import Image
+from PIL import Image, ImageDraw
 from lumaraw.bridge import endpoint
 
 
@@ -35,6 +35,7 @@ def main():
     suites+=('NativeImportSequenceRegression',)
     suites+=('NativeImportDateRegression',)
     suites+=('NativeImportDestinationRegression',)
+    suites+=('NativeImportLoupeRegression',)
     suites+=('NativePreviousImportRegression',)
     suites+=('NativeColorMixerRegression',)
     suites+=('NativePointCurveRegression',)
@@ -69,7 +70,15 @@ def main():
             if suite in ('NativeFolderRegression','NativeFolderRelocationRegression','NativeFolderSyncRegression'):
                 path=fixtures / ('Parent/direct.png','Parent/child/a.png','Parent/child/b.png','Elsewhere/c.png','Elsewhere/d.png')[index]
                 path.parent.mkdir(parents=True,exist_ok=True)
-            if suite=='NativeAutoStackRegression':
+            if suite=='NativeImportLoupeRegression':
+                picture=Image.new('RGB',(2400,1800));draw=ImageDraw.Draw(picture)
+                for y in range(0,1800,100):
+                    for x in range(0,2400,100):
+                        fill=((x//100*11+index*37)%256,(y//100*15+index*19)%256,((x+y)//100*7)%256)
+                        draw.rectangle((x,y,x+99,y+99),fill=fill,outline='white',width=2)
+                        draw.text((x+8,y+8),f'{x},{y}',fill='white',stroke_width=1,stroke_fill='black')
+                picture.save(path)
+            elif suite=='NativeAutoStackRegression':
                 path=path.with_suffix('.jpg');exif=Image.Exif()
                 second,fraction=((0,'9'),(1,'1'),(2,'0'),(2,'3'),(4,'0'))[index]
                 exif[34665]={36867:f'2026:09:26 12:00:{second:02d}',37521:fraction,36881:'+00:00'}
@@ -90,7 +99,7 @@ def main():
             'LUMARAW_PRESETS_ROOT':str(work/'presets'/suite)}
         if suite=='NativeReferenceRegression':env['LUMARAW_TEST_FIXTURES']='|'.join(paths)
         if suite=='NativeImportNamingRegression':env['LUMARAW_TEST_FIXTURES']='|'.join(paths)
-        if suite in ('NativeImportBackupRegression','NativeImportPresetRegression','NativeImportSequenceRegression','NativeImportDateRegression','NativeImportDestinationRegression'):env['LUMARAW_TEST_FIXTURES']='|'.join(paths)
+        if suite in ('NativeImportBackupRegression','NativeImportPresetRegression','NativeImportSequenceRegression','NativeImportDateRegression','NativeImportDestinationRegression','NativeImportLoupeRegression'):env['LUMARAW_TEST_FIXTURES']='|'.join(paths)
         if suite=='NativeResponsivenessRegression':env['LUMARAW_TEST_FIXTURES']='|'.join(paths)
         if suite=='NativeTransportRegression':
             relay=fixtures/'native-relay'

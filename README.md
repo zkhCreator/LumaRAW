@@ -80,6 +80,13 @@ next import; it does not guess old batch membership from timestamps.
 Interrupted scans resume explicitly. Changed sources/sidecars or catalog conflicts
 reject application without partial catalog changes.
 
+Import **Loupe** offers **Fit** and **100%**. At 100%, an image pixel maps to a
+physical display pixel; drag to inspect another region without importing the
+photo. Full-resolution rendering is bounded to the visible region, while the
+first RAW request still decodes the original. Repeating an unchanged Fit or
+region can reuse a completed preview. This is on-demand review, not an import
+policy that prebuilds every photo's 1:1 preview.
+
 **Import Presets…** saves the current ready review's method, duplicate/subfolder
 policy, destinations, filename settings, captured Develop/metadata settings and
 keywords. Presets are catalog-local and support Save Current as New, Update,

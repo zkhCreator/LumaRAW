@@ -7,6 +7,7 @@
 // Preset choices are revision-bound; explicit rescans atomically replace ready plans.
 // Counter-dependent naming stays bound to the sequence revision captured by the plan.
 // Date-folder format is a separate captured Copy option; legacy presets default to year/date.
+// Focused Loupe requests are generation-bound, with Import-local Fit and 1:1 viewport state.
 import AppKit
 import Foundation
 
@@ -82,7 +83,8 @@ struct ImportItem: Identifiable {
     @Published var previewErrors: [Int:String]=[:]
     @Published var focused: Int?
     @Published var loupe=false
-    @Published var detail: NSImage?
+    @Published var loupeViewport=ImportLoupeViewport()
+    @Published var detailFrame: ImportLoupeFrame?
     @Published var detailLoading=false
     @Published var detailError: String?
     @Published var processingEditor: ImportProcessingEditor?
@@ -94,30 +96,48 @@ struct ImportItem: Identifiable {
     private let detailClient=UUID().uuidString
     private var previewGeneration=0
     private var detailGeneration=0
+    private var loupeWidthPixels=0
+    private var loupeHeightPixels=0
+    private var loupeDisplayScale=1.0
+    private var loupeResizeInvalidated=false
     private var readGeneration=0
     private var previewTask: Task<Void,Never>?
     private var detailTask: Task<Void,Never>?
     private var closed=false
     private var delivered: Set<Int>=[]
+    private let detailCall: (String,[String:Any]) async throws -> [String:Any]
     var onApplied: ((Int)->Void)?
     var canScan: Bool { !busy && !loading && plan?.interruptedCopy != true && (plan == nil || plan?.active == false || ["planning","interrupted"].contains(plan?.state ?? "")) }
     var canApply: Bool { !busy && !loading && plan?.ready == true && (plan?.number("selected_count") ?? 0)>0 }
     var canResumeCopy: Bool { !busy && !loading && plan?.interruptedCopy == true }
-    init(sources: [String]=[]) { self.sources=sources }
+    init(sources: [String]=[],detailCall: @escaping (String,[String:Any]) async throws -> [String:Any] = Backend.call) {
+        self.sources=sources;self.detailCall=detailCall
+    }
 
     func receive(_ result: [String:Any]) {
         guard !closed,let values=result["plan"] as? [String:Any] else { return }
         let next=ImportPlan(values:values)
+        let previousFocus=focused
+        var discardDetail=false
         if let previous=plan,previous.id == next.id {
             guard next.revision>=previous.revision else { return }
             if next.revision == previous.revision && next.number("checked")<previous.number("checked") { return }
             let oldKey=(previous.values["processing"] as? [String:Any])?["develop_key"] as? String
             let newKey=(next.values["processing"] as? [String:Any])?["develop_key"] as? String
-            if oldKey != newKey { images=[:];detail=nil }
+            if oldKey != newKey { images=[:];discardDetail=true }
+            if next.revision != previous.revision { discardDetail=true }
+        } else if plan?.id != next.id || plan?.revision != next.revision {
+            discardDetail=true
         }
         plan=next;items=(result["items"] as? [[String:Any]] ?? []).compactMap(ImportItem.init)
         total=result["total"] as? Int ?? 0;offset=result["offset"] as? Int ?? 0
         if !items.contains(where:{$0.id == focused}) { focused=items.first?.id }
+        if previousFocus != focused {
+            loupeViewport=ImportLoupeViewport()
+            discardDetail=true
+        }
+        if !next.ready { discardDetail=true }
+        if discardDetail { discardLoupeFrame() }
         if next.state == "applied",delivered.insert(next.id).inserted { onApplied?(next.number("imported")) }
     }
 
@@ -305,27 +325,110 @@ struct ImportItem: Identifiable {
     }
 
     func focus(_ item: ImportItem,detail: Bool=false) {
+        if focused != item.id { loupeViewport=ImportLoupeViewport() }
         focused=item.id;if detail { loupe=true };refreshDetail()
     }
 
+    var currentLoupeRequest: ImportLoupeRequest? {
+        guard let plan,let item=items.first(where:{$0.id == focused}),plan.ready,
+              !["pending","error"].contains(item.state) else { return nil }
+        let oneToOne=loupeViewport.zoom == 1
+        if oneToOne && (loupeWidthPixels<=0 || loupeHeightPixels<=0) { return nil }
+        return ImportLoupeRequest(planID:plan.id,revision:plan.revision,itemID:item.id,source:item.path,
+            viewport:loupeViewport,width:oneToOne ? loupeWidthPixels:0,height:oneToOne ? loupeHeightPixels:0)
+    }
+
+    var currentLoupeFrame: ImportLoupeFrame? {
+        guard let request=currentLoupeRequest,let frame=detailFrame,frame.request == request else { return nil }
+        return frame
+    }
+
+    var loupePixelSize: (width:Int,height:Int) { (loupeWidthPixels,loupeHeightPixels) }
+
+    func setLoupeViewportSize(_ size: CGSize,displayScale: Double) {
+        let scale=displayScale.isFinite && displayScale>0 ? displayScale:1
+        let width=max(1,min(2048,Int((Double(size.width)*scale).rounded())))
+        let height=max(1,min(1536,Int((Double(size.height)*scale).rounded())))
+        let pixelSizeChanged=width != loupeWidthPixels || height != loupeHeightPixels
+        if !pixelSizeChanged && scale == loupeDisplayScale {
+            if loupeResizeInvalidated { loupeResizeInvalidated=false;if loupeViewport.zoom == 1 { refreshDetail() } }
+            return
+        }
+        loupeWidthPixels=width;loupeHeightPixels=height;loupeDisplayScale=scale
+        let needsRender=loupeResizeInvalidated
+        loupeResizeInvalidated=false
+        if (pixelSizeChanged || needsRender) && loupeViewport.zoom == 1 { refreshDetail() }
+    }
+
+    func invalidateLoupeViewportForResize() {
+        guard loupeViewport.zoom == 1 else { return }
+        detailGeneration+=1;let token=detailGeneration;detailTask?.cancel();detailTask=nil
+        detailFrame=nil;detailError=nil;detailLoading=false
+        guard !loupeResizeInvalidated else { return }
+        loupeResizeInvalidated=true
+        Task { _=try? await detailCall("cancel_preview",["client_id":detailClient,"generation":token]) }
+    }
+
+    func setLoupeZoom(_ zoom: Double) {
+        let value=zoom >= 0.5 ? 1.0:0.0
+        guard value != loupeViewport.zoom else { return }
+        loupeViewport.zoom=value
+        refreshDetail()
+    }
+
+    func finishLoupePan(_ translation: CGSize,displayScale: Double,from request: ImportLoupeRequest) {
+        guard request.viewport.zoom == 1,request == currentLoupeRequest,
+              let frame=detailFrame,frame.request == request,let roi=frame.roi,
+              frame.fullWidth>0,frame.fullHeight>0 else { return }
+        let scale=displayScale.isFinite && displayScale>0 ? displayScale:loupeDisplayScale
+        let x=(roi.x+roi.width/2)/Double(frame.fullWidth)
+            - Double(translation.width)*scale/(request.viewport.zoom*Double(frame.fullWidth))
+        let y=(roi.y+roi.height/2)/Double(frame.fullHeight)
+            - Double(translation.height)*scale/(request.viewport.zoom*Double(frame.fullHeight))
+        loupeViewport.move(
+            x:ImportLoupeViewport.clampedCenter(x,viewportPixels:request.width,fullPixels:frame.fullWidth),
+            y:ImportLoupeViewport.clampedCenter(y,viewportPixels:request.height,fullPixels:frame.fullHeight))
+        refreshDetail()
+    }
+
     func refreshDetail() {
-        detailGeneration+=1;let token=detailGeneration;detailTask?.cancel();detail=nil;detailError=nil;detailLoading=false
-        let captured=plan,item=items.first{$0.id == focused}
+        loupeResizeInvalidated=false
+        detailGeneration+=1;let token=detailGeneration;detailTask?.cancel();detailError=nil;detailLoading=false
+        detailFrame=nil
+        let captured=plan,item=items.first{$0.id == focused},request=currentLoupeRequest
         detailTask=Task { [weak self] in
             guard let self else { return }
-            _=try? await Backend.call("cancel_preview",["client_id":detailClient,"generation":token])
-            guard loupe,!closed,let captured,captured.ready,let item,!["pending","error"].contains(item.state) else { return }
+            _=try? await detailCall("cancel_preview",["client_id":detailClient,"generation":token])
+            guard loupe,!closed,let captured,captured.ready,let item,let request,
+                  request == currentLoupeRequest else { return }
             detailLoading=true
             defer { if token == detailGeneration { detailLoading=false } }
             do {
-                let result=try await Backend.call("preview_import_item",["plan_id":captured.id,"item_id":item.id,
-                    "expected_revision":captured.revision,"client_id":detailClient,"generation":token,"detail":true])
+                var params=request.params
+                params["client_id"]=detailClient;params["generation"]=token
+                let result=try await detailCall("preview_import_item",params)
                 guard !Task.isCancelled,!closed,token == detailGeneration else { return }
+                guard result["plan_id"] as? Int == captured.id,result["item_id"] as? Int == item.id,
+                      result["revision"] as? Int == captured.revision,result["source"] as? String == item.path,
+                      request == currentLoupeRequest else {
+                    throw EngineFailure(message:"The import preview no longer matches this review")
+                }
                 let loaded=await PreviewImageLoader.load(result["preview"] as? String)
                 guard !Task.isCancelled,!closed,token==detailGeneration else {return}
-                self.detail=loaded
+                guard request == currentLoupeRequest,let loaded,
+                      let frame=ImportLoupeFrame(result:result,image:loaded,request:request) else {
+                    throw EngineFailure(message:"The import preview frame is invalid")
+                }
+                detailFrame=frame
             } catch { if token == detailGeneration,!closed { detailError=error.localizedDescription } }
         }
+    }
+
+    private func discardLoupeFrame() {
+        loupeResizeInvalidated=false
+        detailGeneration+=1;let token=detailGeneration;detailTask?.cancel();detailTask=nil
+        detailFrame=nil;detailError=nil;detailLoading=false
+        Task { _=try? await detailCall("cancel_preview",["client_id":detailClient,"generation":token]) }
     }
 
     private func stopPreviews() {

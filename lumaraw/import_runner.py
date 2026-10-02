@@ -1,12 +1,15 @@
 """Responsive filesystem/preview orchestration for durable import reviews.
 
-Inputs: explicit paths, plan/item revisions and cancellation generations. Outputs:
-bounded scan pages, file-backed previews and catalog-only import receipts. File
-and sidecar I/O runs outside catalog locks. One directory iterator survives pages;
-restart replays into unique staging rows. Copy I/O is delegated to its journalled
-adapter; this module never writes originals or replays an uncertain application.
+Inputs: explicit paths, plan/item revisions, viewport requests and cancellation
+generations. Outputs: bounded scan pages, fitted or 1:1 file-backed previews and
+catalog-only import receipts. File and sidecar I/O runs outside catalog locks.
+Completed previews use the shared integrity-checked cache; misses use the bounded
+image worker. One directory iterator survives pages; restart replays into unique
+staging rows. Copy I/O is delegated to its journalled adapter; this module never
+writes originals or replays an uncertain application.
 """
 import json
+import math
 from pathlib import Path
 import threading
 
@@ -84,7 +87,20 @@ class ImportRunner:
             return result
         return self.run(method,params)
 
-    def preview(self,plan_id,item_id,expected_revision,client_id,generation,detail=False):
+    def preview(self,plan_id,item_id,expected_revision,client_id,generation,detail=False,viewport=None):
+        if type(detail) is not bool:raise ValueError('detail must be an explicit boolean')
+        if viewport is not None:
+            if detail is not True:raise ValueError('A 1:1 viewport requires explicit detail=true')
+            if not isinstance(viewport,dict) or set(viewport)!={'cx','cy','width','height'}:
+                raise ValueError('A 1:1 viewport requires cx, cy, width and height')
+            for key in ('cx','cy'):
+                value=viewport[key]
+                if type(value) not in (int,float) or not math.isfinite(value) or not 0<=value<=1:
+                    raise ValueError('Viewport center coordinates must be between 0 and 1')
+            for key,maximum in (('width',2048),('height',1536)):
+                value=viewport[key]
+                if type(value) is not int or not 1<=value<=maximum:
+                    raise ValueError(f'Viewport {key} must be between 1 and {maximum}')
         admitted=self.service.dispatch('cancel_preview',{'client_id':client_id,'generation':generation})
         if admitted.get('superseded'):raise InterruptedError('Preview is superseded')
         with self.service.catalog() as catalog:
@@ -98,15 +114,30 @@ class ImportRunner:
         from .source_identity import cached_thumbnail
         from .model import Recipe
         recipe=Recipe.parse(patch) if patch else None
-        path=None if detail else cached_thumbnail(row['path'],self.service.cache,recipe=recipe)
-        if path:result={'thumbnail':path,'cache_hit':True,'worker_spawned':False}
-        else:
-            result=self.service.run_worker({'operation':'preview' if detail else 'thumbnail','path':row['path'],
-                'recipe':patch,'kind':'developed' if patch else 'source','max_edge':1600,
-                'include_before':False,'client_id':client_id,'generation':generation})
+        result=None
+        if not detail:
+            path=cached_thumbnail(row['path'],self.service.cache,recipe=recipe)
+            if path:result={'thumbnail':path,'cache_hit':True,'worker_spawned':False}
+        request={'operation':'preview' if detail else 'thumbnail','path':row['path'],
+            'recipe':patch,'kind':'developed' if patch else 'source',
+            'max_edge':1600,'include_before':False,'client_id':client_id,'generation':generation}
+        if detail:
+            if viewport is not None:
+                request.pop('max_edge')
+                request['detail']=dict(viewport)
+            from . import preview_cache
+            backend=self.service.compute_backend
+            cache_key=preview_cache.key(request,self.service.worker_identity,backend)
+            result=preview_cache.load(self.service.cache,cache_key,request,backend,
+                lambda:self.service.check_preview_current(request),repair_lock=self.service.image_lock)
+            if result is not None and cache_key!=preview_cache.key(request,self.service.worker_identity,self.service.compute_backend):
+                raise ValueError('Source or rendering asset changed during preview; reload the photograph')
+        if result is None:result=self.service.run_worker(request)
+        self.service.check_preview_current(request)
         if identity(row['path'])!=expected:raise ValueError('The import source changed during preview')
         with self.service.catalog() as catalog:
             ImportReview(catalog).item(plan_id,item_id,expected_revision)
+        self.service.check_preview_current(request)
         return {**result,'plan_id':plan_id,'item_id':item_id,'revision':expected_revision,'source':row['path']}
 
     def run(self,method,params):

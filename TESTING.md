@@ -1340,3 +1340,39 @@ bounds SQLite work so an individual checkbox cannot recount the whole review.
 Record first/warm times, VM steps, reply bytes and RSS
 sampled every 5 ms. New connections retain warm OS caches from seeding; there are
 no real photos, image dimensions, pixels, GPU work, IPC or desktop frames timed.
+
+## Import Loupe full-resolution regions
+
+`tests/test_import_loupe.py` validates the explicit `detail=true` plus complete
+`viewport` contract, legacy thumbnail/Fit behavior, pixel-coordinate crop results,
+edge clamps, small images and captured Develop settings. Cache reuse must avoid a
+new worker even while image work is occupied. Both cache-hit and newly rendered
+paths must reject changed source, plan revision or cancellation generation.
+
+`NativeImportLoupeRegression` receives five generated 2400 x 1800 PNGs with labeled
+100-pixel color-grid cells. It exercises Fit and 100% physical display scaling,
+pan/edge positions, stale frames/gestures, source safety and offscreen layout.
+These images establish viewport mechanics, not camera color or Adobe pixel parity.
+Offscreen PNGs do not establish desktop drag, keyboard or VoiceOver acceptance.
+
+```sh
+.venv/bin/python tests/run_native.py --work work/new-import-loupe-native \
+  --engine /absolute/LumaRAW.app/Contents/Resources/Engine/LumaRAWEngine \
+  --suite NativeImportLoupeRegression --suite NativeImportRegression \
+  --suite NativeResponsivenessRegression
+.venv/bin/python tests/import_loupe_probe.py --work work/new-import-loupe-raw \
+  --engine /absolute/LumaRAW.app/Contents/Resources/Engine/LumaRAWEngine \
+  --fixture /absolute/nikon.NEF
+```
+
+Run the RAW probe without competing tests/builds. It uses a fresh catalog per CPU
+and Metal backend, one first request plus five exact repeats for Fit, central
+800 x 600 ROI and a panned ROI. First Fit has cold application caches; the first
+ROI populates the full-resolution linear base, and OS caches remain warm. Record
+relay elapsed time, actual dispatched tiles, exact-repeat pixel identity, CPU/
+Metal code differences, worker RSS and broker RSS sampled every 5 ms. These are
+separate peaks, not whole-app memory; native display decoding and UI frames are
+outside the measurement. The probe previews only and leaves the catalog empty.
+For a comparable Fit baseline, `--legacy-fit` omits viewport requests and requires
+every repeated Fit request to spawn work; run it against the previous packaged
+engine. Use a separate new work directory and report both executable hashes.

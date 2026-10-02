@@ -58,7 +58,7 @@ gaps. Nothing below is full Lightroom parity merely because historical tests pas
 
 | Area | Current implementation | Remaining acceptance / work |
 | --- | --- | --- |
-| Import and catalogs | Partial: durable Add/Copy review with checked selection, Grid/Loupe source previews, suspected duplicates, bounded sorting/filtering, captured import-time presets and keywords, Copy destination/subfolder and flat/source/date organization with three numeric date layouts and paged destination photo counts, filename token editor and catalog-local templates with checked-sequence and catalog Import/Image numbering, byte-verified original/XMP transfers, optional original-state second copies, catalog-local saved import configurations with explicit rescans, explicit crash recovery and retained-copy cancellation, Previous Import navigation and catalog backup/restore | Move/Copy as DNG, destination-tree grouping and more date formats, numbering edge-case reference acceptance and wider EXIF/shared templates, shared/Adobe import-preset exchange and interaction acceptance, preview policies, cards/tethering, progressive Current Import, catalog switching/merge and desktop/reference acceptance |
+| Import and catalogs | Partial: durable Add/Copy review with checked selection, Grid/Loupe source previews with on-demand Fit/100% regions and completed-preview reuse, suspected duplicates, bounded sorting/filtering, captured import-time presets and keywords, Copy destination/subfolder and flat/source/date organization with three numeric date layouts and paged destination photo counts, filename token editor and catalog-local templates with checked-sequence and catalog Import/Image numbering, byte-verified original/XMP transfers, optional original-state second copies, catalog-local saved import configurations with explicit rescans, explicit crash recovery and retained-copy cancellation, Previous Import navigation and catalog backup/restore | Move/Copy as DNG, destination-tree grouping and more date formats, numbering edge-case reference acceptance and wider EXIF/shared templates, shared/Adobe import-preset exchange and interaction acceptance, preview policies, cards/tethering, progressive Current Import, catalog switching/merge and desktop/reference acceptance |
 | Library navigation | Partial: bounded grid/filmstrip, folder tree/search/favorites/labels, durable missing-folder relocation and folder synchronization, direct/recursive sources, filters/sorting including live snapshot status, regular/smart/Quick collections and nested sets | Multi-source selection, complete sync Import Dialog/duplicate policy, folder move/rename, relocation overlap/collision handling, collection drag/drop/color labels, full smart criteria/import-export, source-selection memory, desktop acceptance |
 | Organization | Partial: duplicate/missing detection, hierarchical keywords/synonyms/export flags/Will Export preview, text/CSV vocabulary exchange and manual person tags, custom nine-slot keyword sets/recent entries/shared or catalog storage, multi-keyword shortcuts and keyword/rating/flag/label/target-collection/rotation/Develop-preset/metadata-preset Painter strokes, independent catalog rotation/flips, title/caption/copyright plus thirty IPTC fields, selective metadata presets, labels, batch metadata, virtual copies, manual/split/capture-time scoped stacks | Keyword policy/file and preset reference acceptance, built-in sets/suggestions/undo, Painter desktop acceptance, IPTC Extension and complete metadata parity, stack interaction acceptance, rename and sidecars |
 | Culling | Partial: Loupe/Compare/Survey, linked detail, anchored page selection, Develop Reference/Active pairs with independent Fit/1:1 viewports, session lock and RGB/LAB readouts | Desktop and numerical reference acceptance, HDR readouts, scrubby/box zoom, cross-page selection, auto advance, persistent workspace state |
@@ -3970,3 +3970,92 @@ The official MCP SDK, macOS 14, actual desktop interaction/VoiceOver and Lightro
 reference acceptance were not run. No desktop automation was retried. Grouped
 thumbnails, destination trees/new-folder styling and the broader non-AI scope
 remain unfinished.
+
+### Import Loupe 100% viewport and completed-preview reuse
+
+Engine generation 45 / schema 32 retains the existing import thumbnail and
+1600-pixel Fit requests and adds a complete physical-pixel viewport with explicit
+`detail=true`. The native Import Loupe offers Fit and 100%, keeps its viewport
+separate from Library, and displays a rendered pixel as one physical display pixel.
+Pan requests derive from the actual clamped ROI rather than a requested center
+outside the image. Dragging moves the current frame locally; release requests a
+new bounded region. Changed focus, plan, revision or pane geometry cannot apply
+an old drag or frame to a new photograph.
+
+The existing renderer supplies full-resolution regions no larger than 2048 x 1536,
+using captured import Develop settings. RAW decoding still loads the full source
+inside the bounded disposable worker; only the requested region is rendered for
+display. This is on-demand Import review and does not implement the separate
+Build Previews policies or persistent full-image 1:1 assets.
+
+Import Loupe previously bypassed broker-side completed-preview lookup and started
+new image work for repeated Fit requests. Both Fit and exact ROI requests now
+reuse the existing validated preview receipts before worker admission. Cache keys
+retain source, recipe/assets, engine/backend and complete render options. Cached
+and newly rendered paths recheck source identity, plan/item revision and client
+generation before returning; unchanged images do not justify accepting stale
+review state. Source thumbnails also receive the final generation check.
+
+Focused import/cache regression passed **118 tests**. The complete suite passed
+**945 tests in 108.65 s**, requiring actual Metal dispatch and the real NEF fixture,
+with no skips. Five packaged-engine native suites passed **106 assertions**:
+Loupe 14, Add/Copy 29, import processing 22, destination folders 25 and
+responsiveness 16. Coverage includes Retina physical dimensions, exact ROI edges,
+immediate reverse movement from an edge, delayed focus/resize replies, rejection
+of a drag captured before resize, changed source identity and unchanged originals.
+One pre-existing destination test depended on the length of the work-directory
+name; it now checks the generated relative path's UTF-8 length and exact joined
+path. That suite passed after correction. No engine or app change was required.
+
+The inspected offscreen 100% pane shows the generated labeled 100-pixel grid at
+the expected physical scale, readable zoom controls and clipped panning. Resize
+invalidates the current frame immediately and coalesces requests after 160 ms of
+stable geometry. These are native model/IPC and offscreen checks, not desktop
+pointer/keyboard or VoiceOver acceptance.
+
+Real-RAW measurement used the same read-only Nikon D3S NEF, **4284 x 2844**,
+**10,656,312 bytes**, on an Apple M3 Max / 128 GiB / macOS 26.6.2. Tests and builds
+were stopped before the packaged relay probe. Each backend starts a fresh catalog;
+first Fit has cold application caches, first ROI populates the full-resolution
+linear base, and storage/OS caches remain warm. Each mode has one first request
+and five exact repeats. Fit outputs 1600 x 1062; ROI outputs 800 x 600.
+
+| Backend / request | First request | Repeated median / max |
+| --- | ---: | ---: |
+| CPU / prior Fit | 1071.616 ms | 832.269 / 837.490 ms |
+| Metal / prior Fit | 899.151 ms | 640.606 / 643.178 ms |
+| CPU / cached Fit | 1071.999 ms | 7.214 / 7.660 ms |
+| Metal / cached Fit | 864.859 ms | 7.219 / 7.701 ms |
+| CPU / center ROI | 970.143 ms | 6.031 / 7.112 ms |
+| Metal / center ROI | 911.172 ms | 6.288 / 7.129 ms |
+| CPU / new panned ROI | 406.088 ms | 6.213 / 6.946 ms |
+| Metal / new panned ROI | 358.130 ms | 5.972 / 6.587 ms |
+
+The center ROI is `[1742,1122,800,600]`; the panned ROI is
+`[3113,1890,800,600]`. First Fit dispatched nine grading tiles and first ROI five,
+on the requested backend. Every candidate repeat reused its completed receipt,
+spawned no image worker and reported zero CPU/Metal grading tiles. Repeated PNG
+pixels were exact; CPU/Metal maximum 8-bit code differences were Fit 1, center 1,
+pan 0. Embedded ICC data remained present. The original hash was unchanged and
+no catalog photos were created.
+
+Broker RSS sampled every 5 ms peaked at **55.594 MiB CPU / 53.406 MiB Metal**.
+Separately reported worker RSS peaked at **331.8 MiB** for either backend; panned
+ROI workers reused the linear base and peaked at 100.4 / 106.3 MiB. These are
+separate process peaks, not whole-app memory. Timings include relay IPC and cache
+validation, exclude native image preparation and desktop drawing, and do not
+establish camera color accuracy or Adobe pixel identity. The previous engine
+SHA-256 was `43ba45e6ba91c28a611b10828756904dd0ca7abb4704bf74d009aa0145164153`.
+
+The Mac 14-target app builds without Swift warnings and passes deep/strict local
+ad-hoc signature verification. Packaged initialization, all **138 MCP schemas**,
+engine identity and the bundled guide match source. Build identities:
+
+- Source digest: `1b96fbc60d7eafebda7375b2f074f55b32a05d1ae169ed67f0564ad1b86d310f`
+- Engine SHA-256: `10b19d34d30669c9785556e6a5ca39a30cf30af9d179c0504eb7b1c913808719`
+- Native SHA-256: `46e22bf8cb5ea95b27d928e937c0c54ab8d4e73a9dcbd055829222e2c8a49ab6`
+
+The official MCP SDK, macOS 14 runtime, actual desktop interaction/VoiceOver and
+Lightroom reference acceptance were not run. Desktop automation was not retried.
+Import preview policies, offline assets and the wider non-AI parity inventory
+remain incomplete.

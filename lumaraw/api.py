@@ -1,7 +1,8 @@
 """Versioned public command contracts shared by native UI, CLI and MCP.
 
-Inputs: bounded JSON objects. Outputs: JSON schemas and validated domain commands.
-No transport, pixels or UI dependencies. IDs refer only to the selected catalog.
+Inputs: bounded JSON objects. Outputs: JSON schemas and validated domain commands,
+including bounded full-resolution import viewport requests. No transport, pixels or
+UI dependencies. IDs refer only to the selected catalog.
 Tool annotations describe effects; they never substitute for user authorization.
 """
 from .model import LIMITS, Recipe, SYNC_GROUPS, POINT_CURVE_FIELDS, PARAMETRIC_FIELDS, MIXER_FIELDS, BW_FIELDS
@@ -69,7 +70,10 @@ tool('get_filename_template','Read one saved filename token sequence at the capt
 tool('save_filename_template','Create, replace or rename a catalog-local filename template. Does not change captured import choices.',{'template_id':string(80),'name':string(120),'template':TEMPLATE_SCHEMA,'expected_revision':REV},['name','template','expected_revision'])
 tool('delete_filename_template','Delete a saved filename template at its library revision; captured import choices are preserved.',{'template_id':string(80),'expected_revision':REV},['template_id','expected_revision'])
 TOOLS['delete_filename_template']['annotations']['destructiveHint']=True
-tool('preview_import_item','Preview one scanned original without importing it. Bounded image worker and client generation cancellation are shared with normal previews.',{'plan_id':ID,'item_id':ID,'expected_revision':REV,'client_id':string(120),'generation':REV,'detail':BOOL},['plan_id','item_id','expected_revision','client_id','generation'],True)
+IMPORT_VIEWPORT=obj({'cx':{'type':'number','minimum':0,'maximum':1},'cy':{'type':'number','minimum':0,'maximum':1},'width':integer(1,2048),'height':integer(1,1536)},['cx','cy','width','height'])
+tool('preview_import_item','Preview one scanned original without importing it. detail=true requests the fitted 1600-pixel preview; an explicit detail=true plus viewport requests that 1:1 crop. Completed previews may be reused after bounded integrity checks.',{'plan_id':ID,'item_id':ID,'expected_revision':REV,'client_id':string(120),'generation':REV,'detail':BOOL,'viewport':IMPORT_VIEWPORT},['plan_id','item_id','expected_revision','client_id','generation'],True)
+TOOLS['preview_import_item']['inputSchema']['if']={'required':['viewport']}
+TOOLS['preview_import_item']['inputSchema']['then']={'required':['detail'],'properties':{'detail':{'const':True}}}
 IMPORT_PRESET={'anyOf':[obj({'preset_id':PRESET_ID,'expected_revision':PRESET_TOKEN},['preset_id','expected_revision']),{'type':'null'}]}
 tool('get_import_processing','Read captured import preset names and additional keyword text without full preset payloads.',{'plan_id':ID},['plan_id'],True)
 tool('set_import_processing','Capture Develop/metadata presets or additional keywords for a ready import. Later preset edits do not change the captured values. Null clears a preset; omitted settings are preserved.',{'plan_id':ID,'expected_revision':REV,'develop_preset':IMPORT_PRESET,'metadata_preset':IMPORT_PRESET,'keywords':{'type':'array','maxItems':100,'items':string()}},['plan_id','expected_revision'])

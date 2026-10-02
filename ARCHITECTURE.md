@@ -710,9 +710,24 @@ is discarded after completion/cancellation/failure; 32 compact receipts remain.
 Backup/restore includes pending reviews; interrupted operations require explicit
 resumption. An uncertain native apply response is read back without replay.
 
-Thumbnail and fitted Loupe requests use the existing bounded worker/cache with
+Thumbnail, fitted Loupe and full-resolution Loupe requests use the existing bounded worker/cache with
 separate client generations and no catalog-photo requirement. The native model
-retains one page of images and rejects late replies. This Add contract never
+retains one page of images and rejects late replies. `preview_import_item` keeps
+its `detail` boolean for thumbnail/Fit compatibility; `detail=true` with a complete
+`viewport` requests a full-resolution ROI through the same renderer as Library.
+The ROI path omits `max_edge`, uses at most 2048 x 1536 pixels and returns actual
+clamped `roi`, PNG dimensions and full cropped canvas dimensions. A native pixel
+occupies `1/displayScale` points at 100%; drag release computes its next center
+from the actual ROI, with stale focus/plan/frame checks. Dragging itself does not
+send image work. Import keeps its own viewport state instead of changing Library.
+
+Import Fit/ROI reads use the completed-preview cache outside catalog locks. Keys
+include exact viewport, captured recipe/assets, source, engine and backend. A hit
+does not acquire the image worker; corruption repair uses the existing image lock.
+Cached and rendered replies still validate cancellation generation, source identity
+and plan/item revision before returning. This is disposable per-request cache reuse,
+not persistent imported Standard/1:1 preview policy or offline editing support.
+This Add contract never
 copies/moves originals. Filesystem stat checks cannot provide an OS-wide snapshot;
 Copy uses the separate adapter below. Move/DNG and
 offline preview policy still need explicit adapters and acceptance evidence.

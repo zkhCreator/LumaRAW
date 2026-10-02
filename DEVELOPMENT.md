@@ -100,6 +100,12 @@ when a clear function is more maintainable. Avoid unrelated formatting churn.
   never automatically replayed. Resumption retains captured selection and source
   identity, and must not silently accept changed files. Copy uses the explicit
   destination/collision/recovery contract below; Move remains separate scope.
+- Import Loupe 100% must request physical-pixel ROIs, not enlarge a fitted image.
+  Keep Import viewport state separate from Library. Pan from the returned clamped
+  ROI center; reject stale focus, plan, frame and pane geometry before applying a
+  gesture. Reuse completed Fit/ROI receipts with the same source/asset/revision
+  and generation checks as new image work; never turn a thumbnail into a 100%
+  placeholder or emit a worker request on every drag event.
 - Import configurations capture source-neutral options and exact processing/naming
   values, not live preset references. Keep list pages free of payloads and source
   receipts separate from polled summaries. Choosing a configuration pins fresh

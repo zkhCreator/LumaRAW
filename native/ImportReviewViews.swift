@@ -238,11 +238,7 @@ struct ImportReviewSheet: View {
     }
     var loupe: some View {
         VStack(spacing:8) {
-            ZStack {
-                Rectangle().fill(Color.black.opacity(0.3))
-                if let image=model.detail ?? model.focused.flatMap({model.images[$0]}) { Image(nsImage:image).resizable().scaledToFit().padding(10) }
-                if model.detailLoading { ProgressView() }
-            }.frame(maxWidth:.infinity,maxHeight:.infinity)
+            ImportLoupePane(model:model).frame(maxWidth:.infinity,maxHeight:.infinity)
             if let item=model.items.first(where:{$0.id == model.focused}) {
                 HStack {
                     Button("Previous Photo") { moveFocus(-1) }
