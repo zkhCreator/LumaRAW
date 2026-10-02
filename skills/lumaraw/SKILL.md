@@ -269,8 +269,38 @@ cleans owned scratch files and reports any unsafe cleanup. `get_import_copies`
 returns sixty transfer receipts per offset, including after cancellation. A
 restored catalog can inspect/cancel but cannot resume or clean the original
 catalog's transfer. Read the plan after an uncertain reply; never replay blindly.
-Move, DNG conversion, renaming, second-copy backup and extended-attribute copying
+Move, DNG conversion, second-copy backup and extended-attribute copying
 remain unsupported. Copy requires a filesystem supporting exclusive hard links.
+
+Use `get_import_naming(plan_id)` for the saved Copy configuration, built-in
+templates and supported token kinds. `preview_import_naming(plan_id,
+expected_revision, settings, offset)` previews sixty checked destinations from an
+unsaved draft. `set_import_naming(plan_id, expected_revision, settings)` captures
+the complete configuration on a ready Copy plan. Add never renames originals.
+Settings contain `enabled`, `template` (1–48 token objects), `custom_text`,
+`shoot_name`, `start` (1–9999999999) and `extension` (`preserve`, `lower`, `upper`).
+Token kinds are `literal` (required `text`), `filename`, `original_number`,
+`folder`, `custom_text`, `shoot_name`, `sequence`, `index`, `total`, `year`,
+`month`, `day`, `hour`, `minute`, `second`, `camera`. Number tokens accept optional
+`digits` (1–10); other nonliteral tokens accept no additional fields.
+
+`filename` is the source stem; the extension is appended automatically.
+`original_number` uses the last ASCII digit run in the source stem. Sequence and
+position follow checked eligible filenames (ASCII-NOCASE then stable item ID),
+independently of review sorting. Capture tokens use the camera's civil time.
+Missing values and invalid/overlong basenames fail visibly, never fall back to
+mtime or silently truncate. Full collisions are preflighted before copying.
+XMP adopts the new stem and original names remain the duplicate identity.
+
+`list_filename_templates(offset)` pages thirty catalog-local template names and
+a numeric revision. Read via `get_filename_template(template_id,
+expected_revision)`. Save/create/update/rename via `save_filename_template(name,
+template, expected_revision, template_id?)`; delete via
+`delete_filename_template(template_id, expected_revision)`. Keep the loaded
+template revision with its draft; listing a newer library never authorizes
+overwriting it. Saved imports contain values independent of library edits/deletion.
+Catalog-wide Import/Image counters, shared/Adobe template exchange, wider EXIF
+tokens, Library renaming and export reuse remain unsupported.
 
 For a ready review, `set_import_processing(plan_id, expected_revision, ...)` changes
 one or more of `develop_preset`, `metadata_preset` and `keywords`. A preset choice

@@ -4,7 +4,8 @@ Inputs: TIFF-family, JPEG or PNG headers. Outputs: camera model, integer
 microseconds and clock provenance; no pixel decoder, hash, original writes or
 host-timezone dependence. Explicit offsets normalize to UTC. Without an offset,
 camera wall time is compared as-is, not claimed to be an absolute UTC instant.
-An optional civil date supports import folders without changing UTC comparisons.
+Optional civil date/time fields support Copy folders and filename tokens without
+changing UTC comparisons. Missing metadata is never replaced by filesystem time.
 Only IFD0 and its Exif IFD are read; maker notes and embedded previews are ignored.
 Unsupported containers/malformed metadata remain unknown instead of using mtime.
 """
@@ -114,6 +115,8 @@ def clock_from_tags(tags, include_date=False):
         try:
             value=datetime.strptime(tags[date],'%Y:%m:%d %H:%M:%S')
             civil_date=value.strftime('%Y/%Y-%m-%d')
+            civil={key:value.strftime(fmt) for key,fmt in zip(
+                ('year','month','day','hour','minute','second'),('%Y','%m','%d','%H','%M','%S'))}
             fraction=tags.get(subsec,'').strip()
             if fraction and not re.fullmatch(r'\d+',fraction):raise ValueError('Invalid subsecond time')
             # Keep any finer residual as exact digits, never silently round it.
@@ -131,7 +134,7 @@ def clock_from_tags(tags, include_date=False):
             delta=value-datetime(1970,1,1,tzinfo=timezone.utc)
             us=(delta.days*86400+delta.seconds)*1000000+delta.microseconds
             result.update(taken_us=us,taken_submicro=residual,capture_clock=basis,taken=us//1000000)
-            if include_date:result['capture_date']=civil_date
+            if include_date:result.update(capture_date=civil_date,capture_civil=civil)
             break
         except (ValueError,OverflowError):continue
     return result

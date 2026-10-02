@@ -100,6 +100,14 @@ when a clear function is more maintainable. Avoid unrelated formatting churn.
   never automatically replayed. Resumption retains captured selection and source
   identity, and must not silently accept changed files. Copy uses the explicit
   destination/collision/recovery contract below; Move remains separate scope.
+- Copy naming captures token values, never a live template reference. Keep original
+  names for duplicate identity while displaying verified destination basenames.
+  Rename associated XMP to the same stem; validate every target before filesystem
+  writes. Sequence order follows checked eligible filenames with a stable ID tie
+  break, independently of review sorting. Freeze ordinals before copying, retain
+  them across recovery and support cancellation during bulk SQL. Preview ranks
+  must seek disjoint index ranges, including same-name IDs; test SQLite VM work
+  rather than trusting that an index appearing in EXPLAIN prevents repeated scans.
 - Import-time presets are captured values. Validate preset and plan revisions
   when choosing them; do not reinterpret a saved choice after library edits or
   deletion. Stage LUT assets outside catalog locks, verify before applying and

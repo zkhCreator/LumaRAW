@@ -127,6 +127,8 @@ def migrate(db):
     migrate_snapshot_status(db)
     from .import_copy import migrate as migrate_import_copy
     migrate_import_copy(db)
+    from .import_naming import migrate as migrate_import_naming
+    migrate_import_naming(db)
 
 
 def text_predicate(text):

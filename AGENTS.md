@@ -46,6 +46,9 @@ Keep the explicit publication allowlist current when adding public documentation
   newer revision. Validate all targets before transactional batch mutations.
 - Freeze export recipes/options/metadata at submission. Preserve collision-safe output,
   idempotent requests, cancellation and explicit crash-recovery decisions.
+- Capture Copy naming values and checked-item sequence before writes. Preserve
+  original-name duplicate identity, matching XMP stems and immutable recovery
+  destinations. Bound preview rank work with disjoint indexed ranges.
 - Use bounded queries, pages, worker concurrency, caches and memory. Never load
   a whole catalog to filter or sort it. Keep CPU reference/fallback behavior and
   report actual Metal dispatch, not just library availability.

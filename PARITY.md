@@ -15,6 +15,7 @@ Official references checked September 2026:
 
 - [Hard-drive Add/Copy/Move import, Grid/Loupe and checked selection](https://helpx.adobe.com/lightroom-classic/desktop/import-photos/import-photos-video-catalog.html)
 - [Duplicate criteria, preview choices and import-time options](https://helpx.adobe.com/lightroom-classic/desktop/import-photos/photo-video-import-options.html)
+- [Filename templates and token editor](https://helpx.adobe.com/lightroom-classic/desktop/import-photos/filename-template-editor-text-template.html) (rechecked October 2026)
 - [Previous Import source](https://helpx.adobe.com/lightroom-classic/desktop/viewing-photos/view-photos.html) and [automatic source selection preference](https://helpx.adobe.com/uk/lightroom-classic/desktop/import-photos/file-import-formats-settings.html)
 - [Camera/card import workflow](https://helpx.adobe.com/lightroom-classic/desktop/import-photos/importing-photos-lightroom-basic-workflow.html)
 - [Workspace and module responsibilities](https://helpx.adobe.com/nz/lightroom-classic/help/workspace-basics.html)
@@ -56,7 +57,7 @@ gaps. Nothing below is full Lightroom parity merely because historical tests pas
 
 | Area | Current implementation | Remaining acceptance / work |
 | --- | --- | --- |
-| Import and catalogs | Partial: durable Add/Copy review with checked selection, Grid/Loupe source previews, suspected duplicates, bounded sorting/filtering, captured import-time presets and keywords, Copy destination/subfolder and flat/source/date organization, byte-verified original/XMP transfers, explicit crash recovery and retained-copy cancellation, Previous Import navigation and catalog backup/restore | Move/Copy as DNG, destination-tree grouping and more date formats, rename/second-copy backup, saved import configurations, preview policies, cards/tethering, progressive Current Import, catalog switching/merge and desktop/reference acceptance |
+| Import and catalogs | Partial: durable Add/Copy review with checked selection, Grid/Loupe source previews, suspected duplicates, bounded sorting/filtering, captured import-time presets and keywords, Copy destination/subfolder and flat/source/date organization, filename token editor and catalog-local templates with checked-sequence previews, byte-verified original/XMP transfers, explicit crash recovery and retained-copy cancellation, Previous Import navigation and catalog backup/restore | Move/Copy as DNG, destination-tree grouping and more date formats, catalog-wide Import/Image numbering and wider EXIF/shared templates, second-copy backup, saved import configurations, preview policies, cards/tethering, progressive Current Import, catalog switching/merge and desktop/reference acceptance |
 | Library navigation | Partial: bounded grid/filmstrip, folder tree/search/favorites/labels, durable missing-folder relocation and folder synchronization, direct/recursive sources, filters/sorting including live snapshot status, regular/smart/Quick collections and nested sets | Multi-source selection, complete sync Import Dialog/duplicate policy, folder move/rename, relocation overlap/collision handling, collection drag/drop/color labels, full smart criteria/import-export, source-selection memory, desktop acceptance |
 | Organization | Partial: duplicate/missing detection, hierarchical keywords/synonyms/export flags/Will Export preview, text/CSV vocabulary exchange and manual person tags, custom nine-slot keyword sets/recent entries/shared or catalog storage, multi-keyword shortcuts and keyword/rating/flag/label/target-collection/rotation/Develop-preset/metadata-preset Painter strokes, independent catalog rotation/flips, title/caption/copyright plus thirty IPTC fields, selective metadata presets, labels, batch metadata, virtual copies, manual/split/capture-time scoped stacks | Keyword policy/file and preset reference acceptance, built-in sets/suggestions/undo, Painter desktop acceptance, IPTC Extension and complete metadata parity, stack interaction acceptance, rename and sidecars |
 | Culling | Partial: Loupe/Compare/Survey, linked detail, anchored page selection, Develop Reference/Active pairs with independent Fit/1:1 viewports, session lock and RGB/LAB readouts | Desktop and numerical reference acceptance, HDR readouts, scrubby/box zoom, cross-page selection, auto advance, persistent workspace state |
@@ -3453,3 +3454,89 @@ ACLs or all extended attributes. Power-loss hardware testing, removable/network
 volumes, macOS 14 runtime, actual desktop input/VoiceOver and Lightroom reference
 acceptance remain unverified. Desktop automation was not retried after its prior
 denial. The complete non-AI inventory remains the goal.
+
+### Copy filename templates and bounded naming previews
+
+Engine generation 39 / catalog schema 27 adds explicit Copy filename renaming.
+The native editor provides nine built-in templates, ordered editable tokens,
+custom/shoot text, padded sequence and position/total, original filename/number,
+folder, local capture date/time and camera model, plus extension case. Users can
+preview sixty checked destinations without saving and save import settings
+separately from named catalog-local templates. Templates support create, update,
+rename and delete at captured revisions; later library changes cannot retarget
+an import or silently rebase a loaded native draft.
+
+Sequence order is checked eligible filename (ASCII-NOCASE) then stable item ID,
+independent of review sorting, filtering and paging. Missing metadata is explicit;
+there is no mtime substitution, silent sanitization or byte truncation. All names
+and collisions are validated before copying. XMP uses the new stem, verified
+destination basenames become catalog names, and retained original names still
+identify suspected duplicates. Copy interruption, cancellation, ownership and
+restored-catalog isolation retain the previous module's guarantees.
+
+The first large-plan probe exposed a query-plan failure: SQLite used a covering
+index but did not seek collated tuple bounds, causing repeated scans. Explicit
+filename ranges and separate equal-name ID ranges removed the repeated work.
+A deterministic VM-instruction regression now covers both ordinary and all-equal
+filenames. Frozen application ranks are calculated once in cancellable SQL;
+ordinary Copy imports with renaming disabled do not pay for this step.
+
+On the Apple M3 Max / 128 GiB / macOS 26.6.2 host, a final isolated synthetic
+SQLite probe measured the following sixty-item preview pages. These are engine
+domain calls, with no pixels, broker IPC or desktop rendering. Each page has one
+first call and five warm calls; OS caches remain warm after staging. The first
+10,000-row call, including first-use Python/validation overhead, took 33.257 ms.
+
+| Staged rows / page offset | Warm median / max | First call | Reply bytes |
+| --- | --- | --- | --- |
+| 10,000 / 0 | 4.008 / 4.135 ms | 33.257 ms | 7,264 |
+| 10,000 / 5,000 | 4.426 / 4.589 ms | 4.482 ms | 7,395 |
+| 10,000 / 9,940 | 4.751 / 5.118 ms | 5.125 ms | 7,268 |
+| 100,000 / 0 | 4.042 / 4.091 ms | 4.213 ms | 7,325 |
+| 100,000 / 50,000 | 9.267 / 10.064 ms | 11.531 ms | 7,577 |
+| 100,000 / 99,940 | 15.855 / 16.406 ms | 15.186 ms | 7,390 |
+
+Before the query correction, the same 100,000-row page offsets had warm medians
+581.546 / 515.550 / 440.446 ms and about 89.6 / 78.0 / 66.4 million SQLite VM
+instructions. Final work is approximately 5,000 / 555,000 / 1.105 million
+instructions. This comparison corrects an unreleased naming implementation; it
+does not measure an improvement in previously shipped desktop frame rate.
+One-time cancellable rank freezing took 13.902 / 171.854 ms for 10,000 / 100,000
+rows. Process peak RSS sampled every 5 ms during preview/freeze was 36.80 / 47.05
+MiB. Synthetic staged rows contain no photograph dimensions or RAW pixels; this
+is not a camera throughput, cold-disk, full-app memory or UI-latency measurement.
+
+Validation includes **834 passed** in the complete Python suite (90.88 s), with
+the required Metal backend and the existing real Nikon NEF fixture enabled; no
+tests skipped. Coverage includes Unicode and UTF-8 basename limits, unavailable
+tokens, original/XMP bytes, checked-only numbering, preview immutability, collision
+preflight, original-name duplicate detection, shared sidecars after distinct
+renaming, captured-template deletion/backup, stale edits, crash/resume, cancelled
+rank freezing and atomic migration from a genuine schema-26 catalog. Migration
+keeps old Copy plans disabled for renaming and preserves existing photo state.
+
+The final packaged engine passed **97 native assertions**: Naming 30, Add/Copy
+29, Apply During Import 22 and Responsiveness 16. The naming editor's offscreen
+960 × 810-point render was inspected, including persistent text-field labels,
+token order, saved templates, draft previews and explicit save/cancel actions.
+No desktop input, window fitting on other displays or accessibility acceptance
+is inferred from those state probes and offscreen images.
+
+The Mac 14 deployment-target app builds and passes local deep/strict ad-hoc
+signature verification. All **129 full MCP schemas**, initialization and the
+updated bundled guide match source through the packaged stdio protocol. This is
+not a new official Python MCP SDK client run. The known optional PyInstaller
+`scipy.special._cdflib` warning remains. Build identities:
+
+- Source digest: `e73fa63f881cb8e2448d37dac17d118dc7f23d1812f742916c2c44b1cdb6094f`
+- Engine SHA-256: `45945af0410c3d7d691528c4be97067736c8a56b0ca5c732dcadd8d9291e3b60`
+- Native SHA-256: `ed9eced7b76876e12a5fb6aa2dbc200f7b16e62519ff3c6f956d575165619e72`
+
+Remaining naming scope includes catalog-wide Import/Image counters, additional
+EXIF tokens, shared preset storage and Adobe template exchange, Library renaming,
+export reuse and exact Lightroom reference acceptance. Filename ordering and
+invalid-name policy are explicit LumaRAW contracts, not claimed to reproduce
+every Adobe edge case. Move/DNG, backup copies, saved import configurations and
+the complete inventory remain open. Actual desktop input/VoiceOver, macOS 14,
+removable/network filesystems and Lightroom-rendered reference acceptance remain
+unverified; denied desktop automation was not retried.

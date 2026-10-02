@@ -39,7 +39,8 @@ struct ImportItem: Identifiable {
         self.id=id;self.path=path;self.name=name;self.state=state
         selected=(row["selected"] as? Int ?? 0) != 0;eligible=row["eligible"] as? Bool ?? false
         bytes=(row["bytes"] as? NSNumber)?.int64Value ?? 0
-        error=row["error"] as? String ?? "";hasNotes=(row["has_notes"] as? Int ?? 0) != 0
+        error=[row["error"] as? String ?? "",row["naming_error"] as? String ?? ""].filter{!$0.isEmpty}.joined(separator:" · ")
+        hasNotes=(row["has_notes"] as? Int ?? 0) != 0
         destination=row["destination"] as? String ?? ""
     }
 }
@@ -72,6 +73,7 @@ struct ImportItem: Identifiable {
     @Published var detailLoading=false
     @Published var detailError: String?
     @Published var processingEditor: ImportProcessingEditor?
+    @Published var namingEditor: ImportNamingEditor?
     private let previewClient=UUID().uuidString
     private let detailClient=UUID().uuidString
     private var previewGeneration=0

@@ -14,6 +14,7 @@ struct ImportReviewSheet: View {
         content.task { await model.load(initial:true) }.onDisappear { model.invalidate() }
             .interactiveDismissDisabled(model.busy)
             .sheet(item:$model.processingEditor) { ImportProcessingSheet(model:$0) }
+            .sheet(item:$model.namingEditor) { ImportNamingSheet(model:$0) }
             .sheet(isPresented:$showCopies) { if let plan=model.plan { ImportCopyReceipts(planID:plan.id) } }
     }
     var content: some View {
@@ -73,6 +74,10 @@ struct ImportReviewSheet: View {
                 if plan.active {
                     HStack {
                         Button("Apply During Import…") { model.openProcessing() }.disabled(model.busy || model.loading || !plan.ready)
+                        if plan.isCopy {
+                            Button(plan.copy["renaming"] as? Bool == true ? "File Renaming: On…":"File Renaming…") { model.openNaming() }
+                                .disabled(model.busy || model.loading || !plan.ready)
+                        }
                         if let settings=plan.values["processing"] as? [String:Any] {
                             let names=[settings["develop_name"] as? String ?? "",settings["metadata_name"] as? String ?? ""].filter{!$0.isEmpty}
                             Text((names+[(settings["keyword_count"] as? Int ?? 0)>0 ? "Additional keywords":""]).filter{!$0.isEmpty}.joined(separator:" · "))

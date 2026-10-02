@@ -7,6 +7,8 @@ initialize only new photos. Filesystem reads and pixels
 belong to the runner; Copy supplies verified destination references. This file
 performs no filesystem writes, copying, moving, DNG conversion or AI selection.
 Unknown capture time never falls back to mtime for suspected-duplicate matching.
+Copy naming previews are bounded and use selection ranks; original names remain
+the duplicate identity even when verified destination basenames differ.
 """
 import json
 import os
@@ -97,7 +99,10 @@ class ImportReview:
         from .import_copy import settings, target
         copy=settings(self.db,plan_id)
         plan['mode']='copy' if copy else 'add'
-        if copy:plan['copy']={key:copy[key] for key in ('destination','organization','subfolder','copied','copied_bytes','transfer_count')}
+        if copy:
+            plan['copy']={key:copy[key] for key in ('destination','organization','subfolder','copied','copied_bytes','transfer_count')}
+            from .import_naming import settings as naming_settings
+            plan['copy']['renaming']=naming_settings(copy)['enabled']
         if kind not in KINDS:raise ValueError('Unsupported import filter')
         clause='plan_id=?';args=[plan_id]
         if kind=='selected':clause+=' AND selected=1 AND '+self.eligible(plan)
@@ -115,8 +120,15 @@ class ImportReview:
         for row in rows:
             item=dict(row);item['clock']=json.loads(item['clock'])
             item['eligible']=item['state']=='new' or item['state']=='duplicate' and not plan['skip_duplicates']
-            if copy:item['destination']=target(copy,item)
             items.append(item)
+        if copy:
+            from .import_naming import ordinals
+            ranks=ordinals(self.db,plan,items) if plan['copy']['renaming'] else {}
+            for item in items:
+                if plan['copy']['renaming'] and item['id'] not in ranks:
+                    continue
+                try:item['destination']=target(copy,item,ranks.get(item['id']),plan['selected_count'])
+                except ValueError as error:item['naming_error']=str(error)
         return {'plan':plan,'items':items,'total':total,'offset':offset,'page_size':60}
 
     def item(self,plan_id,item_id,expected_revision):
@@ -293,7 +305,7 @@ class ImportReview:
                     'SELECT path,folder_name(path),folder_parent(path) FROM paths')
                 self.db.execute('UPDATE folder_maintenance SET enabled=0 WHERE id=1')
                 self.db.execute('INSERT INTO photos(path,name,original_name,bytes,mtime,recipe,created,taken,taken_us,taken_submicro,capture_clock,camera) '
-                    'SELECT '+PHOTO_PATH+',f.name,f.name,f.bytes,f.mtime,?,?,COALESCE(json_extract(f.clock,\'$.taken\'),0),'
+                    'SELECT '+PHOTO_PATH+',folder_name('+PHOTO_PATH+'),f.name,f.bytes,f.mtime,?,?,COALESCE(json_extract(f.clock,\'$.taken\'),0),'
                     'f.taken_us,f.taken_submicro,f.capture_clock,COALESCE(json_extract(f.clock,\'$.camera\'),\'\') FROM import_files f WHERE '+where,
                     (json.dumps(recipe),time.time(),plan_id))
                 after=0

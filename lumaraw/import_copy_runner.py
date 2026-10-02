@@ -52,6 +52,9 @@ class CopyRunner:
                 catalog.db.execute('DELETE FROM import_transfers WHERE plan_id=?', (plan_id,))
                 catalog.db.execute("UPDATE import_files SET catalog_path='' WHERE plan_id=?", (plan_id,))
                 catalog.db.execute('UPDATE import_copy_plans SET transfer_count=0,copied=0,copied_bytes=0 WHERE plan_id=?', (plan_id,))
+                from .import_naming import freeze, settings as naming_settings
+                if naming_settings(value)['enabled']:
+                    freeze(catalog.db,plan,cancelled)
             after = 0
             while True:
                 io.check_cancel(cancelled)

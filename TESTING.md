@@ -47,6 +47,36 @@ RSS, concurrent control median/p95/max and byte checks. OS source caches are war
 there is no pixel/GPU work. This does not establish SSD-independent throughput,
 desktop frame rate, removable-media behavior or untested filesystem support.
 
+## Copy filename templates
+
+`test_import_naming.py` checks captured templates, Unicode, local EXIF clock tokens,
+selected-only sequence and x-of-y counts, independent review sorting, missing
+metadata, unsafe/overlong names, collisions before writes, XMP stem correspondence,
+original-name duplicate identity, template revision conflicts/deletion, backup,
+copy crash recovery and an atomic genuine schema-26 migration. A deterministic
+SQLite VM-work bound covers different-name and same-name rank queries; cancellation
+rolls back a bulk rank freeze before copying.
+
+`NativeImportNamingRegression` uses real engine IPC to verify drafts, previews,
+library refresh without stale-draft rebasing, preset deletion, plan conflicts,
+saved names, final catalog original/destination identities and untouched bytes.
+Its offscreen editor PNG is layout evidence only, not desktop acceptance.
+
+```sh
+.venv/bin/python -m pytest -q tests/test_import_naming.py tests/test_import_copy.py
+.venv/bin/python tests/run_native.py --work work/new-naming-native \
+  --engine /absolute/LumaRAW.app/Contents/Resources/Engine/LumaRAWEngine \
+  --suite NativeImportNamingRegression --suite NativeImportRegression
+.venv/bin/python tests/import_naming_probe.py --work work/new-naming-scale
+```
+
+Run the scale probe after builds/tests stop. It stages 10,000 and 100,000 synthetic
+SQL rows without photograph files. For first/middle/last sixty-item pages it records
+first and five warm calls, serialized size and SQLite VM instructions, followed by
+one cancellable rank freeze and sampled process peak RSS at 5 ms. The first call
+uses a newly opened connection but OS caches remain warm from setup; no cold-disk,
+broker IPC, pixels, real-photo accuracy or desktop latency is established.
+
 ## Native responsiveness
 
 `test_preview_cache.py` uses real workers for completed Fit/detail/Before replies,

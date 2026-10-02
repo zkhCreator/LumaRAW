@@ -2,6 +2,7 @@
 
 Inputs: captured destination/source roots, bounded selected rows and I/O receipts.
 Outputs: deterministic target paths, collision checks and resumable ownership state.
+Captured naming affects destination basenames and associated XMP stems only.
 This domain owns SQL only; import_copy_io owns filesystem writes. Originals and
 existing targets are never overwritten. Cancelled copies retain published files.
 Restored catalogs cannot resume another catalog's filesystem operation.
@@ -50,7 +51,7 @@ def settings(db, plan_id):
     return result
 
 
-def target(settings, row):
+def target(settings, row, ordinal=None, total=0):
     source = Path(row['path'])
     relative = Path(source.name)
     if settings['organization'] == 'source':
@@ -64,7 +65,11 @@ def target(settings, row):
         # the host timezone nor file modification time defines date folders.
         date = clock.get('capture_date', 'Unknown Date')
         relative = Path(date)/source.name
-    result = Path(settings['destination'])/settings['subfolder']/relative
+    from .import_naming import settings as naming_settings
+    from .filename_templates import render
+    clock = row['clock'] if isinstance(row['clock'],dict) else json.loads(row['clock'])
+    name = render(naming_settings(settings), {**row,'clock':clock}, ordinal or row.get('naming_index',0), total)
+    result = Path(settings['destination'])/settings['subfolder']/relative.with_name(name)
     if len(str(result).encode()) > 4096:
         raise ValueError('Copy destination exceeds the supported filesystem path length')
     return str(result)
@@ -84,9 +89,10 @@ class ImportCopy:
                                                     'ORDER BY id LIMIT 60', (plan_id, after))]
 
     def stage(self, plan_id, rows, value):
+        total = self.db.execute('SELECT selected_count FROM import_plans WHERE id=?',(plan_id,)).fetchone()[0]
         with self.db:
             for row in rows:
-                destination = target(value, row)
+                destination = target(value, row, total=total)
                 if Path(destination) == self.catalog.root or self.catalog.root in Path(destination).parents:
                     raise ValueError('Copy destinations cannot be inside the active catalog')
                 self.db.execute('UPDATE import_files SET catalog_path=? WHERE id=? AND plan_id=?',
@@ -96,7 +102,7 @@ class ImportCopy:
                     if fingerprint is None or tuple(fingerprint[:2]) in seen:
                         continue
                     seen.add(tuple(fingerprint[:2]))
-                    output = str(Path(destination).with_name(Path(source).name))
+                    output = destination if source == row['path'] else str(Path(destination).with_suffix(Path(source).suffix))
                     key = folded(output)
                     previous = self.db.execute('SELECT source,source_identity FROM import_transfers '
                                                'WHERE plan_id=? AND target_key=?', (plan_id, key)).fetchone()

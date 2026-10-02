@@ -136,6 +136,12 @@ class Service:
         if method=='metadata_schema':
             from .iptc import FIELDS, SCHEMA
             return {'iptc_fields':list(FIELDS.values()),'iptc_schema':SCHEMA}
+        if method in ('get_import_naming','set_import_naming','preview_import_naming','list_filename_templates','get_filename_template','save_filename_template','delete_filename_template'):
+            from .import_naming import ImportNaming
+            with self.catalog() as c:
+                domain=ImportNaming(c)
+                return {'get_import_naming':domain.get,'set_import_naming':domain.set,'preview_import_naming':domain.preview,'list_filename_templates':domain.list,
+                        'get_filename_template':domain.read,'save_filename_template':domain.save,'delete_filename_template':domain.delete}[method](**p)
         if method in ('list_metadata_presets','get_metadata_preset','save_metadata_preset','metadata_preset_action','apply_metadata_preset'):
             return self.metadata_presets.dispatch(method,p)
         if method in ('list_develop_presets','get_develop_preset','save_develop_preset','develop_preset_action','apply_develop_preset'):

@@ -10,7 +10,7 @@ LumaRAW preserves your originals. Add references files in place; Copy imports by
 
 | Area | Capabilities |
 | --- | --- |
-| Import | Resumable Add/Copy review, thumbnail/Loupe inspection, checked selections, suspected duplicates, destination/subfolder and flat/source/date organization, original/XMP copies with explicit recovery, and captured Develop/metadata presets plus keywords |
+| Import | Resumable Add/Copy review, thumbnail/Loupe inspection, checked selections, suspected duplicates, destination organization, filename templates and sequence previews, original/XMP copies with explicit recovery, and captured Develop/metadata presets plus keywords |
 | RAW development | Nikon NEF/NRW and other LibRaw formats, as-shot white balance, exposure, highlights/shadows, relative temperature/tint, monochrome, and presets |
 | Color | Eight-band HSL and Black & White Mix, interactive RGB/channel point curves, camera-bound chart calibration, `.cube` LUTs, ICC soft proofing, and gamut warnings |
 | Detail and composition | Full-resolution 1:1 viewports, noise reduction, sharpening, defringing, rotation, crop, straighten, and perspective |
@@ -91,7 +91,22 @@ Cancelling removes owned scratch files and keeps completed copies at their
 destinations. Inspect any reported scratch-ownership problem before starting
 another review. Copy currently requires a destination filesystem supporting hard
 links; Finder tags, resource forks and ACLs are not copied. Move, Copy as DNG,
-renaming and second-copy backups remain unimplemented.
+second-copy backups remain unimplemented.
+
+After a Copy scan, **File Renaming** offers nine built-in templates and a token
+editor with literal/custom/shoot text, original filename/number, folder, padded
+sequence, position/total, local capture date/time and camera model. Preview Names
+shows sixty checked destinations at a time without saving or copying. Save Import
+Settings captures the token values, start number and extension case. Missing
+metadata is an explicit error; names are never silently truncated or sanitized.
+Sequence follows checked filenames in ascending case-insensitive order, then
+stable item ID, independently of review sorting. Associated XMP takes the same new
+stem. The catalog retains original filenames for suspected-duplicate detection.
+
+Saved filename templates belong to this catalog, with create/update/rename/delete
+and revision checks. Editing/deleting a template does not alter captured imports.
+Library/export renaming, shared template storage, Adobe template exchange, wider
+EXIF tokens and catalog-wide Import/Image counters remain incomplete.
 
 After scanning, choose **Apply During Import…** to select a Develop preset,
 metadata preset or None. Search and page the preset lists, or use **New…** to

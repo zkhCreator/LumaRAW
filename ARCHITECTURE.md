@@ -762,8 +762,32 @@ action; it never automatically replays an uncertain application response.
 
 Stat checks are not an OS-wide filesystem snapshot. Copy preserves file bytes
 and mtime, not Finder tags, resource forks, ACLs or all extended attributes. Move,
-DNG conversion, import renaming, second-copy backups, more date templates and
+DNG conversion, second-copy backups, more date templates and
 destination-tree grouping remain separate scope.
+
+Schema 27 adds catalog-local filename templates, revision state, captured Copy
+naming values and a frozen ordinal on each staged item. `filename_templates.py`
+is a pure portable renderer; `import_naming.py` owns SQL and preview contracts.
+Templates contain at most 48 tokens. Lists contain thirty names; previews contain
+sixty selected destinations. Native drafts never compute names or access files.
+Explicit template updates/deletes cannot retarget captured naming settings.
+
+Sequence order is ASCII-NOCASE filename then stable item ID over checked eligible
+items, independent of page/filter/sort presentation. Preview ranks use disjoint
+index spans for filenames and same-name IDs. A collated row-value comparison alone
+does not produce SQLite composite range seeks and must not be substituted without
+query-plan and VM-work evidence. Application freezes all ranks in one cancellable
+SQL statement before transfer staging. Recovery preserves selection and settings;
+published transfer destinations are never regenerated mid-copy.
+
+Capture date/time tokens use bounded header metadata before UTC conversion. Missing
+values fail visibly; there is no mtime fallback, silent sanitization or truncation.
+Final basenames are limited to 255 UTF-8 bytes and paths to 4096 bytes. Naming applies
+only to copied originals and the matching XMP stem. Final photos use destination
+basenames while `original_name` preserves duplicate identity. Existing collision,
+exclusive publication, cancellation and restored-catalog restrictions still apply.
+Catalog-wide Import/Image counters, wider EXIF tokens, shared/Adobe template exchange,
+Library renaming and export reuse remain separate scope.
 
 `import_processing.py` owns schema 20's per-plan Develop/metadata snapshots and
 additional keyword choices. Preset libraries are read with captured revision

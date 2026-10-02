@@ -215,11 +215,14 @@ def test_backup_cannot_resume_or_clean_original_catalog_transfer(library,monkeyp
 
 def test_additive_schema_25_upgrade_is_atomic_and_keeps_existing_review(tmp_path,monkeypatch):
     from lumaraw import import_copy
+    from lumaraw import catalog as module
+    from legacy_catalog import migrate_to
     migration=import_copy.migrate
-    monkeypatch.setattr(import_copy,'migrate',lambda db:None)
-    c=Catalog(tmp_path/'old');c.db.execute("INSERT INTO import_plans(include_subfolders,created) VALUES(1,1)");c.db.commit()
+    with monkeypatch.context() as context:
+        context.setattr(module,'migrate',lambda db:migrate_to(db,25))
+        c=Catalog(tmp_path/'old')
+    c.db.execute("INSERT INTO import_plans(include_subfolders,created) VALUES(1,1)");c.db.commit()
     assert c.db.execute('PRAGMA user_version').fetchone()[0]==25
-    monkeypatch.setattr(import_copy,'migrate',migration)
     c.db.set_authorizer(lambda action,a,b,d,t:sqlite3.SQLITE_DENY if action==sqlite3.SQLITE_CREATE_TABLE and a=='import_copy_plans' else sqlite3.SQLITE_OK)
     with pytest.raises(sqlite3.DatabaseError):migration(c.db)
     assert c.db.execute('PRAGMA user_version').fetchone()[0]==25
