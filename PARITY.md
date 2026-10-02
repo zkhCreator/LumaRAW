@@ -20,7 +20,7 @@ Official references checked September 2026:
 - [Previous Import source](https://helpx.adobe.com/lightroom-classic/desktop/viewing-photos/view-photos.html) and [automatic source selection preference](https://helpx.adobe.com/uk/lightroom-classic/desktop/import-photos/file-import-formats-settings.html)
 - [Camera/card import workflow](https://helpx.adobe.com/lightroom-classic/desktop/import-photos/importing-photos-lightroom-basic-workflow.html)
 - [Workspace and module responsibilities](https://helpx.adobe.com/nz/lightroom-classic/help/workspace-basics.html)
-- [Collections, smart collections and collection sets](https://helpx.adobe.com/lightroom-classic/desktop/organize-photos-in-lightroom-classic/photo-collections.html)
+- [Collections, smart collections, sets and their color labels](https://helpx.adobe.com/lightroom-classic/desktop/organize-photos-in-lightroom-classic/photo-collections.html) (rechecked October 2026)
 - [Smart collection criteria](https://helpx.adobe.com/lightroom-classic/desktop/organize-photos-in-lightroom-classic/smart-collections-criteria-in-lightroom-classic.html)
 - [Develop tools](https://helpx.adobe.com/lightroom-classic/desktop/process-and-develop-photos/develop-module-tools.html)
 - [Reference View selection, locking and crop exit, Adobe's Julieanne Kost](https://jkost.com/blog/2024/08/reference-view-in-lightroom-classic.html)
@@ -59,7 +59,7 @@ gaps. Nothing below is full Lightroom parity merely because historical tests pas
 | Area | Current implementation | Remaining acceptance / work |
 | --- | --- | --- |
 | Import and catalogs | Partial: durable Add/Copy review with checked selection, Grid/Loupe source previews with on-demand Fit/100% regions and completed-preview reuse, suspected duplicates, bounded sorting/filtering, captured import-time presets and keywords, Copy destination/subfolder and flat/source/date organization with three numeric date layouts and paged destination photo counts, filename token editor and catalog-local templates with checked-sequence and catalog Import/Image numbering, byte-verified original/XMP transfers, optional original-state second copies, catalog-local saved import configurations with explicit rescans, explicit crash recovery and retained-copy cancellation, Previous Import navigation and catalog backup/restore | Move/Copy as DNG, destination-tree grouping and more date formats, numbering edge-case reference acceptance and wider EXIF/shared templates, shared/Adobe import-preset exchange and interaction acceptance, preview policies, cards/tethering, progressive Current Import, catalog switching/merge and desktop/reference acceptance |
-| Library navigation | Partial: bounded grid/filmstrip, folder tree/search/favorites/labels, durable missing-folder relocation and folder synchronization, direct/recursive sources, filters/sorting including live snapshot status, regular/smart/Quick collections and nested sets | Multi-source selection, complete sync Import Dialog/duplicate policy, folder move/rename, relocation overlap/collision handling, collection drag/drop/color labels, full smart criteria/import-export, source-selection memory, desktop acceptance |
+| Library navigation | Partial: bounded grid/filmstrip, folder tree/search/favorites/labels, durable missing-folder relocation and folder synchronization, direct/recursive sources, filters/sorting including live snapshot status, regular/smart/Quick collections and nested sets, single/batch collection color labels and global color filtering | Multi-source selection, complete sync Import Dialog/duplicate policy, folder move/rename, relocation overlap/collision handling, collection drag/drop, custom label names/sets and sidebar multi-selection interaction, full smart criteria/import-export, source-selection memory, desktop acceptance |
 | Organization | Partial: duplicate/missing detection, hierarchical keywords/synonyms/export flags/Will Export preview, text/CSV vocabulary exchange and manual person tags, custom nine-slot keyword sets/recent entries/shared or catalog storage, multi-keyword shortcuts and keyword/rating/flag/label/target-collection/rotation/Develop-preset/metadata-preset Painter strokes, independent catalog rotation/flips, title/caption/copyright plus thirty IPTC fields, selective metadata presets, labels, batch metadata, virtual copies, manual/split/capture-time scoped stacks | Keyword policy/file and preset reference acceptance, built-in sets/suggestions/undo, Painter desktop acceptance, IPTC Extension and complete metadata parity, stack interaction acceptance, rename and sidecars |
 | Culling | Partial: Loupe/Compare/Survey, linked detail, anchored page selection, Develop Reference/Active pairs with independent Fit/1:1 viewports, session lock and RGB/LAB readouts | Desktop and numerical reference acceptance, HDR readouts, scrubby/box zoom, cross-page selection, auto advance, persistent workspace state |
 | Basic development | Partial: light/WB/color, eight-band HSL and B&W Mix with photo-targeted adjustment and selective resets/sync | Calibrated absolute WB, eyedropper, texture/clarity/dehaze, Point Color, Auto B&W mix, color grading and Adobe processing/reference acceptance |
@@ -4143,3 +4143,99 @@ macOS 14 runtime, the official MCP SDK, desktop interaction/VoiceOver and Adobe
 reference acceptance remain unverified; no desktop automation was retried.
 Cross-page cover focus, large-stack page sorting cost and the remaining parity
 inventory are still open.
+
+### Collection color labels and bounded tree refresh
+
+Engine generation 47 / schema 33 adds standard labels to regular collections,
+smart collections and collection sets. Single-row context actions and a dedicated
+native batch sheet support five colors and None. Batches capture up to sixty
+collection revisions across pages, validate every target before writes and keep
+all rows unchanged after a stale target or SQL failure. Quick is excluded. Changed
+nodes and ancestor sets advance once per affected node; assigning the same label
+to every target is a validated no-op. Labels do not propagate to photos or child
+nodes. Subtree copies preserve labels as a local policy; Adobe's documentation
+confirms collection labeling/copying but does not specify label inheritance.
+
+Flat color filtering spans the entire hierarchy, retains normal tree expansions
+and page offsets, and uses indexed counts plus at most sixty payload rows. A
+bounded parent-name lookup supplies immediate-parent context for matching names.
+Tree mutations advance an independent counter, preserving Quick/target conflict
+semantics. The Mac shell refreshes loaded pages after that counter changes,
+including when the photo result is empty, rejects older page/state replies and
+preserves captured editor/batch selections. Filtered rows reuse the existing
+subtree deletion confirmation and context actions. Batch conflicts explicitly
+require reloading and reselecting changed targets; no mutation is retried.
+
+Focused collection, identity, target-Painter and stack regression passed
+**44 tests in 5.53 s**. New Python coverage includes a genuine schema-32 upgrade,
+DDL failure rollback, custom schema objects, hierarchy/Quick target/membership/
+stacks preservation, standard label assignment/clear/no-op, atomic parent-child
+batches, injected mid-write failure, label-preserving copies/moves, bounded global
+paging and unchanged originals, photo metadata, recipes and history. The older
+v4 identity fixture now seeds its published schema directly and checks preserved
+old columns separately from the new default label.
+
+An isolated SQL probe used 10,000 and 100,000 synthetic top-level collections,
+10% labeled red, on Apple M3 Max / 128 GiB / macOS 26.6.2. Each page used a fresh
+SQL connection, one first request and five repeats. Count and page costs are
+included; connection startup is separately recorded. OS caches remain warm from
+seeding and the genuine schema-32-to-33 upgrade. VM instrumentation ran in a
+separate request after timing. There were no photos, image dimensions, pixels,
+workers, GPU work, IPC or native frames in this measurement.
+
+| Collections / filter | First page first / warm median | Last page first / warm median |
+| --- | ---: | ---: |
+| 10,000 / any | 0.384 / 0.252 ms | 0.516 / 0.385 ms |
+| 10,000 / labeled | 0.184 / 0.130 ms | 0.145 / 0.106 ms |
+| 10,000 / no label | 0.424 / 0.323 ms | 0.597 / 0.522 ms |
+| 10,000 / red | 0.178 / 0.142 ms | 0.186 / 0.132 ms |
+| 100,000 / any | 2.323 / 1.908 ms | 3.649 / 3.654 ms |
+| 100,000 / labeled | 0.354 / 0.255 ms | 0.417 / 0.374 ms |
+| 100,000 / no label | 2.666 / 2.673 ms | 5.013 / 5.156 ms |
+| 100,000 / red | 0.477 / 0.362 ms | 0.634 / 0.554 ms |
+
+Last pages contain forty rows where the matched total is not divisible by sixty;
+no-label last pages contain sixty. Warm maxima at 100,000 were 3.758 ms for any,
+0.380 ms for labeled, 5.180 ms for no label and 0.562 ms for red. Payloads ranged
+from 6,800 to 10,344 bytes. Queries used the intended indexes without a temporary
+sort; deep no-label work reached about 721,000 VM instructions, so counts/deep
+OFFSET remain proportional to matching index entries. This is not constant-time
+paging. Connection-open measurements ranged from 0.868 to 1.106 ms.
+
+Compact Quick/target/tree polling used 372–373 bytes and fewer than 1,000 VM
+instructions. First/warm medians were 0.041/0.013 ms at 10,000 collections and
+0.033/0.012 ms at 100,000. Process RSS sampled every 5 ms after seeding peaked at
+37.797/42.516 MiB; these are SQL-probe process measurements, not whole-app memory.
+
+The complete Python suite passed **962 tests in 129.11 s**, with required actual
+Metal and the real 4284 x 2844 Nikon D3S NEF fixture, with no skips. This covers
+existing image/export behavior as well as the collection increment; it does not
+establish Adobe color equivalence.
+
+Five native suites against the packaged engine passed **116 assertions**:
+collections 42, Library 13, Target Collection Painter 18, stacks 27 and
+responsiveness 16. Collection checks cover across-page captured batches, the
+sixty-target cap, stale rejection/reselection, global filters, preserved tree
+state, active collection readback, empty-filter external changes and quiet polls.
+The first native run stopped on a test that expected yellow while still selecting
+red. The test now explicitly selects yellow before the captured-conflict scenario;
+all five suites passed in a fresh run without changing application code. Both
+receipts remain local. Inspected batch-picker and filtered-row PNGs match the
+successful run byte-for-byte and show the parent context and color indicators.
+They are offscreen layout evidence, not desktop interaction or VoiceOver testing.
+
+The Mac app builds for the macOS 14 deployment target without Swift diagnostics
+and passes deep/strict local ad-hoc signature verification. Packaged MCP
+initialization, all **139 tool schemas**, broker/client/source identity equality
+and bundled-guide bytes match. Build identities:
+
+- Source digest: `1533fa43bb5efc6339d6dc20db79fbfafe3fda2c912ac71aead7e947ae90d90f`
+- Engine SHA-256: `33ec0cacc85146643ab322e83d44790a0e6ab17c7b3053547a93737436dba182`
+- Native SHA-256: `c40ac23ee361ddc9a032b2df6e779087b5f06fde92a4ab4d449d2c70ed090247`
+
+The independent batch sheet differs from Adobe's sidebar multi-selection gesture.
+Custom label names/sets, full ancestor-path disambiguation for repeated parent
+names, collection drag/drop, remaining smart criteria/exchange and Adobe desktop
+reference acceptance remain open. The macOS 14 runtime, current desktop input,
+VoiceOver and official MCP SDK were not tested; desktop automation was not retried.
+This module does not complete the overall Lightroom parity inventory.

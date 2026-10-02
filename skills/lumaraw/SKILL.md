@@ -437,6 +437,25 @@ collection revision; save can atomically clear afterward. The Quick Collection
 cannot be renamed, moved or deleted. Limits: 32 nesting levels, 128 smart descendants
 in an aggregate view, and 1,000 collection nodes per subtree duplication.
 
+Regular/smart collections and sets have `color_label`: `none`, `red`, `yellow`,
+`green`, `blue` or `purple`. Use `set_collection_labels` with one to sixty unique
+`targets: [{collection_id, expected_revision}]` and the shared `color_label`.
+All captured revisions are validated before any changes, even for no-op targets.
+The result contains updated `collections` and `tree_revision`. Quick cannot be
+labeled. Labels affect the named nodes only, not their photos or descendants;
+copies preserve them. Clearing uses `none`; custom label names are unsupported.
+
+For flat global color filtering, omit `parent_id` and pass `color_label` to
+`list_collections`: a standard color, `none`, or `labeled` for any assigned color.
+Omit the filter for ordinary listing. Do not combine a color filter with even a
+null `parent_id`. Page rows include an immediate `parent_name` for display, null
+at the root; it is not a unique identity or a full ancestor path.
+Pages and `collection_state` include `tree_revision`, which
+changes with collection-tree mutations. It is independent of the target-state
+`revision`; never submit it as a target or collection mutation revision. Refresh
+displayed pages after a changed tree revision without replacing captured forms
+or automatically retrying a stale mutation.
+
 `edit_metadata` takes at most 60 `{photo_id,expected_metadata_revision}` targets and
 a shared `patch` containing title/caption/copyright/color_label/keywords/copy_name. Read each
 target before editing; keywords replace the current set. The response contains a

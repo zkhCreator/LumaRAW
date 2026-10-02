@@ -1,7 +1,7 @@
-// Purpose: lazy collection-tree pages and revision-safe Quick/target workflows.
-// Inputs: explicit expansion, captured collection state and photo selections.
-// Outputs: bounded sidebar pages, membership and atomic Quick-save requests.
-// No SQL, original writes or implicit retries after another client changes target.
+// Purpose: lazy collection-tree pages, color labels and revision-safe target workflows.
+// Inputs: explicit expansion, captured collection revisions and photo selections.
+// Outputs: bounded hierarchy/filter pages and atomic catalog-only mutations.
+// No SQL, original writes or implicit retries after another client changes a target.
 import Foundation
 
 extension Store {
@@ -12,19 +12,116 @@ extension Store {
         do {
             let result=try await Backend.call("list_collections",["parent_id":parent as Any? ?? NSNull(),"offset":offset])
             guard collectionPageGenerations[key] == token else { return }
+            guard let treeRevision=result["tree_revision"] as? Int else {
+                throw EngineFailure(message:"Collection listing did not include its tree revision")
+            }
+            if let parent,!expandedCollections.contains(parent) { return }
+            guard treeRevision >= collectionTreeRevision else {
+                staleCollectionPageKeys.insert(key)
+                return
+            }
+            observeCollectionTreeRevision(treeRevision)
             let items=(result["collections"] as? [[String:Any]] ?? []).compactMap(LibraryCollection.init)
-            let page=CollectionPage(items:items,offset:result["offset"] as? Int ?? 0,total:result["total"] as? Int ?? 0)
+            let page=CollectionPage(items:items,offset:result["offset"] as? Int ?? 0,
+                total:result["total"] as? Int ?? 0,treeRevision:treeRevision)
+            staleCollectionPageKeys.remove(key)
             if let parent {
-                guard expandedCollections.contains(parent) else { return }
-                collectionPages[parent]=page
+                if collectionPages[parent] != page { collectionPages[parent]=page }
             } else {
-                collections=items;collectionOffset=page.offset;collectionTotal=page.total
-                collectionPages[0]=page
+                if collections != items { collections=items }
+                if collectionOffset != page.offset { collectionOffset=page.offset }
+                if collectionTotal != page.total { collectionTotal=page.total }
+                if collectionPages[0] != page { collectionPages[0]=page }
             }
         } catch {
             guard collectionPageGenerations[key] == token else { return }
             if let parent { collapseCollection(parent) }
             self.error=error.localizedDescription
+        }
+    }
+
+    func observeCollectionTreeRevision(_ revision: Int) {
+        guard revision > collectionTreeRevision else { return }
+        collectionTreeRevision=revision
+        for (key,page) in collectionPages where page.treeRevision < revision {
+            staleCollectionPageKeys.insert(key)
+        }
+        if let page=collectionFilteredPage,page.treeRevision < revision {
+            staleCollectionFilterPage=true
+        }
+    }
+
+    func loadCollectionFilteredPage(offset: Int=0) async {
+        guard collectionColorFilter != "any" else { return }
+        collectionFilteredPageGeneration+=1
+        let token=collectionFilteredPageGeneration
+        let filter=collectionColorFilter
+        var params: [String:Any] = ["offset":offset]
+        if filter != "all" { params["color_label"]=filter }
+        do {
+            // Omitting parent_id requests the bounded flat global color-filter page.
+            let result=try await Backend.call("list_collections",params)
+            guard collectionFilteredPageGeneration == token,collectionColorFilter == filter else { return }
+            guard let treeRevision=result["tree_revision"] as? Int else {
+                throw EngineFailure(message:"Collection listing did not include its tree revision")
+            }
+            guard treeRevision >= collectionTreeRevision else {
+                staleCollectionFilterPage=true
+                return
+            }
+            observeCollectionTreeRevision(treeRevision)
+            let page=CollectionPage(items:(result["collections"] as? [[String:Any]] ?? []).compactMap(LibraryCollection.init),
+                offset:result["offset"] as? Int ?? 0,total:result["total"] as? Int ?? 0,treeRevision:treeRevision)
+            collectionFilteredOffset=page.offset
+            staleCollectionFilterPage=false
+            if collectionFilteredPage != page { collectionFilteredPage=page }
+        } catch {
+            guard collectionFilteredPageGeneration == token else { return }
+            self.error=error.localizedDescription
+        }
+    }
+
+    func setCollectionColorFilter(_ filter: String) async {
+        guard ["any","all","labeled","none","red","yellow","green","blue","purple"].contains(filter) else { return }
+        guard collectionColorFilter != filter else {
+            if filter != "any",collectionFilteredPage == nil { await loadCollectionFilteredPage(offset:collectionFilteredOffset) }
+            return
+        }
+        collectionColorFilter=filter
+        collectionFilteredOffset=0
+        collectionFilteredPageGeneration+=1
+        collectionFilteredPage=nil
+        if filter == "any" {
+            staleCollectionFilterPage=false
+        } else {
+            await loadCollectionFilteredPage(offset:0)
+        }
+    }
+
+    func turnCollectionColorFilterPage(offset: Int) async {
+        guard collectionColorFilter != "any" else { return }
+        await loadCollectionFilteredPage(offset:max(0,offset))
+    }
+
+    func refreshLoadedCollectionPagesForTreeRevision() async {
+        if let root=collectionPages[0] {
+            await loadCollectionPage(parent:nil,offset:root.offset)
+        } else if staleCollectionPageKeys.contains(0) {
+            await loadCollectionPage(parent:nil,offset:collectionOffset)
+        }
+        for id in expandedCollections.sorted() {
+            await loadCollectionPage(parent:id,offset:collectionPages[id]?.offset ?? 0)
+        }
+        if collectionColorFilter != "any" && (collectionFilteredPage != nil || staleCollectionFilterPage) {
+            await loadCollectionFilteredPage(offset:collectionFilteredPage?.offset ?? collectionFilteredOffset)
+        }
+        if let id=collectionID,let capturedRevision=activeCollection?.revision,
+           activeCollection?.id == id,
+           let row=try? await Backend.call("get_collection",["collection_id":id]),
+           let updated=LibraryCollection(row),collectionID == id,
+           activeCollection?.id == id,activeCollection?.revision == capturedRevision,
+           updated.revision >= capturedRevision,activeCollection != updated {
+            activeCollection=updated
         }
     }
 
@@ -36,7 +133,7 @@ extension Store {
     func collapseCollection(_ id: Int) {
         collectionPageGenerations[id]=(collectionPageGenerations[id] ?? 0)+1
         for child in collectionPages[id]?.items ?? [] where child.kind == "set" { collapseCollection(child.id) }
-        collectionPages.removeValue(forKey:id);expandedCollections.remove(id)
+        collectionPages.removeValue(forKey:id);expandedCollections.remove(id);staleCollectionPageKeys.remove(id)
     }
 
     func turnCollectionPage(parent: Int?,offset: Int) async {
@@ -50,12 +147,27 @@ extension Store {
         do {
             let result=try await Backend.call("collection_state",ids.isEmpty ? [:]:["photo_ids":ids])
             guard photos.map(\.id) == ids else { return }
-            if let state=CollectionState(result),state.revision >= (collectionState?.revision ?? 0) {
-                if let current=collectionState,state.revision == current.revision,
-                   (state.target.revision < current.target.revision || state.quick.revision < current.quick.revision) { return }
+            guard let responseTreeRevision=result["tree_revision"] as? Int else {
+                throw EngineFailure(message:"Collection state did not include its tree revision")
+            }
+            let treeChanged=responseTreeRevision > collectionTreeRevision
+            observeCollectionTreeRevision(responseTreeRevision)
+            if let state=CollectionState(result),collectionStateCanAdopt(state,responseTreeRevision:responseTreeRevision) {
                 if collectionState != state {collectionState=state}
             }
+            if treeChanged || !staleCollectionPageKeys.isEmpty || staleCollectionFilterPage {
+                await refreshLoadedCollectionPagesForTreeRevision()
+            }
         } catch { message=error.localizedDescription }
+    }
+
+    func collectionStateCanAdopt(_ state: CollectionState,responseTreeRevision: Int) -> Bool {
+        guard responseTreeRevision >= collectionTreeRevision,
+              state.revision >= (collectionState?.revision ?? 0) else { return false }
+        if let current=collectionState,state.revision == current.revision {
+            return state.target.revision >= current.target.revision && state.quick.revision >= current.quick.revision
+        }
+        return true
     }
 
     func setTargetCollection(_ collection: LibraryCollection?) async {
@@ -113,5 +225,28 @@ extension Store {
             await refreshCollections()
             if collectionID == source.id { await refresh() }
         } catch { self.error=error.localizedDescription }
+    }
+
+    func setCollectionColorLabel(_ collection: LibraryCollection,colorLabel: String) async -> Bool {
+        await setCollectionColorLabels([collection],colorLabel:colorLabel)
+    }
+
+    func setCollectionColorLabels(_ captured: [LibraryCollection],colorLabel: String) async -> Bool {
+        guard (1...60).contains(captured.count),Set(captured.map(\.id)).count == captured.count,
+              captured.allSatisfy({ $0.kind != "quick" }),
+              LibraryLabels.names.contains(colorLabel) else {
+            error="Choose 1 to 60 unique non-Quick collections and a valid color label"
+            return false
+        }
+        let targets=captured.map { ["collection_id":$0.id,"expected_revision":$0.revision] }
+        do {
+            _=try await Backend.call("set_collection_labels",["targets":targets,"color_label":colorLabel])
+            await refreshCollections()
+            message="Updated color labels for \(captured.count) collections"
+            return true
+        } catch {
+            self.error=error.localizedDescription
+            return false
+        }
     }
 }

@@ -1,6 +1,6 @@
-// Purpose: keep the visible library page and its edited thumbnails current.
+// Purpose: keep visible library summaries, thumbnails and collection state current.
 // Inputs: bounded page summaries, local edits and external-client polling.
-// Outputs: revision-keyed thumbnail requests and changed summary rows only.
+// Outputs: revision-keyed thumbnail requests and changed library/collection summaries.
 // Full inspector recipes retain their separate optimistic-conflict barrier.
 import Foundation
 
@@ -16,8 +16,9 @@ extension Store {
         if ids.isEmpty {
             if let result=try? await Backend.call("library_state"),!browsing,photos.isEmpty,
                (snapshotFilterChanged(result) || importSourceChanged(result) || result["stack_revision"] as? Int != stackRevision || result["folder_revision"] as? Int != photoFolderRevision || result["keyword_revision"] as? Int != photoKeywordRevision) {
-                await refresh()
+                await refresh();return
             }
+            await refreshCollectionState()
             return
         }
         do {

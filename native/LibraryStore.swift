@@ -10,9 +10,15 @@ extension Store {
         for id in expandedCollections.sorted() {
             await loadCollectionPage(parent:id,offset:collectionPages[id]?.offset ?? 0)
         }
+        if collectionColorFilter != "any" {
+            await loadCollectionFilteredPage(offset:collectionFilteredPage?.offset ?? collectionFilteredOffset)
+        }
         await refreshCollectionState()
-        if let id=collectionID,let row=try? await Backend.call("get_collection",["collection_id":id]),collectionID == id {
-            activeCollection=LibraryCollection(row)
+        let captured=activeCollection
+        if let id=collectionID,let row=try? await Backend.call("get_collection",["collection_id":id]),
+           collectionID == id,activeCollection == captured,let updated=LibraryCollection(row),
+           updated.revision >= (captured?.revision ?? 0),activeCollection != updated {
+            activeCollection=updated
         }
     }
 

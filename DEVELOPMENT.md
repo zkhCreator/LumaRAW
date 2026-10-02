@@ -190,6 +190,13 @@ when a clear function is more maintainable. Avoid unrelated formatting churn.
 - Store collection membership relationally. Compile supported filters to bound
   SQL parameters; whitelist sort columns. Smart collections evaluate stored rules
   at query time. Count and page queries must use identical predicates.
+- Collection labels belong to collection nodes, not their photos or descendants.
+  Validate every captured target before a batch label transaction, including
+  no-op targets; preserve ancestor conflicts and original Quick/target semantics.
+  Poll a separate tree revision and refresh only loaded pages after changes.
+  Color filtering is a bounded flat query across the hierarchy; keep unfiltered
+  expansion and page state independent. Never rebase an open label selection or
+  editor silently when another client changes a collection.
 - Persist identities that cannot be reused by a later object. Migration must
   preserve live references and roll back failures; a stale native editor must
   never modify a newly created collection with an old identifier.

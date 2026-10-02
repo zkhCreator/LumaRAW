@@ -1,7 +1,7 @@
 // Purpose: main-thread presentation state and user workflows for the native shell.
 // Inputs: native controls and service replies. Outputs: reversible recipe edits,
 // preview paths and queue state. Revisions belong to the service; stale edits are
-// rejected, never silently retried. UI state contains one bounded catalog page.
+// rejected, never silently retried. Photo results and collection browsers use bounded pages.
 import SwiftUI
 import AppKit
 import UniformTypeIdentifiers
@@ -134,6 +134,13 @@ import UniformTypeIdentifiers
     @Published var collectionOffset=0
     @Published var collectionPages: [Int:CollectionPage] = [:]
     var collectionPageGenerations: [Int:Int] = [:]
+    @Published var collectionColorFilter="any"
+    @Published var collectionFilteredPage: CollectionPage?
+    @Published var collectionFilteredOffset=0
+    var collectionFilteredPageGeneration=0
+    var collectionTreeRevision = -1
+    var staleCollectionPageKeys: Set<Int> = []
+    var staleCollectionFilterPage=false
     @Published var expandedCollections: Set<Int> = []
     @Published var collectionState: CollectionState?
     @Published var newCollectionKind="regular"
@@ -142,6 +149,7 @@ import UniformTypeIdentifiers
     @Published var quickSaveSource: LibraryCollection?
     @Published var collectionTotal=0
     @Published var showCollectionEditor=false
+    @Published var showCollectionLabelBatch=false
     @Published var editingCollection: LibraryCollection?
     @Published var showLibraryFilters=false
     @Published var copyBusy=false

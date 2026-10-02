@@ -27,26 +27,32 @@ struct LibraryCollection: Identifiable,Equatable {
     let rules: [String: Any]
     let match: String
     let parentID: Int?
+    let parentName: String?
+    let colorLabel: String
     var symbol: String { kind == "set" ? "folder" : kind == "smart" ? "gearshape.2" : kind == "quick" ? "circle.dashed" : "square.stack" }
     static func ==(lhs:Self,rhs:Self)->Bool {
         lhs.id==rhs.id && lhs.name==rhs.name && lhs.kind==rhs.kind && lhs.revision==rhs.revision &&
-        lhs.match==rhs.match && lhs.parentID==rhs.parentID && NSDictionary(dictionary:lhs.rules).isEqual(to:rhs.rules)
+        lhs.match==rhs.match && lhs.parentID==rhs.parentID && lhs.parentName==rhs.parentName && lhs.colorLabel==rhs.colorLabel &&
+        NSDictionary(dictionary:lhs.rules).isEqual(to:rhs.rules)
     }
 
     init?(_ row: [String: Any]) {
         guard let id=row["id"] as? Int, let name=row["name"] as? String else { return nil }
         self.id=id; self.name=name;parentID=row["parent_id"] as? Int
+        parentName=row["parent_name"] as? String
         kind=row["kind"] as? String ?? "regular"
         revision=row["revision"] as? Int ?? 0
         rules=row["rules"] as? [String: Any] ?? [:]
         match=row["match"] as? String ?? "all"
+        colorLabel=row["color_label"] as? String ?? "none"
     }
 }
 
-struct CollectionPage {
+struct CollectionPage: Equatable {
     let items: [LibraryCollection]
     let offset: Int
     let total: Int
+    let treeRevision: Int
 }
 
 struct CollectionState:Equatable {

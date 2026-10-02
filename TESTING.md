@@ -1396,3 +1396,35 @@ outside the measurement. The probe previews only and leaves the catalog empty.
 For a comparable Fit baseline, `--legacy-fit` omits viewport requests and requires
 every repeated Fit request to spawn work; run it against the previous packaged
 engine. Use a separate new work directory and report both executable hashes.
+
+## Collection color labels
+
+`tests/test_collection_labels.py` covers additive schema-32 upgrades, independent
+tree and target-state revisions, atomic batch validation, ancestor conflicts,
+no-op labels, Quick exclusion, label-preserving duplication and bounded global
+color filtering. Old-catalog evidence must construct the old schema rather than
+only lower a newer database's version. Invalid or stale targets leave every row
+unchanged; labels never edit photos or recipes.
+
+`NativeCollectionRegression` exercises the same contracts through packaged IPC,
+including filtered pages, preserved tree expansion, captured multi-page label
+selections, external tree changes and unchanged polling. Inspect its offscreen
+sidebar and batch-sheet PNGs for layout only; these do not verify desktop input,
+VoiceOver or the macOS 14 runtime.
+
+```sh
+.venv/bin/python -m pytest -q tests/test_collection_labels.py tests/test_collections.py \
+  tests/test_collection_identities.py tests/test_target_painter.py
+.venv/bin/python tests/run_native.py --work work/new-collection-labels-native \
+  --engine /absolute/LumaRAW.app/Contents/Resources/Engine/LumaRAWEngine \
+  --suite NativeCollectionRegression --suite NativeLibraryRegression \
+  --suite NativeTargetPainterRegression --suite NativeResponsivenessRegression
+.venv/bin/python tests/collection_labels_probe.py \
+  --work work/new-collection-labels-scale --rows 10000 100000
+```
+
+Run the scale probe without other tests/builds. Synthetic collection rows establish
+SQL paging and compact state-poll costs, not photographic processing or desktop
+frame rate. Record complete count-plus-page requests, first and repeated timings,
+query plans/VM work, reply sizes and sampled RSS. A newly opened SQL connection
+still has warm OS caches after seeding; do not describe it as a cold disk test.

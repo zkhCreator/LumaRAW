@@ -18,7 +18,7 @@ LumaRAW preserves your originals. Add references files in place; Copy imports by
 | Library | Folder tree/search/favorites/labels, ratings, flags, catalog metadata/keywords, regular/live smart collections, nested sets, Quick/target collections, SQL filters/sorting, manual/capture-time stacks, duplicate/missing indexing, virtual copies/shared snapshots, selective sync, and backup/restore |
 | Culling | Grid/Loupe/Compare/Survey, anchored page selections, active-photo review actions, linked or independent full-resolution comparison viewports |
 | Export | JPEG and 16-bit TIFF with embedded sRGB, Display P3, Adobe RGB, or ProPhoto RGB ICC profiles; frozen catalog XMP/keyword policies, persistent queue, pause/cancel/retry, and collision-safe filenames |
-| Agents | 137 MCP tools, equivalent JSON CLI commands, and a bundled skill; app and agent edits share conflict detection |
+| Agents | 139 MCP tools, equivalent JSON CLI commands, and a bundled skill; app and agent edits share conflict detection |
 
 ## Build and run
 
@@ -413,6 +413,16 @@ Collection removal preserves catalog
 photos and originals. **Filter** combines rating, flag, color, keyword, text,
 camera and folder criteria; sorting is stable across 60-photo pages. Camera and
 capture-time filters require the library index to have read that metadata.
+
+Collection rows support five color labels and **None** through their contextual
+menu. Labels belong to the collection, smart collection or set; they do not
+change its photographs or children. Use the Collections color filter to find
+matching nodes anywhere in the hierarchy. Clearing the filter restores the tree's
+expanded branches and page positions. **Label Multiple Collections…** opens a
+paged picker for up to sixty captured collections, including across pages. If
+another client edits a chosen collection, the whole label batch fails for review.
+Duplicating collections preserves their labels. Custom label names are not yet
+supported.
 
 The **Quick Collection** is persistent and unique per catalog. Its contextual menu
 can save it as a regular collection, optionally clearing it in the same operation.

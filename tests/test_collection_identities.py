@@ -28,11 +28,17 @@ def test_v4_migration_preserves_live_references_and_schema_objects(tmp_path,monk
     root=tmp_path/'catalog'
     with monkeypatch.context() as patch:
         patch.setattr(catalog_module,'migrate',v4)
-        c=Catalog(root);store=Collections(c)
-        parent=store.save('Set',kind='set')
-        album=store.save('Album',parent_id=parent['id'])
-        smart=store.save('Smart',kind='smart',rules={'rating_min':4},parent_id=parent['id'])
-        store.set_target(0,album['id'])
+        c=Catalog(root)
+        # Seed published v4 columns, without calling current state commands that
+        # require later migrations such as the independent collection-tree token.
+        with c.db:
+            parent_id=c.db.execute("INSERT INTO collections(name,kind,created) VALUES('Set','set',0)").lastrowid
+            album_id=c.db.execute("INSERT INTO collections(name,kind,parent_id,created) VALUES('Album','regular',?,0)",
+                                  (parent_id,)).lastrowid
+            c.db.execute("INSERT INTO collections(name,kind,rules,parent_id,created) VALUES('Smart','smart',?, ?,0)",
+                         (json.dumps({'rating_min':4}),parent_id))
+            c.db.execute('UPDATE collection_state SET target_id=?,revision=revision+1 WHERE id=1',(album_id,))
+        album={'id':album_id}
         with c.db:
             c.db.execute("ALTER TABLE collections ADD COLUMN notes TEXT DEFAULT ''")
             c.db.execute("UPDATE collections SET notes='retained' WHERE id=?",(album['id'],))
@@ -53,13 +59,15 @@ def test_v4_migration_preserves_live_references_and_schema_objects(tmp_path,monk
             c.db.executemany('INSERT INTO stack_members(scope,photo_id,stack_id,position) VALUES(?,?,?,?)',
                             [(scope,1,stack,0),(scope,2,stack,1)])
         tables=('collections','collection_state','collection_photos','photo_stacks','stack_members','stack_state','collection_audit')
-        before={table:[tuple(row) for row in c.db.execute(f'SELECT * FROM {table}')] for table in tables}
+        columns={table:','.join(row[1] for row in c.db.execute(f'PRAGMA table_info({table})')) for table in tables}
+        before={table:[tuple(row) for row in c.db.execute(f'SELECT {columns[table]} FROM {table}')] for table in tables}
         assert c.db.execute('PRAGMA user_version').fetchone()[0]==4
         c.close()
     c=Catalog(root)
     assert c.db.execute('PRAGMA user_version').fetchone()[0]==CATALOG_VERSION
     for table in tables:
-        assert [tuple(row) for row in c.db.execute(f'SELECT * FROM {table}')]==before[table]
+        assert [tuple(row) for row in c.db.execute(f'SELECT {columns[table]} FROM {table}')]==before[table]
+    assert {row[0] for row in c.db.execute('SELECT color_label FROM collections')}=={'none'}
     assert c.db.execute("SELECT count(*) FROM sqlite_master WHERE name IN ('collection_notes','collection_audited','stacked_collection_deleted')").fetchone()[0]==3
     with c.db:c.db.execute("UPDATE collections SET notes='updated' WHERE id=?",(album['id'],))
     assert c.db.execute('SELECT id FROM collection_audit ORDER BY rowid DESC LIMIT 1').fetchone()[0]==album['id']

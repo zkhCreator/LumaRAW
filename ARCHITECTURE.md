@@ -267,6 +267,23 @@ Metadata and collections have independent revisions. Grid filtering/counting/sor
 SQLite with a deterministic ID tie-breaker; summaries never select recipe or EXIF
 JSON. Collections also paginate at 60 and do not eagerly count every smart collection.
 
+Schema 33 adds collection-node color labels and a separate tree-change counter.
+Collection insert/update/delete triggers advance that counter in the same
+transaction, without changing the independent Quick/target state revision.
+Label batches validate all captured collection revisions before changing rows;
+ancestor sets advance once per affected node. Assigning an unchanged label is
+a no-op after validation. Labels never propagate to photographs or child nodes.
+Subtree duplication preserves labels as an explicit LumaRAW policy.
+
+Color-filtered collection pages are flat indexed queries across the hierarchy,
+with the same sixty-row limit and name/ID order. Each page and compact state poll
+includes the tree revision. Immediate parent names use at most one bounded
+lookup for the page's missing parents, without traversing the whole tree.
+The Mac shell retains separate filtered-page state
+and normal tree expansions; it refreshes loaded pages after changes and rejects
+late responses. Unchanged polling does not republish the workspace. A captured
+batch selection remains revision-bound even while the sidebar refreshes.
+
 `virtual_copies.py` owns schema version 3 and catalog variants. A source-family ID
 is independent of photo identity; one partial unique index permits exactly one
 master for a path and another permits at most one master per family. Creation and

@@ -307,6 +307,7 @@ class Service:
             if method=='apply_auto_stack':return AutoStacks(c).apply(**p)
             if method=='refresh_capture_times':return AutoStacks(c).refresh_times(**p)
             if method=='list_collections':return Collections(c).list(**p)
+            if method=='set_collection_labels':return Collections(c).set_labels(**p)
             if method=='get_collection':
                 store=Collections(c);row=store.get(p['collection_id'])
                 return {**row,'ancestors':list(reversed(store.ancestors(row['parent_id'])))}

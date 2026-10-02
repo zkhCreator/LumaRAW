@@ -1,10 +1,13 @@
-"""Portable hierarchical collections and durable Quick/target collection state.
+"""Portable hierarchical collections, labels and durable Quick/target state.
 
 Inputs: validated commands, expected revisions and catalog-owned SQLite access.
-Outputs: bounded collection pages, predicates and atomic membership changes.
+Outputs: bounded collection pages with one-level parent-name context, predicates
+and atomic membership changes.
 Sets contain collections, never photos directly. Originals and photo recipes are
 untouched. Ancestor revisions cover descendant edits so stale subtree deletion
-cannot erase changes the caller has not seen. No pixels or platform UI.
+cannot erase changes the caller has not seen. Standard color labels are catalog
+metadata; a separate tree revision tracks collection row changes. Label-filtered
+pages stay flat across the hierarchy and use covering indexes. No pixels or UI.
 Collection identities are never reused after deletion, including after restart.
 Membership validation reads only bounded IDs, never full photo/keyword details.
 """
@@ -63,6 +66,30 @@ def migrate_identities(db):
         db.execute('PRAGMA user_version=5')
 
 
+def migrate_labels(db):
+    """v33: add catalog-only collection colors and an independent tree token."""
+    if db.execute('PRAGMA user_version').fetchone()[0] >= 33:
+        return
+    with db:
+        db.execute('BEGIN IMMEDIATE')
+        columns = {row[1] for row in db.execute('PRAGMA table_info(collections)')}
+        if 'color_label' not in columns:
+            db.execute("ALTER TABLE collections ADD COLUMN color_label TEXT NOT NULL DEFAULT 'none'")
+        db.execute('CREATE TABLE IF NOT EXISTS collection_tree_state('
+                   'id INTEGER PRIMARY KEY CHECK(id=1),revision INTEGER NOT NULL DEFAULT 0)')
+        db.execute('INSERT OR IGNORE INTO collection_tree_state(id,revision) VALUES(1,0)')
+        db.execute("CREATE INDEX IF NOT EXISTS collection_flat_name_color ON collections"
+                   "(name COLLATE NOCASE,id,color_label) WHERE kind!='quick'")
+        db.execute("CREATE INDEX IF NOT EXISTS collection_label_name ON collections"
+                   "(color_label,name COLLATE NOCASE,id) WHERE kind!='quick'")
+        db.execute("CREATE INDEX IF NOT EXISTS collection_labeled_name ON collections"
+                   "(name COLLATE NOCASE,id) WHERE kind!='quick' AND color_label!='none'")
+        for event, suffix in (('INSERT','insert'),('UPDATE','update'),('DELETE','delete')):
+            db.execute(f'CREATE TRIGGER IF NOT EXISTS collection_tree_{suffix} AFTER {event} ON collections '
+                       'BEGIN UPDATE collection_tree_state SET revision=revision+1 WHERE id=1; END')
+        db.execute('PRAGMA user_version=33')
+
+
 class Collections:
     def __init__(self,catalog):
         self.catalog=catalog
@@ -78,6 +105,9 @@ class Collections:
         row=self.get(id_)
         if row['revision'] != revision: raise ValueError('Collection conflict; reload the collection before editing')
         return row
+
+    def tree_revision(self):
+        return self.db.execute('SELECT revision FROM collection_tree_state WHERE id=1').fetchone()[0]
 
     def ancestors(self,id_):
         result=[];seen=set()
@@ -97,17 +127,68 @@ class Collections:
         if any(row['id']==id_ for row in ancestors): raise ValueError('A collection set cannot contain itself or its ancestor')
         if len(ancestors)>=32: raise ValueError('Collection nesting exceeds 32 levels')
 
-    def list(self,offset=0,parent_id=UNSET):
+    def list(self,offset=0,parent_id=UNSET,color_label=UNSET):
         where="kind!='quick'";params=[]
-        if parent_id is not UNSET:
+        if color_label is not UNSET:
+            if parent_id is not UNSET:
+                raise ValueError('Color-filtered collection pages must omit parent_id')
+            if color_label not in ('labeled','none','red','yellow','green','blue','purple'):
+                raise ValueError('Unsupported collection color filter')
+            where += " AND color_label!='none'" if color_label=='labeled' else ' AND color_label=?'
+            if color_label != 'labeled': params.append(color_label)
+        elif parent_id is not UNSET:
             if parent_id is not None and self.get(parent_id)['kind'] != 'set':
                 raise ValueError('Only a collection set has child collections')
             where+=' AND parent_id IS ?';params.append(parent_id)
         total=self.db.execute('SELECT count(*) FROM collections WHERE '+where,params).fetchone()[0]
         offset=min(offset,max(0,((total-1)//60)*60))
-        rows=self.db.execute('SELECT id FROM collections WHERE '+where+
-                             ' ORDER BY name COLLATE NOCASE,id LIMIT 60 OFFSET ?',[*params,offset]).fetchall()
-        return {'collections':[self.get(row[0]) for row in rows],'offset':offset,'total':total,'page_size':60}
+        rows=[dict(row) for row in self.db.execute('SELECT * FROM collections WHERE '+where+
+                             ' ORDER BY name COLLATE NOCASE,id LIMIT 60 OFFSET ?',[*params,offset])]
+        parent_ids=sorted({row['parent_id'] for row in rows if row['parent_id'] is not None})
+        parent_names={row['id']:row['name'] for row in rows if row['id'] in parent_ids}
+        missing_parent_ids=[id_ for id_ in parent_ids if id_ not in parent_names]
+        if missing_parent_ids:
+            slots=','.join('?' for _ in missing_parent_ids)
+            parent_names.update({row['id']:row['name'] for row in self.db.execute(
+                f'SELECT id,name FROM collections WHERE id IN ({slots})',missing_parent_ids)})
+        for row in rows:
+            row['rules']=json.loads(row['rules'])
+            row['parent_name']=parent_names.get(row['parent_id'])
+        return {'collections':rows,'offset':offset,'total':total,'page_size':60,
+                'tree_revision':self.tree_revision()}
+
+    def set_labels(self,targets,color_label):
+        from .organization import COLORS
+        targets=list(targets)
+        ids=[target['collection_id'] for target in targets]
+        if not 1 <= len(targets) <= 60 or len(set(ids)) != len(ids):
+            raise ValueError('Collection label updates require 1 to 60 distinct collections')
+        if color_label not in COLORS:
+            raise ValueError('Unsupported collection color label')
+        with self.db:
+            self.db.execute('BEGIN IMMEDIATE')
+            rows=[]
+            # Validate the whole request and all affected ancestor paths before
+            # the first row changes, so stale or invalid targets cannot partially
+            # apply a batch.
+            for target in targets:
+                row=self.checked(target['collection_id'],target['expected_revision'])
+                if row['kind']=='quick':
+                    raise ValueError('The Quick Collection cannot be color-labeled')
+                rows.append(row)
+            changed=[row for row in rows if row['color_label'] != color_label]
+            changed_ids={row['id'] for row in changed}
+            affected=set(changed_ids)
+            for row in changed:
+                affected.update(ancestor['id'] for ancestor in self.ancestors(row['parent_id']))
+            for row in changed:
+                self.db.execute('UPDATE collections SET color_label=?,revision=revision+1 WHERE id=?',
+                                (color_label,row['id']))
+            for id_ in affected-changed_ids:
+                self.db.execute('UPDATE collections SET revision=revision+1 WHERE id=?',(id_,))
+            updated=[self.get(id_) for id_ in ids]
+            tree_revision=self.tree_revision()
+        return {'collections':updated,'tree_revision':tree_revision}
 
     def save(self,name,kind='regular',rules=None,match='all',collection_id=None,
              expected_revision=None,parent_id=UNSET,photo_ids=None):
@@ -184,7 +265,8 @@ class Collections:
 
     def state(self,photo_ids=()):
         row=dict(self.db.execute('SELECT * FROM collection_state WHERE id=1').fetchone())
-        result={'revision':row['revision'],'quick':self.get(row['quick_id']),'target':self.get(row['target_id']),'members':[]}
+        result={'revision':row['revision'],'tree_revision':self.tree_revision(),
+                'quick':self.get(row['quick_id']),'target':self.get(row['target_id']),'members':[]}
         if photo_ids:
             slots=','.join('?' for _ in photo_ids)
             result['members']=[r[0] for r in self.db.execute(
@@ -252,8 +334,8 @@ class Collections:
             # Allocate every copy first; never depend on recursive SQL row order.
             for id_ in ids:
                 row=self.get(id_)
-                new_id=self.db.execute('INSERT INTO collections(name,kind,rules,match,parent_id,created) VALUES(?,?,?,?,?,?)',
-                    (name.strip() if id_==collection_id else row['name'],row['kind'],json.dumps(row['rules']),row['match'],None,time.time())).lastrowid
+                new_id=self.db.execute('INSERT INTO collections(name,kind,rules,match,parent_id,created,color_label) VALUES(?,?,?,?,?,?,?)',
+                    (name.strip() if id_==collection_id else row['name'],row['kind'],json.dumps(row['rules']),row['match'],None,time.time(),row['color_label'])).lastrowid
                 mapping[id_]=new_id
                 self.db.execute('INSERT INTO collection_photos SELECT ?,photo_id FROM collection_photos WHERE collection_id=?',(new_id,id_))
                 from .stacks import Stacks
