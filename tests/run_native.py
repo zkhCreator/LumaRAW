@@ -33,6 +33,7 @@ def main():
     suites+=('NativeImportBackupRegression',)
     suites+=('NativeImportPresetRegression',)
     suites+=('NativeImportSequenceRegression',)
+    suites+=('NativeImportDateRegression',)
     suites+=('NativePreviousImportRegression',)
     suites+=('NativeColorMixerRegression',)
     suites+=('NativePointCurveRegression',)
@@ -72,6 +73,10 @@ def main():
                 second,fraction=((0,'9'),(1,'1'),(2,'0'),(2,'3'),(4,'0'))[index]
                 exif[34665]={36867:f'2026:09:26 12:00:{second:02d}',37521:fraction,36881:'+00:00'}
                 Image.new('RGB',(160,100),color).save(path,exif=exif)
+            elif suite=='NativeImportDateRegression':
+                exif=Image.Exif()
+                exif[34665]={36867:'2026:09:28 00:15:00',36881:'+14:00'}
+                Image.new('RGB',(160,100),color).save(path,exif=exif)
             else:Image.new('RGB',(2400,1800) if suite in ('NativeComparisonLayoutRegression','NativeReferenceRegression','NativeResponsivenessRegression','NativeColorReadoutRegression') else (160,100),color).save(path)
             paths.append(str(path))
         executable=work/suite
@@ -84,7 +89,7 @@ def main():
             'LUMARAW_PRESETS_ROOT':str(work/'presets'/suite)}
         if suite=='NativeReferenceRegression':env['LUMARAW_TEST_FIXTURES']='|'.join(paths)
         if suite=='NativeImportNamingRegression':env['LUMARAW_TEST_FIXTURES']='|'.join(paths)
-        if suite in ('NativeImportBackupRegression','NativeImportPresetRegression','NativeImportSequenceRegression'):env['LUMARAW_TEST_FIXTURES']='|'.join(paths)
+        if suite in ('NativeImportBackupRegression','NativeImportPresetRegression','NativeImportSequenceRegression','NativeImportDateRegression'):env['LUMARAW_TEST_FIXTURES']='|'.join(paths)
         if suite=='NativeResponsivenessRegression':env['LUMARAW_TEST_FIXTURES']='|'.join(paths)
         if suite=='NativeTransportRegression':
             relay=fixtures/'native-relay'

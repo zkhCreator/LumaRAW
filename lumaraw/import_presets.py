@@ -4,6 +4,7 @@ Inputs: ready review/library revisions and explicit save/use/rename/delete actio
 Outputs: bounded preset names and frozen options, processing and naming snapshots.
 Sources, checked rows, destination identities, transfer journals and dated backup
 folders are never saved in presets. Each use pins fresh filesystem identities.
+Date-folder layout is a captured option; old presets retain the year/date default.
 Replacing a ready review requires explicit rescan and atomically retains its old
 receipt; failures before commit preserve it. No original writes or preset replay.
 """
@@ -44,7 +45,7 @@ def capture(catalog, plan_id, expected_revision):
     value = {'options':options, 'processing':processing.settings(catalog, plan_id)}
     value['processing'].pop('plan_id')
     if copy:
-        options.update({key:copy[key] for key in ('destination','organization','subfolder')})
+        options.update({key:copy[key] for key in ('destination','organization','subfolder','date_format')})
         from .import_backup import settings
         options['second_copy_destination'] = settings(copy).get('destination')
         value['naming'] = naming.settings(copy)
@@ -89,6 +90,8 @@ class ImportPresets:
     def get(self, preset_id, expected_revision):
         row = self.read(preset_id, expected_revision)
         value = row.pop('value')
+        if value['options']['mode'] == 'copy':
+            value['options'].setdefault('date_format','year_date')
         # Preset pickers do not transport potentially large recipe/metadata patches.
         return {**row, 'revision':expected_revision, 'options':value['options'],
                 'processing':processing.summary(value['processing']), 'renaming':value.get('naming',{}).get('enabled',False)}
@@ -154,10 +157,11 @@ def prepare(service, params, replace=None):
     if options.get('mode','add') == 'copy':
         if not options.get('destination'):
             raise ValueError('Choose a Copy destination')
-        copy = validate_destination(options['destination'], captured, service.root, options.get('organization','flat'), options.get('subfolder',''))
+        copy = validate_destination(options['destination'], captured, service.root, options.get('organization','flat'),
+                                    options.get('subfolder',''),options.get('date_format','year_date'))
         if options.get('second_copy_destination'):
             copy['backup'] = backup_capture(options['second_copy_destination'], copy, service.root)
-    elif any(key in params for key in ('destination','organization','subfolder','second_copy_destination')):
+    elif any(key in params for key in ('destination','organization','subfolder','date_format','second_copy_destination')):
         raise ValueError('Destination options require Copy mode')
     if row:
         processing.verify_asset(row['value']['processing'])

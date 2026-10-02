@@ -3,6 +3,7 @@
 Inputs: a new disposable work directory and synthetic staged-row counts. Outputs:
 warm/cold connection page timings, SQLite VM work, RSS and frozen rank checks.
 Optional catalog tokens measure global-counter lookup plus the same bounded ranks.
+Optional date organization measures captured civil-date path rendering per page.
 No photos/pixels, real source reads, broker IPC or desktop input are measured.
 """
 import argparse
@@ -29,10 +30,17 @@ def seed(c,count):
 def main():
     parser=argparse.ArgumentParser();parser.add_argument('--work',type=Path,required=True)
     parser.add_argument('--rows',type=int,nargs='+',default=[10000,100000])
-    parser.add_argument('--catalog-counters',action='store_true');args=parser.parse_args()
+    parser.add_argument('--catalog-counters',action='store_true')
+    parser.add_argument('--date-format',choices=('year_date','year_month_day','date'));args=parser.parse_args()
     args.work.mkdir(parents=True,exist_ok=False);results=[]
     for count in args.rows:
-        root=args.work/str(count);c=Catalog(root);seed(c,count);c.close()
+        root=args.work/str(count);c=Catalog(root);seed(c,count)
+        if args.date_format:
+            with c.db:
+                c.db.execute("UPDATE import_copy_plans SET organization='date',date_format=?",(args.date_format,))
+                c.db.execute('UPDATE import_files SET clock=?',
+                    (json.dumps({'capture_civil':{'year':'2026','month':'09','day':'28'}}),))
+        c.close()
         value={**names.defaults(),'enabled':True,'template':names.builtins()[2]['template'],'custom_text':'Batch'}
         if args.catalog_counters:
             value['template']=[names.token('import_number',digits=4),names.token('literal',text='-'),
@@ -55,6 +63,9 @@ def main():
                 if args.catalog_counters:
                     assert Path(result['items'][0]['destination']).name==f'0001-{offset+1:08}.jpg'
                     assert result['sequence']=={'revision':0,'import_number':1,'image_number':1,'frozen':False}
+                if args.date_format:
+                    expected={'year_date':'2026/2026-09-28','year_month_day':'2026/09/28','date':'2026-09-28'}[args.date_format]
+                    assert all(str(Path(item['destination']).parent)==f'/probe/destination/{expected}' for item in result['items'])
             samples.append({'offset':offset,'first_ms':runs[0],'warm_median_ms':statistics.median(runs[1:]),
                             'warm_max_ms':max(runs[1:]),'vm_steps':vm,'reply_bytes':len(json.dumps(result).encode())})
         start=time.perf_counter()
@@ -66,7 +77,8 @@ def main():
         results.append({'rows':count,'pages':samples,'freeze_ms':elapsed,'sampled_peak_mb':peak[0]/1024**2,'sample_interval_ms':5})
         c.close()
     report={'results':results,'pixel_workers':0,'fixtures':'synthetic SQLite rows only','desktop_ui':'NOT_VERIFIED',
-            'catalog_counters':args.catalog_counters,'cache':'new SQLite connection; OS cache warm from seeding'}
+            'catalog_counters':args.catalog_counters,'date_format':args.date_format,
+            'cache':'new SQLite connection; OS cache warm from seeding'}
     (args.work/'report.json').write_text(json.dumps(report,indent=2));print(json.dumps(report,indent=2))
 
 

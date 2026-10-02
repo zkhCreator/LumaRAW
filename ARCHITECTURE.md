@@ -729,7 +729,12 @@ without that publication primitive fail explicitly; Windows is unverified.
 
 Copy captures an existing destination and optional single subfolder. Organization
 supports one folder, original folder hierarchy (including the selected root name),
-or `YYYY/YYYY-MM-DD`. Date folders use EXIF's original civil date before UTC
+or a captured numeric date layout. Schema 31 adds `date_format`, defaulting old
+plans to `year_date` (`YYYY/YYYY-MM-DD`). `import_dates.py` also renders
+`year_month_day` (`YYYY/MM/DD`) and `date` (`YYYY-MM-DD`) without locale-dependent
+month names. Presets retain the option; missing old preset fields default to the
+original layout. Explicit new preparation overrides a preset, while interrupted
+transfer journal paths never change. Date folders use EXIF's original civil date before UTC
 conversion; unavailable dates use `Unknown Date`, never mtime. Overlapping source
 roots choose the most specific selected root. The native review displays target
 paths before application. All selected originals and recognized XMP sidecars are

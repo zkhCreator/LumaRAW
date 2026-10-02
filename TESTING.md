@@ -1288,3 +1288,24 @@ rank-freeze elapsed time and 5 ms sampled RSS. No pixel dimensions/backend are
 applicable; no image workers, IPC or desktop frames are timed. Run separately from
 compilation and test activity. Numeric preview correctness does not establish
 Adobe failure/cancellation/reset semantics or gapless numbering.
+
+## Copy date-folder layouts
+
+`tests/test_import_dates.py` covers the three numeric layouts, explicit defaults,
+EXIF civil dates across UTC day boundaries, unknown dates without mtime fallback,
+subfolders/XMP, collisions, frozen preset choices and genuine schema-30 migration.
+Run it with Copy, naming, sequence/recovery and import-preset tests. The existing
+schema-29 journal recovery fixture inserts the old columns directly; current
+capture APIs must not be called on a partially upgraded catalog.
+
+`NativeImportDateRegression` receives generated 160 × 100 PNGs with EXIF civil
+date `2026:09:28 00:15:00` and `+14:00` offset. The directory stays September 28
+even though the normalized timestamp is September 27. It exercises captured
+choices and preset reuse through packaged Backend IPC. Offscreen options evidence
+does not establish desktop interaction or Adobe's full localized format menu.
+
+For large-review work, the naming probe accepts `--date-format year_month_day`
+alongside `--catalog-counters --rows 10000 100000`. It verifies every returned
+parent path from captured civil fields while timing the same bounded 60-row
+preview and selected ranks. Report synthetic fixtures, warm OS cache, no pixels/
+workers, elapsed times and sampled RSS; do not claim RAW or desktop throughput.

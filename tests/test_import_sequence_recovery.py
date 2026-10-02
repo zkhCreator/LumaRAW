@@ -35,7 +35,10 @@ def test_schema_29_copy_resume_allocates_provenance_once_without_retargeting(tmp
             (plan_id,str(source),source.name,source.stat().st_size,source.stat().st_mtime_ns,
              json.dumps({str(source):identity(source)})))
         domain = ImportCopy(catalog)
-        domain.capture(plan_id,value)
+        # Seed the old contract directly; current capture writes a newer option.
+        catalog.db.execute('INSERT INTO import_copy_plans(plan_id,destination,destination_identity,organization,subfolder,roots,owner) '
+            'VALUES(?,?,?,?,?,?,?)',(plan_id,value['destination'],json.dumps(value['destination_identity']),
+            value['organization'],value['subfolder'],json.dumps(value['roots']),str(catalog.root)))
     value.update(naming='{}', backup='{}')
     rows = [dict(row) for row in catalog.db.execute('SELECT * FROM import_files')]
     domain.stage(plan_id,rows,value)

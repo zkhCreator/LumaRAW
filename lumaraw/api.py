@@ -39,6 +39,9 @@ tool('set_import_sequence','Set future Import and Image starting numbers at the 
 tool('prepare_import','Stage a durable Add or Copy review. Copy requires an existing destination and captures organization and optional subfolder; no destination writes occur until explicit application.',{'paths':array(PATH),'include_subfolders':BOOL,'skip_duplicates':BOOL,'mode':{'enum':['add','copy']},'destination':PATH,'organization':{'enum':['flat','source','date']},'subfolder':{'type':'string','maxLength':255}},['paths'])
 IMPORT_CONFIGURATION=obj({'preset_id':string(80),'expected_revision':REV},['preset_id','expected_revision'])
 TOOLS['prepare_import']['inputSchema']['properties'].update(second_copy_destination={'anyOf':[PATH,{'type':'null'}]},preset=IMPORT_CONFIGURATION)
+from .import_dates import FORMATS as IMPORT_DATE_FORMATS
+TOOLS['prepare_import']['inputSchema']['properties']['date_format']={'enum':list(IMPORT_DATE_FORMATS)}
+TOOLS['prepare_import']['description']+=' Date organization uses captured camera civil dates: year_date (default), year_month_day or date. Unknown capture dates remain Unknown Date; no filesystem-time fallback.'
 tool('list_import_presets','Read thirty catalog-local import configuration names without settings payloads.',{'offset':integer()},read=True)
 tool('get_import_preset','Read import options and compact processing summaries at a captured library revision. Source selections are never saved.',{'preset_id':string(80),'expected_revision':REV},['preset_id','expected_revision'],True)
 tool('save_import_preset','Save or update a named configuration from a ready review. Freeze naming, processing, keywords and destination options; exclude selected sources, checked rows and transfer identities.',{'name':string(120),'preset_id':string(80),'plan_id':ID,'expected_plan_revision':REV,'expected_revision':REV},['name','plan_id','expected_plan_revision','expected_revision'])

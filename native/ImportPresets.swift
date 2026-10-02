@@ -3,6 +3,7 @@
 // Outputs: save/update/rename/delete commands and a source-neutral parent choice.
 // Full recipes and SQL stay in the engine. Pagination never rebases selected drafts.
 // Applying to an existing review explicitly rescans and resets checked selections.
+// Copy date-folder layout is included in saved options and its human-readable summary.
 import Foundation
 import SwiftUI
 
@@ -137,7 +138,11 @@ struct ImportPresetSheet: View {
                         Text(options["skip_duplicates"] as? Bool == true ? "Skip suspected duplicates":"Include suspected duplicates")
                         if let destination=options["destination"] as? String {Text("To: \(destination)").lineLimit(2).help(destination)}
                         if let organization=options["organization"] as? String {
-                            Text("Organize: \(["flat":"Into One Folder","source":"By Original Folders","date":"By Date"][organization] ?? organization)")
+                            Text("Organize: \(["flat":"Into One Folder","source":"By Original Folders","date":"By Capture Date"][organization] ?? organization)")
+                            if organization == "date" {
+                                let format=options["date_format"] as? String ?? "year_date"
+                                Text("Date Format: \(dateFormatLabel(format))")
+                            }
                         }
                         if let folder=options["subfolder"] as? String,!folder.isEmpty {Text("Subfolder: \(folder)").lineLimit(2).help(folder)}
                         if let backup=options["second_copy_destination"] as? String {Text("Second copy: \(backup)").lineLimit(2).help(backup)}
@@ -165,5 +170,13 @@ struct ImportPresetSheet: View {
                     .buttonStyle(.borderedProminent).disabled(!model.canUse)
             }
         }.padding(22).frame(width:800,height:510)
+    }
+
+    private func dateFormatLabel(_ value:String) -> String {
+        switch value {
+        case "year_month_day": return "YYYY/MM/DD"
+        case "date": return "YYYY-MM-DD"
+        default: return "YYYY/YYYY-MM-DD"
+        }
     }
 }

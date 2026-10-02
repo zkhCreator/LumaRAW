@@ -257,7 +257,11 @@ Add is the default. For Copy, pass `mode: "copy"`, an existing `destination`,
 optional `organization` (`flat`, `source`, `date`) and `subfolder` (one folder name)
 to `prepare_import`. Only `apply_import` writes the chosen destination. Source
 hierarchy includes the selected root name; dates use the camera's civil date in
-`YYYY/YYYY-MM-DD`, with `Unknown Date` for unavailable metadata. Review pages show
+the captured `date_format`: `year_date` (default, `YYYY/YYYY-MM-DD`),
+`year_month_day` (`YYYY/MM/DD`) or `date` (`YYYY-MM-DD`). Old presets without the
+field keep `year_date`. Pass a new explicit value on preparation to override a
+preset; interrupted transfers retain their original paths. Unknown capture dates
+use `Unknown Date`, never modification time or host timezone. Review pages show
 computed destination paths. Originals and recognized XMP are copied byte-for-byte;
 existing targets are never overwritten, and all target names are preflighted.
 

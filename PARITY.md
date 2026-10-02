@@ -3804,3 +3804,72 @@ and a Lightroom reference interaction comparison remain unavailable. No desktop
 automation was retried. Full import parity still needs Move/DNG, further date
 formats/destination grouping, preview policies, shared/Adobe preset exchange,
 camera/card workflows and reference acceptance; the overall non-AI goal is open.
+
+### Copy capture-date folder formats
+
+Engine generation 43 / schema 31 adds a separate Date Format choice for Copy's
+By Capture Date organization: `YYYY/YYYY-MM-DD` (existing default), `YYYY/MM/DD`
+and a single `YYYY-MM-DD` directory. The format is captured in the plan, displayed
+in saved configuration summaries and restored through explicit preset use/rescan.
+Older plans and presets missing this field keep the original layout. Explicit
+preparation options override a preset; recovery continues using journaled targets.
+
+[Adobe's hard-drive import documentation](https://helpx.adobe.com/lightroom-classic/desktop/import-photos/import-photos-video-catalog.html)
+describes the Date Format control. The [Adobe Press 2024 sample chapter, page 59](https://www.adobepress.com/content/images/9780138318147/samplepages/9780138318147_Sample.pdf)
+explains nested year/month/day directories and distinguishes folder separators
+from characters in a single date name. These sources do not enumerate the entire
+current menu or establish localization behavior, so three numeric choices are
+partial coverage, not a complete reproduction of every Lightroom date preset.
+
+The portable formatter validates captured civil year/month/day and emits only
+numeric components with fixed separators. It does not use UTC-normalized dates,
+host locale or filesystem timestamps. Missing/invalid capture dates use Unknown
+Date. Old snapshots containing only the historical civil-date string remain
+supported. Naming and associated XMP stems are independent of the date folder;
+second copies retain their separate original-state backup naming. Destination
+calculation decodes a stored clock once instead of twice for date organization.
+
+The focused group passed **132 tests in 12.76 s**; the complete required-Metal /
+real-NEF suite passed **905 tests in 96.25 s**, no skips. Coverage includes civil
+dates across UTC offsets, unknown dates, preset defaults/overrides, primary/XMP
+paths, collision preflight, schema-30 migration rollback/idempotency and immutable
+old journal recovery. Four packaged-engine native suites passed **139 assertions**:
+date folders 71, configurations 23, Import 29 and responsiveness 16. The date suite
+copies fifteen 160 x 100 EXIF-tagged PNG originals across all three layouts, checks
+preview/preset restore and verifies original bytes. Its camera date is September
+28 with +14:00 offset while UTC is September 27. Inspected offscreen date pickers
+are readable; this is not real desktop input, sheet dismissal or VoiceOver testing.
+
+The generated SQL naming probe combined catalog counters with `year_month_day`
+on Apple M3 Max / 128 GiB / macOS 26.6.2. Each page has 60 names, one first request
+and five warm requests. Connections are new, OS cache warm from seeding; the first
+10,000-row request includes lazy Python setup. Tests/builds had ended. Timings
+exclude seeding, IPC, image processing and desktop rendering; there are no image
+dimensions, GPU dispatches or pixel workers in this probe.
+
+| Staged rows / offset | First | Warm median / max | Reply bytes |
+| --- | --- | --- | --- |
+| 10,000 / 0 | 28.617 ms | 4.021 / 4.109 ms | 8,189 |
+| 10,000 / 5,000 | 4.560 ms | 4.443 / 4.493 ms | 8,320 |
+| 10,000 / 9,940 | 5.002 ms | 4.920 / 5.004 ms | 8,192 |
+| 100,000 / 0 | 4.195 ms | 3.922 / 3.966 ms | 8,250 |
+| 100,000 / 50,000 | 9.427 ms | 9.088 / 9.222 ms | 8,442 |
+| 100,000 / 99,940 | 15.035 ms | 14.985 / 15.641 ms | 8,254 |
+
+One-time rank freeze took 14.412 / 196.156 ms; process RSS sampled every 5 ms
+peaked at 36.094 / 41.547 MiB. Last-page VM work remained about 115,000 / 1,105,000
+steps. These measurements cover bounded path preview work, not cold-storage import
+throughput or frame rate.
+
+The Mac 14 deployment-target app builds and passes deep/strict local ad-hoc signing.
+Packaged initialization, all **137 MCP schemas**, engine identity and bundled guide
+match source. Build identities:
+
+- Source digest: `4b6f2fa08a9335eb982bfa0e98ad7a3960a8d21e9fd49e4e17e2b0c2865c77c0`
+- Engine SHA-256: `7a2940ad199d95d61c3552e9e749308542093aef8abd355262c4109f4622e87f`
+- Native SHA-256: `aecbc391bfb2291d732a2e15f27166e92ea2717588de1c2db0a9b72829775640`
+
+The official MCP SDK was not run. macOS 14, actual desktop interaction/VoiceOver,
+localized date menus and Lightroom reference comparison remain unverified. No
+desktop automation was retried. Further date formats, destination grouping and
+the wider non-AI import/product scope remain open.

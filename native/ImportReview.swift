@@ -6,6 +6,7 @@
 // Optional second copies retain original state independently of import naming.
 // Preset choices are revision-bound; explicit rescans atomically replace ready plans.
 // Counter-dependent naming stays bound to the sequence revision captured by the plan.
+// Date-folder format is a separate captured Copy option; legacy presets default to year/date.
 import AppKit
 import Foundation
 
@@ -62,6 +63,7 @@ struct ImportItem: Identifiable {
     @Published var mode="add"
     @Published var destination=""
     @Published var organization="flat"
+    @Published var dateFormat="year_date"
     @Published var subfolder=""
     @Published var makeSecondCopy=false
     @Published var secondCopyDestination=""
@@ -150,7 +152,8 @@ struct ImportItem: Identifiable {
                 if let presetChoice { params["preset"]=presetChoice }
                 if mode == "copy" {
                     guard !destination.isEmpty else { throw EngineFailure(message:"Choose a Copy destination") }
-                    params["destination"]=destination;params["organization"]=organization;params["subfolder"]=subfolder
+                    params["destination"]=destination;params["organization"]=organization
+                    params["date_format"]=dateFormat;params["subfolder"]=subfolder
                     params["second_copy_destination"]=NSNull()
                     if makeSecondCopy {
                         guard !secondCopyDestination.isEmpty else { throw EngineFailure(message:"Choose a second-copy destination") }
@@ -203,6 +206,7 @@ struct ImportItem: Identifiable {
         mode=options["mode"] as? String ?? "add";includeSubfolders=options["include_subfolders"] as? Bool ?? true
         initialSkipDuplicates=options["skip_duplicates"] as? Bool ?? true
         destination=options["destination"] as? String ?? "";organization=options["organization"] as? String ?? "flat"
+        dateFormat=options["date_format"] as? String ?? "year_date"
         subfolder=options["subfolder"] as? String ?? "";secondCopyDestination=options["second_copy_destination"] as? String ?? ""
         makeSecondCopy = !secondCopyDestination.isEmpty;presetChoice=choice;presetName=value["name"] as? String ?? ""
         return true

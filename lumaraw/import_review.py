@@ -106,7 +106,7 @@ class ImportReview:
         copy=settings(self.db,plan_id)
         plan['mode']='copy' if copy else 'add'
         if copy:
-            plan['copy']={key:copy[key] for key in ('destination','organization','subfolder','copied','copied_bytes','transfer_count')}
+            plan['copy']={key:copy[key] for key in ('destination','organization','subfolder','date_format','copied','copied_bytes','transfer_count')}
             from .import_naming import settings as naming_settings
             plan['copy']['renaming']=naming_settings(copy)['enabled']
             from . import import_backup

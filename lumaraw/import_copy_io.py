@@ -6,6 +6,7 @@ Source files are read-only. Paths are traversed with no-follow directory handles
 publication is an exclusive hard link on the destination volume. Unsupported
 filesystems fail visibly. No SQL, image decoding, renaming or deletion of originals
 or published copies. Recovery never adopts an unowned file, even with equal bytes.
+Destination validation captures explicit date layout without reading photo pixels.
 """
 from contextlib import contextmanager
 import hashlib
@@ -43,7 +44,9 @@ def directory(path, create=False):
         os.close(fd)
 
 
-def validate_destination(path, sources, catalog, organization='flat', subfolder=''):
+def validate_destination(path, sources, catalog, organization='flat', subfolder='', date_format='year_date'):
+    from .import_dates import validate
+    validate(date_format)
     if organization not in ('flat', 'source', 'date'):
         raise ValueError('Unsupported destination organization')
     if subfolder and (subfolder in ('.', '..') or '/' in subfolder or '\\' in subfolder or
@@ -58,7 +61,7 @@ def validate_destination(path, sources, catalog, organization='flat', subfolder=
     if any(path == Path(root) or Path(root) in path.parents for root in roots):
         raise ValueError('Choose a destination outside the selected source folders')
     return {'destination':str(path), 'destination_identity':pinned, 'organization':organization,
-            'subfolder':subfolder, 'roots':roots}
+            'subfolder':subfolder, 'roots':roots, 'date_format':date_format}
 
 
 def check_destination(value):

@@ -124,6 +124,10 @@ when a clear function is more maintainable. Avoid unrelated formatting churn.
   a race returns to ready with refreshed names and requires explicit application.
   Retain reserved ranges across cancellation, crashes and SQL rollback. Never
   guess historical provenance during migration or reset counters automatically.
+- Capture Copy date-folder layouts with the plan and saved configurations. Preserve
+  missing-field defaults for older presets and migrations, use original camera
+  civil date fields, and never reinterpret published journal paths. Unsupported
+  localized formats stay explicit gaps; no mtime or host-timezone fallback.
 - Second copies preserve original names, bytes and recognized XMP independently
   of primary naming and presets. Pin both destinations, validate collisions across
   all transfers before writes, and verify both roles before cataloging main copies.

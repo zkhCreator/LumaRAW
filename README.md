@@ -96,7 +96,9 @@ new source selection before this rescan workflow can be used.
 
 For **Copy**, choose an existing destination before scanning, optionally enter
 **Into Subfolder**, and organize into one folder, original folders or date folders
-(`YYYY/YYYY-MM-DD`). Unknown capture dates use `Unknown Date`. The review shows
+with **Date Format** (`YYYY/YYYY-MM-DD`, `YYYY/MM/DD` or `YYYY-MM-DD`). The choice
+uses the camera's local capture date and is saved in import presets. Old presets
+retain `YYYY/YYYY-MM-DD`. Unknown capture dates use `Unknown Date`. The review shows
 each target path. Import copies checked originals and associated XMP with checksum
 verification and then registers the completed batch. Existing destinations are
 never overwritten. **Transfer Details…** shows bounded progress/receipts;

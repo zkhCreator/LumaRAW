@@ -4,6 +4,7 @@
 // original writes or AI choices. Closing retains unfinished plans for later review.
 // Second-copy choices/progress are explicit; backups retain source names and bytes.
 // Presets are source-neutral; ready-review replacement uses explicit rescan.
+// Date folder layout is selected before scanning and frozen into the Copy review.
 import SwiftUI
 import AppKit
 
@@ -44,9 +45,20 @@ struct ImportReviewSheet: View {
                             Picker("Organize",selection:$model.organization) {
                                 Text("Into One Folder").tag("flat")
                                 Text("By Original Folders").tag("source")
-                                Text("By Date (YYYY/YYYY-MM-DD)").tag("date")
+                                Text("By Capture Date").tag("date")
                             }.frame(width:350)
                             TextField("Into Subfolder (optional)",text:$model.subfolder).frame(maxWidth:260)
+                        }
+                        if model.organization == "date" {
+                            HStack(alignment:.top) {
+                                Picker("Date Format",selection:$model.dateFormat) {
+                                    Text("YYYY/YYYY-MM-DD").tag("year_date")
+                                    Text("YYYY/MM/DD").tag("year_month_day")
+                                    Text("YYYY-MM-DD").tag("date")
+                                }.frame(width:350)
+                                Text("Uses the camera capture date. Photos without one go to Unknown Date.")
+                                    .font(.caption).foregroundStyle(.secondary).frame(maxWidth:300,alignment:.leading)
+                            }
                         }
                         HStack {
                             Toggle("Make a Second Copy To",isOn:$model.makeSecondCopy)
