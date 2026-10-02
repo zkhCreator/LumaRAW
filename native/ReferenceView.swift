@@ -1,6 +1,7 @@
 // Purpose: session-scoped Reference/Active roles in Develop, separate from recipes.
 // Inputs: explicit reference selection, module transitions, viewport and drop events.
-// Outputs: one bounded reference request plus active-only native editing actions.
+// Outputs: one bounded reference request plus active-only native editing actions;
+// reference transitions defer pending Library-set page refreshes until return.
 // Lock retains identity across module changes, not across app restarts. Reference
 // pixels follow saved catalog edits; active selection never retargets the reference.
 // SQL, image processing and persistent photographic state remain in the engine.
@@ -29,11 +30,15 @@ extension Store {
     }
 
     func startReferenceView() async {
-        reviewSwitchGeneration+=1;let token=reviewSwitchGeneration
-        guard await flushEdits(),token==reviewSwitchGeneration,selected != nil,!browsing else {return}
+        let token=beginReviewSwitchTransition()
+        guard await flushEdits(),token==reviewSwitchGeneration,selected != nil,!browsing else {
+            await finishReviewSwitchTransition(token)
+            return
+        }
         reviewRenderer.stop();workspace="library";develop=true
         referenceEnabled=true;comparisonMode = .after;canvasTool="view"
         render(debounce:false);updateReferenceRequest()
+        reviewSwitchInFlightGeneration=nil
     }
 
     func endReferenceView() {

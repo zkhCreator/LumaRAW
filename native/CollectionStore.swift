@@ -1,10 +1,173 @@
 // Purpose: lazy collection-tree pages, color labels and revision-safe target workflows.
 // Inputs: explicit expansion, captured collection revisions and photo selections.
-// Outputs: bounded hierarchy/filter pages and atomic catalog-only mutations.
-// No SQL, original writes or implicit retries after another client changes a target.
+// Outputs: bounded hierarchy/filter pages, catalog-only mutations and generation-safe
+// active-set refreshes after node moves. No SQL, original writes or retries.
 import Foundation
 
 extension Store {
+    func collectionNodeDrag(_ collection: LibraryCollection) -> CatalogCollectionDrag {
+        CatalogCollectionDrag(
+            session: ["regular", "smart", "set"].contains(collection.kind)
+                ? referenceDragSession
+                : "",
+            collectionID: collection.id,
+            revision: collection.revision
+        )
+    }
+
+    func canDropCollectionNode(_ drag: CatalogCollectionDrag, to target: LibraryCollection) -> Bool {
+        guard workspace == "library", !develop,
+              drag.isValid(session: referenceDragSession),
+              drag.collectionID != target.id,
+              target.kind == "set",
+              let source = visibleCollectionNode(id: drag.collectionID),
+              source.revision == drag.revision,
+              ["regular", "smart", "set"].contains(source.kind),
+              let visibleTarget = visibleCollectionNode(id: target.id),
+              visibleTarget.revision == target.revision,
+              visibleTarget.kind == "set" else {
+            return false
+        }
+        return true
+    }
+
+    private func visibleCollectionNode(id: Int) -> LibraryCollection? {
+        if collectionColorFilter != "any" {
+            guard !staleCollectionFilterPage,
+                  let page = collectionFilteredPage,
+                  page.treeRevision >= collectionTreeRevision else { return nil }
+            return page.items.first { $0.id == id }
+        }
+
+        if !staleCollectionPageKeys.contains(0),
+           let page = collectionPages[0],
+           page.treeRevision >= collectionTreeRevision,
+           let row = page.items.first(where: { $0.id == id }) {
+            return row
+        }
+        for parent in expandedCollections.sorted() {
+            guard !staleCollectionPageKeys.contains(parent),
+                  let page = collectionPages[parent],
+                  page.treeRevision >= collectionTreeRevision else { continue }
+            if let row = page.items.first(where: { $0.id == id }) { return row }
+        }
+        return nil
+    }
+
+    @discardableResult
+    func beginCollectionNodeDrop(
+        _ drag: CatalogCollectionDrag,
+        to target: LibraryCollection,
+        call: ((String, [String: Any]) async throws -> [String: Any])? = nil,
+        // Tests may gate this move's single list_photos request without replacing
+        // the shared backend transport or any related metadata reads.
+        pageCall: ((String, [String: Any]) async throws -> [String: Any])? = nil
+    ) -> Task<Void, Never>? {
+        guard canDropCollectionNode(drag, to: target) else { return nil }
+
+        // Copy every gesture input before the task can suspend. The payload only
+        // carries identity; mutable fields come from get_collection below.
+        let sourceID = drag.collectionID
+        let sourceRevision = drag.revision
+        let targetID = target.id
+        let targetKind = target.kind
+        let commandCall: (String, [String: Any]) async throws -> [String: Any]
+        if let call {
+            commandCall = call
+        } else {
+            commandCall = { method, params in
+                try await Backend.call(method, params)
+            }
+        }
+        return Task {
+            await reparentCollectionNode(
+                sourceID: sourceID,
+                expectedRevision: sourceRevision,
+                targetID: targetID,
+                targetKind: targetKind,
+                call: commandCall,
+                pageCall: pageCall
+            )
+        }
+    }
+
+    private func reparentCollectionNode(
+        sourceID: Int,
+        expectedRevision: Int,
+        targetID: Int,
+        targetKind: String,
+        call: (String, [String: Any]) async throws -> [String: Any],
+        pageCall: ((String, [String: Any]) async throws -> [String: Any])?
+    ) async {
+        do {
+            guard targetKind == "set" else {
+                throw EngineFailure(message: "Collections can only be dropped into a collection set")
+            }
+            guard let source = LibraryCollection(
+                try await call("get_collection", ["collection_id": sourceID])
+            ) else {
+                throw EngineFailure(message: "Collection does not exist")
+            }
+            guard source.revision == expectedRevision else {
+                throw EngineFailure(message: "Collection conflict; reload the collection before editing")
+            }
+            guard ["regular", "smart", "set"].contains(source.kind) else {
+                throw EngineFailure(message: "This collection cannot be moved")
+            }
+
+            // Avoid the existing save path's revision bump for a same-parent drop.
+            guard source.parentID != targetID else { return }
+
+            let params: [String: Any] = [
+                "collection_id": source.id,
+                "expected_revision": source.revision,
+                "name": source.name,
+                "kind": source.kind,
+                "rules": source.rules,
+                "match": source.match,
+                "parent_id": targetID,
+            ]
+            _ = try await call("save_collection", params)
+            collectionNodePhotoRefreshGeneration += 1
+            pendingCollectionNodePhotoRefreshGeneration = collectionNodePhotoRefreshGeneration
+            await refreshLoadedCollectionPagesForTreeRevision()
+            _ = await refreshPendingCollectionNodePhotos(pageCall: pageCall)
+        } catch {
+            self.error = error.localizedDescription
+        }
+    }
+
+    @discardableResult
+    func refreshPendingCollectionNodePhotos(
+        expectedSourceNavigationGeneration: Int? = nil,
+        allowingReviewSwitchToken: Int? = nil,
+        pageCall: ((String, [String: Any]) async throws -> [String: Any])? = nil
+    ) async -> Bool {
+        guard let invalidation = pendingCollectionNodePhotoRefreshGeneration else { return true }
+        guard workspace == "library", !develop, folderID == nil,
+              let id = collectionID,
+              activeCollection?.id == id, activeCollection?.kind == "set" else {
+            return true
+        }
+        guard reviewSwitchInFlightGeneration == nil ||
+                reviewSwitchInFlightGeneration == allowingReviewSwitchToken else {
+            return false
+        }
+        guard expectedSourceNavigationGeneration == nil ||
+                expectedSourceNavigationGeneration == sourceNavigationGeneration else { return false }
+        let navigationGeneration = expectedSourceNavigationGeneration ?? sourceNavigationGeneration
+        let reviewToken = reviewSwitchGeneration
+        return await refreshPage(
+            expectedSourceNavigationGeneration: navigationGeneration,
+            expectedReviewSwitchGeneration: reviewToken,
+            expectedCollectionID: id,
+            consumingCollectionNodeRefreshGeneration: invalidation,
+            guardingCollectionNodePhotoRefreshGeneration: invalidation,
+            allowedReviewSwitchInFlightGeneration: allowingReviewSwitchToken,
+            pageCall: pageCall
+        )
+    }
+
     func loadCollectionPage(parent: Int?,offset: Int=0) async {
         let key=parent ?? 0
         let token=(collectionPageGenerations[key] ?? 0)+1

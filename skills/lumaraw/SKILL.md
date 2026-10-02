@@ -554,6 +554,16 @@ involved. A direct Quick drop uses Quick's ID/revision and does not follow the
 current Target Collection. Reference/Active drops use only the anchor photo. A stale revision must
 remain a visible conflict, never a reason to replay the mutation with a fresh token.
 
+The Mac shell also moves regular collections, smart collections and collection
+sets by dragging their node onto a set. This uses a distinct node payload and
+the existing `save_collection` update contract, preserving fields and memberships.
+Quick is excluded; same-parent drops do not write. Root moves use Edit / Move
+and Use Root. The current set's aggregate photo page refreshes after a move,
+without navigating to the moved node or replacing a newer user navigation.
+If the move finishes during Develop or Reference, the active edit remains in
+place and the aggregate page refreshes on return to Library. A failed refresh
+keeps the update pending for a later retry.
+
 `collection_state` returns the Quick/target collections and independent state
 revision; optional `photo_ids` returns target membership for that page. Target
 changes require `set_target_collection` with the state revision; null resets to

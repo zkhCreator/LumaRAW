@@ -60,7 +60,7 @@ gaps. Nothing below is full Lightroom parity merely because historical tests pas
 | Area | Current implementation | Remaining acceptance / work |
 | --- | --- | --- |
 | Import and catalogs | Partial: durable Add/Copy review with checked selection, Grid/Loupe source previews with on-demand Fit/100% regions and completed-preview reuse, suspected duplicates, bounded sorting/filtering, captured import-time presets and keywords, Copy destination/subfolder and flat/source/date organization with three numeric date layouts and paged destination photo counts, filename token editor and catalog-local templates with checked-sequence and catalog Import/Image numbering, byte-verified original/XMP transfers, optional original-state second copies, catalog-local saved import configurations with explicit rescans, explicit crash recovery and retained-copy cancellation, Previous Import navigation and catalog backup/restore | Move/Copy as DNG, destination-tree grouping and more date formats, numbering edge-case reference acceptance and wider EXIF/shared templates, shared/Adobe import-preset exchange and interaction acceptance, preview policies, cards/tethering, progressive Current Import, catalog switching/merge and desktop/reference acceptance |
-| Library navigation | Partial: bounded grid/filmstrip, folder tree/search/favorites/labels, durable missing-folder relocation and folder synchronization with reviewed suspected-duplicate inclusion, direct/recursive sources, filters/sorting including live snapshot status, regular/smart/Quick collections and nested sets, photo drops into regular and Quick collections, single/batch collection color labels and global color filtering | Multi-source selection, complete sync Import Dialog, folder move/rename, relocation overlap/collision handling, collection-node drag/drop, custom label names/sets and sidebar multi-selection interaction, full smart criteria/import-export, source-selection memory, desktop/reference acceptance |
+| Library navigation | Partial: bounded grid/filmstrip, folder tree/search/favorites/labels, durable missing-folder relocation and folder synchronization with reviewed suspected-duplicate inclusion, direct/recursive sources, filters/sorting including live snapshot status, regular/smart/Quick collections and nested sets, photo drops into regular and Quick collections, collection-node moves into sets, single/batch collection color labels and global color filtering | Multi-source selection, complete sync Import Dialog, folder move/rename, relocation overlap/collision handling, collection-node drag/drop desktop/reference acceptance, custom label names/sets and sidebar multi-selection interaction, full smart criteria/import-export, source-selection memory, desktop/reference acceptance |
 | Organization | Partial: duplicate/missing detection, hierarchical keywords/synonyms/export flags/Will Export preview, text/CSV vocabulary exchange and manual person tags, custom nine-slot keyword sets/recent entries/shared or catalog storage, multi-keyword shortcuts and keyword/rating/flag/label/target-collection/rotation/Develop-preset/metadata-preset Painter strokes, independent catalog rotation/flips, title/caption/copyright plus thirty IPTC fields, selective metadata presets, labels, batch metadata, virtual copies, manual/split/capture-time scoped stacks | Keyword policy/file and preset reference acceptance, built-in sets/suggestions/undo, Painter desktop acceptance, IPTC Extension and complete metadata parity, stack interaction acceptance, rename and sidecars |
 | Culling | Partial: Loupe/Compare/Survey, linked detail, anchored page selection, Develop Reference/Active pairs with independent Fit/1:1 viewports, session lock and RGB/LAB readouts | Desktop and numerical reference acceptance, HDR readouts, scrubby/box zoom, cross-page selection, auto advance, persistent workspace state |
 | Basic development | Partial: light/WB/color, eight-band HSL and B&W Mix with photo-targeted adjustment and selective resets/sync | Calibrated absolute WB, eyedropper, texture/clarity/dehaze, Point Color, Auto B&W mix, color grading and Adobe processing/reference acceptance |
@@ -4954,3 +4954,62 @@ Conditional folder/keyword pages, selected-photo details and thumbnail work stil
 use their previous paths. Saturated broker admission and expensive queries can
 also delay reads. Desktop input/scrolling, VoiceOver and macOS 14 runtime acceptance
 remain open, together with the broader non-AI Lightroom Classic inventory.
+
+## Collection nodes dragged into sets (October 2, 2026)
+
+The Mac sidebar accepts regular collections, smart collections and collection
+sets dragged onto a set. Adobe documents this node-to-set workflow in its
+[collection guide](https://helpx.adobe.com/lightroom-classic/desktop/organize-photos-in-lightroom-classic/photo-collections.html).
+LumaRAW uses a distinct exported transfer type with session, source ID and
+captured revision; no names, rule edits, photo IDs or paths are trusted from the
+payload. Admission requires fresh loaded source/target pages. The authoritative
+source is fetched and checked before the existing revision-bound save command
+changes its parent. Same-parent drops do not write. Quick is excluded. Root
+moves remain available through Edit / Move and Use Root; root-area drag behavior
+was not established from the inspected reference and is not implemented here.
+
+Moves retain the node's name, kind, smart rules, match policy, color label,
+memberships and subtree. The service's existing cycle/depth and stale-revision
+failures remain visible without retry. After saving and reloading bounded sidebar
+pages, the currently active Library set refreshes its aggregate photos, including
+when the user entered that destination before the write completed. No source is
+opened automatically. Navigation guards reject a stale refresh before advancing
+its page token and after asynchronous work. Photo collection drops and Reference
+drags keep their separate payload and behavior.
+
+An acknowledged move records a pending photo-page invalidation before reloading
+the tree. Develop/Reference and in-flight view changes defer that refresh, keeping
+the active photo and recipe in place. Returning to Library refreshes the current
+set before Compare/Survey initializes. Failed reads retain pending work; a late
+older page cannot consume a newer invalidation or overwrite its state. New node
+drops are not admitted while Develop is active.
+
+The collection/domain suite passes **17 tests in 2.05 s**. The new native suite
+passes **19 state/IPC assertions** against the verified generation-55 engine,
+including two gated real-save/navigation races, open source/destination set counts,
+same-parent revision stability, stale/cycle/depth failures and unchanged authored
+photo state/original bytes. Depth fixtures expand one ancestor at a time, avoiding
+an unrelated command-admission burst. A generated standalone sidebar snapshot
+shows readable regular/smart/set rows and disclosure controls; it is offscreen
+layout evidence, not native pointer, hover, drop or accessibility acceptance.
+
+A separate native regression first reproduced the selected Develop photo being
+replaced after a gated move completed. After the fix, the new transition suite
+passes **21 assertions**, alongside **19** node-move and **20** Compare/Survey
+assertions. The tests gate actual saves and bounded page replies to cover locked
+Reference identity, active recipes, failed reads, newer moves overtaking older
+replies, Develop entry during a pending page and fresh view initialization on
+return. Generated originals remain byte-identical.
+
+The final packaged engine passes **214 native state/IPC assertions** across node
+moves 19, Develop/node races 21, photo drops 19, collections 42, Library 13,
+selection 12, Compare/Survey 20, Reference 52 and responsiveness 16. The Mac app
+builds with a macOS 14 target, exports both transfer types and passes deep strict
+ad-hoc signature verification. Source/client/broker identities, all 149 command
+schemas and the bundled guide match. These checks run on macOS 26.6.2 with
+generated fixtures; the offscreen sidebar was inspected separately.
+
+No engine command, schema or generation change is required: generation **55**,
+schema **37**, and **149** contracts remain unchanged. Desktop drag/drop,
+VoiceOver, macOS 14 runtime and Lightroom interaction acceptance remain open.
+This is one collection workflow increment, not complete non-AI parity.

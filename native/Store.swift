@@ -1,6 +1,7 @@
 // Purpose: main-thread presentation state and user workflows for the native shell.
 // Inputs: native controls and service replies. Outputs: reversible recipe edits,
-// preview paths and queue state, including one revision-bound Previous export action.
+// preview paths and queue state, including revision-bound exports and captured
+// collection-node workflows with generation-safe photo-page refreshes.
 // Revisions belong to the service; stale edits are rejected, never silently retried.
 // Photo results and collection browsers use bounded pages.
 import SwiftUI
@@ -185,6 +186,9 @@ import UniformTypeIdentifiers
     var reviewPaneWidth=1200
     var reviewPaneHeight=900
     var reviewSwitchGeneration=0
+    var reviewSwitchInFlightGeneration:Int?
+    var collectionNodePhotoRefreshGeneration=0
+    var pendingCollectionNodePhotoRefreshGeneration:Int?
     @Published var showInspector=true
     @Published var comparisonMode:BeforeAfterMode = .after
     // Existing editing tools use these gates to leave comparison or block sampling.
@@ -319,17 +323,75 @@ import UniformTypeIdentifiers
             self.error=error.localizedDescription
         }
     }
-    func refresh() async {
+    func refresh(expectedSourceNavigationGeneration: Int? = nil) async {
+        let currentSetID = collectionID.flatMap { id in
+            workspace == "library" && folderID == nil &&
+                activeCollection?.id == id && activeCollection?.kind == "set" ? id : nil
+        }
+        if pendingCollectionNodePhotoRefreshGeneration != nil, currentSetID != nil {
+            guard !develop else { return }
+            guard expectedSourceNavigationGeneration == nil ||
+                    expectedSourceNavigationGeneration == sourceNavigationGeneration else { return }
+            _ = await refreshPendingCollectionNodePhotos(
+                expectedSourceNavigationGeneration: expectedSourceNavigationGeneration
+            )
+            return
+        }
+        let membershipGeneration: Int? = (currentSetID == nil || develop)
+            ? nil
+            : collectionNodePhotoRefreshGeneration
+        _ = await refreshPage(
+            expectedSourceNavigationGeneration: expectedSourceNavigationGeneration,
+            guardingCollectionNodePhotoRefreshGeneration: membershipGeneration
+        )
+    }
+
+    @discardableResult
+    func refreshPage(
+        expectedSourceNavigationGeneration: Int? = nil,
+        expectedReviewSwitchGeneration: Int? = nil,
+        expectedCollectionID: Int? = nil,
+        consumingCollectionNodeRefreshGeneration: Int? = nil,
+        guardingCollectionNodePhotoRefreshGeneration: Int? = nil,
+        allowedReviewSwitchInFlightGeneration: Int? = nil,
+        pageCall: ((String, [String: Any]) async throws -> [String: Any])? = nil
+    ) async -> Bool {
+        func requestIsCurrent() -> Bool {
+            if let expectedSourceNavigationGeneration,
+               expectedSourceNavigationGeneration != sourceNavigationGeneration { return false }
+            if let guardingCollectionNodePhotoRefreshGeneration,
+               guardingCollectionNodePhotoRefreshGeneration != collectionNodePhotoRefreshGeneration { return false }
+            if let expectedReviewSwitchGeneration {
+                guard reviewSwitchGeneration == expectedReviewSwitchGeneration,
+                      workspace == "library", !develop, folderID == nil,
+                      expectedCollectionID != nil,
+                      collectionID == expectedCollectionID,
+                      activeCollection?.id == expectedCollectionID,
+                      activeCollection?.kind == "set" else { return false }
+                if let inFlight = reviewSwitchInFlightGeneration,
+                   inFlight != allowedReviewSwitchInFlightGeneration { return false }
+            }
+            if let consumingCollectionNodeRefreshGeneration,
+               pendingCollectionNodePhotoRefreshGeneration != consumingCollectionNodeRefreshGeneration { return false }
+            return true
+        }
+
+        guard requestIsCurrent() else { return false }
         pageGeneration += 1;let token=pageGeneration;browsing=true
         defer{if token==pageGeneration{browsing=false}}
-        guard await flushEdits(),token==pageGeneration else{return}
+        guard await flushEdits(),token==pageGeneration,requestIsCurrent() else{return false}
         do {
             var params: [String: Any] = ["offset":offset,"mode":mode,"search":search,
                                        "filters":libraryFilters,"sort":librarySort,"descending":sortDescending,"stacked":showStacks]
             if let collectionID { params["collection_id"]=collectionID }
             if let folderID { params["folder_id"]=folderID;params["include_subfolders"]=includeSubfolders }
-            let result=try await Backend.call("list_photos",params)
-            guard token==pageGeneration else{return}
+            let result: [String: Any]
+            if let pageCall {
+                result = try await pageCall("list_photos", params)
+            } else {
+                result = try await Backend.call("list_photos", params)
+            }
+            guard token==pageGeneration,requestIsCurrent() else{return false}
             photos=(result["photos"] as? [[String:Any]] ?? []).compactMap(Photo.init)
             adoptStacks(result)
             previousImportRevision=(result["previous_import"] as? [String:Any])?["revision"] as? Int ?? previousImportRevision
@@ -342,16 +404,38 @@ import UniformTypeIdentifiers
             selection.formIntersection(Set(photos.map(\.id)))
             if !photos.contains(where: { $0.id == selectionAnchor }) { selectionAnchor=nil }
             if selected==nil || !photos.contains(where:{$0.id==selected}) {
-                if let first=photos.first{selected=first.id;selection=[first.id];await load(first.id)}
+                if let first=photos.first {
+                    selected=first.id
+                    selection=[first.id]
+                    await load(first.id)
+                    guard token==pageGeneration,requestIsCurrent() else{return false}
+                }
                 else{selected=nil;selection=[];clearPhoto()}
             }
             reviewSelectionChanged()
             updateThumbnails(force:true)
             await refreshCollectionState()
+            guard token==pageGeneration,requestIsCurrent() else{return false}
             await refreshOrientationState()
+            guard token==pageGeneration,requestIsCurrent() else{return false}
             if folderRevision != photoFolderRevision { await refreshFolders() }
-            if keywordRevision != photoKeywordRevision { await refreshKeywords();await refreshKeywordPhoto() }
-        } catch {self.error=error.localizedDescription}
+            guard token==pageGeneration,requestIsCurrent() else{return false}
+            if keywordRevision != photoKeywordRevision {
+                await refreshKeywords()
+                guard token==pageGeneration,requestIsCurrent() else{return false}
+                await refreshKeywordPhoto()
+                guard token==pageGeneration,requestIsCurrent() else{return false}
+            }
+            if let consumingCollectionNodeRefreshGeneration,
+               pendingCollectionNodePhotoRefreshGeneration == consumingCollectionNodeRefreshGeneration {
+                pendingCollectionNodePhotoRefreshGeneration = nil
+            }
+            return true
+        } catch {
+            guard token==pageGeneration,requestIsCurrent() else{return false}
+            self.error=error.localizedDescription
+            return false
+        }
     }
     func clearPhoto() {
         clearColorReadout();colorReadoutFrame=nil

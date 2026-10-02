@@ -214,6 +214,20 @@ when a clear function is more maintainable. Avoid unrelated formatting churn.
   Preserve the captured gesture if only selection changes; never read replacement
   IDs after suspension or retry a stale collection mutation. A direct Quick
   Collection action uses its captured ID/revision, never the current Target.
+- Keep collection-node drags separate from photo drags. Carry only session, source
+  ID and revision; require fresh loaded source/target rows and a set destination.
+  Fetch authoritative name/kind/rules before reparenting, compare the captured
+  source revision and preserve the backend's cycle/depth checks. Do not send new
+  memberships or silently rebase a stale source. Same-parent moves must avoid a
+  revision bump. Refresh loaded tree pages and the current aggregate set query
+  after the write, including when navigation entered that set during the save.
+  Never navigate to the moved node. Guard later refresh work against newer source
+  navigation, without invalidating a newer page for an already-stale request.
+  Defer aggregate photo refresh while Develop/Reference or a view transition is
+  active. Record a monotonic invalidation after an acknowledged move; consume
+  only that generation after a current page succeeds. Failed or superseded reads
+  must leave it pending. Returning to Library must service the current set before
+  initializing Compare/Survey; an old response cannot replace the active edit.
 - Collection labels belong to collection nodes, not their photos or descendants.
   Validate every captured target before a batch label transaction, including
   no-op targets; preserve ancestor conflicts and original Quick/target semantics.

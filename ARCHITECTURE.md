@@ -178,7 +178,21 @@ page and submit them with the target collection's captured revision. Later
 selection changes do not substitute new photos, and conflicts are never rebased
 or retried automatically. A Quick Collection drop uses its captured identity,
 independent of the configurable Target Collection. Smart collections and sets do
-not accept manual drops.
+not accept manual photo drops.
+
+Collection-node drags use a separate exported type and carry only the Store
+session, source collection ID and captured revision. Fresh loaded pages admit
+regular/smart/set sources and set destinations; Quick and root-area drops are
+excluded. The move fetches authoritative fields, checks the captured revision
+and calls the existing save contract without photo IDs. A same-parent drop is a
+no-op. After the write and bounded sidebar reload, the currently active Library
+set refreshes its aggregate photo query without changing navigation. A captured
+navigation generation guards that refresh before it invalidates a page and after
+asynchronous work. An acknowledged move marks a monotonic pending invalidation;
+Develop/Reference and in-flight view transitions defer aggregate refresh. Library
+return services the current set before Compare/Survey setup. Page, source, view
+and invalidation generations reject stale adoption; only the captured successful
+generation is consumed. Mutation failures are displayed without rebase or replay.
 
 `preview_photo(expected_revision)` now binds ordinary as well as draft previews.
 The service checks before releasing the catalog lock for image work, then checks

@@ -1,7 +1,8 @@
-// Purpose: native lazy collection hierarchy, color labels and Quick-save forms.
+// Purpose: native lazy collection hierarchy, color labels, Quick-save forms and
+// collection-node drag-to-set reparenting.
 // Inputs: bounded Store pages and captured revision-bearing collection values.
-// Outputs: explicit create/move/open/label/membership actions. No eager tree load
-// or photo deletion; set deletion confirms its contained collections are removed.
+// Outputs: explicit create/move/open/label/membership actions. No eager tree load,
+// implicit root drag or photo deletion; set deletion confirms contained removal.
 import SwiftUI
 
 struct CollectionsSidebar: View {
@@ -149,6 +150,7 @@ struct CollectionTreeRow: View {
     var allowsExpansion=true
     @State private var deleting=false
     @State private var dropTargeted=false
+    @State private var nodeDropTargeted=false
     var body: some View {
         Group {
             if collection.kind == "set",allowsExpansion {
@@ -182,8 +184,8 @@ struct CollectionTreeRow: View {
             Text(collection.kind == "set" ? "This removes the set, all nested collections and their memberships. All photos and originals remain in the library.":"All photos and originals remain in the library.")
         }
     }
-    var openButton: some View {
-        Button { Task { await s.openCollection(collection) } } label: {
+    @ViewBuilder var openButton: some View {
+        let button = Button { Task { await s.openCollection(collection) } } label: {
             HStack {
                 VStack(alignment:.leading,spacing:2) {
                     Label(collection.name,systemImage:collection.symbol).lineLimit(1)
@@ -197,10 +199,30 @@ struct CollectionTreeRow: View {
                 if s.collectionState?.target.id == collection.id { Image(systemName:"plus").help("Target Collection") }
                 if s.collectionID == collection.id { Image(systemName:"checkmark").font(.caption) }
             }
-        }.accessibilityAddTraits(s.collectionID == collection.id ? .isSelected:[])
-            .help("Open \(collection.name) · \(collection.colorLabel == "none" ? "No color label":"\(collection.colorLabel.capitalized) color label")")
-            .accessibilityLabel("\(collection.name), \(collection.kind), \(collection.colorLabel == "none" ? "no color label":"\(collection.colorLabel.capitalized) color label")")
-            .accessibilityValue(allowsExpansion ? "":collection.parentName.map { "In \($0)" } ?? "Top Level")
+        }
+        .accessibilityAddTraits(s.collectionID == collection.id ? .isSelected:[])
+        .draggable(s.collectionNodeDrag(collection))
+        .help("Open \(collection.name) · \(collection.colorLabel == "none" ? "No color label":"\(collection.colorLabel.capitalized) color label") · Drag to move into a set")
+        .accessibilityLabel("\(collection.name), \(collection.kind), \(collection.colorLabel == "none" ? "no color label":"\(collection.colorLabel.capitalized) color label")")
+        .accessibilityHint(collection.kind == "set"
+            ? "Drop a collection here to move it inside this set. Drag this set to another set to move it."
+            : collection.kind == "regular"
+                ? "Drag this collection to a set to move it. Drop photos from the current Library page to add them. Add Selected Photos remains available in the context menu."
+                : "Drag this collection to a set to move it.")
+        .accessibilityValue(allowsExpansion ? "":collection.parentName.map { "In \($0)" } ?? "Top Level")
+
+        if collection.kind == "set" {
+            button
+                .dropDestination(for: CatalogCollectionDrag.self) { items, _ in
+                    guard items.count == 1,
+                          s.beginCollectionNodeDrop(items[0], to: collection) != nil else { return false }
+                    return true
+                } isTargeted: { nodeDropTargeted = $0 }
+                .background(nodeDropTargeted ? Color.accentColor.opacity(0.14) : Color.clear,
+                            in: RoundedRectangle(cornerRadius: 6))
+        } else {
+            button
+        }
     }
 
     @ViewBuilder var openCollectionButton: some View {
@@ -213,8 +235,8 @@ struct CollectionTreeRow: View {
                 } isTargeted: { dropTargeted = $0 }
                 .background(dropTargeted ? Color.accentColor.opacity(0.14) : Color.clear,
                             in: RoundedRectangle(cornerRadius: 6))
-                .help("Open \(collection.name) or drop photos to add them")
-                .accessibilityHint("Drop photos from the current Library page to add them. Add Selected Photos remains available in the context menu.")
+                .help("Open \(collection.name), drop photos to add them, or drag this collection to a set to move it")
+                .accessibilityHint("Drag this collection to a set to move it. Drop photos from the current Library page to add them. Add Selected Photos remains available in the context menu.")
         } else {
             openButton
         }

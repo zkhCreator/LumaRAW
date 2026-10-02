@@ -23,6 +23,40 @@ state checks or offscreen snapshots; those require desktop acceptance separately
   --suite NativeReferenceRegression --suite NativeResponsivenessRegression
 ```
 
+## Native collection-node moves
+
+`NativeCollectionNodeDropRegression` exercises the separate node payload, regular/
+smart/set moves, unchanged fields/memberships and original bytes, same-parent
+no-ops, and stale/cycle/depth rejection. It gates actual save calls while navigation
+enters an unrelated or affected set, then checks the current source, selection,
+photo page and total. Moving a child out of or into the open set must update that
+set's aggregate results. Depth fixtures expand ancestors sequentially, as a user
+does; they must not flood transport admission to test an unrelated failure mode.
+Decoder metadata caches may fill during preview; authored metadata and recipes
+must remain unchanged. The app's Info.plist must export both photo and node UTIs.
+
+`NativeCollectionNodeDevelopDropRegression` gates real saves while the selected
+photo's child collection moves out of its set, then enters Develop or Reference.
+The active photo, saved recipe and independent locked reference must survive;
+returning to Library must refresh the set without a test-side manual refresh.
+Also gate page replies to exercise view-transition invalidation, failed reads
+and newer pending generations. Compare/Survey must initialize from fresh rows.
+
+```sh
+.venv/bin/python tests/run_native.py --work work/new-collection-node-native \
+  --engine /absolute/LumaRAW.app/Contents/Resources/Engine/LumaRAWEngine \
+  --suite NativeCollectionNodeDropRegression --suite NativeCollectionDropRegression \
+  --suite NativeCollectionNodeDevelopDropRegression --suite NativeReviewRegression \
+  --suite NativeCollectionRegression --suite NativeLibraryRegression \
+  --suite NativeSelectionRegression --suite NativeReferenceRegression \
+  --suite NativeResponsivenessRegression
+```
+
+Inspect generated sidebar snapshots as offscreen layout evidence only. Native
+drag recognition, hover, drop hit regions, keyboard alternatives and VoiceOver
+still require desktop acceptance on macOS 14 and the current supported macOS.
+Root moves remain available through the existing Edit / Move location picker.
+
 ## Multiple-preset export batches
 
 `test_export_batch.py` covers captured shared/catalog preset revisions, individual

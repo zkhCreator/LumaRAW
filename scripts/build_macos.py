@@ -1,8 +1,9 @@
 """Build an Apple Silicon native SwiftUI app with a self-contained Python engine.
 
 Inputs: source and an explicit, new build directory. Outputs: a local ad-hoc signed
-.app. Never accesses signing identities, credentials or Keychain. No notarization
-or public distribution claim. Builds can be repeated into a fresh directory.
+.app with registered photo and collection-node transfer types. Never accesses
+signing identities, credentials or Keychain. No notarization or public distribution
+claim. Builds can be repeated into a fresh directory.
 """
 import argparse
 import json
@@ -47,8 +48,12 @@ def main():
         'CFBundlePackageType':'APPL','CFBundleIconFile':'LumaRAW.icns','LSMinimumSystemVersion':'14.0',
         'NSHighResolutionCapable':True,'NSPrincipalClass':'NSApplication',
         'LSApplicationCategoryType':'public.app-category.photography',
-        'UTExportedTypeDeclarations':[{'UTTypeIdentifier':'local.lumaraw.catalog-photo',
-            'UTTypeDescription':'LumaRAW Catalog Photo','UTTypeConformsTo':['public.data']}],
+        'UTExportedTypeDeclarations':[
+            {'UTTypeIdentifier':'local.lumaraw.catalog-photo',
+             'UTTypeDescription':'LumaRAW Catalog Photo','UTTypeConformsTo':['public.data']},
+            {'UTTypeIdentifier':'local.lumaraw.catalog-collection-node',
+             'UTTypeDescription':'LumaRAW Catalog Collection','UTTypeConformsTo':['public.data']}
+        ],
         'CFBundleDocumentTypes':[{'CFBundleTypeName':'Photographs','CFBundleTypeRole':'Viewer','LSHandlerRank':'Alternate',
             'CFBundleTypeExtensions':['nef','nrw','dng','arw','cr2','cr3','raf','orf','rw2','jpg','jpeg','png','tif','tiff']}]
     }))

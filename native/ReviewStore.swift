@@ -1,11 +1,28 @@
 // Purpose: connect review selection/navigation to the bounded native catalog page.
 // Inputs: explicit view, candidate, focus, zoom and pan actions. Outputs: review
-// state, captured per-photo mutations and lightweight revision-aware preview work.
+// state, captured per-photo mutations, lightweight preview work and deferred
+// collection-page refreshes when returning from Develop.
 // No catalog or pixel processing; excluding a photo only changes the selection.
 import AppKit
 import Foundation
 
 extension Store {
+    func beginReviewSwitchTransition() -> Int {
+        reviewSwitchGeneration += 1
+        let token = reviewSwitchGeneration
+        reviewSwitchInFlightGeneration = token
+        return token
+    }
+
+    func finishReviewSwitchTransition(_ token: Int, refreshPending: Bool = true) async {
+        guard token == reviewSwitchGeneration,
+              reviewSwitchInFlightGeneration == token else { return }
+        reviewSwitchInFlightGeneration = nil
+        if refreshPending, workspace == "library", !develop {
+            _ = await refreshPendingCollectionNodePhotos()
+        }
+    }
+
     var isMultiReview: Bool { workspace == "library" && !develop && (libraryView == .compare || libraryView == .survey) }
     var actionPhotoIDs: [Int] {
         (!develop && libraryView == .grid) ? selection.sorted() : selected.map { [$0] } ?? []
@@ -16,9 +33,19 @@ extension Store {
     }
 
     func switchLibraryView(_ view: LibraryViewMode) async {
-        reviewSwitchGeneration+=1;let token=reviewSwitchGeneration
-        guard await flushEdits(), !browsing,token == reviewSwitchGeneration else { return }
-        develop=false;workspace="library";libraryView=view
+        let token=beginReviewSwitchTransition()
+        guard await flushEdits(), !browsing,token == reviewSwitchGeneration else {
+            await finishReviewSwitchTransition(token)
+            return
+        }
+        develop=false;workspace="library"
+        guard await refreshPendingCollectionNodePhotos(allowingReviewSwitchToken: token),
+              token == reviewSwitchGeneration else {
+            await finishReviewSwitchTransition(token, refreshPending: false)
+            return
+        }
+        reviewSwitchInFlightGeneration=nil
+        libraryView=view
         canvasTool="view";compare=false;splitCompare=false;detail=false
         if view == .compare {
             review.begin(visible:photos.map(\.id),selection:selection,active:selected)
@@ -30,11 +57,15 @@ extension Store {
     }
 
     func startDevelop() async {
-        reviewSwitchGeneration+=1;let token=reviewSwitchGeneration
-        guard await flushEdits(),token == reviewSwitchGeneration else { return }
+        let token=beginReviewSwitchTransition()
+        guard await flushEdits(),token == reviewSwitchGeneration else {
+            await finishReviewSwitchTransition(token)
+            return
+        }
         endReferenceView()
         reviewRenderer.stop();workspace="library";develop=true
         comparisonMode = .after;canvasTool="view";render()
+        reviewSwitchInFlightGeneration=nil
     }
 
     func reviewSelectionChanged() {
