@@ -38,6 +38,14 @@ end-to-end photo export throughput.
   --photos 100 --preset-counts 1 5 10 --keywords-per-photo 100
 ```
 
+`test_export_batch_metadata_cache.py` checks batch-local metadata reuse against
+fresh snapshot bytes and receipts, policy separation, unchanged job ordering,
+bounded retention and oversized-item fallback. Separate submissions must observe
+intervening metadata/keyword edits; exact request replay must do no new snapshot
+work. Ordinary export must retain its independent preparation path. Compare the
+same scale probe in fresh directories before and after an optimization, without
+concurrent tests/builds or workers.
+
 ## Export with Previous
 
 `test_previous_export.py` exercises genuine schema-34 upgrades, initial absence,

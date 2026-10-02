@@ -4523,3 +4523,60 @@ reference acceptance remain unavailable or unverified. Full filename templates,
 custom-text/start-number batch overrides, additional formats, complete metadata,
 watermarks and publish workflows remain open. This increment does not complete
 the full Lightroom parity inventory.
+
+### Reusing metadata during batch submission
+
+The generation-50 probe above measured about one second inside the catalog write
+transaction for 100 photos exported with ten metadata-equivalent presets. Every
+photo/preset job independently queried the same keyword hierarchy, validated its
+XMP and serialized its frozen snapshot. This work blocks other catalog commands
+while the batch is accepted, even though pixel work is outside that transaction.
+
+Engine generation 51 reuses the exact serialized metadata snapshot and compact
+receipt for repeated photo/policy pairs inside that single write transaction.
+Catalog, copyright-only and no-metadata modes remain distinct; hierarchy settings
+matter only for catalog metadata. Image format, destination and processing options
+remain job-specific, as do recipes and orientation. Preset-first job ordering and
+ordinary export's independent preparation path are unchanged. The cache is local
+to one submission, retains at most 16 MiB of UTF-8 payloads and 1,000 entries, and
+evicts least-recently used entries. Oversized entries still export but are not
+retained. The cache never survives a submission; later batches read current values.
+Exact request replay returns its existing receipt without new snapshot preparation.
+Schema 36 and all 149 command contracts remain unchanged.
+
+The identical isolated scale probe (100 generated 8×8 PNGs, 100 direct keywords
+per photo, paused queue, no pixel workers) produced these results on the same
+Apple M3 Max / 128 GiB / macOS 26.6.2 host. Each row is one first submission plus
+five further submissions with fresh request keys, warm OS/SQLite state and
+pre-created destination folders; no tests or builds ran concurrently.
+
+| Jobs | Before warm median | New first / warm median | New transaction median | New peak RSS / rise |
+| --- | ---: | ---: | ---: | ---: |
+| 100 (1 preset) | 123.0 ms | 121.1 / 124.4 ms | 115.0 ms | 45.2 / 7.8 MiB |
+| 500 (5 presets) | 510.9 ms | 143.8 / 147.9 ms | 128.1 ms | 48.2 / 2.5 MiB |
+| 1,000 (10 presets) | 1,018.1 ms | 170.3 / 178.6 ms | 142.3 ms | 48.7 / 0.1 MiB |
+
+At 1,000 jobs, warm submission was about **5.7× faster** and the measured catalog
+transaction fell from 996.0 to 142.3 ms. A single preset has no reuse opportunity
+and stayed approximately unchanged. RSS is sampled process memory, not a heap
+proof or a guarantee; the last case starts after earlier cases have already
+allocated memory. The transaction measurement excludes the shared preset-store
+transaction. These measurements do not include IPC, desktop drawing, image
+processing or cold storage, and do not establish desktop frame rate or export
+throughput improvements.
+
+Validation: **81 focused Python tests passed**; the full suite with required
+actual Metal dispatch and the retained real NEF fixture passed **1,011 tests in
+141.68 s**, without skips. The new regression checks compare canonical snapshot
+and receipt bytes across formats and output options, four effective metadata
+policies, ordinary export, exact replay, job order/orientation, Unicode byte
+budgets, LRU eviction, oversized entries and later metadata/keyword/rating changes.
+The packaged engine passed **78 native assertions** (Batch 46, Export Metadata 16,
+Responsiveness 16). All 149 MCP schemas, source/client/broker identity, bundled
+guide bytes and deep strict ad-hoc signature verification matched.
+
+The app was built for the macOS 14 deployment target and run on macOS 26.6.2.
+macOS 14 runtime and current desktop/VoiceOver/Lightroom reference acceptance
+remain unverified; desktop automation was not retried. This optimization changes
+submission preparation, not image algorithms, processing throughput or product
+parity status.

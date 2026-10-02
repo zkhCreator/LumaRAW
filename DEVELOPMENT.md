@@ -336,6 +336,10 @@ when a clear function is more maintainable. Avoid unrelated formatting churn.
   cancellation/retry must stay within indexed membership; pause/resume is global.
   Keep collision publication atomic and preserve existing files. A failed batch
   may leave created empty directories, never partial jobs or receipts.
+  Reuse descriptive metadata only inside that batch's catalog write transaction,
+  with bounded retained bytes/entries and policy-aware keys. Never retain a cache
+  across commands or use metadata revision alone as a complete change token.
+  Preserve serialized snapshot/receipt bytes and preset-first job ordering.
 
 ## Engine changes and handoff
 

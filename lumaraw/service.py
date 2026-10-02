@@ -5,7 +5,8 @@ opens its own SQLite connection under a short catalog lock. Expensive pixels run
 outside that lock, in one child at a time, with sampled RSS and time limits.
 Inputs: validated API commands. Outputs: JSON, file-backed previews, durable jobs,
 revision-bound shared/catalog export preset workflows, catalog-local Previous
-settings and immutable, pageable multi-preset export batches.
+settings and immutable, pageable multi-preset export batches. Same-policy batch
+jobs reuse only bounded serialized metadata during the batch write transaction.
 Completed preview receipts are checked outside catalog locks without starting an
 image worker; source identity, revisions and cancellation still bind each reply.
 No GUI, HTTP listener, telemetry or original-file writes. Interrupted exports are
@@ -42,6 +43,7 @@ from .runtime import engine_identity, EngineChangedError
 from .folder_sync import FolderSync
 from .folder_sync_runner import FolderSyncRunner
 from .keyword_exports import KeywordExports
+from .batch_export_metadata import BatchExportMetadataCache
 from .keyword_details import KeywordDetails
 from .previous_import import state as previous_import_state
 from .develop_history import DevelopHistory, adjustment_label
@@ -267,6 +269,7 @@ class Service:
                           'destination_mode,parent_destination) VALUES(?,?,?,?,?,?,?,?)',
                           (batch_id,created,revision,len(rows),len(resolved),len(rows)*len(resolved),
                            destination_mode,parent_destination))
+            metadata_cache=BatchExportMetadataCache(c)
             for order,item in enumerate(resolved):
                 c.db.execute('INSERT INTO export_batch_presets(batch_id,preset_order,preset_id,name,format,options,'
                              'destination,subfolder,filename_suffix) VALUES(?,?,?,?,?,?,?,?,?)',
@@ -275,8 +278,10 @@ class Service:
                               item['destination'],item['subfolder'],item['filename_suffix']))
                 options=ExportOptions.parse(item['options'])
                 for row in rows:
+                    frozen_metadata=metadata_cache.get(row['id'],options)
                     c.enqueue_one(row,item['destination'],item['format'],options,batch_id=batch_id,
-                                  preset_name=item['name'],collision_suffix=item['filename_suffix'])
+                                  preset_name=item['name'],collision_suffix=item['filename_suffix'],
+                                  frozen_metadata=frozen_metadata)
             result={'batch_id':batch_id,'queued':len(rows)*len(resolved),
                     'photo_count':len(rows),'preset_count':len(resolved)}
             c.db.execute('INSERT INTO requests VALUES(?,?,?)',

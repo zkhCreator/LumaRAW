@@ -12,7 +12,9 @@ Direct imports number successful new originals with item savepoints and retain a
 single import number across the invocation's bounded commit batches.
 Last accepted manual export settings are catalog-local and commit atomically with
 their queue submission; immutable batch-export provenance and every corresponding
-job are catalog-local, and export workers never rewrite those captured settings.
+job are catalog-local. Batch jobs may reuse bounded serialized metadata snapshots
+inside their single write transaction; ordinary jobs keep independent snapshots.
+Export workers never rewrite those captured settings.
 """
 from contextlib import contextmanager
 import json
@@ -207,16 +209,21 @@ class Catalog:
         return count
 
     def enqueue_one(self, row, destination, fmt, options, *, batch_id=None,
-                    preset_name='', collision_suffix=''):
+                    preset_name='', collision_suffix='', frozen_metadata=None):
         """Insert one complete snapshot inside the caller's batch transaction."""
         from .keyword_exports import KeywordExports, encode, receipt
-        snapshot = KeywordExports(self).snapshot(row['id'], options)
+        if frozen_metadata is None:
+            snapshot = KeywordExports(self).snapshot(row['id'], options)
+            snapshot_json = encode(snapshot)
+            receipt_json = json.dumps(receipt(snapshot))
+        else:
+            snapshot_json, receipt_json = frozen_metadata
         return self.db.execute(
             'INSERT INTO jobs(photo_id,source,recipe,destination,format,created,options,priority,source_id,'
             'metadata_snapshot,export_metadata,orientation,batch_id,preset_name,collision_suffix) '
             'VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
             (row['id'],row['path'],row['recipe'],str(destination),fmt,time.time(),json.dumps(options.dict()),
-             options.priority,row['source_id'],encode(snapshot),json.dumps(receipt(snapshot)),row['orientation'],
+             options.priority,row['source_id'],snapshot_json,receipt_json,row['orientation'],
              batch_id,preset_name,collision_suffix)).lastrowid
 
     def all_ids(self, stars=False):

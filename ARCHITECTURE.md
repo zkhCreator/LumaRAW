@@ -318,6 +318,18 @@ extension to it. Only the base stem is shortened on Unicode boundaries as needed
 to keep the complete filename within 255 bytes; the suffix and extension remain
 intact. Existing-file protection still uses atomic hard links.
 
+Batch metadata preparation can reuse an already validated, serialized snapshot
+inside the current catalog write transaction. `batch_export_metadata.py` owns a
+local cache keyed by photo identity, metadata mode and the effective hierarchy
+option. Other output settings do not affect the descriptive packet. The cache
+never survives a submission or escapes to the broker's persistent state; the write
+transaction, not photo revision fields alone, supplies its consistency boundary.
+Ordinary export still prepares its own snapshots. The preset-first job loop and
+job-specific recipes, orientation, output options and destinations are unchanged.
+Retained serialized UTF-8 payloads are capped at 16 MiB and 1,000 entries. Least
+recently used entries are removed as needed; an oversized entry is used once and
+not retained. The byte cap measures serialized payloads, not total process RSS.
+
 Schema 36 stores durable batch summaries and captured preset context, with indexed
 job membership. Queue submission freezes current recipes, metadata, orientation
 and output values in the same transaction. Preset edits/deletion after acceptance
