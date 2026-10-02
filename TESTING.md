@@ -2,6 +2,38 @@
 
 All probes use explicit read-only input photographs and new disposable catalog/output directories. They never use a personal photo library by default.
 
+## Native culling shortcuts
+
+`NativeCullingShiftRegression` uses five generated originals and catalog-only
+virtual copies to exercise the documented rating/flag/color key mappings,
+single-photo Grid/Loupe advance, active-only Compare/Survey writes and captured
+Grid batches. Check Stars/Keepers/Rejects, filters, smart/set membership, sorting,
+no successor and the 61-to-60 filtered page clamp. Rows and focus must remain
+coherent when a query changes membership or a later view/source action supersedes
+its reply. Gate real command replies to cover late same-field writes, independent
+rating/flag fields and partially overlapping batches. Cover both orders of an
+older successful acknowledgment and a newer failed attempt, plus a third success
+before the old reply arrives. Use distinct initial values so failure to adopt
+cannot pass accidentally; preserve newer error/status without moving focus.
+A real node move with a
+failed page read supplies a pending aggregate-set invalidation; culling its final
+smart member must clear focus and consume only the successful refresh generation.
+
+```sh
+.venv/bin/python tests/run_native.py --work work/new-culling-native \
+  --engine /absolute/LumaRAW.app/Contents/Resources/Engine/LumaRAWEngine \
+  --suite NativeCullingShiftRegression --suite NativeLibraryRegression \
+  --suite NativeSelectionRegression --suite NativeReviewRegression \
+  --suite NativeReferenceRegression --suite NativeCollectionNodeDevelopDropRegression \
+  --suite NativeMetadataPresetRegression --suite NativePainterRegression \
+  --suite NativeResponsivenessRegression
+```
+
+The pure key mapping and native Store probes do not dispatch desktop key events,
+verify text-input focus routing, establish keyboard-layout/VoiceOver acceptance,
+or prove Lightroom's exact sorted/filter-removal/selection behavior. Keep those
+checks separate on macOS 14 and the current supported macOS.
+
 ## Native collection photo drops
 
 `NativeCollectionDropRegression` exercises captured visible-page photo drags,

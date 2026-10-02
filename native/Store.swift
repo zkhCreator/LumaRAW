@@ -1,7 +1,8 @@
 // Purpose: main-thread presentation state and user workflows for the native shell.
 // Inputs: native controls and service replies. Outputs: reversible recipe edits,
 // preview paths and queue state, including revision-bound exports and captured
-// collection-node workflows with generation-safe photo-page refreshes.
+// collection-node and culling workflows with generation-safe page refreshes and
+// per-field rating/flag reply reconciliation.
 // Revisions belong to the service; stale edits are rejected, never silently retried.
 // Photo results and collection browsers use bounded pages.
 import SwiftUI
@@ -187,6 +188,11 @@ import UniformTypeIdentifiers
     var reviewPaneHeight=900
     var reviewSwitchGeneration=0
     var reviewSwitchInFlightGeneration:Int?
+    var cullingActionGeneration=0
+    var cullingPhotoActionGenerationByPhoto:[Int:Int]=[:]
+    var photoFieldWriteLedger=PhotoFieldWriteLedger()
+    var metadataWriteGeneration=0
+    var metadataWriteGenerationByPhoto:[Int:Int]=[:]
     var collectionNodePhotoRefreshGeneration=0
     var pendingCollectionNodePhotoRefreshGeneration:Int?
     @Published var showInspector=true
@@ -267,6 +273,8 @@ import UniformTypeIdentifiers
     private var started=false
     private var previousExportRevision:Int?
     private var selectionAnchor: Int?
+    var cullingPageGeneration: Int { pageGeneration }
+    var cullingSelectionAnchor: Int? { selectionAnchor }
     var canChangePhoto: Bool { !browsing && !editing && pendingPatch.isEmpty }
     var hasPendingEdits: Bool { editing || !pendingPatch.isEmpty }
 
@@ -354,9 +362,12 @@ import UniformTypeIdentifiers
         consumingCollectionNodeRefreshGeneration: Int? = nil,
         guardingCollectionNodePhotoRefreshGeneration: Int? = nil,
         allowedReviewSwitchInFlightGeneration: Int? = nil,
+        cullingAdvanceContext: CullingAdvanceContext? = nil,
+        advanceCullingSelection: Bool = false,
+        preserveCullingBatchSelection: Bool = false,
         pageCall: ((String, [String: Any]) async throws -> [String: Any])? = nil
     ) async -> Bool {
-        func requestIsCurrent() -> Bool {
+        func requestIsCurrent(expectedPageGeneration: Int? = nil) -> Bool {
             if let expectedSourceNavigationGeneration,
                expectedSourceNavigationGeneration != sourceNavigationGeneration { return false }
             if let guardingCollectionNodePhotoRefreshGeneration,
@@ -373,10 +384,15 @@ import UniformTypeIdentifiers
             }
             if let consumingCollectionNodeRefreshGeneration,
                pendingCollectionNodePhotoRefreshGeneration != consumingCollectionNodeRefreshGeneration { return false }
+            if let cullingAdvanceContext,
+               !cullingAdvanceContext.matches(
+                    self,
+                    pageGeneration: expectedPageGeneration ?? pageGeneration
+               ) { return false }
             return true
         }
 
-        guard requestIsCurrent() else { return false }
+        guard requestIsCurrent(expectedPageGeneration: cullingAdvanceContext?.pageGeneration) else { return false }
         pageGeneration += 1;let token=pageGeneration;browsing=true
         defer{if token==pageGeneration{browsing=false}}
         guard await flushEdits(),token==pageGeneration,requestIsCurrent() else{return false}
@@ -392,6 +408,8 @@ import UniformTypeIdentifiers
                 result = try await Backend.call("list_photos", params)
             }
             guard token==pageGeneration,requestIsCurrent() else{return false}
+            let resultOffset = result["offset"] as? Int ?? offset
+            cullingAdvanceContext?.acceptPageOffset(resultOffset)
             photos=(result["photos"] as? [[String:Any]] ?? []).compactMap(Photo.init)
             adoptStacks(result)
             previousImportRevision=(result["previous_import"] as? [String:Any])?["revision"] as? Int ?? previousImportRevision
@@ -399,18 +417,28 @@ import UniformTypeIdentifiers
             photoFolderRevision=result["folder_revision"] as? Int ?? photoFolderRevision
             photoKeywordRevision=result["keyword_revision"] as? Int ?? photoKeywordRevision
             total=result["total"] as? Int ?? 0
-            offset=result["offset"] as? Int ?? offset
+            offset=resultOffset
             thumbnails=thumbnails.filter { id,_ in photos.contains{$0.id==id} }
-            selection.formIntersection(Set(photos.map(\.id)))
-            if !photos.contains(where: { $0.id == selectionAnchor }) { selectionAnchor=nil }
-            if selected==nil || !photos.contains(where:{$0.id==selected}) {
-                if let first=photos.first {
-                    selected=first.id
-                    selection=[first.id]
-                    await load(first.id)
-                    guard token==pageGeneration,requestIsCurrent() else{return false}
+            let pagePhotoIDs = Set(photos.map(\.id))
+            if advanceCullingSelection, let cullingAdvanceContext {
+                cullingAdvanceContext.adoptAdvanceFocus(self, pagePhotoIDs: pagePhotoIDs)
+            } else if preserveCullingBatchSelection, let cullingAdvanceContext {
+                cullingAdvanceContext.adoptBatchFocus(self, pagePhotoIDs: pagePhotoIDs)
+            } else {
+                selection.formIntersection(Set(photos.map(\.id)))
+                if !photos.contains(where: { $0.id == selectionAnchor }) { selectionAnchor=nil }
+                if selected==nil || !photos.contains(where:{$0.id==selected}) {
+                    if let first=photos.first {
+                        selected=first.id
+                        selection=[first.id]
+                        cullingAdvanceContext?.recordFocus(self)
+                        let fallbackID = first.id
+                        await load(fallbackID)
+                        guard token==pageGeneration,requestIsCurrent() else{return false}
+                    }
+                    else{selected=nil;selection=[];clearPhoto()}
                 }
-                else{selected=nil;selection=[];clearPhoto()}
+                cullingAdvanceContext?.recordFocus(self)
             }
             reviewSelectionChanged()
             updateThumbnails(force:true)
@@ -446,6 +474,38 @@ import UniformTypeIdentifiers
         cancelMixerTarget(restore:false);mixerTargetFrame=nil
         generation += 1;previewTask?.cancel();photo=nil;recipe=[:]
         preview=nil;previewGeometry=nil;before=nil;metadata=[:];histogram=[];rendering=false;loading=false
+    }
+    func clearCullingFocus() {
+        selected=nil
+        selection=[]
+        selectionAnchor=nil
+        clearPhoto()
+    }
+    func adoptCullingFocus(_ id: Int) {
+        guard photos.contains(where: { $0.id == id }) else {
+            clearCullingFocus()
+            return
+        }
+        selected=id
+        selection=[id]
+        selectionAnchor=id
+        saveFailed=false
+        clearPhoto()
+        Task { await load(id) }
+    }
+    func adoptCullingBatchFocus(_ id: Int, selection adoptedSelection: Set<Int>, anchor: Int) {
+        guard photos.contains(where: { $0.id == id }), adoptedSelection.contains(id) else {
+            clearCullingFocus()
+            return
+        }
+        selected=id
+        selection=adoptedSelection
+        selectionAnchor=anchor
+        if photo?.id != id {
+            saveFailed=false
+            clearPhoto()
+            Task { await load(id) }
+        }
     }
     func choose(_ id:Int, extend:Bool=false, range:Bool=false) {
         guard !browsing,!editing,pendingPatch.isEmpty else{message="Wait for the current edit to finish saving";return}
@@ -655,27 +715,80 @@ import UniformTypeIdentifiers
         let ids=actionPhotoIDs
         Task { await ratePhotos(ids,patch:["flag":value]) }
     }
-    func ratePhotos(_ ids: [Int], patch: [String: Any]) async {
-        guard !ids.isEmpty else { return }
+    @discardableResult
+    func ratePhotos(
+        _ ids: [Int],
+        patch: [String: Any],
+        call: CullingCommandCall? = nil,
+        shouldAdopt: CullingMutationAdoption? = nil
+    ) async -> Bool {
+        guard !ids.isEmpty else { return false }
+        let targetIDs = Set(ids)
+        let fields = Set(patch.keys.filter { ["rating", "flag"].contains($0) })
+        let keys = Set(targetIDs.flatMap { id in
+            fields.map { PhotoFieldWriteKey(photoID: id, field: $0) }
+        })
+        let writeGeneration = photoFieldWriteLedger.begin(keys)
+        var fieldWriteFinished = false
+        defer {
+            if !fieldWriteFinished {
+                _ = photoFieldWriteLedger.finish(writeGeneration, keys: keys, accepted: false)
+            }
+        }
         do {
-            let result=try await Backend.call("rate_photos",patch.merging(["photo_ids":ids]) { _,new in new })
+            let params = patch.merging(["photo_ids":ids]) { _,new in new }
+            let result: [String: Any]
+            if let call {
+                result = try await call("rate_photos", params)
+            } else {
+                result = try await Backend.call("rate_photos", params)
+            }
+            let resolution = photoFieldWriteLedger.finish(writeGeneration, keys: keys, accepted: true)
+            fieldWriteFinished = true
             for row in result["updated"] as? [[String: Any]] ?? [] {
                 guard let id=row["photo_id"] as? Int else { continue }
+                let canAdoptRating = resolution.adoptable.contains(
+                    PhotoFieldWriteKey(photoID: id, field: "rating")
+                )
+                let canAdoptFlag = resolution.adoptable.contains(
+                    PhotoFieldWriteKey(photoID: id, field: "flag")
+                )
                 if var current=photo,current.id == id {
-                    if let rating=row["rating"] as? Int { current.rating=rating }
-                    if let flag=row["flag"] as? Int { current.flag=flag }
-                    photo=current
+                    var changed = false
+                    if canAdoptRating, let rating=row["rating"] as? Int {
+                        current.rating=rating
+                        changed = true
+                    }
+                    if canAdoptFlag, let flag=row["flag"] as? Int {
+                        current.flag=flag
+                        changed = true
+                    }
+                    if changed { photo=current }
                 }
                 if let index=photos.firstIndex(where: { $0.id == id }) {
-                    if let rating=row["rating"] as? Int { photos[index].rating=rating }
-                    if let flag=row["flag"] as? Int { photos[index].flag=flag }
+                    if canAdoptRating, let rating=row["rating"] as? Int { photos[index].rating=rating }
+                    if canAdoptFlag, let flag=row["flag"] as? Int { photos[index].flag=flag }
                 }
             }
             // Keep the active recipe revision for conflict detection. A new
             // library query is explicit so a pick does not unexpectedly hide
             // the photo while the user is still reviewing or editing it.
-            message="Updated \(ids.count) \(ids.count == 1 ? "photo":"photos")"
-        } catch { self.error=error.localizedDescription }
+            if resolution.isLatestAttempt && targetIDs.allSatisfy({ id in
+                shouldAdopt.map { $0(id) } ?? true
+            }) {
+                message="Updated \(ids.count) \(ids.count == 1 ? "photo":"photos")"
+            }
+            return true
+        } catch {
+            let resolution = photoFieldWriteLedger.finish(writeGeneration, keys: keys, accepted: false)
+            fieldWriteFinished = true
+            if resolution.isLatestAttempt && targetIDs.allSatisfy({ id in
+                shouldAdopt.map { $0(id) } ?? true
+            }) {
+                self.error=error.localizedDescription
+            }
+            return false
+        }
     }
     func mutate(_ method:String,_ params:[String:Any]) async {
         do {

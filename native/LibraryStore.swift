@@ -1,6 +1,6 @@
 // Purpose: native collection and descriptive metadata workflows over shared APIs.
 // Inputs: captured selections, expected metadata/collection revisions and forms.
-// Outputs: refreshed bounded pages and catalog-only mutations; originals untouched.
+// Outputs: optional refreshed bounded pages and catalog-only mutations; originals untouched.
 // Recipe state and recipe revisions are never adopted from metadata write replies.
 import Foundation
 
@@ -131,15 +131,46 @@ extension Store {
         } catch { self.error=error.localizedDescription }
     }
 
-    func saveMetadata(targets: [Photo], patch: [String: Any]) async -> Bool {
+    func saveMetadata(
+        targets: [Photo],
+        patch: [String: Any],
+        refreshAfter: Bool = true,
+        call: CullingCommandCall? = nil,
+        shouldAdopt: CullingMutationAdoption? = nil
+    ) async -> Bool {
         guard !targets.isEmpty, !patch.isEmpty else { return false }
+        metadataWriteGeneration += 1
+        let writeGeneration = metadataWriteGeneration
+        let targetIDs = Set(targets.map(\.id))
+        for id in targetIDs {
+            metadataWriteGenerationByPhoto[id] = writeGeneration
+        }
+        defer {
+            for id in targetIDs where metadataWriteGenerationByPhoto[id] == writeGeneration {
+                metadataWriteGenerationByPhoto.removeValue(forKey: id)
+            }
+        }
         do {
-            let result=try await Backend.call("edit_metadata", ["targets":targets.map {
+            let params: [String: Any] = ["targets":targets.map {
                 ["photo_id":$0.id, "expected_metadata_revision":$0.metadataRevision]
-            }, "patch":patch])
+            }, "patch":patch]
+            let result: [String: Any]
+            if let call {
+                result = try await call("edit_metadata", params)
+            } else {
+                result = try await Backend.call("edit_metadata", params)
+            }
             let accepted=result["patch"] as? [String: Any] ?? [:]
-            for row in result["updated"] as? [[String: Any]] ?? [] {
-                guard let id=row["photo_id"] as? Int,let revision=row["metadata_revision"] as? Int else { continue }
+            let updates = (result["updated"] as? [[String: Any]] ?? []).compactMap { row -> (Int, Int)? in
+                guard let id=row["photo_id"] as? Int,
+                      let revision=row["metadata_revision"] as? Int else { return nil }
+                return (id, revision)
+            }
+            for (id, revision) in updates {
+                let pageRevision = photos.first(where: { $0.id == id })?.metadataRevision
+                let activeRevision = photo?.id == id ? photo?.metadataRevision : nil
+                let knownRevision = [pageRevision, activeRevision].compactMap { $0 }.max()
+                guard knownRevision.map({ revision >= $0 }) ?? true else { continue }
                 if var current=photo, current.id == id {
                     current.adoptLibraryPatch(accepted,revision:revision); photo=current
                 }
@@ -147,10 +178,24 @@ extension Store {
                     photos[index].adoptLibraryPatch(accepted,revision:revision)
                 }
             }
-            await refresh()
-            message="Updated metadata for \(targets.count) photos"
+            func canPresentResult() -> Bool {
+                targetIDs.allSatisfy { id in
+                    metadataWriteGenerationByPhoto[id] == writeGeneration
+                        && (shouldAdopt.map { $0(id) } ?? true)
+                }
+            }
+            if refreshAfter, canPresentResult() { await refresh() }
+            if canPresentResult() { message="Updated metadata for \(targets.count) photos" }
             return true
-        } catch { self.error=error.localizedDescription; return false }
+        } catch {
+            if targetIDs.allSatisfy({ id in
+                metadataWriteGenerationByPhoto[id] == writeGeneration
+                    && (shouldAdopt.map { $0(id) } ?? true)
+            }) {
+                self.error=error.localizedDescription
+            }
+            return false
+        }
     }
 
     func labelSelection(_ label: String) {

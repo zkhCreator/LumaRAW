@@ -1,6 +1,6 @@
-// Purpose: photo-only single-key shortcuts scoped to focused viewing surfaces.
-// Inputs: key events from the grid, filmstrip or canvas. Outputs: Store actions.
-// Non-goals: global menu accelerators or intercepting metadata/search text input.
+// Purpose: photo-only shortcuts, including documented Shift culling actions.
+// Inputs: key events from focused viewing surfaces. Outputs: captured Store actions.
+// Non-goals: global menu accelerators, text input, Auto Advance preferences or Caps Lock behavior.
 // Command shortcuts retain their standard native menu or focused-grid behavior.
 import SwiftUI
 
@@ -45,17 +45,24 @@ struct PhotoKeyboardShortcuts: ViewModifier {
             Task {await s.startReferenceView()};return .handled
         }.onKeyPress(characters:CharacterSet(charactersIn:"yY¥")) { press in
             s.comparisonShortcut(press.modifiers) ? .handled:.ignored
-        }.onKeyPress(characters:CharacterSet(charactersIn:"012345pxu\\gecnd/b")) { press in
-            guard press.modifiers.isEmpty, s.selected != nil else { return .ignored }
-            if let rating=Int(press.characters), (0...5).contains(rating) {
-                s.rate(rating)
-                return .handled
+        }.onKeyPress(characters:CharacterSet(charactersIn:"0123456789pPxXuU\\gecnd/b")) { press in
+            guard s.selected != nil else { return .ignored }
+            let key=press.characters.lowercased()
+            let shifted=press.modifiers == .shift
+            guard shifted || press.modifiers.isEmpty else { return .ignored }
+            if let action=CullingShortcutMapper.action(for:key,shifted:shifted) {
+                if shifted || actionRequiresLibrary(action) {
+                    guard s.workspace == "library",!s.develop else { return .ignored }
+                }
+                return s.applyCullingShortcut(
+                    action.mutation,
+                    advanceAfterSuccess:action.advanceAfterSuccess,
+                    refreshAfterMetadataMutation:action.refreshAfterMetadataMutation
+                ) ? .handled:.ignored
             }
-            switch press.characters {
+            guard !shifted else { return .ignored }
+            switch key {
             case "b": Task { await s.toggleTargetMembership() }
-            case "p": s.flag(1)
-            case "x": s.flag(-1)
-            case "u": s.flag(0)
             case "\\": if s.develop {s.setComparisonMode(s.compare ? "after":"before")} else {s.showLibraryFilters=true}
             case "g": Task { await s.switchLibraryView(.grid) }
             case "e": Task { await s.switchLibraryView(.loupe) }
@@ -67,5 +74,10 @@ struct PhotoKeyboardShortcuts: ViewModifier {
             }
             return .handled
         }
+    }
+
+    private func actionRequiresLibrary(_ action: CullingShortcutAction) -> Bool {
+        if case .colorLabel(_) = action.mutation { return true }
+        return false
     }
 }

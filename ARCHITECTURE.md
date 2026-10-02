@@ -194,6 +194,22 @@ return services the current set before Compare/Survey setup. Page, source, view
 and invalidation generations reject stale adoption; only the captured successful
 generation is consumed. Mutation failures are displayed without rebase or replay.
 
+Explicit Shift culling shortcuts capture the action's targets, bounded visible
+order, source, view, selection and filter/sort state before a command can suspend.
+Rating/flag and revision-bound label writes use existing service contracts.
+Single-photo Grid/Loupe actions may select the next captured ID that survives
+the current page. A query whose membership/order can change adopts its rows,
+returned offset and reconciled focus together, before later asynchronous reads.
+Grid batches retain surviving selection; they do not advance to an unrelated row.
+Page, navigation, view, action and collection-move generations guard adoption.
+Overlapping rating/flag replies reconcile independently by photo and field. An
+acknowledged value is not suppressed by a later pending or failed attempt; a
+newer acknowledged attempt prevents late older replies from replacing it. The
+per-field record is removed when that field's in-flight requests drain. Metadata
+replies adopt the complete canonical patch at each target's newest known metadata
+revision. Separate ownership guards control status and focus. An acknowledged
+catalog write remains successful even if its presentation action is superseded.
+
 `preview_photo(expected_revision)` now binds ordinary as well as draft previews.
 The service checks before releasing the catalog lock for image work, then checks
 again before returning the result. Conflicts never return stale pixels or write

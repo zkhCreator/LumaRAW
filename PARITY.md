@@ -62,7 +62,7 @@ gaps. Nothing below is full Lightroom parity merely because historical tests pas
 | Import and catalogs | Partial: durable Add/Copy review with checked selection, Grid/Loupe source previews with on-demand Fit/100% regions and completed-preview reuse, suspected duplicates, bounded sorting/filtering, captured import-time presets and keywords, Copy destination/subfolder and flat/source/date organization with three numeric date layouts and paged destination photo counts, filename token editor and catalog-local templates with checked-sequence and catalog Import/Image numbering, byte-verified original/XMP transfers, optional original-state second copies, catalog-local saved import configurations with explicit rescans, explicit crash recovery and retained-copy cancellation, Previous Import navigation and catalog backup/restore | Move/Copy as DNG, destination-tree grouping and more date formats, numbering edge-case reference acceptance and wider EXIF/shared templates, shared/Adobe import-preset exchange and interaction acceptance, preview policies, cards/tethering, progressive Current Import, catalog switching/merge and desktop/reference acceptance |
 | Library navigation | Partial: bounded grid/filmstrip, folder tree/search/favorites/labels, durable missing-folder relocation and folder synchronization with reviewed suspected-duplicate inclusion, direct/recursive sources, filters/sorting including live snapshot status, regular/smart/Quick collections and nested sets, photo drops into regular and Quick collections, collection-node moves into sets, single/batch collection color labels and global color filtering | Multi-source selection, complete sync Import Dialog, folder move/rename, relocation overlap/collision handling, collection-node drag/drop desktop/reference acceptance, custom label names/sets and sidebar multi-selection interaction, full smart criteria/import-export, source-selection memory, desktop/reference acceptance |
 | Organization | Partial: duplicate/missing detection, hierarchical keywords/synonyms/export flags/Will Export preview, text/CSV vocabulary exchange and manual person tags, custom nine-slot keyword sets/recent entries/shared or catalog storage, multi-keyword shortcuts and keyword/rating/flag/label/target-collection/rotation/Develop-preset/metadata-preset Painter strokes, independent catalog rotation/flips, title/caption/copyright plus thirty IPTC fields, selective metadata presets, labels, batch metadata, virtual copies, manual/split/capture-time scoped stacks | Keyword policy/file and preset reference acceptance, built-in sets/suggestions/undo, Painter desktop acceptance, IPTC Extension and complete metadata parity, stack interaction acceptance, rename and sidecars |
-| Culling | Partial: Loupe/Compare/Survey, linked detail, anchored page selection, Develop Reference/Active pairs with independent Fit/1:1 viewports, session lock and RGB/LAB readouts | Desktop and numerical reference acceptance, HDR readouts, scrubby/box zoom, cross-page selection, auto advance, persistent workspace state |
+| Culling | Partial: Loupe/Compare/Survey, linked detail, anchored page selection, rating/flag/color keys with guarded Shift advance in single-target Grid/Loupe, Develop Reference/Active pairs with independent Fit/1:1 viewports, session lock and RGB/LAB readouts | Desktop and numerical reference acceptance, exact sorted/filter-removal behavior, HDR readouts, scrubby/box zoom, cross-page selection, Auto Advance preference/Caps Lock, persistent workspace state |
 | Basic development | Partial: light/WB/color, eight-band HSL and B&W Mix with photo-targeted adjustment and selective resets/sync | Calibrated absolute WB, eyedropper, texture/clarity/dehaze, Point Color, Auto B&W mix, color grading and Adobe processing/reference acceptance |
 | Curves and profiles | Partial: four-region parametric curves with movable splits and photo-targeted adjustment, interactive RGB/channel point curves, shared temporary previews, legacy luminance curve, LUT/ICC | Point/channel targeting, curve exchange, camera/profile browser, Adobe processing and rendered/reference acceptance |
 | Detail and optics | Partial: noise/sharpen, manual lens | Complete manual detail controls, automatic lens profiles, bounded full-resolution acceptance |
@@ -5013,3 +5013,57 @@ No engine command, schema or generation change is required: generation **55**,
 schema **37**, and **149** contracts remain unchanged. Desktop drag/drop,
 VoiceOver, macOS 14 runtime and Lightroom interaction acceptance remain open.
 This is one collection workflow increment, not complete non-AI parity.
+
+## Captured culling shortcuts (October 2, 2026)
+
+The focused Mac Library surfaces map ratings 0–5, flags P/X/U and labels
+6/7/8/9 (red/yellow/green/blue). Adobe's
+[keyboard reference](https://helpx.adobe.com/lightroom-classic/desktop/introduction-to-lightroom-classic/keyboard-shortcuts.html)
+documents the corresponding Shift forms for applying a value and advancing.
+LumaRAW advances after an acknowledged write for one Grid target or the active
+Loupe photo. Grid batches retain captured targets; Compare/Survey change only the
+active photo without advancing. Ordinary rating/flag keys retain their existing
+Develop behavior; the new Shift and label-key paths are scoped to Library.
+
+Affected modes, filters, sort orders and smart/set membership requery the bounded
+page. Rows, clamped offset and focus reconcile together before asynchronous detail
+loads. The next photo comes from the captured visible order, intersected with the
+new page. A batch retains surviving selection and its active photo, or a captured
+surviving selected row; an empty selection clears instead of selecting an unrelated
+first row. No successor wraps around or guesses a photo on an unloaded page.
+Pending collection-node invalidations are consumed only by a successful current
+aggregate refresh. Later navigation, selection, view changes or culling actions
+prevent an older action from retargeting focus.
+
+The initial native preflight passes **151 state/IPC assertions**: culling 97,
+Library 13, Compare/Survey 20 and collection-node/Develop transitions 21. Five
+generated originals plus catalog-only virtual copies cover batches, membership,
+61-to-60 page clamping and gated real mutation/page replies. A reversed rating-sort
+tie assumption in the fixture was corrected before this passing run.
+
+A subsequent regression reproduced an older accepted rating being absent from
+native state after a newer attempt failed: the catalog held 2 while the displayed
+value remained 0. Rating/flag adoption now tracks the most recent acknowledged
+attempt for each photo/field until its in-flight requests drain. A pending or
+failed attempt cannot suppress an accepted value, while a later accepted attempt
+blocks older replies. Metadata adopts the entire canonical patch at a non-stale
+revision; status and focus ownership remain independent. No mutation is replayed.
+The shared organization, keyword and metadata-preset service tests pass **26 tests
+in 3.15 s**.
+
+The final packaged engine passes **323 native state/IPC assertions**: culling 121,
+Library 13, selection 12, Compare/Survey 20, Reference 52, collection-node/Develop
+transitions 21, metadata presets 32, Painter 36 and responsiveness 16. The new
+failure cases use distinct starting values and both reply orders, and retain a
+third successful write against an older late response. Generated originals remain
+byte-identical. The Mac app builds for a macOS 14 deployment target and passes
+deep strict ad-hoc signature verification; source/client/broker identities, all
+149 command schemas and bundled guide bytes match on macOS 26.6.2. Engine
+generation **55** and catalog schema **37** remain unchanged because this increment
+changes native presentation and reuses existing commands.
+
+Auto Advance preferences, Caps Lock, Shift+B, cross-page advance, purple/no-label
+keys and exact Adobe sorted/filter-removal selection behavior remain open. The
+state suite does not dispatch physical keyboard events or verify international
+keyboard layouts, text-focus routing, VoiceOver or macOS 14 runtime behavior.
+Desktop automation remains unavailable, and full Lightroom parity is not claimed.

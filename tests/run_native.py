@@ -25,6 +25,7 @@ def main():
     suites+=('NativeCollectionDropRegression',)
     suites+=('NativeCollectionNodeDropRegression',)
     suites+=('NativeCollectionNodeDevelopDropRegression',)
+    suites+=('NativeCullingShiftRegression',)
     suites+=('NativeThumbnailPublicationRegression',)
     suites+=('NativePainterKeywordPickerRegression',)
     suites+=('NativeTargetPainterRegression',)
@@ -112,6 +113,7 @@ def main():
             'LUMARAW_PRESETS_ROOT':str(work/'presets'/suite)}
         if suite=='NativeReferenceRegression':env['LUMARAW_TEST_FIXTURES']='|'.join(paths)
         if suite=='NativeCollectionNodeDevelopDropRegression':env['LUMARAW_TEST_FIXTURES']='|'.join(paths)
+        if suite=='NativeCullingShiftRegression':env['LUMARAW_TEST_FIXTURES']='|'.join(paths)
         if suite=='NativeImportNamingRegression':env['LUMARAW_TEST_FIXTURES']='|'.join(paths)
         if suite=='NativeExportBatchRegression':env['LUMARAW_TEST_FIXTURES']='|'.join(paths)
         if suite=='NativeFolderSyncRegression':env['LUMARAW_TEST_DUPLICATE_INCOMING']=str(duplicate_incoming)

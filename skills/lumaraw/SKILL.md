@@ -532,6 +532,17 @@ Shared/Adobe import-preset exchange and unsupported import options remain open.
 Every target is validated before writes. It preserves recipe and descriptive
 metadata revisions. Use `rate_photo` for the existing single-photo contract.
 
+The Mac Library photo surfaces accept 0–5 for ratings, P/X/U for pick/reject/clear
+and 6/7/8/9 for red/yellow/green/blue labels. Shift with these keys requests the
+same mutation followed by the next loaded photo after a successful save. Advance
+is limited to a single-target Grid action or the active Loupe photo. Grid batches
+keep their captured targets; Compare/Survey affect only the active photo without
+advancing. A filter/sort/membership refresh preserves surviving batch selection
+and chooses a surviving successor from the captured visible order. It does not
+wrap or guess a photo on an unloaded page. Failed or superseded actions do not
+move focus. Auto Advance preferences, Caps Lock and Shift+B are not implemented.
+Desktop keyboard-layout and text-focus acceptance remain separate checks.
+
 `list_photos` accepts `filters`, `collection_id`, `sort` and `descending`, and
 returns a clamped offset plus at most 60 summaries. `list_collections` paginates
 regular/smart collections and sets, excluding the single Quick Collection. Omit

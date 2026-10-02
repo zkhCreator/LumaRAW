@@ -423,6 +423,22 @@ Distinguish explicit user-control setters from programmatic navigation restores:
 changing a sort or source preference during photo location must not trigger a
 second UI callback that resets its computed page offset.
 
+Culling shortcuts must separate mutation targets from cursor movement. Capture
+Grid batches and active-only Loupe/Compare/Survey targets before suspension;
+advance only after a successful explicit action and a still-current context.
+Requery affected filters/modes/sorts even when a Grid batch does not advance.
+Adopt the returned page, its clamped offset and valid selection atomically before
+ancillary awaits. Use surviving IDs from the captured page without wrap or
+unloaded-page guesses. Preserve surviving batch selections and clear an empty
+selection instead of choosing an unrelated first row. Scope late rating/flag
+adoption by photo and field, preserving unrelated accepted updates. A newer
+failed attempt must not suppress an older acknowledged value; retain the latest
+acknowledged generation only until the field's pending requests drain. Metadata
+adoption must not lower the newest known revision or discard normalized fields
+returned by the service. Keep status/focus ownership separate. Superseded
+presentation work does not undo, retry or report failure for an acknowledged
+catalog write.
+
 Interactive drafts must not fill history with pointer events. Capture identity
 and revision at gesture start, coalesce temporary image requests with bounded
 in-flight work, and save one partial mutation on release. Cancellation restores
