@@ -4,6 +4,7 @@
 // No filesystem scanning, SQL, image processing or automatic mutation replay.
 // Closing preserves a plan; an uncertain apply is read back before any next action.
 // Optional second copies retain original state independently of import naming.
+// Preset choices are revision-bound; explicit rescans atomically replace ready plans.
 import AppKit
 import Foundation
 
@@ -82,6 +83,9 @@ struct ImportItem: Identifiable {
     @Published var detailError: String?
     @Published var processingEditor: ImportProcessingEditor?
     @Published var namingEditor: ImportNamingEditor?
+    @Published var presetEditor: ImportPresetEditor?
+    @Published var presetChoice: [String:Any]?
+    @Published var presetName=""
     private let previewClient=UUID().uuidString
     private let detailClient=UUID().uuidString
     private var previewGeneration=0
@@ -141,9 +145,11 @@ struct ImportItem: Identifiable {
                 guard !sources.isEmpty else { throw EngineFailure(message:"Choose photos or folders first") }
                 kind="all";offset=0
                 var params: [String:Any]=["paths":sources,"include_subfolders":includeSubfolders,"skip_duplicates":initialSkipDuplicates,"mode":mode]
+                if let presetChoice { params["preset"]=presetChoice }
                 if mode == "copy" {
                     guard !destination.isEmpty else { throw EngineFailure(message:"Choose a Copy destination") }
                     params["destination"]=destination;params["organization"]=organization;params["subfolder"]=subfolder
+                    params["second_copy_destination"]=NSNull()
                     if makeSecondCopy {
                         guard !secondCopyDestination.isEmpty else { throw EngineFailure(message:"Choose a second-copy destination") }
                         params["second_copy_destination"]=secondCopyDestination
@@ -156,6 +162,48 @@ struct ImportItem: Identifiable {
             }
             if !closed { await load() }
         } catch { self.error=error.localizedDescription;if !closed { await load() } }
+    }
+
+    func openPresets() {
+        guard !busy,!loading,plan?.active != true || plan?.ready == true else {return}
+        let editor=ImportPresetEditor(plan:plan)
+        editor.onUse={ [weak self,weak editor] value in
+            guard let self else {return false}
+            let result=await self.usePreset(value)
+            if !result {editor?.error=self.error}
+            return result
+        }
+        presetEditor=editor
+    }
+
+    func usePreset(_ value:[String:Any]) async -> Bool {
+        guard !busy,!loading,!closed,let key=value["id"] as? String,let revision=value["revision"] as? Int else {return false}
+        let choice: [String:Any]=["preset_id":key,"expected_revision":revision]
+        error=nil
+        if let captured=plan,captured.active {
+            guard captured.ready else {return false}
+            busy=true;readGeneration+=1;stopPreviews()
+            do {
+                receive(try await Backend.call("restart_import_with_preset",["plan_id":captured.id,"expected_revision":captured.revision,"preset":choice]))
+                guard !closed else {busy=false;return false}
+                kind="all";offset=0;busy=false
+                // Dismiss the preset sheet immediately so the parent exposes Cancel.
+                Task { [weak self] in await self?.scan() }
+                return true
+            } catch {
+                self.error=error.localizedDescription;busy=false
+                // Inspect an uncertain receipt; never automatically repeat a restart.
+                if let latest=try? await Backend.call("get_import") {receive(latest)}
+                await load();return false
+            }
+        }
+        guard let options=value["options"] as? [String:Any] else {return false}
+        mode=options["mode"] as? String ?? "add";includeSubfolders=options["include_subfolders"] as? Bool ?? true
+        initialSkipDuplicates=options["skip_duplicates"] as? Bool ?? true
+        destination=options["destination"] as? String ?? "";organization=options["organization"] as? String ?? "flat"
+        subfolder=options["subfolder"] as? String ?? "";secondCopyDestination=options["second_copy_destination"] as? String ?? ""
+        makeSecondCopy = !secondCopyDestination.isEmpty;presetChoice=choice;presetName=value["name"] as? String ?? ""
+        return true
     }
 
     func select(_ selected: Bool,ids: [Int]?=nil) async {

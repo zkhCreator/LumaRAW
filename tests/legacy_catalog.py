@@ -30,6 +30,7 @@ from lumaraw.snapshots import migrate as snapshots
 from lumaraw.snapshot_status import migrate as snapshot_status
 from lumaraw.import_copy import migrate as import_copy
 from lumaraw.import_naming import migrate as import_naming
+from lumaraw.import_backup import migrate as import_backup
 import json
 from pathlib import Path
 from lumaraw.model import Recipe
@@ -44,7 +45,7 @@ def seed_photo(db, path):
 
 
 def migrate_to(db, version):
-    migrations = (migrate_metadata, collections, copies, stacks, migrate_identities, capture, folders, keywords, relocations, folder_sync, keyword_exports, keyword_exchange, keyword_sets, painter, orientation, develop_presets, iptc, metadata_presets, import_review, import_processing, previous_import, develop_history, before_after, snapshots, snapshot_status, import_copy, import_naming)
+    migrations = (migrate_metadata, collections, copies, stacks, migrate_identities, capture, folders, keywords, relocations, folder_sync, keyword_exports, keyword_exchange, keyword_sets, painter, orientation, develop_presets, iptc, metadata_presets, import_review, import_processing, previous_import, develop_history, before_after, snapshots, snapshot_status, import_copy, import_naming, import_backup)
     if not 0 <= version <= len(migrations):
         raise ValueError('Unsupported legacy fixture version')
     for migration in migrations[:version]:

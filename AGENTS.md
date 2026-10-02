@@ -49,6 +49,8 @@ Keep the explicit publication allowlist current when adding public documentation
 - Capture Copy naming values and checked-item sequence before writes. Preserve
   original-name duplicate identity, matching XMP stems and immutable recovery
   destinations. Bound preview rank work with disjoint indexed ranges.
+- Import configurations exclude sources, selections and transfer identities. Freeze
+  processing/naming values and validate preset plus plan revisions after file I/O.
 - Second copies retain original state. Pin and verify both destinations before
   cataloging main copies; never silently skip backups or retarget recovery.
 - Use bounded queries, pages, worker concurrency, caches and memory. Never load

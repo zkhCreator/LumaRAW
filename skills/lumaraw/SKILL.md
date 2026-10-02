@@ -339,8 +339,31 @@ Develop settings initialize the new recipe and affect review previews. Backups
 retain pending choices and LUT assets. Settings replies can advance only the same
 acknowledged editor revision; stale/uncertain writes are never automatically retried.
 Create a named metadata preset with the existing `save_metadata_preset` contract
-before choosing it for import. Saving an entire import configuration is not yet
-implemented.
+before choosing it for import.
+
+`list_import_presets(offset?)` lists thirty catalog-local configuration names with
+an integer library revision. `save_import_preset(name, plan_id,
+expected_plan_revision, expected_revision, preset_id?)` captures a ready review;
+omit the ID to create or supply it to update. `get_import_preset(preset_id,
+expected_revision)` reads options and compact processing summaries. Rename/delete
+through `import_preset_action(action, preset_id, expected_revision, name?)`.
+These configurations are separate from Develop/metadata preset libraries.
+
+Pass `preset: {preset_id, expected_revision}` to `prepare_import` with newly chosen
+`paths`. Explicit options override the saved options; null `second_copy_destination`
+turns off backup. An explicit Add method omits inherited Copy destinations, but
+passing destination fields explicitly with Add is invalid. Processing and naming
+values remain frozen even if their source preset libraries change or are deleted.
+Missing/changed LUT assets and stale configuration revisions reject preparation.
+
+`restart_import_with_preset(plan_id, expected_revision, preset)` explicitly replaces
+a ready review from its stored source selection. It resets checked rows and requires
+new `scan_import` calls before application. Destination/source checks occur before
+one atomic replacement; failures preserve the old ready plan. Older reviews without
+a source receipt require a new source selection. Interrupted Copy transfers cannot
+be replaced. Inspect `get_import` without a plan ID after an uncertain restart;
+never replay it. Applying a configuration never copies photos by itself.
+Shared/Adobe import-preset exchange and unsupported import options remain open.
 
 ## Library organization
 

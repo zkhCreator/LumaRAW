@@ -58,7 +58,7 @@ gaps. Nothing below is full Lightroom parity merely because historical tests pas
 
 | Area | Current implementation | Remaining acceptance / work |
 | --- | --- | --- |
-| Import and catalogs | Partial: durable Add/Copy review with checked selection, Grid/Loupe source previews, suspected duplicates, bounded sorting/filtering, captured import-time presets and keywords, Copy destination/subfolder and flat/source/date organization, filename token editor and catalog-local templates with checked-sequence previews, byte-verified original/XMP transfers, optional original-state second copies, explicit crash recovery and retained-copy cancellation, Previous Import navigation and catalog backup/restore | Move/Copy as DNG, destination-tree grouping and more date formats, catalog-wide Import/Image numbering and wider EXIF/shared templates, saved import configurations, preview policies, cards/tethering, progressive Current Import, catalog switching/merge and desktop/reference acceptance |
+| Import and catalogs | Partial: durable Add/Copy review with checked selection, Grid/Loupe source previews, suspected duplicates, bounded sorting/filtering, captured import-time presets and keywords, Copy destination/subfolder and flat/source/date organization, filename token editor and catalog-local templates with checked-sequence previews, byte-verified original/XMP transfers, optional original-state second copies, catalog-local saved import configurations with explicit rescans, explicit crash recovery and retained-copy cancellation, Previous Import navigation and catalog backup/restore | Move/Copy as DNG, destination-tree grouping and more date formats, catalog-wide Import/Image numbering and wider EXIF/shared templates, shared/Adobe import-preset exchange and interaction acceptance, preview policies, cards/tethering, progressive Current Import, catalog switching/merge and desktop/reference acceptance |
 | Library navigation | Partial: bounded grid/filmstrip, folder tree/search/favorites/labels, durable missing-folder relocation and folder synchronization, direct/recursive sources, filters/sorting including live snapshot status, regular/smart/Quick collections and nested sets | Multi-source selection, complete sync Import Dialog/duplicate policy, folder move/rename, relocation overlap/collision handling, collection drag/drop/color labels, full smart criteria/import-export, source-selection memory, desktop acceptance |
 | Organization | Partial: duplicate/missing detection, hierarchical keywords/synonyms/export flags/Will Export preview, text/CSV vocabulary exchange and manual person tags, custom nine-slot keyword sets/recent entries/shared or catalog storage, multi-keyword shortcuts and keyword/rating/flag/label/target-collection/rotation/Develop-preset/metadata-preset Painter strokes, independent catalog rotation/flips, title/caption/copyright plus thirty IPTC fields, selective metadata presets, labels, batch metadata, virtual copies, manual/split/capture-time scoped stacks | Keyword policy/file and preset reference acceptance, built-in sets/suggestions/undo, Painter desktop acceptance, IPTC Extension and complete metadata parity, stack interaction acceptance, rename and sidecars |
 | Culling | Partial: Loupe/Compare/Survey, linked detail, anchored page selection, Develop Reference/Active pairs with independent Fit/1:1 viewports, session lock and RGB/LAB readouts | Desktop and numerical reference acceptance, HDR readouts, scrubby/box zoom, cross-page selection, auto advance, persistent workspace state |
@@ -3632,3 +3632,92 @@ power-loss hardware tests, desktop input/VoiceOver and macOS 14 runtime remain
 unverified. Desktop automation was not retried. Move/DNG, import configurations,
 preview policies, catalog-wide numbering and the complete non-AI inventory remain
 the active goal.
+
+
+### Saved import configurations and explicit rescans
+
+A fresh fetch before implementation found no unmerged local or remote branches;
+work continued from `2d18e62` on `codex/lightroom-classic-mac` in the sole worktree.
+
+Engine generation 41 / schema 29 adds catalog-local import configurations with
+save-as-new, update, rename, delete and bounded native browsing. Snapshots contain
+the implemented method, recursion/duplicate policy, destinations/organization,
+second-copy choice, naming values, captured Develop/metadata patches and keyword
+segments. They exclude sources, checked rows, transfer identities and backup dates.
+Later preset edits/deletion do not alter a prepared review. This follows the
+[documented import-preset lifecycle](https://helpx.adobe.com/lightroom-classic/desktop/import-photos/photo-video-import-options.html),
+not Adobe preset file interoperability or exact interaction equivalence.
+
+Choose before scanning new sources and override visible destination options if
+needed. On a ready review, Use & Rescan explicitly replaces the plan from its
+stored source selection and resets checked rows. Fresh destination identities and
+LUT checks occur outside the catalog lock; captured library and ready-plan revisions
+are rechecked in the final transaction. Missing/symlink/overlapping roots, conflicts
+and SQL failures preserve the old review. Interrupted transfers cannot be retargeted.
+The preset sheet releases after replacement so the parent shows scan progress and
+cancellation. No copying occurs before Import Checked.
+
+Names/methods occupy separate columns from the bounded settings payload, with
+thirty-row indexed pages. Source receipts are separate from repeatedly returned
+review summaries. Pagination never rebases captured native drafts. Catalog restore
+rebinds nested LUT snapshots into restored assets, rejecting corrupt/missing assets
+without falling back to the original catalog. Schema-28 migration is additive and
+atomic; older reviews keep their state but cannot infer missing source selections.
+
+The complete required-Metal/real-NEF Python suite passed **880 tests in 96.05 s**
+with no skips. Regressions cover source-neutral snapshot reuse, independent original
+backups and naming, deleted source-preset libraries, overrides, Add/Copy/recursion
+changes, stale choices, changes during unlocked validation, failed-rescan rollback,
+interrupted-copy rejection, restart persistence, name uniqueness, bounded payloads,
+LUT restore/corruption and a genuine schema-28 rollback/idempotency upgrade.
+
+Six packaged-engine native suites passed **144 assertions**: presets 21, second
+copies 26, naming 30, processing 22, Add/Copy 29 and responsiveness 16. After the
+native-only scan-window release fix, the final package passed the three affected
+suites again: **68 assertions** (presets 23, Add/Copy 29, responsiveness 16).
+The engine bytes are identical across both packages. Final preset-library
+800 × 510-point and ready-review 1060 × 840-point offscreen renders were inspected;
+management actions, destination organization, backup names and rescan guidance
+remain readable. Actual sheet dismissal/cancel gestures still need desktop acceptance.
+
+A packaged relay probe seeded valid 100-keyword configuration snapshots (56,267
+bytes each) into 100-row and 5,000-row libraries. Fixtures are generated 16 × 12
+rasters used only to construct a valid review before measurement; no photos are
+processed in timed operations. Host: Apple M3 Max, 128 GiB, macOS 26.6.2. Each page
+has one first read plus 30 warm reads, and each detail result has 30 reads. Timing
+includes native relay IPC, service/SQLite and JSON, excluding seeding, process
+startup and desktop rendering. Catalog generation warms the OS cache; all tests
+and builds had ended before measurement. No GPU or image workers were used.
+
+| Library / page offset | First request | Warm median / p95 / max | Reply bytes |
+| --- | --- | --- | --- |
+| 100 / 0 | 2.826 ms | 1.768 / 2.257 / 2.369 ms | 1,672 |
+| 100 / 50 | 1.682 ms | 1.663 / 1.803 / 1.851 ms | 1,683 |
+| 100 / 70 | 1.634 ms | 1.614 / 1.916 / 2.022 ms | 1,683 |
+| 5,000 / 0 | 2.770 ms | 1.830 / 4.215 / 7.005 ms | 1,673 |
+| 5,000 / 2,500 | 1.715 ms | 1.681 / 2.769 / 5.708 ms | 1,746 |
+| 5,000 / 4,970 | 1.727 ms | 1.705 / 4.197 / 5.191 ms | 1,746 |
+
+Compact detail median/p95/max was 1.759/2.006/2.401 ms (100 rows, 350-byte reply)
+and 1.812/5.891/7.642 ms (5,000 rows, 352-byte reply). Broker RSS sampled every
+5 ms peaked at 36.98 and 38.50 MiB respectively; zero worker peak means no image
+work, not zero total app memory. This verifies bounded browsing with sizable saved
+payloads, not RAW/slider latency, a cold disk or desktop frame rate.
+
+The final Mac 14 deployment-target package builds and passes deep/strict local
+ad-hoc signature verification. Packaged stdio initialization, **135 full MCP
+schemas** and the bundled guide match source. The optional official Python MCP
+SDK remains unavailable; no SDK-client execution is claimed. The known optional
+PyInstaller `scipy.special._cdflib` warning remains. Build identities:
+
+- Source digest: `b43e9a5e58dccc371c1cd3fec1e98cf27311028827a418f6b06f9caf384477ca`
+- Engine SHA-256: `1ba63f663df30fb92fa8e7c1247061e0796ac466e1614cd98f6d5fd65bb5e0cf`
+- Native SHA-256: `526a043358e92f6ac14867de9da29e52ba64ba39bca52568ccb802663bcc6b28`
+
+Shared import-preset storage, Adobe preset exchange, preset editing of full
+processing/naming before scanning, preservation of manual checks across setting
+changes, Lightroom-rendered interaction acceptance and pre-29 source-receipt recovery
+remain open. Move/DNG, preview policies, catalog-wide numbering and the complete
+non-AI feature inventory remain part of the active goal. Actual desktop inputs,
+file panels, VoiceOver and macOS 14 runtime are unavailable; no desktop automation
+was retried and offscreen/model evidence is not desktop acceptance.

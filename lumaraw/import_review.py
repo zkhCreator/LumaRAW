@@ -10,6 +10,7 @@ Unknown capture time never falls back to mtime for suspected-duplicate matching.
 Copy naming previews are bounded and use selection ranks; original names remain
 the duplicate identity even when verified destination basenames differ.
 Second copies are receipt-only backups; only verified primary paths are cataloged.
+Source receipts support explicit, atomic preset rescans of ready reviews.
 """
 import json
 import os
@@ -143,17 +144,23 @@ class ImportReview:
         if row is None:raise ValueError('Import item does not exist')
         return dict(row)
 
-    def prepare(self,sources,include_subfolders=True,skip_duplicates=True,copy=None):
+    def prepare(self,sources,include_subfolders=True,skip_duplicates=True,copy=None,setup=None,replace=None):
         with self.db:
             self.db.execute('BEGIN IMMEDIATE')
+            if replace:
+                self.check(replace['plan_id'],replace['expected_revision'],('ready',))
+                self.db.execute("UPDATE import_plans SET state='cancelled',revision=revision+1 WHERE id=?",(replace['plan_id'],))
+                self.discard(replace['plan_id'])
             if self.db.execute("SELECT 1 FROM import_plans WHERE state IN ('planning','scanning','ready','verifying','interrupted')").fetchone():
                 raise ValueError('Finish or cancel the existing import review first')
             self.db.execute('DELETE FROM import_plans WHERE id NOT IN (SELECT id FROM import_plans ORDER BY id DESC LIMIT 31)')
             plan_id=self.db.execute('INSERT INTO import_plans(include_subfolders,skip_duplicates,created) VALUES(?,?,?)',
                 (int(include_subfolders),int(skip_duplicates),time.time())).lastrowid
+            self.db.execute('INSERT INTO import_sources VALUES(?,?)',(plan_id,json.dumps([source['path'] for source in sources])))
             if copy:
                 from .import_copy import ImportCopy
                 ImportCopy(self.catalog).capture(plan_id,copy)
+            if setup:setup(self.catalog,plan_id)
             for source in sources:
                 if source['directory']:
                     self.db.execute('INSERT INTO import_directories(plan_id,path,fingerprint,source) VALUES(?,?,?,1) '

@@ -131,6 +131,8 @@ def migrate(db):
     migrate_import_naming(db)
     from .import_backup import migrate as migrate_import_backup
     migrate_import_backup(db)
+    from .import_presets import migrate as migrate_import_presets
+    migrate_import_presets(db)
 
 
 def text_predicate(text):

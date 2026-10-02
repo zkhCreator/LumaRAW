@@ -3,6 +3,7 @@
 // duplicate policy, Add/Copy import and cancellation commands. No filesystem traversal,
 // original writes or AI choices. Closing retains unfinished plans for later review.
 // Second-copy choices/progress are explicit; backups retain source names and bytes.
+// Presets are source-neutral; ready-review replacement uses explicit rescan.
 import SwiftUI
 import AppKit
 
@@ -16,6 +17,7 @@ struct ImportReviewSheet: View {
             .interactiveDismissDisabled(model.busy)
             .sheet(item:$model.processingEditor) { ImportProcessingSheet(model:$0) }
             .sheet(item:$model.namingEditor) { ImportNamingSheet(model:$0) }
+            .sheet(item:$model.presetEditor) { ImportPresetSheet(model:$0) }
             .sheet(isPresented:$showCopies) { if let plan=model.plan { ImportCopyReceipts(planID:plan.id) } }
     }
     var content: some View {
@@ -154,6 +156,15 @@ struct ImportReviewSheet: View {
                  "Copy preserves originals and copies associated XMP. Existing destinations are never overwritten. Cancelling keeps completed copies. Unknown capture dates use an Unknown Date folder.":
                  "Files stay in place. Supported embedded and sidecar descriptions are read into the catalog; existing catalog photos are preserved.")
                 .font(.caption).foregroundStyle(.secondary)
+            HStack {
+                Button("Import Presets…") {model.openPresets()}.disabled(model.busy || model.loading || model.plan?.active == true && model.plan?.ready != true)
+                let presetName=model.plan?.active == true ? model.plan?.text("preset_name") ?? "":model.presetName
+                if !presetName.isEmpty {Text("Based on: \(presetName)").font(.caption).lineLimit(1)}
+                if model.plan?.active != true,model.presetChoice != nil {
+                    Button("Clear Preset") {model.presetChoice=nil;model.presetName=""}.disabled(model.busy || model.loading)
+                }
+                Spacer()
+            }
             HStack {
                 Button("Done") { dismiss() }.keyboardShortcut(.cancelAction).disabled(model.busy)
                 if model.plan?.active == true {

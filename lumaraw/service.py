@@ -136,6 +136,12 @@ class Service:
         if method=='metadata_schema':
             from .iptc import FIELDS, SCHEMA
             return {'iptc_fields':list(FIELDS.values()),'iptc_schema':SCHEMA}
+        if method in ('list_import_presets','get_import_preset','save_import_preset','import_preset_action'):
+            from .import_presets import ImportPresets
+            with self.catalog() as c:
+                domain=ImportPresets(c)
+                return {'list_import_presets':domain.list,'get_import_preset':domain.get,
+                        'save_import_preset':domain.save,'import_preset_action':domain.action}[method](**p)
         if method in ('get_import_naming','set_import_naming','preview_import_naming','list_filename_templates','get_filename_template','save_filename_template','delete_filename_template'):
             from .import_naming import ImportNaming
             with self.catalog() as c:
@@ -150,7 +156,7 @@ class Service:
             return self.keyword_sets.dispatch(method,p)
         if method in ('prepare_folder_sync','get_folder_sync','get_folder_sync_metadata','scan_folder_sync','select_folder_sync_items','apply_folder_sync','cancel_folder_sync'):
             return self.folder_sync.dispatch(method,p)
-        if method in ('prepare_import','get_import','scan_import','select_import_items','set_import_options','apply_import','cancel_import','preview_import_item','get_import_processing','set_import_processing','resume_import_copy','get_import_copies','set_import_backup'):
+        if method in ('prepare_import','get_import','scan_import','select_import_items','set_import_options','apply_import','cancel_import','preview_import_item','get_import_processing','set_import_processing','resume_import_copy','get_import_copies','set_import_backup','restart_import_with_preset'):
             return self.import_review.dispatch(method,p)
         if method=='status':
             with self.catalog() as c:

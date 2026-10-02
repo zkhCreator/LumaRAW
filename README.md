@@ -10,7 +10,7 @@ LumaRAW preserves your originals. Add references files in place; Copy imports by
 
 | Area | Capabilities |
 | --- | --- |
-| Import | Resumable Add/Copy review, thumbnail/Loupe inspection, checked selections, suspected duplicates, destination organization, filename templates, optional original-state second copies with explicit recovery, and captured Develop/metadata presets plus keywords |
+| Import | Resumable Add/Copy review, thumbnail/Loupe inspection, checked selections, suspected duplicates, destination organization, filename templates, saved import configurations, optional original-state second copies with explicit recovery, and captured Develop/metadata presets plus keywords |
 | RAW development | Nikon NEF/NRW and other LibRaw formats, as-shot white balance, exposure, highlights/shadows, relative temperature/tint, monochrome, and presets |
 | Color | Eight-band HSL and Black & White Mix, interactive RGB/channel point curves, camera-bound chart calibration, `.cube` LUTs, ICC soft proofing, and gamut warnings |
 | Detail and composition | Full-resolution 1:1 viewports, noise reduction, sharpening, defringing, rotation, crop, straighten, and perspective |
@@ -36,7 +36,7 @@ Replace `/absolute/new-build-directory` with a new directory that does not alrea
 
 Open `Package.swift` for Swift development. A standalone Swift executable needs `LUMARAW_ENGINE` set to the engine executable; use the build script for a self-contained app.
 
-The default catalog is `~/Library/Application Support/LumaRAW Native`. Use `--catalog /absolute/catalog` or `LUMARAW_CATALOG` for a separate library. Imports reference original file locations; they do not copy photos. Back up a catalog before migration, and do not open the same SQLite catalog simultaneously with an older Qt application.
+The default catalog is `~/Library/Application Support/LumaRAW Native`. Use `--catalog /absolute/catalog` or `LUMARAW_CATALOG` for a separate library. Add references original locations; the reviewed Copy workflow writes only to explicitly chosen destinations. Back up a catalog before migration, and do not open the same SQLite catalog simultaneously with an older Qt application.
 
 If another build already owns the catalog service, use **Settings → Background
 Service → Connect with This Version** when image processing is idle. Newer engine
@@ -79,6 +79,20 @@ Upgrading an older catalog starts with an empty Previous Import source until the
 next import; it does not guess old batch membership from timestamps.
 Interrupted scans resume explicitly. Changed sources/sidecars or catalog conflicts
 reject application without partial catalog changes.
+
+**Import Presets…** saves the current ready review's method, duplicate/subfolder
+policy, destinations, filename settings, captured Develop/metadata settings and
+keywords. Presets are catalog-local and support Save Current as New, Update,
+Rename and Delete. Select a preset before scanning new sources; visible destination
+options remain editable. Clear Preset removes the captured processing/naming
+choice while retaining the visible import options.
+
+On a ready review, **Use & Rescan** creates a fresh review from the same source
+selection and resets checked photos. No copying occurs until Import Checked.
+Missing destinations or revision conflicts preserve the existing review. Presets
+never retain source files, checked rows or transfer identities, and later library
+changes do not alter a prepared review. A review created before schema 29 needs a
+new source selection before this rescan workflow can be used.
 
 For **Copy**, choose an existing destination before scanning, optionally enter
 **Into Subfolder**, and organize into one folder, original folders or date folders

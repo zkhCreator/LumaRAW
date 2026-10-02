@@ -1221,3 +1221,37 @@ one clear of the remaining timeline; those single observations are not latency
 distributions. Setup, IPC, image workers and desktop latency are excluded;
 assert no image work and unchanged original bytes. Do not use it to claim preview
 or full interaction performance.
+
+
+## Saved import configurations
+
+Run `tests/test_import_presets.py` with the existing import, naming, processing and
+second-copy suites. Cover frozen settings after source-preset deletion, source-neutral
+choices, destination/backup overrides, Add/Copy/recursion rescans, stale plan and
+library changes during unlocked validation, SQL rollback, missing/symlink/overlapping
+roots, interrupted-copy rejection, catalog restore with nested LUTs, genuine schema-28
+migration and bounded name-only pagination. All originals and catalogs are generated.
+
+```sh
+.venv/bin/python -m pytest -q tests/test_import_presets.py
+.venv/bin/python tests/run_native.py --work work/import-presets-native \
+  --engine build/mac-import-presets/LumaRAW.app/Contents/Resources/Engine/LumaRAWEngine \
+  --suite NativeImportPresetRegression --suite NativeImportBackupRegression \
+  --suite NativeImportNamingRegression --suite NativeImportProcessingRegression \
+  --suite NativeImportRegression --suite NativeResponsivenessRegression
+```
+
+The native preset suite covers save/update/rename/delete, captured stale drafts after
+pagination, explicit reload, source-preserving rescans, pre-scan option overrides,
+retained settings after deletion and exact original bytes. Inspect generated preset
+library and ready-review offscreen renders. These are model/IPC and layout checks,
+not actual desktop inputs, file panels or VoiceOver. Record unavailable OS runtimes.
+
+For preset-library responsiveness, run the packaged engine without concurrent tests
+or builds. `tests/import_preset_probe.py --engine <engine> --work <new-directory>`
+seeds 100 and 5,000 configurations from a valid captured 100-keyword snapshot before
+measurement, then measures name pages and compact detail reads through native IPC.
+Record reply bytes, first/warm timing distributions, 5 ms sampled broker RSS and
+worker count. Generated catalogs warm the OS cache; this does not measure RAW,
+desktop frame latency or cold filesystem performance. The native preset sheet must
+release after replacement so long scans expose cancellation on the parent review.

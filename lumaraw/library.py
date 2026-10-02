@@ -4,6 +4,7 @@ Inputs: catalog references and explicitly selected assets/backups. Outputs: exac
 hash duplicate groups, EXIF burst groups, validated recipe bundles and new catalogs.
 Original images are never moved/deleted. Backup restore creates a new catalog and
 never replaces the active database. Hashes stream in 1 MiB blocks with cancellation.
+Restored import configurations rebind nested LUT snapshots to restored assets.
 """
 import hashlib
 import io
@@ -134,6 +135,13 @@ def restore_catalog(path,destination):
                     candidate=dest/'assets'/(recipe['lut']['sha256']+'.cube')
                     if candidate.exists(): recipe['lut']['path']=str(candidate)
                     catalog.db.execute(f'UPDATE {table} SET {column}=? WHERE {key}=?',(json.dumps(recipe),id_))
+        # Import configurations contain a nested, source-neutral processing snapshot.
+        # Missing restored assets must fail visibly, never fall back to the old catalog.
+        for id_,payload in catalog.db.execute('SELECT id,value FROM import_presets'):
+            value=json.loads(payload)
+            if lut := value['processing']['develop_patch'].get('lut'):
+                lut['path']=str(dest/'assets'/(lut['sha256']+'.cube'))
+                catalog.db.execute('UPDATE import_presets SET value=? WHERE id=?',(json.dumps(value),id_))
         # Never start restored exports automatically against old destinations.
         catalog.db.execute("UPDATE jobs SET state='interrupted',error='Restored from backup; check the destination before retrying' WHERE state IN ('running','pending')")
         catalog.db.commit()

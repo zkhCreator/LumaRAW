@@ -1008,3 +1008,30 @@ and history mutations disable conflicting actions. Engine conflict responses are
 shown and reload current state without replay. SwiftUI/AppKit presents the list,
 menus and confirmation; all history semantics are reusable by a future Windows
 adapter. Global undo, hover preview and Before-state assignment are separate gaps.
+
+
+## Source-neutral import configurations
+
+Schema 29 adds catalog-local `import_presets` with a separate library revision and
+indexed names/method columns; thirty-row lists never select or parse saved payloads.
+Each bounded settings object captures existing Add/Copy options, naming values and
+processing patches/keyword segments. Presets exclude source paths, checked rows,
+filesystem identities, backup dates and transfer journals. A separate source receipt
+per review permits explicit rescan without putting potentially large path arrays in
+polled review summaries. Existing pre-29 reviews are preserved without guessed roots.
+
+Preparation resolves a captured preset revision, merges explicit option overrides,
+then validates originals, destinations and LUT assets outside the catalog lock.
+The final transaction rechecks the library and optional ready-plan revisions, pins
+fresh Copy identities and installs snapshots. Explicit replacement cancels/discards
+the old ready staging and creates the new plan in one transaction. Validation or SQL
+failure rolls back everything; no copying occurs. A rescan resets checked selections
+and may change import mode/recursion. Interrupted transfers cannot take this path.
+
+Mac exposes a paged preset editor and source-neutral pre-scan choices. Existing
+ready reviews require Use & Rescan. Captured drafts remain stale across pagination;
+only explicit reload discards them. Uncertain restart replies inspect the latest
+receipt, without replay. Backup restore rebinds nested LUT paths into restored assets;
+missing assets fail instead of reading the old catalog. Shared storage, Adobe preset
+exchange, pre-scan editing of full processing/naming, and exact Lightroom interaction
+acceptance remain pending. The portable service owns all persistence and validation.

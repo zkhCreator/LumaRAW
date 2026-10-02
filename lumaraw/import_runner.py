@@ -47,22 +47,10 @@ class ImportRunner:
             return import_processing.ImportProcessing(self.service).get(**params)
         if method=='set_import_processing':
             return import_processing.ImportProcessing(self.service).set(**params)
-        if method=='prepare_import':
-            captured=sources(params['paths'])
-            if any(Path(item['path'])==self.service.root or self.service.root in Path(item['path']).parents for item in captured):
-                raise ValueError('The active catalog and its generated cache are not import sources')
-            copy=None
-            if params.get('mode','add')=='copy':
-                from .import_copy_io import validate_destination
-                if not params.get('destination'):raise ValueError('Choose a Copy destination')
-                copy=validate_destination(params['destination'],captured,self.service.root,params.get('organization','flat'),params.get('subfolder',''))
-                if params.get('second_copy_destination'):
-                    from .import_backup import capture
-                    copy['backup']=capture(params['second_copy_destination'],copy,self.service.root)
-            elif any(key in params for key in ('destination','organization','subfolder','second_copy_destination')):
-                raise ValueError('Destination options require Copy mode')
-            with self.service.catalog() as catalog:
-                return ImportReview(catalog).prepare(captured,params.get('include_subfolders',True),params.get('skip_duplicates',True),copy=copy)
+        if method in ('prepare_import','restart_import_with_preset'):
+            from .import_presets import prepare
+            if method=='prepare_import':return prepare(self.service,params)
+            return prepare(self.service,{'preset':params['preset']},replace={key:params[key] for key in ('plan_id','expected_revision')})
         if method=='get_import_copies':
             from .import_copy import ImportCopy
             with self.service.catalog() as catalog:return ImportCopy(catalog).receipt(**params)

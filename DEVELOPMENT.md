@@ -100,6 +100,13 @@ when a clear function is more maintainable. Avoid unrelated formatting churn.
   never automatically replayed. Resumption retains captured selection and source
   identity, and must not silently accept changed files. Copy uses the explicit
   destination/collision/recovery contract below; Move remains separate scope.
+- Import configurations capture source-neutral options and exact processing/naming
+  values, not live preset references. Keep list pages free of payloads and source
+  receipts separate from polled summaries. Choosing a configuration pins fresh
+  destinations; explicit ready-review rescans replace the old plan atomically,
+  resetting checked selections only after all validation succeeds. Recheck both
+  captured revisions after unlocked filesystem work. Interrupted transfers cannot
+  be retargeted through a preset. Restores rebind nested LUT assets by hash.
 - Copy naming captures token values, never a live template reference. Keep original
   names for duplicate identity while displaying verified destination basenames.
   Rename associated XMP to the same stem; validate every target before filesystem
