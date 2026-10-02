@@ -18,6 +18,23 @@ observable acceptance condition. New code should be normally formatted with
 named helpers and bounded responsibilities; do not extend dense one-line code
 when a clear function is more maintainable. Avoid unrelated formatting churn.
 
+## RAW dependency build
+
+`scripts/rawpy-wheel/build_rawpy_wheel.py` is a Mac build adapter for the
+greybox-capable rawpy/LibRaw dependency. It requires arm64 CPython 3.12 and Apple
+SDK tools, pins source archives/patches and hash-locks build dependencies. Choose
+a fresh work directory outside the checkout. Codec discovery stays within its
+private prefix and Apple SDK; no project environment or lock is changed. Offline
+builds require verified source and wheel caches. Bootstrap pip comes from the
+selected CPython and is recorded separately from locked build packages.
+
+Keep the source-only publication allowlist exact for patches, CMake and dependency
+inputs. Preserve upstream licenses. Verify minimum-OS/architecture/dependency
+closure and the actual capability import before packaging a candidate wheel.
+Use a separate disposable runtime environment for camera probes, then carry its
+actual backend descriptor into the app build. Pinned inputs do not imply identical
+wheel bytes, camera accuracy, a supported Windows wheel or binary release approval.
+
 ## Contracts and persistence
 
 - Bind engine identity and every pixel-derived cache to actual installed RAW

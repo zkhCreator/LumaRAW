@@ -15,3 +15,18 @@ Building the self-contained engine bundles CPython, rawpy 0.27.1 / LibRaw 0.22.1
 - Qt profile-generation provenance: https://code.qt.io/cgit/qt/qtbase.git/ (unmodified named profiles)
 
 Replace compatible dynamic libraries and rebuild using scripts/build_macos.py to produce a modified local build. No signing identity or Keychain access is needed. The build script applies ad-hoc signing for local use. Public binary distribution needs a separate dependency-license review (including LibRaw/LGPL obligations), Developer ID signing and notarization; this source cleanup does not establish binary release compliance. Public RAW test samples are not included in the application or source archive.
+
+The optional isolated source-build workflow under `scripts/rawpy-wheel/` adds a
+checked greybox API to rawpy and an active-CFA validity warning to LibRaw. Those
+diffs preserve rawpy's BSD-3-Clause and LibRaw's upstream LGPL-2.1 terms; the
+project MIT license does not relicense them. Exact upstream archives and reviewed
+patch hashes are recorded by the builder, which retains sources for rebuilding
+locally. The normal application dependency lock remains unchanged.
+
+This workflow dynamically bundles LCMS2 **2.19.1** core (MIT), libjpeg-turbo
+**3.2.0** (IJG and Modified BSD) and JasPer **4.2.9** (JasPer License 2.0).
+Their unchanged attribution is retained under `licenses/raw-codecs/`.
+This software is based in part on the work of the Independent JPEG Group.
+Optional LCMS GPL plugins, LibRaw GPL packs, RawSpeed and OpenMP are disabled.
+Generated wheels, downloaded archives and private runtime receipts are excluded
+from the source publication. This build workflow is not a public binary release.

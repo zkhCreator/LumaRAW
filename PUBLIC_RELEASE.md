@@ -12,6 +12,12 @@ python3 scripts/package_public.py /absolute/new-source.zip
 
 The packager includes only approved source, documentation, dependency locks, icons, and ICC assets. Unknown files, symlinks, and credential-looking entries are rejected. The scanner checks machine home paths, local task links, common token patterns, private-key blocks, and credential-bearing URLs. Findings contain categories and relative paths, never matched values. PNG text and EXIF metadata are disallowed, including PNG images embedded in ICNS containers.
 
+RAW build inputs under `scripts/rawpy-wheel/` have an exact allowlist for the
+three reviewed patches, toolchain and dependency input/lock files. The exception
+does not allow arbitrary patches, archives or wheels. Upstream codec attribution
+remains under `licenses/raw-codecs/`; all downloaded and generated build/runtime
+artifacts stay outside the source snapshot.
+
 Generated libraries, apps, photos, databases, logs, test receipts, environments, and caches are excluded. First-party project text is English; upstream attribution and user data are not rewritten.
 
 When the root is a Git repository, the scanner also rejects forbidden entries in the index, including force-added ignored files. It does **not** inspect or rewrite Git history. `.gitignore` cannot remove earlier commits. Start from the clean snapshot instead of attaching private history. The tools never initialize, commit, push, or change remote visibility.

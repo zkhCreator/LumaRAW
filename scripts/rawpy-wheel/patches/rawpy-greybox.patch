@@ -1,0 +1,155 @@
+--- a/rawpy/_rawpy.pyx
++++ b/rawpy/_rawpy.pyx
+@@ -65,6 +65,9 @@
+     cdef enum LibRaw_image_formats:
+         LIBRAW_IMAGE_JPEG
+         LIBRAW_IMAGE_BITMAP
++
++    cdef enum LibRaw_warnings:
++        LIBRAW_WARN_LUMARAW_GREYBOX_WB_UNAVAILABLE
+     
+     ctypedef struct libraw_raw_inset_crop_t:
+         ushort cleft, ctop
+@@ -220,7 +223,7 @@
+         libraw_output_params_t      params
+         libraw_raw_unpack_params_t  rawparams
+ #         unsigned int                progress_flags
+-#         unsigned int                process_warnings
++        unsigned int                process_warnings
+         libraw_colordata_t          color
+         libraw_imgother_t           other
+ #         libraw_thumbnail_t          thumbnail
+@@ -287,6 +290,7 @@
+     LIBRAW_MINOR_VERSION,
+     LIBRAW_PATCH_VERSION,
+ )
++GREYBOX_WB_API_VERSION = 1
+ 
+ if _LIBRAW_HAS_FLAGS:
+     flags = {'DNGLOSSYCODEC': bool(_LIBRAW_USE_DNGLOSSYCODEC),
+@@ -437,12 +441,14 @@
+     cdef bint unpack_called
+     cdef bint unpack_thumb_called
+     cdef bint dcraw_process_called
++    cdef bint auto_wb_sampling_requested
+     cdef object bytes
+         
+     def __cinit__(self):
+         self.unpack_called = False
+         self.unpack_thumb_called = False
+         self.dcraw_process_called = False
++        self.auto_wb_sampling_requested = False
+         self.p = new LibRaw()
+         
+     def __dealloc__(self):
+@@ -830,6 +836,17 @@
+                 self.p.imgdata.color.pre_mul[1],
+                 self.p.imgdata.color.pre_mul[2],
+                 self.p.imgdata.color.pre_mul[3]]
++
++    @property
++    def auto_whitebalance_valid(self) -> Optional[bool]:
++        """Whether the last auto-WB pass had nonempty required channel sums.
++
++        None means auto WB was not run or LibRaw skipped scale_colors.
++        """
++        if not self.dcraw_process_called or not self.auto_wb_sampling_requested:
++            return None
++        return not bool(self.p.imgdata.process_warnings &
++                        LIBRAW_WARN_LUMARAW_GREYBOX_WB_UNAVAILABLE)
+     
+     @property
+     def black_level_per_channel(self) -> List[int]:
+@@ -959,6 +976,9 @@
+             raise ValueError('If params is given, then no additional keywords are allowed')
+         if params is None:
+             params = Params(**kw)
++        self.dcraw_process_called = False
++        self.auto_wb_sampling_requested = params.use_auto_wb and not params.no_auto_scale
++        self.p.imgdata.process_warnings &= ~LIBRAW_WARN_LUMARAW_GREYBOX_WB_UNAVAILABLE
+         self.apply_params(params)
+         with nogil:
+             e = self.p.dcraw_process()
+@@ -1067,6 +1087,20 @@
+         if params is None:
+             return
+         cdef libraw_output_params_t* p = &self.p.imgdata.params
++        if params.greybox is None:
++            x, y, width, height = (0, 0, self.p.imgdata.sizes.width,
++                                   self.p.imgdata.sizes.height)
++        else:
++            x, y, width, height = params.greybox
++        if (x >= self.p.imgdata.sizes.width or
++                y >= self.p.imgdata.sizes.height or
++                width > self.p.imgdata.sizes.width - x or
++                height > self.p.imgdata.sizes.height - y):
++            raise ValueError('greybox must fit inside the visible RAW image')
++        p.greybox[0] = x
++        p.greybox[1] = y
++        p.greybox[2] = width
++        p.greybox[3] = height
+         p.user_qual = params.user_qual
+         p.half_size = params.half_size
+         p.four_color_rgb = params.four_color_rgb
+@@ -1269,7 +1303,8 @@
+                  no_auto_scale: bool = False,
+                  gamma: Optional[Tuple[float, float]] = None, 
+                  chromatic_aberration: Optional[Tuple[float, float]] = None,
+-                 bad_pixels_path: Optional[str] = None) -> None:
++                 bad_pixels_path: Optional[str] = None,
++                 greybox: Optional[Tuple[int, int, int, int]] = None) -> None:
+         """
+ 
+         If use_camera_wb and use_auto_wb are False and user_wb is None, then
+@@ -1314,7 +1349,22 @@
+         :param str bad_pixels_path: path to dcraw bad pixels file. Each bad pixel will be corrected using
+                                     the mean of the neighbor pixels. See the :mod:`rawpy.enhance` module
+                                     for alternative repair algorithms, e.g. using the median.
+-        """
++        :param tuple greybox: optional (x, y, width, height) in visible sensor
++                              coordinates; requires use_auto_wb=True.
++        """
++
++        if greybox is not None:
++            if (type(greybox) is not tuple or len(greybox) != 4 or
++                    any(type(value) is not int for value in greybox)):
++                raise ValueError('greybox must be a 4-tuple of exact integers')
++            x, y, width, height = greybox
++            max_unsigned = (1 << 32) - 1
++            if (x < 0 or y < 0 or width <= 0 or height <= 0 or
++                    any(value > max_unsigned for value in greybox)):
++                raise ValueError('greybox coordinates and dimensions are out of range')
++            if not use_auto_wb:
++                raise ValueError('greybox requires use_auto_wb=True')
++        self.greybox = greybox
+ 
+         if demosaic_algorithm:
+             demosaic_algorithm.checkSupported()
+--- a/rawpy/_rawpy.pyi
++++ b/rawpy/_rawpy.pyi
+@@ -11,6 +11,7 @@
+ libraw_version: Tuple[int, int, int]
+ libraw_version_compiled: Tuple[int, int, int]
+ flags: Optional[dict[str, bool]]
++GREYBOX_WB_API_VERSION: int
+ 
+ # Named tuples
+ class ImageSizes(NamedTuple):
+@@ -203,6 +204,7 @@
+         gamma: Optional[Tuple[float, float]] = None,
+         chromatic_aberration: Optional[Tuple[float, float]] = None,
+         bad_pixels_path: Optional[str] = None,
++        greybox: Optional[Tuple[int, int, int, int]] = None,
+     ) -> None:
+         """
+         If use_camera_wb and use_auto_wb are False and user_wb is None, then
+@@ -528,6 +530,9 @@
+         ...
+     
+     @property
++    def auto_whitebalance_valid(self) -> Optional[bool]: ...
++
++    @property
+     def black_level_per_channel(self) -> List[int]:
+         """
+         Per-channel black level correction.

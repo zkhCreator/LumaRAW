@@ -5264,3 +5264,42 @@ assertions**: connection 10, thumbnails 14, white balance 39 and responsiveness
 on macOS **26.6.2**. A fresh fetch finds no unmerged local or remote branches.
 macOS 14 runtime, desktop interaction, broader camera fixtures and Adobe numerical
 acceptance remain absent. Full Lightroom reproduction remains incomplete.
+
+## Rebuildable RAW greybox dependency (October 2, 2026)
+
+The source-only `scripts/rawpy-wheel/` workflow rebuilds rawpy **0.27.1** /
+LibRaw **0.22.1** with a checked visible-sensor greybox API and validity state.
+Four official source archives and three reviewed patches are SHA-256 pinned;
+build packages are hash-locked. It uses fresh work outside the checkout, an
+isolated arm64/macOS 14 prefix and Apple SDK, with an explicit offline option.
+Existing/dangling destinations are rejected. Application `.venv` and `uv.lock`
+remain unchanged. Source/publication boundary regressions pass **19 tests in
+0.28 s**, including tampered cache rejection, unsafe extraction, failed-tool
+propagation and the exact patch/toolchain/lock allowlist.
+
+The reviewed script bytes complete a fresh offline build on macOS **26.6.2**
+with CPython **3.12.0**, vendored bootstrap pip **23.2.1**, CMake **3.31.6**,
+Apple clang **21.0.0** and SDK **26.5**. Structural inspection verifies **7
+Mach-O entries**, all arm64 with minimum OS no newer than **14.0**, and **11**
+resolved non-system load dependencies inside the wheel. The wheel imports with
+`GREYBOX_WB_API_VERSION=1`; local-build/SDK/package-manager strings are absent
+under the builder's byte checks. Pinned inputs are not a bitwise-reproducibility
+claim. Dynamic LCMS2 **2.19.1**, libjpeg-turbo **3.2.0** and JasPer **4.2.9**
+attribution, upstream rawpy/LibRaw terms and rebuild inputs are preserved; no
+binary distribution is performed.
+
+The exact resulting wheel and NumPy are installed into a separate disposable
+runtime. `raw_backend_probe.py` succeeds on the read-only public Nikon D3S NEF
+with **4,284 × 2,844** visible pixels, square pixels, no active crop and flip
+**0**. Full/64×64/repeated greyboxes produce valid results; the repeated vectors
+match. This three-output-color RGBG fixture uses CFA slot **3** for its second
+green. Zeroing **1,024** G2 samples in memory correctly returns validity false;
+disabled auto processing and an invalid ROI reset validity to unset. Invalid API
+inputs fail visibly and original bytes remain unchanged under a supervised
+2 GiB sampled-RSS, 150-second CPU and 180-second wall boundary.
+
+This establishes build/API evidence for one camera and OS. It does not implement
+the native RAW selector, verify other camera formats/rotations, establish absolute
+Kelvin or Adobe pixels, measure throughput, or execute macOS 14. The current
+application remains on the normal dependency with raster-only selector support;
+RAW adapter/service/native integration and broader acceptance remain open.

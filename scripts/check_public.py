@@ -18,6 +18,12 @@ ROOT_FILES = {'.gitignore', 'LICENSE', 'README.md', 'ARCHITECTURE.md', 'METAL.md
               'TESTING.md', 'VERIFICATION.md', 'THIRD_PARTY_NOTICES.md',
               'PUBLIC_RELEASE.md', 'Package.swift', 'launch.py', 'pyproject.toml', 'uv.lock'}
 ROOT_DIRS = {'.github', 'assets', 'licenses', 'lumaraw', 'metal', 'native', 'scripts', 'skills', 'tests', 'examples'}
+RAW_BUILD_INPUTS = {'scripts/rawpy-wheel/requirements.in',
+                    'scripts/rawpy-wheel/requirements.lock',
+                    'scripts/rawpy-wheel/toolchain.cmake',
+                    'scripts/rawpy-wheel/patches/rawpy-greybox.patch',
+                    'scripts/rawpy-wheel/patches/rawpy-cmake-toolchain.patch',
+                    'scripts/rawpy-wheel/patches/libraw-greybox-validity.patch'}
 RUNTIME = {'.git', '.venv', 'venv', '__pycache__', '.pytest_cache', '.build', 'build', 'dist',
            'work', 'outputs', 'cache', 'catalog', 'exports', 'fixtures', 'evidence', '.swiftpm'}
 GENERATED = {'.pyc', '.pyo', '.dylib', '.so', '.dll', '.exe', '.zip', '.dmg', '.log',
@@ -49,6 +55,8 @@ def allowed(path):
         return path.name in ROOT_FILES
     if path.parts[0] not in ROOT_DIRS:
         return False
+    if path.as_posix() in RAW_BUILD_INPUTS:
+        return True
     if path.parts[0] == '.github':
         return path.as_posix() == '.github/workflows/release.yml' or (
             path.parent.as_posix() == '.github/release-notes' and

@@ -11,13 +11,26 @@ import pytest
 
 SCRIPTS = Path(__file__).resolve().parents[1] / 'scripts'
 sys.path.insert(0, str(SCRIPTS))
-from check_public import audit, png_findings
+from check_public import audit, png_findings, RAW_BUILD_INPUTS
 from package_public import package
 
 
 def test_clean_source(tmp_path):
     (tmp_path / 'README.md').write_text('Public source\n')
     assert audit(tmp_path, strict=True)[1] == []
+
+
+def test_raw_build_inputs_use_an_exact_allowlist(tmp_path):
+    for name in RAW_BUILD_INPUTS:
+        path = tmp_path / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text('Synthetic reviewed build input\n')
+    files, findings = audit(tmp_path, strict=True)
+    assert not findings and {path.as_posix() for path in files} == RAW_BUILD_INPUTS
+    unknown = tmp_path / 'scripts/rawpy-wheel/patches/unreviewed.patch'
+    unknown.write_text('Synthetic unknown patch\n')
+    assert audit(tmp_path, strict=True)[1] == [{'path': unknown.relative_to(tmp_path).as_posix(),
+                                             'category': 'unknown-file'}]
 
 
 def test_credentials_not_opened(tmp_path, monkeypatch):

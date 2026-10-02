@@ -1,0 +1,17 @@
+--- a/setup.py
++++ b/setup.py
+@@ -256,6 +256,14 @@
+         "-DCMAKE_INSTALL_LIBDIR=lib",
+         "-DCMAKE_INSTALL_NAME_DIR=" + install_name_dir,
+     ]
++
++    # Private reproducible-build hook: pass the caller's restricted toolchain
++    # to this otherwise fixed LibRaw CMake invocation.
++    toolchain_file = os.environ.get("RAWPY_CMAKE_TOOLCHAIN_FILE")
++    if toolchain_file:
++        if not os.path.isfile(toolchain_file):
++            raise SystemExit("RAWPY_CMAKE_TOOLCHAIN_FILE does not exist")
++        cmake_args.append("-DCMAKE_TOOLCHAIN_FILE=" + toolchain_file)
+ 
+     if buildGPLCode:
+         cmake_args.extend(

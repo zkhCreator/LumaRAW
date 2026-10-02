@@ -30,6 +30,32 @@ The packaged native connection, thumbnail, white-balance and responsiveness
 regressions cover the application boundary. macOS 14 execution and desktop
 interaction require separate evidence.
 
+## Isolated RAW wheel and runtime primitives
+
+```sh
+.venv/bin/python -m pytest -q tests/test_raw_wheel_builder.py tests/test_public_release.py
+python3.12 scripts/rawpy-wheel/build_rawpy_wheel.py \
+  --work /absolute/new-private-build --source-cache /absolute/verified-sources \
+  --wheelhouse /absolute/locked-wheels --offline
+/absolute/disposable-runtime/bin/python tests/raw_backend_probe.py /absolute/read-only-fixture.NEF
+```
+
+The builder checks current patch/source hashes, installs locked build wheels,
+constrains codec discovery, maps local compile paths and verifies native load
+closure. Boundary tests reject existing/dangling work destinations, changed
+source-cache bytes, unsafe wheel paths, failed subprocesses and unreviewed public
+inputs. Each fresh build retains path-free provenance and redacted logs locally.
+
+Install the exact resulting wheel and matching NumPy into a separate disposable
+runtime before the final command. The camera probe checks required feature flags,
+invalid greybox inputs, visible dimensions/CFA slots, repeatable 64×64 statistics,
+processing reset and empty-G2 rejection using only an in-memory fixture mutation.
+Its supervisor verifies unchanged file hashes and bounds CPU/wall time and sampled
+RSS. This is RAW API evidence on the supplied camera/OS, not a performance benchmark,
+camera calibration, desktop workflow or Lightroom equivalence test. Record absent
+fixtures and OS runtimes independently; compile-time codec flags are not format
+acceptance. The application selector still needs its own vertical integration.
+
 ## Raster conversion allocation
 
 `test_raster_decode.py` compares the bounded 8-bit conversion with the previous

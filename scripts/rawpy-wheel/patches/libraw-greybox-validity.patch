@@ -1,0 +1,47 @@
+--- a/external/LibRaw/libraw/libraw_const.h
++++ b/external/LibRaw/libraw/libraw_const.h
+@@ -712,6 +712,7 @@ enum LibRaw_warnings
+   LIBRAW_WARN_VENDOR_CROP_SUGGESTED = 1 << 25,
+   LIBRAW_WARN_DNG_NOT_PROCESSED = 1 << 26,
+-  LIBRAW_WARN_DNG_NOT_PARSED = 1 << 27
++  LIBRAW_WARN_DNG_NOT_PARSED = 1 << 27,
++  LIBRAW_WARN_LUMARAW_GREYBOX_WB_UNAVAILABLE = 1 << 28
+ };
+ enum LibRaw_exceptions
+ {
+--- a/external/LibRaw/src/postprocessing/postprocessing_utils_dcrdefs.cpp
++++ b/external/LibRaw/src/postprocessing/postprocessing_utils_dcrdefs.cpp
+@@ -159,5 +159,33 @@ void LibRaw::scale_colors()
+       }
+     FORC4 if (dsum[c]) pre_mul[c] = float(dsum[c + 4] / dsum[c]);
++    // Let bindings reject LibRaw's unchanged pre_mul fallback for an empty ROI.
++    if (use_auto_wb && colors >= 3)
++    {
++      // `colors` is the unique output color count, not the CFA slot count:
++      // RGBG Bayer can have three output colors and still scale CFA slot 3.
++      bool required[4] = {false, false, false, false};
++      if (filters)
++      {
++        // Bound discovery to LibRaw's encoded repeating filter period.
++        unsigned period_height = filters == 1 ? 16 : (filters == 9 ? 6 : 8);
++        unsigned period_width = filters == 1 ? 16 : (filters == 9 ? 6 : 2);
++        for (row = 0; row < period_height; row++)
++          for (col = 0; col < period_width; col++)
++          {
++            c = fcol(row, col);
++            if (c < 4)
++              required[c] = true;
++          }
++      }
++      else
++      {
++        for (c = 0; c < colors && c < 4; c++)
++          required[c] = true;
++      }
++      for (c = 0; c < 4; c++)
++        if (required[c] && !dsum[c])
++          imgdata.process_warnings |= LIBRAW_WARN_LUMARAW_GREYBOX_WB_UNAVAILABLE;
++    }
+   }
+   if (use_camera_wb && cam_mul[0] > 0.00001f)
+   {
