@@ -539,10 +539,11 @@ memberships; `duplicate_collection` copies it, preserving rules/memberships.
 Deleting a collection never removes
 photos or originals. Smart rules evaluate current metadata when the library is queried.
 
-The Mac shell can add a captured visible selection to a regular collection by
+The Mac shell can add a captured visible selection to a regular or Quick Collection by
 photo drag-and-drop. It uses the existing `collection_membership` contract and
 captured collection revision; no new agent command or implicit file import is
-involved. Reference/Active drops use only the anchor photo. A stale revision must
+involved. A direct Quick drop uses Quick's ID/revision and does not follow the
+current Target Collection. Reference/Active drops use only the anchor photo. A stale revision must
 remain a visible conflict, never a reason to replay the mutation with a fresh token.
 
 `collection_state` returns the Quick/target collections and independent state

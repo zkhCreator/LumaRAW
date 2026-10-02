@@ -66,7 +66,12 @@ extension Store {
     }
 
     func canDropInCollection(_ drag: CatalogPhotoDrag, to collection: LibraryCollection) -> Bool {
-        guard workspace == "library", collection.kind == "regular" else { return false }
+        guard workspace == "library" else { return false }
+        if collection.kind == "quick" {
+            guard collectionState?.quick.id == collection.id else { return false }
+        } else if collection.kind != "regular" {
+            return false
+        }
         return drag.isValid(session: referenceDragSession, visiblePhotoIDs: Set(photos.map(\.id)))
     }
 

@@ -192,10 +192,11 @@ when a clear function is more maintainable. Avoid unrelated formatting churn.
   at query time. Count and page queries must use identical predicates.
 - Capture collection membership event IDs and the target revision before starting
   an asynchronous task. In-app photo drags retain their single reference anchor
-  and may carry at most sixty selected visible IDs for a regular-collection add.
+  and may carry at most sixty selected visible IDs for a regular or Quick add.
   Reject foreign sessions, malformed lists and photos outside the current page.
   Preserve the captured gesture if only selection changes; never read replacement
-  IDs after suspension or retry a stale collection mutation.
+  IDs after suspension or retry a stale collection mutation. A direct Quick
+  Collection action uses its captured ID/revision, never the current Target.
 - Collection labels belong to collection nodes, not their photos or descendants.
   Validate every captured target before a batch label transaction, including
   no-op targets; preserve ancestor conflicts and original Quick/target semantics.

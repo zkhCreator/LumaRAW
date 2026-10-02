@@ -55,11 +55,12 @@ or uncertain exports still require explicit review/retry.
 6. Command-click to toggle selection; Shift-click selects a contiguous range on the current page. **⌘A** in the focused grid selects the visible page. Grid rating/flag/metadata actions apply to the selection; Loupe, Compare, Survey and Develop actions apply to the active photo. **Photo → Sync Selected Photos** copies selected adjustment groups; composition, masks, and camera profiles are excluded by default.
 7. Press **⇧⌘E** to export. Choose a format, color space, long-edge size, and filename template, or load saved export settings. Presets can optionally remember the export folder; a preset without a folder requires choosing one before **Add to Queue**. Existing files are preserved.
 
-Drag a selected Grid photo onto a regular collection in the sidebar to add the
+Drag a selected Grid photo onto a regular or Quick Collection in the sidebar to add the
 captured visible selection. Dragging an unselected photo, or a filmstrip photo
 outside Grid, adds that photo alone. This adds collection membership and keeps
-existing memberships and original files. Smart collections, sets and the Quick
-Collection are not drop targets. The collection's **Add Selected Photos** menu
+existing memberships and original files. A Quick Collection drop adds to Quick
+even when another collection is the Target. Smart collections and sets are not
+drop targets. The collection's **Add Selected Photos** menu
 remains available. Reference/Active drops continue to use the dragged photo alone.
 
 **File → Export with Previous** (**⌥⇧⌘E**) immediately queues the captured photo

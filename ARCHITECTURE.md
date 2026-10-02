@@ -153,10 +153,12 @@ centers. Same-photo roles remain separate because render clients and frames are
 not keyed by a shared native photo-ID dictionary. Custom in-app drag values carry
 a session token, visible anchor photo ID and an optional bounded selection,
 never paths or an implicit import. Reference/Active drops use only the anchor.
-Regular-collection drops validate the captured IDs against the current visible
+Regular and Quick Collection drops validate captured IDs against the current visible
 page and submit them with the target collection's captured revision. Later
 selection changes do not substitute new photos, and conflicts are never rebased
-or retried automatically. Smart collections and sets do not accept manual drops.
+or retried automatically. A Quick Collection drop uses its captured identity,
+independent of the configurable Target Collection. Smart collections and sets do
+not accept manual drops.
 
 `preview_photo(expected_revision)` now binds ordinary as well as draft previews.
 The service checks before releasing the catalog lock for image work, then checks

@@ -7,13 +7,28 @@ import SwiftUI
 struct CollectionsSidebar: View {
     @EnvironmentObject var s: Store
     @State private var clearing: LibraryCollection?
+    @State private var quickDropTargeted=false
     var body: some View {
         Section("Collections") {
             if let state=s.collectionState {
                 Button { Task { await s.openCollection(state.quick) } } label: {
                     Label("Quick Collection\(state.target.id == state.quick.id ? " +":"")",systemImage:"circle.dashed")
-                }.contextMenu {
+                }
+                .dropDestination(for: CatalogPhotoDrag.self) { items, _ in
+                    guard items.count == 1,
+                          s.beginCollectionDrop(items[0], to: state.quick) != nil else { return false }
+                    return true
+                } isTargeted: { quickDropTargeted = $0 }
+                .background(quickDropTargeted ? Color.accentColor.opacity(0.14) : Color.clear,
+                            in: RoundedRectangle(cornerRadius: 6))
+                .help("Open Quick Collection or drop photos to add them")
+                .accessibilityHint("Drop photos from the current Library page to add them. Add Selected Photos is available in the context menu.")
+                .contextMenu {
                     Button("Set as Target Collection") { Task { await s.setTargetCollection(nil) } }
+                    Button("Add Selected Photos") {
+                        let ids=s.actionPhotoIDs
+                        s.beginCollectionMembership(state.quick,action:"add",ids:ids)
+                    }.disabled(s.actionPhotoIDs.isEmpty)
                     Button("Save Quick Collection…") { s.quickSaveSource=state.quick;s.showQuickSave=true }
                     Button("Clear Quick Collection…") { clearing=state.quick }
                 }

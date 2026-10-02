@@ -5,11 +5,14 @@ All probes use explicit read-only input photographs and new disposable catalog/o
 ## Native collection photo drops
 
 `NativeCollectionDropRegression` exercises captured visible-page photo drags,
-regular-collection admission, rejected foreign/malformed/stale-page payloads,
+regular/Quick admission, rejected foreign/malformed/stale-page payloads,
 selection changes after capture and stale collection revisions through the real
 packaged service. Keep original bytes, photographic state and existing memberships
 unchanged while adding the captured IDs. The Reference suite checks that its
 single-anchor behavior is preserved when the shared payload includes a selection.
+Quick drops must keep their captured destination when the configurable Target
+changes, preserve membership on repeated adds with a fresh revision, and reject
+a stale Quick revision without replaying the mutation.
 Do not infer mouse drag recognition, hover feedback or VoiceOver behavior from
 state checks or offscreen snapshots; those require desktop acceptance separately.
 

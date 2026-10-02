@@ -1,17 +1,36 @@
-// Purpose: validate bounded, revision-safe photo drops into regular collections.
+// Purpose: validate bounded, revision-safe photo drops into regular and Quick collections.
 // Inputs: five disposable originals, captured drag payloads and an isolated catalog.
 // Outputs: membership receipts, payload compatibility, rejection checks and unchanged originals.
 // The 60-ID capture boundary uses in-memory Photo values; no extra originals are created.
+// Quick controls are rendered in a standalone stack for offscreen layout evidence.
+// This cannot establish native List rendering or desktop drag/hover acceptance.
 import AppKit
 import Foundation
+import SwiftUI
 
 @main struct NativeCollectionDropRegression {
     @MainActor static func main() async {
         _ = NSApplication.shared
         let s=Store();var checks:[String:Bool]=[:]
+        var screenshots:[String]=[]
         func check(_ value:Bool,_ name:String)throws {
             checks[name]=value
             if !value { throw EngineFailure(message:name) }
+        }
+        func snapshot<V:View>(_ name:String,_ view:V,_ size:NSSize,_ root:URL) async throws {
+            let host=NSHostingView(rootView:view.background(Color(nsColor:.windowBackgroundColor)))
+            host.frame=NSRect(origin:.zero,size:size)
+            host.layoutSubtreeIfNeeded()
+            try await Task.sleep(nanoseconds:150_000_000)
+            host.layoutSubtreeIfNeeded()
+            guard let bitmap=host.bitmapImageRepForCachingDisplay(in:host.bounds) else {
+                throw EngineFailure(message:"No bitmap for \(name)")
+            }
+            host.cacheDisplay(in:host.bounds,to:bitmap)
+            guard let png=bitmap.representation(using:.png,properties:[:]) else {
+                throw EngineFailure(message:"No PNG for \(name)")
+            }
+            try png.write(to:root.appendingPathComponent(name));screenshots.append(name)
         }
         func until(_ condition:()->Bool) async throws {
             for _ in 0..<300 {
@@ -46,6 +65,8 @@ import Foundation
         }
         do {
             let paths=ProcessInfo.processInfo.environment["LUMARAW_TEST_FIXTURES"]!.components(separatedBy:"|")
+            let snapshotRoot=URL(fileURLWithPath:ProcessInfo.processInfo.environment["LUMARAW_CATALOG"]!)
+                .deletingLastPathComponent()
             let originalBytes=try paths.map { try Data(contentsOf:URL(fileURLWithPath:$0)) }
             await s.importPaths(paths);await s.refreshCollections()
             try await until { s.photos.count==paths.count && !s.loading && s.collectionState != nil }
@@ -67,6 +88,7 @@ import Foundation
                 throw EngineFailure(message:"Could not create smart collection")
             }
             let quick=s.collectionState!.quick
+            let quickBefore=try await collectionPhotos(quick.id)
 
             s.selection=Set([ids[0],ids[1]])
             let captured=s.libraryPhotoDrag(ids[0])
@@ -74,10 +96,15 @@ import Foundation
             try check(captured.session==s.referenceDragSession && captured.photoID==ids[0] &&
                 Set(capturedIDs)==Set([ids[0],ids[1]]) && capturedIDs.count==2,
                 "grid_drag_captures_visible_selection_and_anchor")
+            let workspace=s.workspace
+            s.workspace="exports"
+            let quickRejectedOutsideLibrary = !s.canDropInCollection(captured,to:quick)
+            s.workspace=workspace
             try check(s.canDropInCollection(captured,to:target) &&
+                s.canDropInCollection(captured,to:quick) &&
                 !s.canDropInCollection(captured,to:setTarget) &&
                 !s.canDropInCollection(captured,to:smartTarget) &&
-                !s.canDropInCollection(captured,to:quick),"only_regular_collections_accept_photo_drops")
+                quickRejectedOutsideLibrary,"regular_and_quick_only_accept_library_photo_drops")
 
             let legacyJSON=try JSONSerialization.data(withJSONObject:[
                 "session":captured.session,"photoID":ids[4],
@@ -109,6 +136,7 @@ import Foundation
             try check([foreign,staleAnchor,empty,duplicate,missingAnchor,offPage,overLimit]
                 .allSatisfy { !s.canDropInCollection($0,to:target) },
                 "foreign_stale_and_malformed_payloads_are_rejected")
+            try check(!s.canDropInCollection(overLimit,to:quick),"quick_drop_rejects_over_bound_payload")
             let legacyAnchor=CatalogPhotoDrag(session:captured.session,photoID:ids[4])
             try check(s.canDropInCollection(legacyAnchor,to:target),"legacy_anchor_only_payload_remains_valid")
 
@@ -155,6 +183,38 @@ import Foundation
             try check(s.selection==Set([ids[2]]) && membersAfterCapture==Set([ids[0],ids[1]]),
                 "selection_change_after_capture_does_not_change_submitted_ids")
 
+            // The Quick row is the drop destination even if another collection is now targeted.
+            let regularBeforeQuickDrop=try await collectionPhotos(target.id)
+            await s.setTargetCollection(target)
+            await s.refreshCollections()
+            try await snapshot("quick-collection-drop-controls.png",
+                VStack(alignment:.leading,spacing:12) { CollectionsSidebar() }
+                    .padding(16).environmentObject(s),
+                NSSize(width:360,height:540),snapshotRoot)
+            let quickExpected=quickBefore.union(Set(capturedIDs))
+            guard let quickTask=s.beginCollectionDrop(captured,to:quick) else {
+                throw EngineFailure(message:"Captured Quick Collection drop was rejected")
+            }
+            await quickTask.value
+            try await waitForCollectionPhotos(quick.id,quickExpected)
+            let regularAfterQuickDrop=try await collectionPhotos(target.id)
+            let quickAfterTargetDrop=try await collectionPhotos(quick.id)
+            try check(s.collectionState?.target.id==target.id &&
+                regularAfterQuickDrop==regularBeforeQuickDrop &&
+                quickAfterTargetDrop==quickExpected,
+                "quick_drop_ignores_changed_target_and_adds_only_to_quick")
+
+            let quickForRepeat=try await readCollection(quick.id)
+            let revisionBeforeRepeat=quickForRepeat.revision
+            guard let repeatedQuickTask=s.beginCollectionDrop(captured,to:quickForRepeat) else {
+                throw EngineFailure(message:"Repeated Quick Collection add was rejected")
+            }
+            await repeatedQuickTask.value
+            let quickAfterRepeat=try await readCollection(quick.id)
+            let membersAfterRepeat=try await collectionPhotos(quick.id)
+            try check(membersAfterRepeat==quickExpected && quickAfterRepeat.revision==revisionBeforeRepeat+1,
+                "repeated_quick_add_preserves_members_and_advances_revision")
+
             guard let membershipTarget=LibraryCollection(try await Backend.call("save_collection",[
                 "name":"Selection capture target","kind":"regular","rules":[:],"match":"all"])) else {
                 throw EngineFailure(message:"Could not create selection capture collection")
@@ -169,6 +229,25 @@ import Foundation
             let capturedMembership=try await collectionPhotos(membershipTarget.id)
             try check(capturedMembership==Set([ids[2],ids[3]]),
                 "membership_task_uses_synchronous_selection_snapshot")
+
+            // A concurrent Quick edit invalidates the captured Quick row; no stale drop is retried.
+            let staleQuick=try await readCollection(quick.id)
+            s.selection=Set([ids[3],ids[4]])
+            let staleQuickDrag=s.libraryPhotoDrag(ids[3])
+            _=try await Backend.call("collection_membership",[
+                "collection_id":quick.id,"expected_revision":staleQuick.revision,
+                "photo_ids":[ids[2]],"action":"add"])
+            s.error=nil
+            guard let staleQuickTask=s.beginCollectionDrop(staleQuickDrag,to:staleQuick) else {
+                throw EngineFailure(message:"Captured stale Quick drop should reach revision validation")
+            }
+            await staleQuickTask.value
+            let quickAfterConflict=try await collectionPhotos(quick.id)
+            let regularBeforeStaleQuick=try await collectionPhotos(target.id)
+            try check(s.error?.localizedCaseInsensitiveContains("conflict")==true &&
+                quickAfterConflict==quickExpected.union([ids[2]]) &&
+                regularBeforeStaleQuick==Set([ids[0],ids[1]]),
+                "stale_quick_drop_conflicts_without_retry_or_partial_membership")
 
             // A captured collection revision must fail atomically after another client changes it.
             let staleTarget=try await readCollection(target.id)
@@ -196,12 +275,14 @@ import Foundation
             try check(try paths.map { try Data(contentsOf:URL(fileURLWithPath:$0)) }==originalBytes,
                 "collection_drops_preserve_original_bytes")
             print(String(data:try JSONSerialization.data(withJSONObject:[
-                "ok":true,"checks":checks,"desktop_ui":"NOT_VERIFIED","voiceover":"NOT_VERIFIED",
+                "ok":true,"checks":checks,"offscreen_screenshots":screenshots,
+                "desktop_ui":"NOT_VERIFIED","voiceover":"NOT_VERIFIED",
             ],options:[.prettyPrinted,.sortedKeys]),encoding:.utf8)!)
             exit(0)
         } catch {
             print(String(data:try! JSONSerialization.data(withJSONObject:[
-                "ok":false,"checks":checks,"error":error.localizedDescription,"store_error":s.error ?? "",
+                "ok":false,"checks":checks,"offscreen_screenshots":screenshots,
+                "error":error.localizedDescription,"store_error":s.error ?? "",
             ],options:.prettyPrinted),encoding:.utf8)!)
             exit(1)
         }

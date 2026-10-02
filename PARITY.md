@@ -60,7 +60,7 @@ gaps. Nothing below is full Lightroom parity merely because historical tests pas
 | Area | Current implementation | Remaining acceptance / work |
 | --- | --- | --- |
 | Import and catalogs | Partial: durable Add/Copy review with checked selection, Grid/Loupe source previews with on-demand Fit/100% regions and completed-preview reuse, suspected duplicates, bounded sorting/filtering, captured import-time presets and keywords, Copy destination/subfolder and flat/source/date organization with three numeric date layouts and paged destination photo counts, filename token editor and catalog-local templates with checked-sequence and catalog Import/Image numbering, byte-verified original/XMP transfers, optional original-state second copies, catalog-local saved import configurations with explicit rescans, explicit crash recovery and retained-copy cancellation, Previous Import navigation and catalog backup/restore | Move/Copy as DNG, destination-tree grouping and more date formats, numbering edge-case reference acceptance and wider EXIF/shared templates, shared/Adobe import-preset exchange and interaction acceptance, preview policies, cards/tethering, progressive Current Import, catalog switching/merge and desktop/reference acceptance |
-| Library navigation | Partial: bounded grid/filmstrip, folder tree/search/favorites/labels, durable missing-folder relocation and folder synchronization with reviewed suspected-duplicate inclusion, direct/recursive sources, filters/sorting including live snapshot status, regular/smart/Quick collections and nested sets, photo drops into regular collections, single/batch collection color labels and global color filtering | Multi-source selection, complete sync Import Dialog, folder move/rename, relocation overlap/collision handling, collection-node drag/drop, Quick Collection drops, custom label names/sets and sidebar multi-selection interaction, full smart criteria/import-export, source-selection memory, desktop/reference acceptance |
+| Library navigation | Partial: bounded grid/filmstrip, folder tree/search/favorites/labels, durable missing-folder relocation and folder synchronization with reviewed suspected-duplicate inclusion, direct/recursive sources, filters/sorting including live snapshot status, regular/smart/Quick collections and nested sets, photo drops into regular and Quick collections, single/batch collection color labels and global color filtering | Multi-source selection, complete sync Import Dialog, folder move/rename, relocation overlap/collision handling, collection-node drag/drop, custom label names/sets and sidebar multi-selection interaction, full smart criteria/import-export, source-selection memory, desktop/reference acceptance |
 | Organization | Partial: duplicate/missing detection, hierarchical keywords/synonyms/export flags/Will Export preview, text/CSV vocabulary exchange and manual person tags, custom nine-slot keyword sets/recent entries/shared or catalog storage, multi-keyword shortcuts and keyword/rating/flag/label/target-collection/rotation/Develop-preset/metadata-preset Painter strokes, independent catalog rotation/flips, title/caption/copyright plus thirty IPTC fields, selective metadata presets, labels, batch metadata, virtual copies, manual/split/capture-time scoped stacks | Keyword policy/file and preset reference acceptance, built-in sets/suggestions/undo, Painter desktop acceptance, IPTC Extension and complete metadata parity, stack interaction acceptance, rename and sidecars |
 | Culling | Partial: Loupe/Compare/Survey, linked detail, anchored page selection, Develop Reference/Active pairs with independent Fit/1:1 viewports, session lock and RGB/LAB readouts | Desktop and numerical reference acceptance, HDR readouts, scrubby/box zoom, cross-page selection, auto advance, persistent workspace state |
 | Basic development | Partial: light/WB/color, eight-band HSL and B&W Mix with photo-targeted adjustment and selective resets/sync | Calibrated absolute WB, eyedropper, texture/clarity/dehaze, Point Color, Auto B&W mix, color grading and Adobe processing/reference acceptance |
@@ -4720,8 +4720,8 @@ remain unchanged.
 
 Adobe documents [adding photos by dragging them into a collection](https://helpx.adobe.com/lightroom-classic/desktop/organize-photos-in-lightroom-classic/photo-collections.html)
 as a membership copy; moving between collections requires a separate removal.
-This increment covers regular-collection photo addition. Quick Collection drops,
-collection-node reparenting by drag, manual photo ordering and complete desktop
+This increment covers regular-collection photo addition. Quick Collection drops
+are added below; collection-node reparenting by drag, manual photo ordering and complete desktop
 gesture/reference acceptance remain open. Smart collections and sets are not
 manual photo-drop targets. Existing menu actions remain available.
 
@@ -4744,3 +4744,41 @@ deep strict ad-hoc signature verification matched. The build targets macOS 14 an
 was checked on macOS 26.6.2. macOS 14 runtime, desktop gestures, VoiceOver and
 Lightroom reference acceptance remain unverified; desktop automation was not
 retried. No new desktop latency or processing-performance claim is made.
+
+### Direct Quick Collection photo drops
+
+The native Quick Collection row now accepts the same bounded, session-scoped
+photo payload as regular collections, with an Add Selected Photos menu alternative.
+The row's Quick identity and revision are captured before asynchronous work;
+changing the configurable Target Collection does not redirect a Quick drop.
+The direct membership service checks the captured Quick revision and only adds
+relationships. A repeated add with a newly read revision preserves membership
+and follows the existing service behavior of advancing the collection revision.
+A stale Quick value fails without retry or partial membership changes.
+
+The [Adobe collection reference](https://helpx.adobe.com/lightroom-classic/desktop/organize-photos-in-lightroom-classic/photo-collections.html)
+describes Grid-to-collection dragging and separate Quick menu, B-key and thumbnail
+circle actions. It does not explicitly establish Quick-row dragging. This native
+operation is therefore recorded as LumaRAW behavior; matching the Adobe desktop
+gesture remains unverified. Smart collections and sets still reject manual photo
+drops. Engine generation 53, schema 37 and all 149 service contracts are unchanged.
+
+The relevant collection, identity, label and stack Python regressions passed
+**35 tests in 4.36 s**. The portable engine digest remains identical to the prior
+full actual-Metal/real-NEF checkpoint; that result is not a new full-suite run.
+
+The packaged application passed **77 native assertions**: Collection Drop 19,
+Collections 42 and Responsiveness 16. The Quick-specific cases verify a Target
+switch after capture, repeated additions with a current revision, rejection of
+stale Quick revisions and preservation of photo state and original bytes.
+The nineteen Drop assertions passed again after a fixture-only layout change.
+The native List produced only a background in an offscreen snapshot, so it is
+not accepted as visual evidence. A standalone stack of the actual sidebar
+controls was inspected instead: Quick and the separate targeted regular row
+remain readable and distinct. This establishes isolated control layout only.
+
+All **149 MCP schemas**, source/client/broker identity, bundled guide bytes and
+deep strict ad-hoc signature verification matched. The app targets macOS 14 and
+was checked on macOS 26.6.2. macOS 14 runtime, native List/desktop drag and hover,
+VoiceOver and Adobe gesture equivalence remain unverified. Desktop automation
+was not retried; no processing-speed claim is made for this UI increment.
