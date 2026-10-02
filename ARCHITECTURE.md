@@ -142,11 +142,24 @@ Readouts neither write recipes nor enter Develop history.
 
 `runtime.py` identifies an engine by broker protocol, ordered generation, source/
 dependency digest and supported catalog version. Source runs hash the engine and
-Metal sources plus dependency declarations; packaged builds read an embedded
-manifest. Each process retains its identity for its lifetime. Every command uses a
+Metal sources, dependency declarations and actual installed rawpy wrapper/native/
+bundled-codec bytes. RECORD enumerates artifacts but its claimed hashes are not
+trusted. Packaged builds read this path-free descriptor and digest from an embedded
+manifest: collecting/signing Mach-O files can change their bytes. Each process
+validates and retains its identity and RAW cache namespace for its lifetime,
+without importing rawpy or NumPy in ordinary broker startup. Every command uses a
 read-only transport handshake before mutation, and the broker checks the admitted
 identity again. A second broker must acquire a nonblocking lifetime owner lock
 before migration or endpoint replacement. Startup and lifetime locks are separate.
+
+Pixel-derived full/proxy linear arrays, source/developed thumbnails, After/Before
+PNGs and curve/mixer/readout maps all include that RAW backend namespace. Switching
+between distinct same-version implementations therefore cannot reuse old pixels.
+The physical 24-hex source-stat token, catalog recipes, metadata and transfer
+identities remain independent of the backend. Completed preview receipts also
+retain their existing whole-engine and compute-policy identity. Packaging compares
+source and collected-engine import probes for the actual version/capability and
+identity; this smoke check establishes no camera-format or color accuracy claim.
 
 Newer generations automatically request an idle handoff. Different builds within
 one generation require `service_connection(action: activate)` / the Mac Settings

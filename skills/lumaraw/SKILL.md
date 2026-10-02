@@ -21,6 +21,12 @@ Reuse includes requested Before, geometry, histogram and targeting/readout maps;
 missing, changed or damaged cache data causes normal rendering. This is a local
 processing optimization, not evidence of Adobe pixel parity or UI frame rate.
 
+Engine build identity includes the installed RAW wrapper/native and bundled-codec
+bytes. All pixel caches use a validated backend namespace; switching distinct
+same-version implementations causes a normal cache miss. This namespace does not
+change the photograph's physical source-stat token or its catalog revisions.
+Do not infer camera support or RAW selector capability from a version label.
+
 ## White Balance Selector
 
 `preview_photo` returns `source_fingerprint`, a 24-character token derived from

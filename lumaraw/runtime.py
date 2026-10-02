@@ -1,7 +1,8 @@
 """Portable engine identity and catalog compatibility boundaries.
 
-Inputs: shipped build manifest or current source bytes. Outputs: a stable engine
-identity cached for the process lifetime. No catalog writes or process control.
+Inputs: shipped build manifest or current source and installed RAW backend bytes.
+Outputs: stable engine and pixel-cache identities, cached for the process lifetime.
+No catalog writes or process control.
 Generation orders releases; the digest distinguishes edits/builds within one
 generation. Same-generation switches need an explicit connection activation.
 """
@@ -11,7 +12,7 @@ import json
 from pathlib import Path
 import sys
 
-ENGINE_GENERATION = 58
+ENGINE_GENERATION = 59
 CATALOG_VERSION = 37
 BROKER_PROTOCOL = 1
 
@@ -20,7 +21,24 @@ class EngineChangedError(RuntimeError):
     can_activate = True
 
 
-def source_digest(root):
+@lru_cache(maxsize=1)
+def raw_backend():
+    from .runtime_backend import descriptor_digest, installed_descriptor
+    if getattr(sys, 'frozen', False):
+        value = json.loads(Path(__file__).with_name('engine_build.json').read_text())['raw_backend']
+    else:
+        value = installed_descriptor()
+    descriptor_digest(value)
+    return value
+
+
+@lru_cache(maxsize=1)
+def pixel_cache_namespace():
+    from .runtime_backend import descriptor_digest
+    return descriptor_digest(raw_backend())
+
+
+def source_digest(root, *, backend=None):
     root = Path(root)
     digest = hashlib.sha256()
     for name in ('pyproject.toml', 'uv.lock'):
@@ -33,11 +51,17 @@ def source_digest(root):
                     continue
                 digest.update(path.relative_to(root).as_posix().encode()+b'\0')
                 digest.update(hashlib.sha256(path.read_bytes()).digest())
+    from .runtime_backend import descriptor_digest
+    namespace = descriptor_digest(raw_backend() if backend is None else backend)
+    digest.update(b'raw-backend-v1\0' + bytes.fromhex(namespace))
     return digest.hexdigest()
 
 
 @lru_cache(maxsize=1)
 def engine_identity():
+    # Validate/warm the namespace before commands reach cache lookups. Frozen
+    # manifests describe build inputs; packaging may rewrite signed Mach-O bytes.
+    pixel_cache_namespace()
     if getattr(sys, 'frozen', False):
         manifest = json.loads(Path(__file__).with_name('engine_build.json').read_text())
         digest = manifest['digest']

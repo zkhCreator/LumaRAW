@@ -5,6 +5,8 @@ that adapter is implemented but requires Windows integration validation. Wire da
 uses send_bytes/recv_bytes JSON, never pickle. Startup and lifetime owner locks
 prevent competing brokers. Identity negotiation precedes every domain command;
 only a sealed idle handoff preserves pending exports across engine changes.
+The build-only backend probe imports RAW libraries in a separate process and
+returns path-free diagnostics without opening a catalog or broker endpoint.
 """
 import argparse
 from contextlib import contextmanager, nullcontext
@@ -198,8 +200,12 @@ def main():
     parser.add_argument('--catalog',type=Path,default=default_catalog())
     parser.add_argument('--worker',action='store_true');parser.add_argument('--broker',action='store_true');parser.add_argument('--mcp',action='store_true')
     parser.add_argument('--native-client',action='store_true')
+    parser.add_argument('--backend-info',action='store_true',help='Build-only RAW backend smoke probe; no catalog access')
     parser.add_argument('method',nargs='?',default='status');parser.add_argument('--params',help='JSON object; omitted: read stdin for commands other than status and recipe_schema')
     args=parser.parse_args()
+    if args.backend_info:
+        from .raw_backend_probe import inspect_backend
+        print(json.dumps(inspect_backend(),allow_nan=False),flush=True);return
     if args.worker:
         from .worker import main as worker_main
         worker_main();return

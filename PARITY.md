@@ -5223,3 +5223,44 @@ is reduced sampled worker memory with bitwise-preserved source pixels, not a gua
 latency improvement. Pillow decode, ICC transforms and the full linear result
 still allocate full frames. These generated-raster measurements do not establish
 RAW throughput, whole-app memory, desktop interaction speed or Lightroom parity.
+
+## RAW backend identity and pixel-cache isolation (October 2, 2026)
+
+Engine generation **59** adds a path-free descriptor of actual installed rawpy
+wrapper/native and bundled-codec bytes to the source/build digest. Declared RECORD
+hashes are not trusted. Startup validates and memoizes a backend namespace through
+stdlib-only discovery; ordinary broker startup imports no pixel libraries, and
+subsequent cache lookups do not rescan artifacts. Frozen engines use the embedded
+descriptor because PyInstaller/signing may rewrite Mach-O bytes. The build checks
+an explicit source/collected-engine import probe for version/capability and identity
+before app signing. Schema **37** and **150** service contracts are unchanged.
+
+Full/proxy linear keys, source/developed thumbnails, After/Before PNGs and curve,
+mixer and readout maps include this namespace. Distinct same-version backends
+cannot read one another's pixel caches. The 24-hex physical source token, catalog
+recipes/metadata and transfer identities remain independent. Cache disposal and
+ordinary cold processing retain their existing behavior; this change makes no
+latency or camera-format support claim.
+
+The focused suite passes **125 tests in 36.84 s**. New cases cover current bytes
+with unchanged inventory/version labels, local-root independence, unlisted codecs,
+missing/escaped artifacts, canonical manifest validation, frozen startup without
+installed discovery, pixel-free initialization and no repeated hashing. Generated
+raster processing verifies actual thumbnail/PNG/map misses and later warm reuse
+after restoring a namespace, with unchanged originals/source tokens. Real official
+and isolated patched rawpy **0.27.1** environments produce distinct engine/cache
+identities and their actual greybox markers are respectively absent and **1**.
+The patched environment remains a private build; the shipped selector still
+supports rasters only.
+
+The complete Python suite passes **1,140 tests in 171.52 s**, requiring actual
+Metal execution and supplying the public read-only Nikon D3S NEF; no tests are
+skipped. The Mac app builds for macOS 14 and passes deep strict ad-hoc signature
+verification. All **150** packaged MCP contracts, source/client/broker identity
+and bundled guide bytes match. Packaged native state/IPC suites pass **79
+assertions**: connection 10, thumbnails 14, white balance 39 and responsiveness
+16. The source and packaged import probes agree on rawpy **0.27.1**, LibRaw
+**0.22.1**, no greybox capability and the same backend namespace/engine digest
+on macOS **26.6.2**. A fresh fetch finds no unmerged local or remote branches.
+macOS 14 runtime, desktop interaction, broader camera fixtures and Adobe numerical
+acceptance remain absent. Full Lightroom reproduction remains incomplete.

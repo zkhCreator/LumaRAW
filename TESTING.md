@@ -2,6 +2,34 @@
 
 All probes use explicit read-only input photographs and new disposable catalog/output directories. They never use a personal photo library by default.
 
+## RAW backend identity and cache isolation
+
+`test_runtime_backend.py` constructs same-version synthetic installed packages
+with changed wrapper/native/codecs and unchanged RECORD inventories. Identity
+must use current bytes, exclude local paths and reject mismatched, missing,
+escaped or malformed artifacts. Frozen startup validates its descriptor without
+installed discovery. A fresh process initializes identity without importing
+rawpy, NumPy, Pillow or SciPy, then forbids rehashing during subsequent lookups.
+Generated pixels verify cold misses across namespace switches and warm reuse
+after switching back for linear keys, thumbnails, PNGs and targeting/readout maps.
+Original bytes and the physical source token remain unchanged.
+
+```sh
+.venv/bin/python -m pytest -q tests/test_runtime_backend.py \
+  tests/test_thumbnail_cache.py tests/test_developed_thumbnails.py \
+  tests/test_preview_cache.py tests/test_curve_targeting.py \
+  tests/test_mixer_targeting.py tests/test_broker_lifecycle.py
+```
+
+`scripts/build_macos.py` embeds the installed descriptor and compares source and
+collected-engine `--backend-info` JSON before app signing. This explicit import
+probe reports version/capability and engine/cache identity, opens no catalog and
+does not establish camera support. PyInstaller can rewrite load commands and
+signatures, so post-collection bytes are not compared to installed input hashes.
+The packaged native connection, thumbnail, white-balance and responsiveness
+regressions cover the application boundary. macOS 14 execution and desktop
+interaction require separate evidence.
+
 ## Raster conversion allocation
 
 `test_raster_decode.py` compares the bounded 8-bit conversion with the previous

@@ -1,6 +1,6 @@
 """Bounded, disposable input-tone maps for photograph-targeted curve controls.
 
-Inputs: source identity, upstream recipe and the rendered viewport geometry.
+Inputs: source/backend identity, upstream recipe and rendered viewport geometry.
 Outputs: atomically written little-endian float32 maps plus a versioned receipt.
 Values are encoded working luminance before parametric/RGB curves, clipped to
 the curve's SDR input domain. Display proofing never changes them. Downstream
@@ -17,7 +17,7 @@ import tempfile
 import numpy as np
 
 from .model import Recipe, PARAMETRIC_FIELDS, POINT_CURVE_FIELDS, MIXER_FIELDS, BW_FIELDS
-from .source_identity import fingerprint
+from .source_identity import pixel_fingerprint
 
 MAGIC = b'LRTONE1\0'
 STAGE = 'pre-parametric-v1'
@@ -31,7 +31,7 @@ def target_path(path, recipe, cache, geometry):
     defaults = Recipe().dict()
     for key in DOWNSTREAM:
         upstream[key] = defaults[key]
-    identity = [STAGE, fingerprint(path), upstream, geometry]
+    identity = [STAGE, pixel_fingerprint(path), upstream, geometry]
     key = hashlib.sha256(json.dumps(identity, sort_keys=True).encode()).hexdigest()
     return Path(cache) / (key + '.tones')
 

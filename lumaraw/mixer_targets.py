@@ -1,6 +1,6 @@
 """Sparse, exact float32 band weights for photo-targeted HSL and B&W controls.
 
-Inputs: linear pixels immediately before HSL or monochrome mixing, source identity
+Inputs: linear pixels immediately before HSL or monochrome mixing, source/backend identity
 and viewport geometry. Outputs: immutable file-backed weights, no recipe writes.
 The eight existing 50-degree supports overlap at most three ways. Each 16-byte
 pixel stores a little-endian uint32 (three byte-sized band IDs, then count) and
@@ -19,7 +19,7 @@ import numpy as np
 
 from .color import oklab, mixer_weight, mixer_neutral_weight, MIXER_CENTERS
 from .model import Recipe, MIXER_FIELDS, BW_FIELDS, MIXER_BANDS
-from .source_identity import fingerprint
+from .source_identity import pixel_fingerprint
 
 MAGIC = b'LRMIX1\0\0'
 STAGE = 'mixer-target-v1'
@@ -59,7 +59,7 @@ def target_path(path, recipe, cache, geometry, mode):
         downstream += MIXER_FIELDS
     for key in downstream:
         upstream[key] = defaults[key]
-    identity = [STAGE, mode, fingerprint(path), upstream, geometry]
+    identity = [STAGE, mode, pixel_fingerprint(path), upstream, geometry]
     key = hashlib.sha256(json.dumps(identity, sort_keys=True).encode()).hexdigest()
     return Path(cache) / (key + '.mixer')
 

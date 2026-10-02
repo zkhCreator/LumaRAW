@@ -1,7 +1,9 @@
 """Cheap read-only source identity and thumbnail cache lookup for broker/worker.
 
 Inputs: source stat information, recipe, orientation and catalog cache. Outputs:
-stable keys or an existing thumbnail path. No NumPy, image decoding, SQL or UI.
+stable keys or an existing thumbnail path. Pixel keys include the process-cached
+RAW backend namespace initialized at engine startup. No NumPy, image decoding,
+SQL or UI; backend discovery/hashing runs only once per process, not per lookup.
 Stat identity invalidates on path/size/mtime changes; it is not a content hash.
 Only the image worker creates pixels; the broker can reuse completed JPEG files.
 """
@@ -9,6 +11,7 @@ import hashlib
 import json
 import os
 from pathlib import Path
+from .runtime import pixel_cache_namespace
 
 PIPELINE_VERSION = 'libraw-prophoto-d65-v3'
 
@@ -21,8 +24,12 @@ def fingerprint(path):
     ).hexdigest()[:24]
 
 
+def pixel_fingerprint(path):
+    return hashlib.sha256((fingerprint(path) + pixel_cache_namespace()).encode()).hexdigest()
+
+
 def cache_key(path, recipe, kind):
-    return hashlib.sha256((fingerprint(path) + kind +
+    return hashlib.sha256((pixel_fingerprint(path) + kind +
                            json.dumps(recipe.dict(), sort_keys=True)).encode()).hexdigest()
 
 
@@ -31,7 +38,7 @@ def thumbnail_path(path, cache, recipe=None, orientation=0):
     validate(orientation)
     suffix=f'-orientation-{orientation}' if orientation else ''
     if recipe is None:
-        return Path(cache) / (fingerprint(path) + suffix + '-thumb.jpg')
+        return Path(cache) / (pixel_fingerprint(path) + suffix + '-thumb.jpg')
     # Imported LUTs are immutable by contract. Stat identity prevents reusing a
     # thumbnail after external removal/replacement; the worker verifies its SHA.
     asset = fingerprint(recipe.lut['path']) if recipe.lut else ''

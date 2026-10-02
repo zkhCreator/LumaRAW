@@ -20,6 +20,13 @@ when a clear function is more maintainable. Avoid unrelated formatting churn.
 
 ## Contracts and persistence
 
+- Bind engine identity and every pixel-derived cache to actual installed RAW
+  wrapper/native/bundled-codec bytes, including distinct same-version builds.
+  Enumerate RECORD but hash current bytes; preserve the independent physical
+  source-stat token and catalog/transfer identities. Validate the embedded build
+  descriptor before frozen commands, and compare source/collected import probes.
+  Packaging may rewrite Mach-O bytes. Initialize the stdlib-only namespace once
+  per process; ordinary cache lookup must not rehash libraries or import pixels.
 - Library photo lists and compact Library/collection/orientation state replies
   use an independent read-only WAL transaction per command. Keep exact count,
   page, stack projection, bounded summaries and returned revision/state fields on
