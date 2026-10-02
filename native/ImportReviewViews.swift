@@ -2,6 +2,7 @@
 // Inputs: one bounded ImportReviewModel page. Outputs: explicit scan, selection,
 // duplicate policy, Add/Copy import and cancellation commands. No filesystem traversal,
 // original writes or AI choices. Closing retains unfinished plans for later review.
+// Second-copy choices/progress are explicit; backups retain source names and bytes.
 import SwiftUI
 import AppKit
 
@@ -45,6 +46,15 @@ struct ImportReviewSheet: View {
                             }.frame(width:350)
                             TextField("Into Subfolder (optional)",text:$model.subfolder).frame(maxWidth:260)
                         }
+                        HStack {
+                            Toggle("Make a Second Copy To",isOn:$model.makeSecondCopy)
+                            if model.makeSecondCopy {
+                                Button("Choose Folder…") { chooseSecondDestination(ready:false) }
+                                Text(model.secondCopyDestination.isEmpty ? "Choose an existing folder":model.secondCopyDestination)
+                                    .font(.caption).lineLimit(1).help(model.secondCopyDestination)
+                            }
+                            Spacer()
+                        }
                     }
                     Text(model.sources.isEmpty ? "Choose files or folders to review.":"\(model.sources.count) sources selected")
                     ForEach(Array(model.sources.prefix(3).enumerated()),id:\.offset) { _,path in Text(path).font(.caption).lineLimit(1).help(path) }
@@ -59,8 +69,26 @@ struct ImportReviewSheet: View {
                     HStack {
                         Text("Copy to \(plan.copy["destination"] as? String ?? "")").font(.caption).lineLimit(1)
                         Spacer()
-                        Text("\(plan.copy["copied"] as? Int ?? 0) of \(plan.copy["transfer_count"] as? Int ?? 0) files copied").font(.caption)
+                        Text("\(plan.primaryCopied) of \(plan.primaryTransferCount) main files copied").font(.caption)
                         Button("Transfer Details…") { showCopies=true }
+                    }
+                    if let backup=plan.backup {
+                        HStack {
+                            let path=(backup["destination"] as? String ?? "")+"/"+(backup["subfolder"] as? String ?? "")
+                            Text("Second copy: \(path)").font(.caption).lineLimit(1).help(path)
+                            Spacer()
+                            Text("\(backup["copied"] as? Int ?? 0) of \(backup["transfer_count"] as? Int ?? 0) backed up").font(.caption)
+                            if plan.ready {
+                                Button("Change…") { chooseSecondDestination(ready:true) }.disabled(model.busy || model.loading)
+                                Button("Disable") { Task { await model.setBackup(nil) } }.disabled(model.busy || model.loading)
+                            }
+                        }
+                        if backup["same_volume"] as? Bool == true {
+                            Text("Both destinations are on the same filesystem volume. A separate drive provides protection against drive failure.")
+                                .font(.caption).foregroundStyle(.secondary)
+                        }
+                    } else if plan.ready {
+                        Button("Make a Second Copy To…") { chooseSecondDestination(ready:true) }.disabled(model.busy || model.loading)
                     }
                 }
                 HStack {
@@ -146,7 +174,7 @@ struct ImportReviewSheet: View {
     }
     var grid: some View {
         ScrollView {
-            LazyVGrid(columns:[GridItem(.adaptive(minimum:thumbnailSize),spacing:10)],spacing:12) {
+            LazyVGrid(columns:[GridItem(.adaptive(minimum:thumbnailSize),spacing:10,alignment:.top)],spacing:12) {
                 ForEach(model.items) { item in
                     VStack(alignment:.leading,spacing:7) {
                         ZStack {
@@ -163,7 +191,8 @@ struct ImportReviewSheet: View {
                         Text(item.state == "existing" ? "Already imported":item.state == "duplicate" ? "Suspected duplicate":item.state.capitalized)
                             .font(.caption2).foregroundStyle(item.eligible ? Color.secondary:Color.orange)
                         if item.hasNotes { Text("Some metadata is unsupported").font(.caption2).foregroundStyle(.secondary) }
-                        if !item.destination.isEmpty { Text("To: \(item.destination)").font(.caption2).lineLimit(2).help(item.destination) }
+                        if !item.destination.isEmpty { Text("To: \(URL(fileURLWithPath:item.destination).lastPathComponent)").font(.caption2).lineLimit(2).help(item.destination) }
+                        if !item.secondDestination.isEmpty { Text("Backup: \(URL(fileURLWithPath:item.secondDestination).lastPathComponent)").font(.caption2).lineLimit(2).help(item.secondDestination) }
                         if !item.error.isEmpty { Text(item.error).font(.caption2).foregroundStyle(.red).lineLimit(2) }
                         if let error=model.previewErrors[item.id] { Text(error).font(.caption2).foregroundStyle(.red).lineLimit(2) }
                     }.padding(8).background(RoundedRectangle(cornerRadius:7).fill(model.focused == item.id ? Color.accentColor.opacity(0.15):Color.clear))
@@ -205,5 +234,14 @@ struct ImportReviewSheet: View {
         let panel=NSOpenPanel();panel.canChooseFiles=false;panel.canChooseDirectories=true;panel.allowsMultipleSelection=false
         panel.prompt="Choose Destination";panel.message="Copies will be written here when you import the checked photographs"
         if panel.runModal() == .OK,let path=panel.url?.path { model.destination=path }
+    }
+    func chooseSecondDestination(ready: Bool) {
+        let panel=NSOpenPanel();panel.canChooseFiles=false;panel.canChooseDirectories=true;panel.allowsMultipleSelection=false
+        panel.prompt="Choose Backup Folder"
+        panel.message="Keep an extra copy of the original files and XMP, using their original names, in a dated folder"
+        if panel.runModal() == .OK,let path=panel.url?.path {
+            if ready { Task { await model.setBackup(path) } }
+            else { model.secondCopyDestination=path }
+        }
     }
 }

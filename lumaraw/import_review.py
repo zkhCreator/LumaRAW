@@ -9,6 +9,7 @@ performs no filesystem writes, copying, moving, DNG conversion or AI selection.
 Unknown capture time never falls back to mtime for suspected-duplicate matching.
 Copy naming previews are bounded and use selection ranks; original names remain
 the duplicate identity even when verified destination basenames differ.
+Second copies are receipt-only backups; only verified primary paths are cataloged.
 """
 import json
 import os
@@ -103,6 +104,8 @@ class ImportReview:
             plan['copy']={key:copy[key] for key in ('destination','organization','subfolder','copied','copied_bytes','transfer_count')}
             from .import_naming import settings as naming_settings
             plan['copy']['renaming']=naming_settings(copy)['enabled']
+            from . import import_backup
+            plan['copy']['backup']=import_backup.summary(copy)
         if kind not in KINDS:raise ValueError('Unsupported import filter')
         clause='plan_id=?';args=[plan_id]
         if kind=='selected':clause+=' AND selected=1 AND '+self.eligible(plan)
@@ -129,6 +132,9 @@ class ImportReview:
                     continue
                 try:item['destination']=target(copy,item,ranks.get(item['id']),plan['selected_count'])
                 except ValueError as error:item['naming_error']=str(error)
+                if item['selected'] and item['eligible'] and (backup := import_backup.settings(copy)):
+                    try:item['second_destination']=import_backup.target(backup,item['path'])
+                    except ValueError as error:item['backup_error']=str(error)
         return {'plan':plan,'items':items,'total':total,'offset':offset,'page_size':60}
 
     def item(self,plan_id,item_id,expected_revision):
@@ -280,6 +286,10 @@ class ImportReview:
             where='f.plan_id=? AND f.selected=1 AND '+self.eligible(plan).replace('state','f.state')
             from .import_copy import settings
             copy=settings(self.db,plan_id)
+            from .import_backup import settings as backup_settings
+            if copy and backup_settings(copy) and (copy['backup_transfer_count'] == 0 or
+                    copy['backup_copied'] != copy['backup_transfer_count'] or copy['backup_transfer_count'] >= copy['transfer_count']):
+                raise ValueError('Finish and verify every second copy before catalog application')
             if copy and (copy['copied']!=copy['transfer_count'] or not copy['transfer_count'] or self.db.execute(
                 "SELECT 1 FROM import_files f WHERE "+where+" AND f.catalog_path='' LIMIT 1",(plan_id,)).fetchone()):
                 raise ValueError('Finish and verify every Copy transfer before catalog application')

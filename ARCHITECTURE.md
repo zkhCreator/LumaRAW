@@ -762,8 +762,34 @@ action; it never automatically replays an uncertain application response.
 
 Stat checks are not an OS-wide filesystem snapshot. Copy preserves file bytes
 and mtime, not Finder tags, resource forks, ACLs or all extended attributes. Move,
-DNG conversion, second-copy backups, more date templates and
+DNG conversion, more date templates and
 destination-tree grouping remain separate scope.
+
+Schema 28 adds captured second-copy settings, separate compact backup progress
+counters and a role on every transfer. `import_backup.py` validates an existing,
+nonoverlapping secondary destination outside SQL locks and records its device/inode,
+an import-date folder and same-volume information. Readiness and plan revisions
+are rechecked after filesystem inspection. Clearing/changing the choice is allowed
+only before application. Earlier journals migrate to the primary role with backup
+disabled; no existing filesystem work changes destination during upgrade.
+
+Backup paths use original basenames, independently of primary naming, organization,
+Develop/metadata presets and extension-case choices. Original XMP is copied once
+per distinct target, including a shared RAW/JPEG sidecar. The ordinary bounded
+transfer journal holds both roles; all target collisions are preflighted before
+any filesystem writes. Each role uses its own pinned root through the same no-follow,
+exclusive, hashed/fsynced publication adapter. Both roles must verify before one
+catalog commit; only main paths enter photos, folder counts and Previous Import.
+
+Interruptions preserve role, ownership and destinations. Recovery cannot redirect
+or disable a backup midway; it must restore access and resume or explicitly cancel.
+Cancellation cleans only owned scratch files at each available original destination
+and keeps all published copies. Catalog restoration does not gain permission to
+resume or clean the original operation. The dated flat folder and refusal of
+same-name collisions are explicit contracts, not verified Adobe edge-case parity.
+Second copies are a one-time import operation; no ongoing backup synchronization,
+physical-drive independence, extended-attribute or removable-volume guarantee is
+implied by matching device IDs or by successful local filesystem tests.
 
 Schema 27 adds catalog-local filename templates, revision state, captured Copy
 naming values and a frozen ordinal on each staged item. `filename_templates.py`

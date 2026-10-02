@@ -2,12 +2,15 @@
 
 Inputs: a revision-bound import, cancellation and read-only source verification.
 Outputs: collision preflight, durable copy progress and one catalog transaction.
+Primary and original-state second copies have independent pinned destinations;
+both must verify before the main copies enter the catalog.
 No pixels or automatic replay. A failed transfer remains interrupted for explicit
 resume/cancel. Cancellation removes owned scratch links and retains completed files.
 """
 from .import_copy import ImportCopy, settings, COPY_PHASES
 from .import_review import ImportReview
 from . import import_copy_io as io
+from . import import_backup
 
 
 class CopyRunner:
@@ -43,6 +46,8 @@ class CopyRunner:
         if value['owner'] != str(self.service.root):
             raise ValueError('This Copy plan belongs to another catalog; cancel it and create a fresh review')
         io.check_destination(value)
+        if backup := import_backup.settings(value):
+            io.check_destination(backup)
         if plan['phase'] != 'copying':
             # No destination writes are allowed until the entire selected scope
             # has passed collision preflight. A crash here can rebuild staging.
@@ -51,7 +56,8 @@ class CopyRunner:
                 catalog.db.execute("UPDATE import_plans SET phase='copy_preparing' WHERE id=?", (plan_id,))
                 catalog.db.execute('DELETE FROM import_transfers WHERE plan_id=?', (plan_id,))
                 catalog.db.execute("UPDATE import_files SET catalog_path='' WHERE plan_id=?", (plan_id,))
-                catalog.db.execute('UPDATE import_copy_plans SET transfer_count=0,copied=0,copied_bytes=0 WHERE plan_id=?', (plan_id,))
+                catalog.db.execute('UPDATE import_copy_plans SET transfer_count=0,copied=0,copied_bytes=0,'
+                    'backup_copied=0,backup_bytes=0,backup_transfer_count=0 WHERE plan_id=?', (plan_id,))
                 from .import_naming import freeze, settings as naming_settings
                 if naming_settings(value)['enabled']:
                     freeze(catalog.db,plan,cancelled)
@@ -67,19 +73,19 @@ class CopyRunner:
             for rows in self.pages(plan_id):
                 for row in rows:
                     io.check_cancel(cancelled)
-                    io.preflight(row, value)
+                    io.preflight(row, import_backup.destination(value,row))
             with self.service.catalog() as catalog, catalog.db:
                 catalog.db.execute("UPDATE import_plans SET phase='copying' WHERE id=?", (plan_id,))
         for rows in self.pages(plan_id):
             for row in rows:
-                io.transfer(row, value, self.save, cancelled)
+                io.transfer(row, import_backup.destination(value,row), self.save, cancelled)
         # Recheck source observations as well as the newly published files before
         # committing catalog references. No source/target I/O holds a SQL lock.
         verify_sources(plan, cancelled, count=False)
         for rows in self.pages(plan_id):
             for row in rows:
                 io.check_cancel(cancelled)
-                io.verify_published(row, value)
+                io.verify_published(row, import_backup.destination(value,row))
         with self.service.catalog() as catalog:
             return ImportReview(catalog).apply(plan_id, revision, cancelled)
 
@@ -103,7 +109,7 @@ class CopyRunner:
             for row in rows:
                 try:
                     if value['owner'] == str(self.service.root):
-                        io.check_destination(value)
+                        io.check_destination(import_backup.destination(value,row))
                         io.cleanup(row)
                     else:
                         warnings += 1

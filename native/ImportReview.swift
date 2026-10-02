@@ -3,6 +3,7 @@
 // Outputs: checked selections, resumable scans and one explicit apply command.
 // No filesystem scanning, SQL, image processing or automatic mutation replay.
 // Closing preserves a plan; an uncertain apply is read back before any next action.
+// Optional second copies retain original state independently of import naming.
 import AppKit
 import Foundation
 
@@ -15,6 +16,9 @@ struct ImportPlan {
     var ready: Bool { state == "ready" }
     var isCopy: Bool { text("mode") == "copy" }
     var copy: [String:Any] { values["copy"] as? [String:Any] ?? [:] }
+    var backup: [String:Any]? { copy["backup"] as? [String:Any] }
+    var primaryCopied: Int { (copy["copied"] as? Int ?? 0)-(backup?["copied"] as? Int ?? 0) }
+    var primaryTransferCount: Int { (copy["transfer_count"] as? Int ?? 0)-(backup?["transfer_count"] as? Int ?? 0) }
     var interruptedCopy: Bool { isCopy && state == "interrupted" && ["copying","copy_preparing"].contains(text("phase")) }
     var skipDuplicates: Bool { number("skip_duplicates") != 0 }
     func number(_ key: String) -> Int { values[key] as? Int ?? 0 }
@@ -33,15 +37,17 @@ struct ImportItem: Identifiable {
     let error: String
     let hasNotes: Bool
     let destination: String
+    let secondDestination: String
     init?(_ row: [String:Any]) {
         guard let id=row["id"] as? Int,let path=row["path"] as? String,let name=row["name"] as? String,
               let state=row["state"] as? String else { return nil }
         self.id=id;self.path=path;self.name=name;self.state=state
         selected=(row["selected"] as? Int ?? 0) != 0;eligible=row["eligible"] as? Bool ?? false
         bytes=(row["bytes"] as? NSNumber)?.int64Value ?? 0
-        error=[row["error"] as? String ?? "",row["naming_error"] as? String ?? ""].filter{!$0.isEmpty}.joined(separator:" · ")
+        error=[row["error"] as? String ?? "",row["naming_error"] as? String ?? "",row["backup_error"] as? String ?? ""].filter{!$0.isEmpty}.joined(separator:" · ")
         hasNotes=(row["has_notes"] as? Int ?? 0) != 0
         destination=row["destination"] as? String ?? ""
+        secondDestination=row["second_destination"] as? String ?? ""
     }
 }
 
@@ -54,6 +60,8 @@ struct ImportItem: Identifiable {
     @Published var destination=""
     @Published var organization="flat"
     @Published var subfolder=""
+    @Published var makeSecondCopy=false
+    @Published var secondCopyDestination=""
     @Published var plan: ImportPlan?
     @Published var items: [ImportItem]=[]
     @Published var kind="all"
@@ -136,6 +144,10 @@ struct ImportItem: Identifiable {
                 if mode == "copy" {
                     guard !destination.isEmpty else { throw EngineFailure(message:"Choose a Copy destination") }
                     params["destination"]=destination;params["organization"]=organization;params["subfolder"]=subfolder
+                    if makeSecondCopy {
+                        guard !secondCopyDestination.isEmpty else { throw EngineFailure(message:"Choose a second-copy destination") }
+                        params["second_copy_destination"]=secondCopyDestination
+                    }
                 }
                 receive(try await Backend.call("prepare_import",params))
             }
@@ -158,6 +170,12 @@ struct ImportItem: Identifiable {
     func skipDuplicates(_ value: Bool) async {
         guard !busy,!loading,let captured=plan,captured.ready else { return }
         await mutate("set_import_options",["plan_id":captured.id,"expected_revision":captured.revision,"skip_duplicates":value])
+    }
+
+    func setBackup(_ destination: String?) async {
+        guard !busy,!loading,let captured=plan,captured.ready,captured.isCopy else { return }
+        await mutate("set_import_backup",["plan_id":captured.id,"expected_revision":captured.revision,
+            "destination":destination.map{$0 as Any} ?? NSNull()])
     }
 
     private func mutate(_ method: String,_ params: [String:Any]) async {

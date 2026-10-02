@@ -108,6 +108,13 @@ when a clear function is more maintainable. Avoid unrelated formatting churn.
   them across recovery and support cancellation during bulk SQL. Preview ranks
   must seek disjoint index ranges, including same-name IDs; test SQLite VM work
   rather than trusting that an index appearing in EXPLAIN prevents repeated scans.
+- Second copies preserve original names, bytes and recognized XMP independently
+  of primary naming and presets. Pin both destinations, validate collisions across
+  all transfers before writes, and verify both roles before cataloging main copies.
+  Inspect destinations outside SQL locks and recheck the captured plan revision.
+  Keep backup progress compact, never catalog backup paths, and never redirect or
+  skip a required backup during recovery. Cancellation retains published files in
+  both locations; restored catalogs cannot clean the original operation's scratch.
 - Import-time presets are captured values. Validate preset and plan revisions
   when choosing them; do not reinterpret a saved choice after library edits or
   deletion. Stage LUT assets outside catalog locks, verify before applying and

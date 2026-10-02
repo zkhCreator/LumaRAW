@@ -1,6 +1,7 @@
 // Purpose: bounded, read-only transfer receipts for a captured Copy import.
 // Inputs: plan identity and explicit page requests. Outputs: source/destination
 // status and Finder reveal on user action. No copying, recovery or file deletion.
+// Each receipt distinguishes catalog-bound primary copies from original backups.
 import SwiftUI
 import AppKit
 
@@ -18,7 +19,7 @@ struct ImportCopyReceipts: View {
             Text("Completed files remain at their destinations after cancellation.").foregroundStyle(.secondary)
             List(Array(items.enumerated()),id:\.offset) { _,item in
                 VStack(alignment:.leading,spacing:5) {
-                    Text(item["state",default:""]).fontWeight(.semibold)
+                    Text((item["role"] == "second" ? "Second Copy · ":"Main Copy · ")+item["state",default:""]).fontWeight(.semibold)
                     Text("From: \(item["source",default:""])").font(.caption).textSelection(.enabled)
                     Text("To: \(item["target",default:""])").font(.caption).textSelection(.enabled)
                     if item["state"] == "published",let path=item["target"] {

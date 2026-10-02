@@ -269,8 +269,27 @@ cleans owned scratch files and reports any unsafe cleanup. `get_import_copies`
 returns sixty transfer receipts per offset, including after cancellation. A
 restored catalog can inspect/cancel but cannot resume or clean the original
 catalog's transfer. Read the plan after an uncertain reply; never replay blindly.
-Move, DNG conversion, second-copy backup and extended-attribute copying
+Move, DNG conversion and extended-attribute copying
 remain unsupported. Copy requires a filesystem supporting exclusive hard links.
+
+For an original-state backup, add `second_copy_destination` to a Copy
+`prepare_import`, or use `set_import_backup(plan_id, expected_revision,
+destination)` on a ready review. Pass null to clear it. The selected folder must
+already exist, be separate and nonoverlapping with the main destination, and stay
+outside selected source folders and the active catalog. Filesystem checks occur
+outside catalog locks, followed by another captured-plan revision check.
+
+Second copies use original filenames and recognized XMP in a captured
+`Imported on YYYY-MM-DD` folder; renaming and import-time presets do not alter
+them. `get_import` includes `copy.backup` destination/progress and checked-row
+`second_destination` previews. `get_import_copies` labels transfers with `role`
+`primary` or `second`. Overall copy counters include both roles; backup counters
+are separate. A missing backup location or collision interrupts before catalog
+application. Both roles are verified; backups never enter the catalog. Resume
+retains captured destinations, while cancellation keeps published files in both
+locations. Never disable/redirect a required backup to work around interrupted
+application. These are one-time copies, not ongoing photo/catalog backup, and
+same-filesystem destinations do not establish physical-drive redundancy.
 
 Use `get_import_naming(plan_id)` for the saved Copy configuration, built-in
 templates and supported token kinds. `preview_import_naming(plan_id,

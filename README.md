@@ -10,7 +10,7 @@ LumaRAW preserves your originals. Add references files in place; Copy imports by
 
 | Area | Capabilities |
 | --- | --- |
-| Import | Resumable Add/Copy review, thumbnail/Loupe inspection, checked selections, suspected duplicates, destination organization, filename templates and sequence previews, original/XMP copies with explicit recovery, and captured Develop/metadata presets plus keywords |
+| Import | Resumable Add/Copy review, thumbnail/Loupe inspection, checked selections, suspected duplicates, destination organization, filename templates, optional original-state second copies with explicit recovery, and captured Develop/metadata presets plus keywords |
 | RAW development | Nikon NEF/NRW and other LibRaw formats, as-shot white balance, exposure, highlights/shadows, relative temperature/tint, monochrome, and presets |
 | Color | Eight-band HSL and Black & White Mix, interactive RGB/channel point curves, camera-bound chart calibration, `.cube` LUTs, ICC soft proofing, and gamut warnings |
 | Detail and composition | Full-resolution 1:1 viewports, noise reduction, sharpening, defringing, rotation, crop, straighten, and perspective |
@@ -90,8 +90,23 @@ never overwritten. **Transfer Details…** shows bounded progress/receipts;
 Cancelling removes owned scratch files and keeps completed copies at their
 destinations. Inspect any reported scratch-ownership problem before starting
 another review. Copy currently requires a destination filesystem supporting hard
-links; Finder tags, resource forks and ACLs are not copied. Move, Copy as DNG,
-second-copy backups remain unimplemented.
+links; Finder tags, resource forks and ACLs are not copied. Move and Copy as DNG
+remain unimplemented.
+
+**Make a Second Copy To** captures an extra destination before scanning or on a
+ready Copy review. It preserves original filenames, file bytes, modification time
+and recognized XMP in an `Imported on YYYY-MM-DD` folder. Import naming and presets
+affect only the main catalog copies. Both destinations are checked before any
+file is written and verified before the main copies enter the catalog. If either
+location is unavailable or already contains a target, the import stops for explicit
+recovery. Cancelling keeps completed files at both locations. Transfer Details
+labels each file as Main Copy or Second Copy.
+
+Choose separate, nonoverlapping destination folders outside selected source folders
+and the active catalog. The interface identifies destinations on the same filesystem
+volume; that does not protect against failure of the physical drive. These are
+one-time original-state copies, not continuing photo or catalog backups. Existing
+files and equal-name collisions are never silently overwritten or auto-renamed.
 
 After a Copy scan, **File Renaming** offers nine built-in templates and a token
 editor with literal/custom/shoot text, original filename/number, folder, padded

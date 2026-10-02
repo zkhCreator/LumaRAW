@@ -40,6 +40,9 @@ class ImportRunner:
         self.reader=DirectoryReader();self.reader_plan=None
 
     def dispatch(self,method,params):
+        if method=='set_import_backup':
+            from .import_backup import set_backup
+            return set_backup(self.service,**params)
         if method=='get_import_processing':
             return import_processing.ImportProcessing(self.service).get(**params)
         if method=='set_import_processing':
@@ -53,7 +56,10 @@ class ImportRunner:
                 from .import_copy_io import validate_destination
                 if not params.get('destination'):raise ValueError('Choose a Copy destination')
                 copy=validate_destination(params['destination'],captured,self.service.root,params.get('organization','flat'),params.get('subfolder',''))
-            elif any(key in params for key in ('destination','organization','subfolder')):
+                if params.get('second_copy_destination'):
+                    from .import_backup import capture
+                    copy['backup']=capture(params['second_copy_destination'],copy,self.service.root)
+            elif any(key in params for key in ('destination','organization','subfolder','second_copy_destination')):
                 raise ValueError('Destination options require Copy mode')
             with self.service.catalog() as catalog:
                 return ImportReview(catalog).prepare(captured,params.get('include_subfolders',True),params.get('skip_duplicates',True),copy=copy)

@@ -150,7 +150,7 @@ class Service:
             return self.keyword_sets.dispatch(method,p)
         if method in ('prepare_folder_sync','get_folder_sync','get_folder_sync_metadata','scan_folder_sync','select_folder_sync_items','apply_folder_sync','cancel_folder_sync'):
             return self.folder_sync.dispatch(method,p)
-        if method in ('prepare_import','get_import','scan_import','select_import_items','set_import_options','apply_import','cancel_import','preview_import_item','get_import_processing','set_import_processing','resume_import_copy','get_import_copies'):
+        if method in ('prepare_import','get_import','scan_import','select_import_items','set_import_options','apply_import','cancel_import','preview_import_item','get_import_processing','set_import_processing','resume_import_copy','get_import_copies','set_import_backup'):
             return self.import_review.dispatch(method,p)
         if method=='status':
             with self.catalog() as c:

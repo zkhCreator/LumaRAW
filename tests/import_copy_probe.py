@@ -4,6 +4,7 @@ Inputs: explicit read-only RAW, packaged engine and a fresh disposable work root
 Outputs: three new-catalog transfer timings, sampled broker RSS, warm control
 latencies and exact copied bytes. Source clones are generated before measurement.
 No cold OS cache, desktop frame-rate or camera-rendering equivalence is claimed.
+An optional second-copy run verifies both independently journaled destinations.
 """
 import argparse
 import hashlib
@@ -52,6 +53,7 @@ def main():
     parser=argparse.ArgumentParser()
     for name in ('engine','fixture','work'):parser.add_argument('--'+name,type=Path,required=True)
     parser.add_argument('--files',type=int,default=24)
+    parser.add_argument('--second-copy',action='store_true')
     args=parser.parse_args();assert 2<=args.files<=256
     root=args.work.resolve();root.mkdir(parents=True,exist_ok=False)
     engine=args.engine.resolve();fixture=args.fixture.resolve();original=sha(fixture)
@@ -61,13 +63,17 @@ def main():
     results=[]
     for index in range(3):
         destination=root/f'output-{index}';destination.mkdir()
+        backup=root/f'backup-{index}'
+        if args.second_copy:backup.mkdir()
         catalog=root/f'catalog-{index}'
         writer=Relay(engine,catalog,root/'presets');control=Relay(engine,catalog,root/'presets')
         stop=threading.Event();samples=[];peak=[0];outcome={};errors=[]
         try:
             writer.call('queue_control',{'action':'pause'})
             connection=control.call('service_connection',{'action':'status'});broker=psutil.Process(connection['pid'])
-            plan=writer.call('prepare_import',{'paths':[str(source)],'mode':'copy','destination':str(destination)})['plan']
+            options={'paths':[str(source)],'mode':'copy','destination':str(destination)}
+            if args.second_copy:options['second_copy_destination']=str(backup)
+            plan=writer.call('prepare_import',options)['plan']
             started=time.perf_counter()
             while plan['state']=='planning':plan=writer.call('scan_import',{'plan_id':plan['id'],'expected_revision':plan['revision']})['plan']
             scan_ms=(time.perf_counter()-started)*1000
@@ -89,7 +95,12 @@ def main():
             assert outcome['plan']['state']=='applied' and outcome['plan']['imported']==args.files,outcome
             assert all(sha(path)==original for path in destination.iterdir())
             assert not list(destination.glob('*.part'))
-            ordered=sorted(samples);total=args.files*fixture.stat().st_size
+            if args.second_copy:
+                backup_files=[p for p in backup.rglob('*') if p.is_file()]
+                assert len(backup_files)==args.files and all(sha(path)==original for path in backup_files)
+                assert outcome['plan']['copy']['backup']['copied']==args.files
+                assert not list(backup.rglob('*.part'))
+            ordered=sorted(samples);total=args.files*fixture.stat().st_size*(2 if args.second_copy else 1)
             results.append({'round':index+1,'scan_ms':round(scan_ms,3),'apply_ms':round(elapsed*1000,3),
                 'throughput_mib_s':round(total/1024**2/elapsed,2),'broker_peak_mib':round(peak[0],2),
                 'control_samples':len(samples),'control_median_ms':round(ordered[len(ordered)//2],3),
@@ -99,7 +110,7 @@ def main():
             stop.set();writer.close();control.close()
     assert sha(fixture)==original
     report={'platform':platform.platform(),'memory_gib':round(psutil.virtual_memory().total/1024**3,1),
-        'engine_sha256':sha(engine),'fixture_sha256':original,'dimensions':dimensions,'files':args.files,
+        'engine_sha256':sha(engine),'fixture_sha256':original,'dimensions':dimensions,'files':args.files,'second_copy':args.second_copy,
         'backend':'filesystem streaming and SHA-256; no image workers or GPU',
         'cache':'Fresh catalog/destination each round; sources and OS caches warm; no app previews',
         'scope':'Copy application includes IPC, preflight, fsync, checksum verification and atomic catalog application; excludes source generation and desktop rendering',

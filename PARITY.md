@@ -16,6 +16,7 @@ Official references checked September 2026:
 - [Hard-drive Add/Copy/Move import, Grid/Loupe and checked selection](https://helpx.adobe.com/lightroom-classic/desktop/import-photos/import-photos-video-catalog.html)
 - [Duplicate criteria, preview choices and import-time options](https://helpx.adobe.com/lightroom-classic/desktop/import-photos/photo-video-import-options.html)
 - [Filename templates and token editor](https://helpx.adobe.com/lightroom-classic/desktop/import-photos/filename-template-editor-text-template.html) (rechecked October 2026)
+- [Original-state second copies, Adobe's Julieanne Kost](https://jkost.com/blog/2024/07/tips-for-importing-files-into-lightroom-classic.html) (rechecked October 2026)
 - [Previous Import source](https://helpx.adobe.com/lightroom-classic/desktop/viewing-photos/view-photos.html) and [automatic source selection preference](https://helpx.adobe.com/uk/lightroom-classic/desktop/import-photos/file-import-formats-settings.html)
 - [Camera/card import workflow](https://helpx.adobe.com/lightroom-classic/desktop/import-photos/importing-photos-lightroom-basic-workflow.html)
 - [Workspace and module responsibilities](https://helpx.adobe.com/nz/lightroom-classic/help/workspace-basics.html)
@@ -57,7 +58,7 @@ gaps. Nothing below is full Lightroom parity merely because historical tests pas
 
 | Area | Current implementation | Remaining acceptance / work |
 | --- | --- | --- |
-| Import and catalogs | Partial: durable Add/Copy review with checked selection, Grid/Loupe source previews, suspected duplicates, bounded sorting/filtering, captured import-time presets and keywords, Copy destination/subfolder and flat/source/date organization, filename token editor and catalog-local templates with checked-sequence previews, byte-verified original/XMP transfers, explicit crash recovery and retained-copy cancellation, Previous Import navigation and catalog backup/restore | Move/Copy as DNG, destination-tree grouping and more date formats, catalog-wide Import/Image numbering and wider EXIF/shared templates, second-copy backup, saved import configurations, preview policies, cards/tethering, progressive Current Import, catalog switching/merge and desktop/reference acceptance |
+| Import and catalogs | Partial: durable Add/Copy review with checked selection, Grid/Loupe source previews, suspected duplicates, bounded sorting/filtering, captured import-time presets and keywords, Copy destination/subfolder and flat/source/date organization, filename token editor and catalog-local templates with checked-sequence previews, byte-verified original/XMP transfers, optional original-state second copies, explicit crash recovery and retained-copy cancellation, Previous Import navigation and catalog backup/restore | Move/Copy as DNG, destination-tree grouping and more date formats, catalog-wide Import/Image numbering and wider EXIF/shared templates, saved import configurations, preview policies, cards/tethering, progressive Current Import, catalog switching/merge and desktop/reference acceptance |
 | Library navigation | Partial: bounded grid/filmstrip, folder tree/search/favorites/labels, durable missing-folder relocation and folder synchronization, direct/recursive sources, filters/sorting including live snapshot status, regular/smart/Quick collections and nested sets | Multi-source selection, complete sync Import Dialog/duplicate policy, folder move/rename, relocation overlap/collision handling, collection drag/drop/color labels, full smart criteria/import-export, source-selection memory, desktop acceptance |
 | Organization | Partial: duplicate/missing detection, hierarchical keywords/synonyms/export flags/Will Export preview, text/CSV vocabulary exchange and manual person tags, custom nine-slot keyword sets/recent entries/shared or catalog storage, multi-keyword shortcuts and keyword/rating/flag/label/target-collection/rotation/Develop-preset/metadata-preset Painter strokes, independent catalog rotation/flips, title/caption/copyright plus thirty IPTC fields, selective metadata presets, labels, batch metadata, virtual copies, manual/split/capture-time scoped stacks | Keyword policy/file and preset reference acceptance, built-in sets/suggestions/undo, Painter desktop acceptance, IPTC Extension and complete metadata parity, stack interaction acceptance, rename and sidecars |
 | Culling | Partial: Loupe/Compare/Survey, linked detail, anchored page selection, Develop Reference/Active pairs with independent Fit/1:1 viewports, session lock and RGB/LAB readouts | Desktop and numerical reference acceptance, HDR readouts, scrubby/box zoom, cross-page selection, auto advance, persistent workspace state |
@@ -3540,3 +3541,94 @@ every Adobe edge case. Move/DNG, backup copies, saved import configurations and
 the complete inventory remain open. Actual desktop input/VoiceOver, macOS 14,
 removable/network filesystems and Lightroom-rendered reference acceptance remain
 unverified; denied desktop automation was not retried.
+
+### Original-state second copies during reviewed import
+
+Engine generation 40 / schema 28 adds Make a Second Copy To before scanning and
+on ready Copy reviews. The engine captures an existing, separate destination,
+its filesystem identity and an `Imported on YYYY-MM-DD` subfolder. Backup files
+retain original names, bytes, modification time and recognized XMP independently
+of primary renaming, destination organization and import presets. They never
+become catalog photos, folder counts or Previous Import members.
+
+Both roles use the existing bounded, no-follow, exclusive publication journal.
+All collisions and both destinations are preflighted before writes, and both
+copies must verify before main photos are cataloged. Interrupted work retains
+destinations/ownership for explicit resume; it cannot silently disable or redirect
+a required backup. Cancellation keeps published files in both locations. Missing
+or replaced roots, stale choices and unowned files fail visibly. Restored catalogs
+cannot resume or clean the original operation. Main and backup counters/receipts
+are distinct, and shared RAW/JPEG XMP is deduplicated per destination.
+
+Native controls support explicit enable/choose/change/disable before application,
+checked-row destination previews, same-filesystem information and per-role transfer
+details. Grid cards now prioritize actual output filenames with full-path help,
+and align thumbnails at the top despite unchecked rows having fewer details.
+These changes make original backup names visibly distinct from renamed main files.
+
+The complete Python suite passed **864 tests in 94.22 s**, including required
+Metal and the real Nikon NEF fixture, with no skips. New regressions exercise:
+
+- Original filenames/bytes/XMP/mtime with simultaneous main renaming and metadata
+  presets, checked scope, role counters and main-only catalog membership.
+- Separate source/catalog/destination boundaries, existing primary/backup/XMP
+  targets, normalized duplicate names and all-target no-write preflight.
+- Writing/sealed/linked/published crash points in both roles, immutable restart
+  destinations, absent/replaced/symlink roots, SQL rollback/retry and shared XMP.
+- Cancellation while service reads remain available, retained published files,
+  restored-catalog ownership and stale changes during filesystem inspection.
+- Atomic migration of a genuine schema-27 catalog/journal; old transfers remain
+  primary and backup stays disabled without changing existing photo state.
+
+The final package passed **101 native assertions**: Second Copy 26, Naming 30,
+Add/Copy 29 and Responsiveness 16. Final options/ready/interrupted offscreen
+1060 × 800-point renders were inspected. Named outputs remain readable, primary
+progress excludes backup transfers, and a backup collision preserves the existing
+file and leaves the primary destination untouched. These probes do not establish
+actual desktop input, native file-panel behavior or VoiceOver acceptance.
+
+A real-RAW throughput probe used the Apple M3 Max / 128 GiB / macOS 26.6.2 host
+and a Nikon D3S NEF (4284 × 2844, 10,656,312 bytes; SHA-256
+`5922721d13f11795557d97fdeb0a60b900086c402bc82a848ff280d15b99ffd4`). Each round
+copied 24 source clones into a fresh catalog/destination; dual rounds added a
+second folder on the same local filesystem. Source/OS caches were warm, with no
+app previews, image workers or GPU work. Timing includes packaged IPC, preflight,
+streaming, hashing/readback, fsync and catalog application, excluding fixture
+generation and desktop rendering. No tests/builds ran concurrently.
+
+| Mode / round | Written bytes | Apply | Output throughput | Control median / p95 / max | Sampled broker peak |
+| --- | --- | --- | --- | --- | --- |
+| Main only / 1 | 255,751,488 | 637.495 ms | 382.60 MiB/s | 2.066 / 3.736 / 4.309 ms (44 calls) | 58.28 MiB |
+| Main only / 2 | 255,751,488 | 642.737 ms | 379.48 MiB/s | 1.981 / 2.652 / 4.162 ms (46 calls) | 58.05 MiB |
+| Main only / 3 | 255,751,488 | 593.722 ms | 410.80 MiB/s | 1.815 / 3.150 / 7.388 ms (42 calls) | 52.14 MiB |
+| Main + second / 1 | 511,502,976 | 1197.083 ms | 407.50 MiB/s | 1.855 / 3.267 / 6.001 ms (84 calls) | 54.50 MiB |
+| Main + second / 2 | 511,502,976 | 1156.143 ms | 421.93 MiB/s | 1.776 / 2.683 / 9.203 ms (81 calls) | 56.31 MiB |
+| Main + second / 3 | 511,502,976 | 1161.860 ms | 419.85 MiB/s | 1.806 / 3.048 / 11.228 ms (82 calls) | 52.30 MiB |
+
+Dual throughput counts both outputs, not twice as many original photographs.
+All 216 output files match the fixture bytes, the original is unchanged and no
+scratch files remain. Peak broker RSS was sampled every 5 ms; worker peak is zero
+because no image processing occurs. The earlier Copy module's different wall times
+are not an optimization baseline for this change. Local warm-cache filesystem
+results do not establish card-reader, cold-disk, separate-drive or UI frame latency.
+
+The Mac 14 deployment-target app builds, with deep/strict local ad-hoc signature
+verification. All **130 full MCP schemas**, initialization and the bundled guide
+match source through packaged stdio. The optional official Python MCP SDK is not
+installed; no new SDK-client run is claimed. The known optional PyInstaller
+`scipy.special._cdflib` warning remains. Build identities:
+
+- Source digest: `f78c73111f2b10e5ab4e5aa00db1b3a621a9770b984cc8a9cf7604b4e1e4f861`
+- Engine SHA-256: `ad3e219461bc26045d756a412f3151cf71da4bf20c2d55553fa199f392b2670c`
+- Native SHA-256: `bfb8924d4f17235e3f9eef6827a45497f681a2145bf6fd14dc4bdf40eb7f7ed2`
+
+This is one-time original-state backup, not ongoing photo/catalog backup or proof
+of independent physical storage. The ISO dated flat folder, nonoverlapping roots,
+refusal of colliding original names and atomic catalog policy are explicit
+LumaRAW contracts; exact Adobe edge-case/reference acceptance remains open.
+Hard-link publication support is still required; Finder tags, resource forks,
+ACLs and other extended attributes are not preserved. Removable/network volumes,
+power-loss hardware tests, desktop input/VoiceOver and macOS 14 runtime remain
+unverified. Desktop automation was not retried. Move/DNG, import configurations,
+preview policies, catalog-wide numbering and the complete non-AI inventory remain
+the active goal.

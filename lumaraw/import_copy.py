@@ -3,6 +3,7 @@
 Inputs: captured destination/source roots, bounded selected rows and I/O receipts.
 Outputs: deterministic target paths, collision checks and resumable ownership state.
 Captured naming affects destination basenames and associated XMP stems only.
+Second-copy transfers retain original names/bytes and never become catalog photos.
 This domain owns SQL only; import_copy_io owns filesystem writes. Originals and
 existing targets are never overwritten. Cancelled copies retain published files.
 Restored catalogs cannot resume another catalog's filesystem operation.
@@ -83,12 +84,16 @@ class ImportCopy:
         self.db.execute('INSERT INTO import_copy_plans(plan_id,destination,destination_identity,organization,subfolder,roots,owner) '
                         'VALUES(?,?,?,?,?,?,?)', (plan_id, value['destination'], json.dumps(value['destination_identity']),
                         value['organization'], value['subfolder'], json.dumps(value['roots']), str(self.catalog.root)))
+        if value.get('backup'):
+            self.db.execute('UPDATE import_copy_plans SET backup=? WHERE plan_id=?',(json.dumps(value['backup']),plan_id))
 
     def page(self, plan_id, after=0):
         return [dict(row) for row in self.db.execute('SELECT * FROM import_transfers WHERE plan_id=? AND id>? '
                                                     'ORDER BY id LIMIT 60', (plan_id, after))]
 
     def stage(self, plan_id, rows, value):
+        from . import import_backup
+        backup = import_backup.settings(value)
         total = self.db.execute('SELECT selected_count FROM import_plans WHERE id=?',(plan_id,)).fetchone()[0]
         with self.db:
             for row in rows:
@@ -102,18 +107,26 @@ class ImportCopy:
                     if fingerprint is None or tuple(fingerprint[:2]) in seen:
                         continue
                     seen.add(tuple(fingerprint[:2]))
+                    if backup:
+                        self.stage_transfer(plan_id,source,import_backup.target(backup,source),fingerprint,'second')
                     output = destination if source == row['path'] else str(Path(destination).with_suffix(Path(source).suffix))
-                    key = folded(output)
-                    previous = self.db.execute('SELECT source,source_identity FROM import_transfers '
-                                               'WHERE plan_id=? AND target_key=?', (plan_id, key)).fetchone()
-                    if previous:
-                        if previous['source'] != source or json.loads(previous['source_identity']) != fingerprint:
-                            raise ValueError('Selected files would share a destination: '+output)
-                        continue  # One shared RAW/JPEG XMP is copied exactly once.
-                    self.db.execute('INSERT INTO import_transfers(plan_id,source,target,target_key,source_identity,temporary) '
-                                    'VALUES(?,?,?,?,?,?)', (plan_id, source, output, key, json.dumps(fingerprint),
-                                    '.lumaraw-copy-'+uuid.uuid4().hex+'.part'))
-                    self.db.execute('UPDATE import_copy_plans SET transfer_count=transfer_count+1 WHERE plan_id=?', (plan_id,))
+                    self.stage_transfer(plan_id,source,output,fingerprint,'primary')
+
+    def stage_transfer(self,plan_id,source,output,fingerprint,role):
+        catalog_key=folded(str(self.catalog.root)).rstrip('/')
+        if folded(output)==catalog_key or folded(output).startswith(catalog_key+'/'):
+            raise ValueError('Copy destinations cannot be inside the active catalog')
+        key = folded(output)
+        previous = self.db.execute('SELECT source,source_identity,role FROM import_transfers '
+                                   'WHERE plan_id=? AND target_key=?', (plan_id,key)).fetchone()
+        if previous:
+            if previous['source'] != source or previous['role'] != role or json.loads(previous['source_identity']) != fingerprint:
+                raise ValueError('Selected files would share a destination: '+output)
+            return  # One shared RAW/JPEG XMP is copied exactly once per target.
+        self.db.execute('INSERT INTO import_transfers(plan_id,source,target,target_key,source_identity,temporary,role) '
+                        'VALUES(?,?,?,?,?,?,?)',(plan_id,source,output,key,json.dumps(fingerprint),'.lumaraw-copy-'+uuid.uuid4().hex+'.part',role))
+        self.db.execute('UPDATE import_copy_plans SET transfer_count=transfer_count+1,backup_transfer_count=backup_transfer_count+? '
+                        'WHERE plan_id=?',(int(role=='second'),plan_id))
 
     def save(self, row, **patch):
         if not set(patch) <= {'state', 'ownership', 'fingerprint', 'sha256'}:
@@ -128,12 +141,15 @@ class ImportCopy:
             if patch.get('state') == 'published' and old['state'] != 'published':
                 self.db.execute('UPDATE import_copy_plans SET copied=copied+1,copied_bytes=copied_bytes+? WHERE plan_id=?',
                                 (json.loads(row['source_identity'])[2], row['plan_id']))
+                if row.get('role') == 'second':
+                    self.db.execute('UPDATE import_copy_plans SET backup_copied=backup_copied+1,backup_bytes=backup_bytes+? WHERE plan_id=?',
+                                    (json.loads(row['source_identity'])[2],row['plan_id']))
         row.update(patch)
 
     def receipt(self, plan_id, offset=0):
         value = settings(self.db, plan_id)
         if value is None:
             raise ValueError('This is not a Copy import')
-        rows = self.db.execute('SELECT source,target,state FROM import_transfers WHERE plan_id=? '
+        rows = self.db.execute('SELECT source,target,state,role FROM import_transfers WHERE plan_id=? '
                                'ORDER BY id LIMIT 60 OFFSET ?', (plan_id, offset))
         return {'items':[dict(row) for row in rows], 'total':value['transfer_count'], 'offset':offset, 'page_size':60}

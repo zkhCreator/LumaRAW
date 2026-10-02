@@ -47,6 +47,39 @@ RSS, concurrent control median/p95/max and byte checks. OS source caches are war
 there is no pixel/GPU work. This does not establish SSD-independent throughput,
 desktop frame rate, removable-media behavior or untested filesystem support.
 
+## Original-state second copies
+
+`test_import_backup.py` uses disposable photos and XMP to verify original names,
+bytes and mtime despite primary naming/presets, checked scope, distinct progress,
+main-only catalog/Previous Import membership, destination boundaries, all-target
+collision preflight, absent/replaced roots and shared sidecars. Fault injection
+covers writing/sealed/linked/published interruptions for each role, cancellation
+with live control reads, catalog rollback/retry and restored-catalog ownership.
+Migration uses a genuine schema-27 journal, checks atomic rollback and preserves
+old transfers as primary with no backup enabled.
+
+`NativeImportBackupRegression` covers choosing before scan and after review,
+clearing, stale changes, checked-row previews, primary renaming with original-name
+backups, collision preservation, explicit resume, per-role receipts and final bytes.
+Its options/ready/interrupted renders are offscreen layout evidence only.
+
+```sh
+.venv/bin/python -m pytest -q tests/test_import_backup.py tests/test_import_copy.py
+.venv/bin/python tests/run_native.py --work work/new-backup-native \
+  --engine /absolute/LumaRAW.app/Contents/Resources/Engine/LumaRAWEngine \
+  --suite NativeImportBackupRegression --suite NativeImportNamingRegression
+.venv/bin/python tests/import_copy_probe.py --work work/new-backup-throughput \
+  --engine /absolute/LumaRAW.app/Contents/Resources/Engine/LumaRAWEngine \
+  --fixture /absolute/nikon.NEF --files 24 --second-copy
+```
+
+Run throughput probes after tests/builds stop. With `--second-copy`, output bytes
+and throughput count both complete copies; original count still denotes selected
+sources. Both destinations are byte-checked, with independent catalog runs and
+sampled broker RSS/concurrent control latency. Local generated folders on one
+filesystem do not validate multiple physical drives, external-volume disconnects,
+power loss, desktop input or cold disk performance.
+
 ## Copy filename templates
 
 `test_import_naming.py` checks captured templates, Unicode, local EXIF clock tokens,
