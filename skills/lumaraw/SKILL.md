@@ -21,6 +21,33 @@ Reuse includes requested Before, geometry, histogram and targeting/readout maps;
 missing, changed or damaged cache data causes normal rendering. This is a local
 processing optimization, not evidence of Adobe pixel parity or UI frame rate.
 
+## White Balance Selector
+
+`preview_photo` returns `source_fingerprint`, a 24-character token derived from
+the resolved path, file size, nanosecond mtime and pipeline version. It is a stat
+identity, not a content hash. Capture it together with the displayed photo's
+revision. A changed source fails before returning the frame, including cache hits.
+
+For an explicit neutral-point choice, call `sample_white_balance` with `photo_id`,
+`expected_revision`, `expected_source_fingerprint`, a dedicated `client_id` and
+`generation`, and `point: {x,y}` in normalized full After-image coordinates after
+recipe geometry and catalog orientation. Expand a detail ROI into full-output
+coordinates first. The command reads source-linear pixels in a worker, returns
+relative `temperature` and `tint`, and never saves a recipe or history step.
+This implementation supports the existing rendered raster inputs; RAW sampling
+currently fails explicitly. Values are relative recipe axes, not Kelvin.
+
+Apply a valid candidate with one `edit_photo` patch containing both fields and
+the same captured revision and `expected_source_fingerprint`. Discard results
+after navigation or source/revision changes. Do not rebase or retry a stale or
+uncertain edit. An unchanged recipe is a successful no-op and retains its revision
+and history. `cancel_preview` with a newer generation stops an older sample
+for that client without cancelling exports or another client. The Mac selector
+is one-shot and accepts active After pixels only, with W to enter and Escape to
+cancel on a focused Develop surface. It does not sample the screen or on hover.
+If a native save fails while newer slider values are pending, those drafts remain
+visible until an explicit discard/reload decision; no automatic retry occurs.
+
 ## Reviewed folder synchronization
 
 `prepare_folder_sync` captures a folder revision and metadata-scan choice.

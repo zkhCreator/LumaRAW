@@ -108,6 +108,7 @@ extension Store {
         mixerTargetFrame != nil && mixerTargetFrame?.context == curveTargetContext && mixerTargetFrame?.map.mode == mixerTargetMode
     }
     func setMixerTargeting(_ component:String?) {
+        if whiteBalanceTargetActive || whiteBalanceSampling || whiteBalanceArming {cancelWhiteBalanceSelector()}
         guard component == nil || MixerFields.components.contains(component!) || component == "bw" else {return}
         guard component == nil || canEditPointCurves && !hasPendingEdits else {return}
         cancelMixerTarget(restore:false);mixerTargetFrame=nil

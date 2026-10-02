@@ -63,7 +63,7 @@ gaps. Nothing below is full Lightroom parity merely because historical tests pas
 | Library navigation | Partial: bounded grid/filmstrip, folder tree/search/favorites/labels, durable missing-folder relocation and folder synchronization with reviewed suspected-duplicate inclusion, direct/recursive sources, filters/sorting including live snapshot status, regular/smart/Quick collections and nested sets, photo drops into regular and Quick collections, collection-node moves into sets, single/batch collection color labels and global color filtering | Multi-source selection, complete sync Import Dialog, folder move/rename, relocation overlap/collision handling, collection-node drag/drop desktop/reference acceptance, custom label names/sets and sidebar multi-selection interaction, full smart criteria/import-export, source-selection memory, desktop/reference acceptance |
 | Organization | Partial: duplicate/missing detection, hierarchical keywords/synonyms/export flags/Will Export preview, text/CSV vocabulary exchange and manual person tags, custom nine-slot keyword sets/recent entries/shared or catalog storage, multi-keyword shortcuts and keyword/rating/flag/label/target-collection/rotation/Develop-preset/metadata-preset Painter strokes, independent catalog rotation/flips, title/caption/copyright plus thirty IPTC fields, selective metadata presets, labels, batch metadata, virtual copies, manual/split/capture-time scoped stacks | Keyword policy/file and preset reference acceptance, built-in sets/suggestions/undo, Painter desktop acceptance, IPTC Extension and complete metadata parity, stack interaction acceptance, rename and sidecars |
 | Culling | Partial: Loupe/Compare/Survey, linked detail, anchored page selection, rating/flag/color keys with guarded Shift advance in single-target Grid/Loupe, Develop Reference/Active pairs with independent Fit/1:1 viewports, session lock and RGB/LAB readouts | Desktop and numerical reference acceptance, exact sorted/filter-removal behavior, HDR readouts, scrubby/box zoom, cross-page selection, Auto Advance preference/Caps Lock, persistent workspace state |
-| Basic development | Partial: light/WB/color, eight-band HSL and B&W Mix with photo-targeted adjustment and selective resets/sync | Calibrated absolute WB, eyedropper, texture/clarity/dehaze, Point Color, Auto B&W mix, color grading and Adobe processing/reference acceptance |
+| Basic development | Partial: light/WB/color, source-bound one-shot raster neutral-point selection, eight-band HSL and B&W Mix with photo-targeted adjustment and selective resets/sync | RAW selector, calibrated absolute WB, selector loupe/scale/hover/Auto Dismiss options, texture/clarity/dehaze, Point Color, Auto B&W mix, color grading and Adobe processing/reference acceptance |
 | Curves and profiles | Partial: four-region parametric curves with movable splits and photo-targeted adjustment, interactive RGB/channel point curves, shared temporary previews, legacy luminance curve, LUT/ICC | Point/channel targeting, curve exchange, camera/profile browser, Adobe processing and rendered/reference acceptance |
 | Detail and optics | Partial: noise/sharpen, manual lens | Complete manual detail controls, automatic lens profiles, bounded full-resolution acceptance |
 | Geometry | Partial: crop/straighten/perspective, independent rotation/flips with attached masks and displayed crop ratios | Interactive retained handles, guided transforms, full crop state and rendered/reference parity |
@@ -5118,3 +5118,65 @@ The final packaged engine passes **89 native state/IPC assertions**: Folder Sync
 41, Library 13, Previous Import 19 and responsiveness 16. These generated-fixture
 checks are not desktop-input or Lightroom acceptance; macOS 14 runtime remains
 unavailable. A fresh fetch finds no unmerged local or remote branches.
+
+## Source-bound raster White Balance Selector (October 2, 2026)
+
+Adobe's [tone and color reference](https://helpx.adobe.com/lightroom-classic/desktop/process-and-develop-photos/image-tone-color.html)
+describes selecting a neutral area with W, paired Temp/Tint adjustment, a loupe
+and optional automatic dismissal. LumaRAW's increment is a one-shot raster
+selector in the active After image, available from the Color inspector or W.
+Fit and full-resolution detail expand the click into normalized full-output
+coordinates; Reference/Before pixels and margins cannot submit a sample.
+
+The shared read-only `sample_white_balance` command binds the displayed source's
+24-hex stat fingerprint and photo revision to a dedicated cancellation generation.
+The worker samples at most 25 full-resolution source-linear pixels through the
+existing geometry, excluding grading and display effects. It reverses current
+relative gains, rejects predominantly invalid/dark/clipped or out-of-range points,
+and returns a candidate. One guarded `edit_photo` stores both fields in one
+history step when values change; unchanged values retain revision and history.
+Originals are read-only; no hover request or screen sampling occurs.
+
+The Python selector, service, reference-preview and completed-cache tests pass
+**84 tests in 32.99 s**. They cover all eight catalog orientations, rotation,
+crop/perspective/lens transforms, one-pixel output, actual source-worker delivery,
+source/revision races, actual child cancellation, NaN input non-interference and
+stale proxy-cache dimensions. Generated rasters establish this relative model's
+math and data flow; they do not establish Adobe processing equivalence.
+
+The complete Python suite passes **1,086 tests in 194.44 s**, with actual Metal
+required and the read-only public Nikon D3S NEF fixture; no tests are skipped.
+Native review also exposed and corrected no-op reply handling, cancelled edit
+waits and stale sample failures clearing a newer edit's busy state. An uncertain
+save now retains concurrent slider drafts behind an explicit captured recovery
+decision instead of leaving an unexplained navigation block or retrying the write.
+
+This adapter explicitly rejects RAW before decoding. RAW camera-gain selection,
+absolute Kelvin calibration, sample loupe/scale, hover Navigator preview and
+Auto Dismiss preference remain open. Source identity uses file stat information,
+not a content hash or filesystem lock. Engine generation **57** raises the command
+inventory to **150**; catalog schema **37** is unchanged. The final Mac package
+builds for a macOS 14 deployment target, passes deep strict ad-hoc signature
+verification, and matches source/client/broker identity, all command schemas and
+bundled guide bytes on macOS 26.6.2.
+
+The reproducible packaged-relay probe uses a generated **4,000 × 3,000 RGB PNG**,
+CPU processing, a fresh catalog and five identical read-only center samples. Fit
+preview setup is separately **949.710 ms**. The first full-source sample takes
+**1,512.855 ms**, including decoding and linear-cache publication, with sampled
+worker peak **970.8 MiB**. Four warm linear-cache samples take **300.198–310.775
+ms**, median **306.902 ms**, with peak **65.9 MiB** and no source decode. Candidate
+values repeat and the catalog/original bytes remain unchanged. OS caches were
+not flushed; these are command/worker measurements, not camera accuracy,
+desktop latency or Lightroom performance equivalence.
+
+The packaged white-balance suite passes **39 state/IPC assertions**. Its original
+ImageRenderer inspector capture was blank; the replacement NSHostingView capture
+is checked for nonuniform pixels and manually inspected. Temperature, Tint and
+Cancel Point Selection are readable in the 390 × 1,700-point inspector. The other
+capture contains the selector instruction overlay only, not a displayed photo.
+Both remain offscreen layout evidence; desktop input, VoiceOver and macOS 14
+runtime are unavailable. The complete packaged native run passes **245
+state/IPC assertions**: white balance 39, Before/After 19, Reference 52, curve
+targeting 33, mixer targeting 48, responsiveness 16, general state 15 and history
+23. A fresh fetch finds no unmerged local or remote branches.

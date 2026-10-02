@@ -9,6 +9,9 @@ struct PhotoKeyboardShortcuts: ViewModifier {
 
     func body(content: Content) -> some View {
         content.onKeyPress(.escape) {
+            if s.whiteBalanceTargetActive || s.whiteBalanceSampling || s.whiteBalanceArming {
+                s.cancelWhiteBalanceSelector();return .handled
+            }
             guard s.painterEnabled else { return .ignored }
             s.setPainting(false);return .handled
         }.onKeyPress(characters:CharacterSet(charactersIn:"kK")) { press in
@@ -43,6 +46,12 @@ struct PhotoKeyboardShortcuts: ViewModifier {
         }.onKeyPress(characters:CharacterSet(charactersIn:"rR")) { press in
             guard press.modifiers == .shift,s.selected != nil else {return .ignored}
             Task {await s.startReferenceView()};return .handled
+        }.onKeyPress(characters:CharacterSet(charactersIn:"wW")) { press in
+            guard press.modifiers.isEmpty,s.workspace=="library",s.develop,s.selected != nil else {return .ignored}
+            if s.whiteBalanceTargetActive || s.whiteBalanceSampling || s.whiteBalanceArming {
+                s.cancelWhiteBalanceSelector();return .handled
+            }
+            Task {await s.armWhiteBalanceSelector()};return .handled
         }.onKeyPress(characters:CharacterSet(charactersIn:"yY¥")) { press in
             s.comparisonShortcut(press.modifiers) ? .handled:.ignored
         }.onKeyPress(characters:CharacterSet(charactersIn:"0123456789pPxXuU\\gecnd/b")) { press in

@@ -6,6 +6,8 @@ LibRaw/NumPy native allocations even after failure. Original files are read-only
 The engine identity must match its broker before any pixels or outputs are opened.
 Batch export requests may carry a captured collision suffix for safe output naming.
 Successful previews publish bounded completed receipts for later broker reuse.
+White-balance samples decode one captured raster and return only relative values;
+they do not publish previews or change catalog state.
 """
 import json
 import sys
@@ -50,6 +52,11 @@ def main():
                 receipt=preview_cache.save(request['cache'],preview_key,request,result)
             if receipt:result.setdefault('cache_keep',[]).append(receipt)
             result.update(preview_cache_hit=False,worker_spawned=True)
+        elif operation == 'white_balance_sample':
+            from .white_balance_worker import sample
+            with performance.stage('white_balance_sample'):
+                result = sample(request['path'], recipe, request['orientation'], request['point'],
+                                request['cache'], request['budget_mb'], request['expected_source_fingerprint'])
         elif operation == 'calibrate':
             from .calibration import calibrate
             result = calibrate(request['path'],request['reference'],request['source_rect'],request['reference_rect'],request['cache'],request['budget_mb'],request['name'],request['lighting'])

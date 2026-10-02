@@ -1,8 +1,8 @@
 // Purpose: main-thread presentation state and user workflows for the native shell.
 // Inputs: native controls and service replies. Outputs: reversible recipe edits,
-// preview paths and queue state, including revision-bound exports and captured
-// collection-node and culling workflows with generation-safe page refreshes and
-// per-field rating/flag reply reconciliation.
+// preview paths and queue state, including revision-bound exports, captured
+// collection-node/culling workflows, and one-shot white-balance sampling.
+// Collection refreshes and rating/flag replies remain generation-safe.
 // Revisions belong to the service; stale edits are rejected, never silently retried.
 // Photo results and collection browsers use bounded pages.
 import SwiftUI
@@ -27,6 +27,7 @@ import UniformTypeIdentifiers
         self?.thumbnails=images;self?.thumbnailErrors=errors
     })
     @Published var preview: NSImage?
+    @Published var previewSourceFingerprint:String?
     let colorReadouts=ColorReadoutState()
     var colorReadoutFrame:ColorReadoutFrame?
     var colorReadoutTask:Task<Void,Never>?
@@ -44,6 +45,15 @@ import UniformTypeIdentifiers
     @Published var mixerTargetSample:MixerTargetSample?
     @Published var mixerTargetGesture:MixerTargetGesture?
     let mixerTargetPreviews=CurvePreviewScheduler()
+    @Published var whiteBalanceSampling=false
+    @Published var whiteBalanceArming=false
+    @Published var whiteBalanceEditRecovery:WhiteBalanceEditRecovery?
+    @Published var whiteBalanceTargetPoint:CGPoint?
+    @Published var whiteBalanceDisplayGeometry:WhiteBalanceDisplayGeometry?
+    var whiteBalanceInteractionGeneration=0
+    let whiteBalanceClient=UUID().uuidString
+    var whiteBalanceArmPreview:WhiteBalancePreviewIdentity?
+    var whiteBalanceDisplayCapture:WhiteBalanceDisplayGeometry?
     @Published var orientationState: PhotoOrientationState?
     @Published var orientationBusy=false
     @Published var developPresetPage: DevelopPresetPage?
@@ -161,10 +171,16 @@ import UniformTypeIdentifiers
     @Published var showMetadataEditor=false
     @Published var metadataTargets: [Photo] = []
     @Published var workspace="library" {
-        didSet {if oldValue=="library" && workspace != "library" {leaveReferenceModule()}}
+        didSet {
+            if oldValue=="library" && workspace != "library" {leaveReferenceModule()}
+            if workspace != "library" {cancelWhiteBalanceSelector()}
+        }
     }
     @Published var develop=false {
-        didSet {if oldValue && !develop {leaveReferenceModule()}}
+        didSet {
+            if oldValue && !develop {leaveReferenceModule()}
+            if !develop {cancelWhiteBalanceSelector()}
+        }
     }
     @Published var referenceEnabled=false
     @Published var referencePhoto:Photo?
@@ -466,6 +482,8 @@ import UniformTypeIdentifiers
         }
     }
     func clearPhoto() {
+        whiteBalanceInteractionGeneration+=1
+        cancelWhiteBalanceSelector()
         clearColorReadout();colorReadoutFrame=nil
         snapshotRequest+=1;snapshotPolling=false;snapshotPage=nil;snapshotAfter=nil;snapshotLoading=false;snapshotError=nil
         beforeLabel="Before";beforePreviewContext=nil;comparisonFrame=nil;activeViewportFrame=nil
@@ -473,7 +491,7 @@ import UniformTypeIdentifiers
         cancelCurveTarget(restore:false);curveTargetFrame=nil
         cancelMixerTarget(restore:false);mixerTargetFrame=nil
         generation += 1;previewTask?.cancel();photo=nil;recipe=[:]
-        preview=nil;previewGeometry=nil;before=nil;metadata=[:];histogram=[];rendering=false;loading=false
+        preview=nil;previewGeometry=nil;previewSourceFingerprint=nil;before=nil;metadata=[:];histogram=[];rendering=false;loading=false
     }
     func clearCullingFocus() {
         selected=nil
@@ -567,6 +585,7 @@ import UniformTypeIdentifiers
     }
     func render(curveDraft:CurvePreviewDraft?=nil,mixerDraft:MixerPreviewDraft?=nil,debounce:Bool=true) {
         guard curveDraft == nil || mixerDraft == nil else {return}
+        if whiteBalanceTargetActive {cancelWhiteBalanceSelector()}
         clearColorReadout();colorReadoutFrame=nil
         let isDraft=curveDraft != nil || mixerDraft != nil
         if !isDraft {
@@ -630,6 +649,7 @@ import UniformTypeIdentifiers
                 histogram=r["histogram"] as? [[Double]] ?? []
                 metadata=r["metadata"] as? [String:Any] ?? [:]
                 previewGeometry=PhotoPreviewGeometry(r)
+                previewSourceFingerprint=r["source_fingerprint"] as? String
                 activeViewportFrame=beforeContext.flatMap {BeforeAfterFrame(r,context:$0)}
                 colorReadoutFrame=nextColors
                 if let toneContext {acceptCurveTones(r,context:toneContext)} else {curveTargetFrame=nil}
@@ -641,6 +661,8 @@ import UniformTypeIdentifiers
     }
     func set(_ key:String,_ value:Any) {
         guard !loading,!browsing,!orientationBusy,!developPresetBusy,!historyBusy,!snapshotBusy,let p=photo,p.id==selected else{return}
+        if let recovery=whiteBalanceEditRecovery {error=recovery.message;return}
+        if whiteBalanceTargetActive || whiteBalanceSampling || whiteBalanceArming {cancelWhiteBalanceSelector()}
         clearColorReadout()
         clearColorReadout()
         saveFailed=false;recipe[key]=value;pendingPatch[key]=value
@@ -652,7 +674,30 @@ import UniformTypeIdentifiers
             guard !Task.isCancelled else{return};await commit()
         }
     }
+    func adoptWhiteBalanceEdit(_ updated:Photo,expectedRevision:Int) async ->Bool {
+        guard selected==updated.id,photo?.id==updated.id,photo?.revision==expectedRevision else {return false}
+        photo=updated;recipe=updated.recipe.merging(pendingPatch){_,new in new}
+        if let index=photos.firstIndex(where:{$0.id==updated.id}) {photos[index]=updated}
+        saveFailed=false;error=nil
+        if pendingPatch.isEmpty {render(debounce:false)}else{await commit()}
+        return true
+    }
+    func recordWhiteBalanceEditFailure(_ failure:Error,photoID:Int) {
+        guard selected==photoID,let current=photo,current.id==photoID else {return}
+        guard !pendingPatch.isEmpty else {error=failure.localizedDescription;return}
+        editTask?.cancel();saveFailed=true
+        let detail="White balance could not be confirmed. Your unsaved slider adjustments are retained. Discard them and reload the catalog photo before continuing. " + failure.localizedDescription
+        whiteBalanceEditRecovery=WhiteBalanceEditRecovery(photoID:photoID,revision:current.revision,message:detail)
+        error=detail
+    }
+    func discardWhiteBalancePendingEdits(_ recovery:WhiteBalanceEditRecovery) async {
+        guard whiteBalanceEditRecovery?.id==recovery.id,selected==recovery.photoID,
+              photo?.id==recovery.photoID,photo?.revision==recovery.revision,!editing else {return}
+        editTask?.cancel();pendingPatch=[:];whiteBalanceEditRecovery=nil;saveFailed=false;error=nil
+        await load(recovery.photoID)
+    }
     func commit() async {
+        if let recovery=whiteBalanceEditRecovery {error=recovery.message;return}
         guard let p=photo,!editing,!pendingPatch.isEmpty else{return}
         let patch=pendingPatch;pendingPatch=[:];editing=true
         do {
@@ -669,11 +714,18 @@ import UniformTypeIdentifiers
         }
     }
     func flushEdits() async -> Bool {
+        if let recovery=whiteBalanceEditRecovery {error=recovery.message;return false}
+        if Task.isCancelled {return false}
         if !editing,pendingPatch.isEmpty{saveFailed=false;return true}
         editTask?.cancel()
-        while editing {try? await Task.sleep(nanoseconds:20_000_000)}
+        while editing {
+            do {try await Task.sleep(nanoseconds:20_000_000)}catch{return false}
+        }
+        if let recovery=whiteBalanceEditRecovery {error=recovery.message;return false}
         if !pendingPatch.isEmpty {await commit()}
-        while editing {try? await Task.sleep(nanoseconds:20_000_000)}
+        while editing {
+            do {try await Task.sleep(nanoseconds:20_000_000)}catch{return false}
+        }
         return !saveFailed && pendingPatch.isEmpty
     }
     func apply(_ patch:[String:Any]) {for(k,v)in patch{set(k,v)}}
@@ -686,6 +738,7 @@ import UniformTypeIdentifiers
         moveDevelopHistory("undo_photo")
     }
     @discardableResult func recipeMutation(_ method:String,_ params:[String:Any],photoID:Int) async ->Bool {
+        if whiteBalanceTargetActive || whiteBalanceSampling || whiteBalanceArming {cancelWhiteBalanceSelector()}
         do {
             let row=try await Backend.call(method,params)
             if let updated=Photo(row),selected==photoID {

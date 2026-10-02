@@ -10,6 +10,8 @@ Batch exports capture selected preset settings, per-preset destinations and boun
 durable job pages under one catalog receipt. Folder synchronization can expose a
 reviewed suspected-duplicate classification and requires an explicit apply option
 to import those files.
+White-balance samples bind a source-stat token and photo revision; they return
+relative recipe candidates without changing the catalog or original.
 IDs refer only to the selected catalog.
 Tool annotations describe effects; they never substitute for user authorization.
 """
@@ -194,7 +196,8 @@ TOOLS['edit_metadata']['inputSchema']['properties']['patch']['properties'].updat
     keyword_ids={'type':'array','items':ID,'maxItems':100,'uniqueItems':True},
     keyword_additions={'type':'array','items':string(4096),'maxItems':100})
 TOOLS['edit_metadata']['description']='Atomically update catalog metadata at captured revisions. Replace keywords with text keywords OR complete keyword_ids plus optional new keyword_additions paths. Never mix both replacement forms. Omitted fields stay unchanged; originals and recipe revisions are preserved.'
-tool('edit_photo','Merge a partial recipe using expected_revision; stale revisions fail without changes.',{'photo_id':ID,'expected_revision':REV,'patch':PATCH},['photo_id','expected_revision','patch'])
+SOURCE_FINGERPRINT={'type':'string','minLength':24,'maxLength':24,'pattern':'^[0-9a-f]{24}$'}
+tool('edit_photo','Merge a partial recipe using expected_revision; stale revisions fail without changes. An optional expected_source_fingerprint binds a sampled source before saving.',{'photo_id':ID,'expected_revision':REV,'patch':PATCH,'expected_source_fingerprint':SOURCE_FINGERPRINT},['photo_id','expected_revision','patch'])
 tool('undo_photo','Undo the last edit only if the revision is current.',{'photo_id':ID,'expected_revision':REV},['photo_id','expected_revision'])
 tool('redo_photo','Move forward one retained Develop history step at the captured photo revision.',{'photo_id':ID,'expected_revision':REV},['photo_id','expected_revision'])
 tool('list_history','Read at most sixty Develop history summaries, newest first, without recipe payloads. Step zero is the initial retained state. before_id pages toward older steps.',{'photo_id':ID,'expected_revision':REV,'before_id':REV},['photo_id','expected_revision'],True)
@@ -213,6 +216,7 @@ CURVE_PATCH['properties']['parametric_splits']={'type':'array','items':{'type':'
 CURVE_PATCH['minProperties']=1
 TOOLS['preview_photo']['inputSchema']['properties'].update(curve_patch=CURVE_PATCH,expected_revision=REV)
 TOOLS['preview_photo']['description']+=' expected_revision also binds ordinary previews before and after processing; a changed photo fails visibly without returning stale pixels.'
+TOOLS['preview_photo']['description']+=' source_fingerprint binds the returned frame to path, size and nanosecond mtime; it is not a content hash.'
 TOOLS['preview_photo']['description']+=' Completed previews may be reused after bounded artifact integrity checks; preview_cache_hit and worker_spawned distinguish reuse from processing.'
 TOOLS['preview_photo']['inputSchema']['properties']['include_curve_tones']=BOOL
 TOOLS['preview_photo']['inputSchema']['properties']['include_color_readouts']=BOOL
@@ -226,7 +230,12 @@ TOOLS['preview_photo']['inputSchema']['properties'].update(mixer_patch=MIXER_PAT
 TOOLS['preview_photo']['inputSchema']['dependentRequired']['mixer_patch']=['expected_revision']
 TOOLS['preview_photo']['inputSchema']['not']={'required':['curve_patch','mixer_patch']}
 TOOLS['preview_photo']['description']+=' mixer_patch previews temporary HSL/B&W values at expected_revision, separately from curve_patch. mixer_target returns aligned sparse band weights before HSL or B&W mixing.'
-tool('cancel_preview','Invalidate older preview generations for one client and stop its older running preview/thumbnail. Never cancels exports or another client.',{'client_id':string(128),'generation':integer()},['client_id','generation'])
+tool('sample_white_balance','Sample one neutral point in the full post-geometry, post-orientation After image. Returns relative Temperature/Tint without saving; supports rendered raster originals. RAW sampling is currently unsupported. Source-stat identity, revision and client generation are required.',{
+    'photo_id':ID,'expected_revision':REV,'expected_source_fingerprint':SOURCE_FINGERPRINT,
+    'client_id':string(128),'generation':REV,
+    'point':obj({'x':{'type':'number','minimum':0,'maximum':1},'y':{'type':'number','minimum':0,'maximum':1}},['x','y'])
+},['photo_id','expected_revision','expected_source_fingerprint','client_id','generation','point'],True)
+tool('cancel_preview','Invalidate older preview generations for one client and stop its older running preview, thumbnail or white-balance sample. Never cancels exports or another client.',{'client_id':string(128),'generation':integer()},['client_id','generation'])
 tool('photo_summaries','Read existing photo summaries for at most 60 IDs without recipe or EXIF payloads.',{'photo_ids':array(ID,60)},['photo_ids'],True)
 tool('thumbnail','Create/read a source thumbnail (default) or a developed recipe-aware 320-pixel thumbnail.',{'photo_id':ID,'kind':{'enum':['source','developed']},'client_id':string(128),'generation':integer()},['photo_id'],True)
 tool('cached_thumbnails','Read completed source (default) or developed thumbnail paths for up to 60 photos without image workers. Developed entries include recipe revisions.',{'photo_ids':array(ID,60),'kind':{'enum':['source','developed']}},['photo_ids'],True)

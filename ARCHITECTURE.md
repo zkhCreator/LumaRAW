@@ -68,6 +68,34 @@ lock, preventing older header-only caches from blessing a damaged body. Valid
 reads never wait for that lock. Concurrent LRU touches are harmless; an atomic
 file replacement is a transient miss and does not trigger destructive repair.
 
+## White-balance point sampling
+
+The selector binds the displayed frame, read-only sample and final edit to a
+24-hex source-stat fingerprint plus the photo revision. Preview replies validate
+the fingerprint around cached or newly processed results, even when the caller
+omits a revision. Sampling requires both guards and its own cancellable client
+generation. Final source/revision checks precede a generation-locked response
+handoff. The optional edit fingerprint is checked under the ordinary mutation
+lock; stat identity cannot atomically lock an external file with a SQLite commit.
+
+`white_balance_worker.py` reuses the full linear source cache and geometry plan.
+`white_balance.py` maps one normalized post-orientation point to at most 5 by 5
+full-resolution source-linear raster pixels. It disables vignette for this
+sample and excludes grading, profiles, LUTs, display proofing and readout maps.
+The solve reverses current relative WB gains, rejects predominantly invalid,
+dark or clipped samples, and solves the two existing relative recipe axes.
+It never silently clamps an out-of-range candidate. RAW is explicitly unsupported
+by this raster adapter; camera-channel WB needs a separately verified backend.
+
+The Mac shell maps Fit/detail coordinates, captures frame and interaction state,
+and submits both values in one ordinary history-producing edit. It does no pixel
+processing and admits no hover work. Reference and Before remain independent.
+If the paired save fails while newer slider values are pending, Store retains
+those drafts and suspends automatic commits. A captured recovery action can
+explicitly discard them and reload only the same photo/revision. The native
+toolbar can reopen that decision after dismissing the error. No uncertain WB
+mutation is replayed, and an obsolete recovery cannot discard a newer draft.
+
 ## Develop color readouts
 
 `preview_photo(include_color_readouts=true)` returns disposable, geometry-aligned

@@ -61,6 +61,17 @@ when a clear function is more maintainable. Avoid unrelated formatting churn.
   follow Before state. Load maps off the main actor and isolate hover publications
   from Store. Local pointer movement must not start workers; an off-viewport
   counterpart may use a debounced, cancellable, revision-bound one-pixel request.
+- White-balance candidates bind the actual displayed source-stat token, recipe
+  revision and interaction generation through preview, sample and one paired edit.
+  Recheck cancellation after final source/catalog validation. Never solve RAW
+  camera gains with rendered RGB equations or infer a camera matrix from a generic
+  metadata field. Keep sampling off the main actor and outside catalog locks;
+  pointer movement must not start workers. Reject invalid/out-of-range candidates
+  visibly instead of clamping, retargeting or retrying an uncertain save.
+  Preserve concurrent slider drafts after an uncertain paired save and expose a
+  captured discard/reload decision. A stale sampler failure must not clear a newer
+  edit's busy state. Cancellation while waiting for edits must exit the wait;
+  swallowing a cancelled sleep can keep the main actor occupied indefinitely.
 - Fuse optional pixel outputs with an existing grading dispatch when their
   equations permit it. Keep CPU reference values, finite SDR clipping and
   proofing boundaries unchanged; document FP32 tolerances and validate real RAW.

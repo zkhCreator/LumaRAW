@@ -37,8 +37,10 @@ struct ReferenceCanvas:View {
             .onKeyPress(.rightArrow) {s.navigateLoupe(1);return .handled}
             .onChange(of:s.referenceRequest) {_,_ in clearDrag()}
             .onChange(of:s.currentBeforeContext) {_,_ in clearDrag()}
+            .onChange(of:s.canvasTool) {_,tool in s.whiteBalanceCanvasToolDidChange(tool)}
+            .onChange(of:s.comparisonMode) {_,mode in s.whiteBalanceComparisonDidChange(mode)}
             .onChange(of:s.referenceVertical) {_,_ in clearDrag()}
-            .onDisappear {clearDrag();s.clearColorReadout()}
+            .onDisappear {clearDrag();s.clearColorReadout();s.cancelWhiteBalanceSelector()}
             .accessibilityElement(children:.contain).accessibilityLabel("Reference and Active photos")
     }
 
@@ -76,13 +78,14 @@ struct ReferenceCanvas:View {
                 else {Text("Drag a photo here, or choose Set as Reference Photo in the filmstrip.").font(.callout).foregroundStyle(.secondary).multilineTextAlignment(.center).padding()}
             }.frame(width:size.width,height:canvasSize(size).height).clipped().contentShape(Rectangle())
                 .onContinuousHover {phase in
-                    if case .active(let location)=phase,referenceDrag == .zero,
+                    if !s.whiteBalanceTargetActive,case .active(let location)=phase,referenceDrag == .zero,
                        let frame=renderer.frame,frame.request==s.referenceRequest {
                         s.hoverColors(point(location,image:frame.image,size:canvasSize(size),detail:s.referenceDetail),role:.reference)
                     } else {s.clearColorReadout()}
                 }
                 .gesture(DragGesture(minimumDistance:3).onChanged {value in
-                    guard s.referenceDetail,!renderer.loading,let frame=renderer.frame,frame.request==s.referenceRequest else {return}
+                    guard !s.whiteBalanceTargetActive,s.referenceDetail,!renderer.loading,
+                          let frame=renderer.frame,frame.request==s.referenceRequest else {return}
                     if capturedReference==nil {capturedReference=frame}
                     s.clearColorReadout()
                     referenceDrag=value.translation
@@ -91,11 +94,13 @@ struct ReferenceCanvas:View {
                     if let frame=capturedReference {s.panReference(value.translation,scale:scale,frame:frame)}
                 })
                 .simultaneousGesture(SpatialTapGesture().onEnded {value in
-                    guard let frame=renderer.frame,frame.request==s.referenceRequest,
+                    guard !s.whiteBalanceTargetActive,let frame=renderer.frame,frame.request==s.referenceRequest,
                           let point=point(value.location,image:frame.image,size:canvasSize(size),detail:s.referenceDetail) else {return}
                     s.toggleReferenceZoom(at:point)
                 })
-                .dropDestination(for:CatalogPhotoDrag.self) {items,_ in s.dropReference(items,active:false)}
+                .dropDestination(for:CatalogPhotoDrag.self) {items,_ in
+                    !s.whiteBalanceTargetActive && s.dropReference(items,active:false)
+                }
         }.frame(width:size.width,height:size.height).accessibilityElement(children:.contain)
             .accessibilityLabel("Reference: \(s.referencePhoto?.displayName ?? "No photo")")
     }
@@ -116,13 +121,21 @@ struct ReferenceCanvas:View {
                             GeometryReader {geometry in
                                 if s.curveTargetActive {CurveTargetOverlay(imageSize:photoImage.size,available:geometry.size,fitted:false)}
                                 if s.mixerTargetActive {MixerTargetOverlay(imageSize:photoImage.size,available:geometry.size,fitted:false)}
+                                if s.whiteBalanceTargetActive && !s.compare {
+                                    WhiteBalanceTargetOverlay(imageSize:photoImage.size,available:geometry.size,
+                                        fitted:false,role:"active",after:true)
+                                }
                             }
                         }
                     }
                     if !s.compare,!s.detail {
                         if s.curveTargetActive {CurveTargetOverlay(imageSize:photoImage.size,available:canvasSize(size))}
                         if s.mixerTargetActive {MixerTargetOverlay(imageSize:photoImage.size,available:canvasSize(size))}
-                        if !["view","curve","mixer"].contains(s.canvasTool) {
+                        if s.whiteBalanceTargetActive && !s.compare {
+                            WhiteBalanceTargetOverlay(imageSize:photoImage.size,available:canvasSize(size),
+                                fitted:true,role:"active",after:true)
+                        }
+                        if !["view","curve","mixer","white-balance"].contains(s.canvasTool) {
                             DrawingOverlay(image:photoImage,available:canvasSize(size))
                         }
                     }
@@ -146,7 +159,7 @@ struct ReferenceCanvas:View {
                     if let frame=capturedActive {s.panReferenceActive(value.translation,scale:scale,frame:frame)}
                 },including:s.canvasTool=="view" ? .all:.subviews)
                 .simultaneousGesture(SpatialTapGesture().onEnded {value in
-                    guard let image=s.compare ? s.before:s.preview,
+                    guard !s.whiteBalanceTargetActive,let image=s.compare ? s.before:s.preview,
                           let point=point(value.location,image:image,size:canvasSize(size),detail:s.detail) else {return}
                     s.toggleReferenceActiveZoom(at:point)
                 })

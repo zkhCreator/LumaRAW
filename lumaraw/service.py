@@ -11,6 +11,8 @@ settings and immutable, pageable multi-preset export batches. Same-policy batch
 jobs reuse only bounded serialized metadata during the batch write transaction.
 Completed preview receipts are checked outside catalog locks without starting an
 image worker; source identity, revisions and cancellation still bind each reply.
+One-click WB samples use the same disposable-worker cancellation boundary and
+bind preview/sample/edit with a source-stat token; the token is not a file lock.
 Other catalog commands retain the serialized write-capable connection path. No
 GUI, HTTP listener, telemetry or original-file writes. Interrupted exports are
 never automatically replayed. Optimistic revisions prevent lost recipe updates.
@@ -18,6 +20,7 @@ never automatically replayed. Optimistic revisions prevent lost recipe updates.
 from contextlib import contextmanager
 import hashlib
 import json
+import math
 import os
 from pathlib import Path
 import subprocess
@@ -317,6 +320,10 @@ class Service:
         self.last_activity=time.monotonic();p={} if p is None else p
         if method not in TOOLS: raise ValueError('Unknown operation: '+method)
         jsonschema.validate(p,TOOLS[method]['inputSchema'])
+        if method=='sample_white_balance' and any(not math.isfinite(p['point'][axis]) for axis in ('x','y')):
+            # JSON Schema comparisons alone do not reject Python float NaN.
+            # Invalid input must not advance a generation or cancel active work.
+            raise ValueError('Choose a finite point inside the photograph')
         if method=='metadata_schema':
             from .iptc import FIELDS, SCHEMA
             return {'iptc_fields':list(FIELDS.values()),'iptc_schema':SCHEMA}
@@ -381,7 +388,7 @@ class Service:
                 cancelled=False
                 if (self.active and self.active.get('client_id')==client
                         and self.active.get('generation',-1)<generation
-                        and self.active.get('operation') in ('preview','detail','thumbnail')):
+                        and self.active.get('operation') in ('preview','detail','thumbnail','white_balance_sample')):
                     self.cancelled=True
                     if self.process.poll() is None:self.process.kill();cancelled=True
                 return {'cancelled':cancelled,'generation':generation}
@@ -397,8 +404,8 @@ class Service:
                     if developed:entry.update(revision=row['revision'],kind='developed',source=row['path'])
                     entries.append(entry)
             return {'thumbnails':entries,'worker_spawned':False}
-        if method in ('preview_photo','thumbnail','calibrate_camera'):
-            if method in ('preview_photo','thumbnail') and p.get('client_id'):
+        if method in ('preview_photo','thumbnail','calibrate_camera','sample_white_balance'):
+            if method in ('preview_photo','thumbnail','sample_white_balance') and p.get('client_id'):
                 if 'generation' not in p:raise ValueError('client_id requires generation')
                 with self.state_lock:
                     client=p['client_id'];generation=p['generation']
@@ -406,7 +413,7 @@ class Service:
                     self.preview_versions[client]=generation
                     if len(self.preview_versions)>128:self.preview_versions.pop(next(iter(self.preview_versions)))
                     if (self.active and self.active.get('client_id')==client and self.active.get('generation',-1)<generation
-                            and self.active.get('operation') in ('preview','detail','thumbnail')):
+                            and self.active.get('operation') in ('preview','detail','thumbnail','white_balance_sample')):
                         self.cancelled=True
                         if self.process.poll() is None:self.process.kill()
             with self.catalog() as c:
@@ -422,12 +429,14 @@ class Service:
                 if path:
                     return {'thumbnail':path,'photo_id':row['id'],'revision':row['revision'],'kind':p.get('kind','source'),'source':row['path'],
                             'cache_hit':True,'worker_spawned':False}
-            request={'operation':{'preview_photo':'preview','thumbnail':'thumbnail','calibrate_camera':'calibrate'}[method],
+            request={'operation':{'preview_photo':'preview','thumbnail':'thumbnail','calibrate_camera':'calibrate','sample_white_balance':'white_balance_sample'}[method],
                      'path':row['path'],'recipe':preview_recipe,'orientation':row['orientation']}
             request.update({k:v for k,v in p.items() if k not in ('photo_id','curve_patch','mixer_patch','expected_revision')})
             if before_state:
                 request['before_recipe']=before_state[0].dict()
-            source_fingerprint=fingerprint(row['path']) if 'expected_revision' in p else None
+            source_fingerprint=fingerprint(row['path']) if method in ('preview_photo','sample_white_balance') or 'expected_revision' in p else None
+            if method=='sample_white_balance' and source_fingerprint!=p['expected_source_fingerprint']:
+                raise ValueError('Source changed before white balance sampling; reload the photograph')
             result=None
             if method=='preview_photo':
                 cache_key=preview_cache.key(request,self.worker_identity,self.compute_backend)
@@ -437,17 +446,26 @@ class Service:
                     raise ValueError('Source or rendering asset changed during preview; reload the photograph')
             if result is None:
                 result=self.run_worker(request)
-            if method=='preview_photo':
+            if method in ('preview_photo','sample_white_balance'):
                 self.check_preview_current(request)
+            if source_fingerprint is not None and fingerprint(row['path']) != source_fingerprint:
+                operation='white balance sampling' if method=='sample_white_balance' else 'preview'
+                raise ValueError(f'Source changed during {operation}; reload the photograph')
             if 'expected_revision' in p:
-                if fingerprint(row['path']) != source_fingerprint:
-                    raise ValueError('Source changed during preview; reload the photograph')
                 with self.catalog() as c:self.check_revision(c,p['photo_id'],p['expected_revision'])
             if 'metadata' in result:
                 with self.catalog() as c:c.update_metadata(row['id'],result['metadata'])
-            return {**result,'photo_id':row['id'],'revision':row['revision'],'source':row['path'],
-                    **({'before_label':before_state[1]} if before_state else {}),
-                    'curve_draft':'curve_patch' in p,'mixer_draft':'mixer_patch' in p}
+            response={**result,'photo_id':row['id'],'revision':row['revision'],'source':row['path'],
+                      **({'source_fingerprint':source_fingerprint} if source_fingerprint is not None else {}),
+                      **({'before_label':before_state[1]} if before_state else {}),
+                      'curve_draft':'curve_patch' in p,'mixer_draft':'mixer_patch' in p}
+            if method in ('preview_photo','sample_white_balance'):
+                # A cancel can arrive while the final revision read waits for a
+                # writer. Serialize the response handoff with that generation.
+                with self.state_lock:
+                    self.check_preview_current(request)
+                    return response
+            return response
         if method=='list_photos':
             mode=p.get('mode','all');search=p.get('search','');offset=p.get('offset',0)
             filters=p.get('filters');collection=p.get('collection_id')
@@ -571,6 +589,9 @@ class Service:
             if method in ('edit_photo','undo_photo','restore_version','load_recipe'):
                 row=self.check_revision(c,p['photo_id'],p['expected_revision'])
                 if method=='edit_photo':
+                    if ('expected_source_fingerprint' in p and
+                            fingerprint(row['path'])!=p['expected_source_fingerprint']):
+                        raise ValueError('Source changed before saving the sampled edit; reload the photograph')
                     values=json.loads(row['recipe']);values.update(p['patch']);c.edit(row['id'],Recipe.parse(values),adjustment_label(p['patch']))
                 elif method=='undo_photo':c.undo(row['id'])
                 elif method=='restore_version':c.restore_version(row['id'],p['version_id'],p.get('expected_version_revision'))

@@ -42,6 +42,11 @@ struct ContentView: View {
                 else {workspace}
             }
             .toolbar {
+                if let recovery=s.whiteBalanceEditRecovery {
+                    ToolbarItem(placement:.primaryAction) {
+                        Button("Resolve Unsaved Adjustments") {s.error=recovery.message}
+                    }
+                }
                 ToolbarItem(placement:.primaryAction){Button{ s.importPanel() }label:{Label("Import",systemImage:"plus")}.help("Import photos or folders ⌘I")}
                 ToolbarItem(placement:.principal){if s.workspace=="library"{Picker("Module",selection:Binding(get:{s.develop},set:{value in Task {if value {await s.startDevelop()} else {await s.switchLibraryView(s.libraryView)}}})){Image(systemName:"square.grid.2x2").tag(false);Image(systemName:"slider.horizontal.3").tag(true)}.pickerStyle(.segmented).frame(width:100)}}
                 ToolbarItemGroup(placement:.primaryAction){
@@ -64,7 +69,14 @@ struct ContentView: View {
                 Button("Connect with This Version") { Task { await s.activateCurrentService() } }
                     .disabled(s.connectingService)
             }
-            Button("OK",role:.cancel){s.error=nil}
+            if let recovery=s.whiteBalanceEditRecovery {
+                Button("Discard Unsaved Adjustments and Reload",role:.destructive) {
+                    Task {await s.discardWhiteBalancePendingEdits(recovery)}
+                }
+                Button("Keep Draft",role:.cancel) {s.error=nil}
+            } else {
+                Button("OK",role:.cancel){s.error=nil}
+            }
         } message:{Text(s.error ?? "")}
         .alert("Exit Reference View to Crop?",isPresented:Binding(get:{s.referenceCropPhotoID != nil},set:{if !$0 {s.referenceCropPhotoID=nil}})) {
             Button("Continue") {s.confirmReferenceCrop()}
@@ -266,6 +278,10 @@ struct PhotoCanvas:View {
                                     if s.mixerTargetActive {
                                         GeometryReader {frame in MixerTargetOverlay(imageSize:image.size,available:frame.size,fitted:false)}
                                     }
+                                    if s.whiteBalanceTargetActive && !s.compare {
+                                        GeometryReader {frame in WhiteBalanceTargetOverlay(imageSize:image.size,available:frame.size,
+                                            fitted:false,role:"active",after:true)}
+                                    }
                                 }
                                 .frame(minWidth:geo.size.width,minHeight:geo.size.height)
                         }
@@ -277,7 +293,10 @@ struct PhotoCanvas:View {
                         }
                         if s.curveTargetActive {CurveTargetOverlay(imageSize:image.size,available:geo.size)}
                         if s.mixerTargetActive {MixerTargetOverlay(imageSize:image.size,available:geo.size)}
-                        if s.develop,!["view","curve","mixer"].contains(s.canvasTool),!s.compare {DrawingOverlay(image:image,available:geo.size)}
+                        if s.whiteBalanceTargetActive && !s.compare {
+                            WhiteBalanceTargetOverlay(imageSize:image.size,available:geo.size,fitted:true,role:"active",after:true)
+                        }
+                        if s.develop,!["view","curve","mixer","white-balance"].contains(s.canvasTool),!s.compare {DrawingOverlay(image:image,available:geo.size)}
                     }
                 } else if s.rendering {ProgressView("Developing…").tint(.white).foregroundStyle(.white)}
                 else {Text("Select a photo to start editing").foregroundStyle(.gray)}
@@ -289,7 +308,11 @@ struct PhotoCanvas:View {
         .focusable().focused($keyboardFocus)
         .onTapGesture { keyboardFocus=true }
         .modifier(PhotoKeyboardShortcuts())
+        .onChange(of:s.canvasTool) {_,tool in s.whiteBalanceCanvasToolDidChange(tool)}
+        .onChange(of:s.comparisonMode) {_,mode in s.whiteBalanceComparisonDidChange(mode)}
+        .onDisappear {s.cancelWhiteBalanceSelector()}
         .onKeyPress(.escape) {
+            if s.whiteBalanceTargetActive || s.whiteBalanceSampling || s.whiteBalanceArming {s.cancelWhiteBalanceSelector();return .handled}
             if s.mixerTargetActive {
                 if s.mixerTargetGesture != nil {s.cancelMixerTarget()} else {s.setMixerTargeting(nil)}
                 return .handled

@@ -54,6 +54,18 @@ struct InspectorView:View {
                     Text("Adjust relative to as-shot white balance").font(.caption).foregroundStyle(.secondary).frame(maxWidth:.infinity,alignment:.leading)
                     edit("Temperature","temperature",-100...100)
                     edit("Tint","tint",-100...100)
+                    if s.develop {
+                        if s.whiteBalanceTargetActive || s.whiteBalanceSampling || s.whiteBalanceArming {
+                            Button("Cancel Point Selection") {s.cancelWhiteBalanceSelector()}
+                                .accessibilityHint("Escape also cancels white-balance sampling.")
+                        } else {
+                            Button {Task {await s.armWhiteBalanceSelector()}} label:{
+                                Label("Select Neutral Point",systemImage:"eyedropper")
+                            }
+                            .disabled(!s.canStartWhiteBalanceSelector)
+                            .help("Click a neutral area in the active After image · W")
+                        }
+                    }
                     edit("Vibrance","vibrance",-100...100)
                     edit("Saturation","saturation",-100...100)
                     Picker("Treatment",selection:bool("monochrome")) { Text("Color").tag(false);Text("Black & White").tag(true) }

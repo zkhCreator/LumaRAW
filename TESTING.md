@@ -2,6 +2,47 @@
 
 All probes use explicit read-only input photographs and new disposable catalog/output directories. They never use a personal photo library by default.
 
+## White Balance Selector
+
+`test_white_balance.py` checks known relative candidates, current-gain reversal,
+dark/clipped/out-of-range rejection, isolated black pixels, tiny crops and all
+eight catalog orientations against independently rendered full geometry.
+`test_white_balance_service.py` uses generated rasters and actual workers to
+verify read-only sampling, one paired edit/undo, frame-stat tokens, revision/source
+races, final generation checks, invalid-input non-interference and source-cache
+dimension validation. A real disposable sleeping child isolates cancellation
+supervision from variable decode speed. The raster adapter must reject RAW before
+loading pixels; these tests establish no camera calibration or Adobe equivalence.
+
+```sh
+.venv/bin/python -m pytest -q tests/test_white_balance.py \
+  tests/test_white_balance_service.py tests/test_reference_preview.py \
+  tests/test_preview_cache.py
+.venv/bin/python tests/run_native.py --work work/new-white-balance-native \
+  --engine /absolute/LumaRAW.app/Contents/Resources/Engine/LumaRAWEngine \
+  --suite NativeWhiteBalanceRegression --suite NativeBeforeAfterRegression \
+  --suite NativeReferenceRegression --suite NativeCurveTargetRegression \
+  --suite NativeMixerTargetRegression --suite NativeResponsivenessRegression \
+  --suite NativeStateRegression --suite NativeHistoryRegression
+.venv/bin/python tests/white_balance_probe.py --work work/new-white-balance-probe \
+  --engine /absolute/LumaRAW.app/Contents/Resources/Engine/LumaRAWEngine \
+  --width 4000 --height 3000 --samples 5
+```
+
+The native suite gates real command replies around navigation, viewport, tool,
+revision and pending-edit changes. It checks one paired history edit and separate
+Reference/Before roles. Failed saves must retain concurrent drafts without retry,
+and explicit captured discard/reload must unblock navigation. An old recovery
+cannot clear a new photo's draft. Cancelled edit waits must exit without clearing
+the active edit, and an obsolete sampler error cannot clear a newer busy state.
+Its NSHostingView snapshots reject uniform captures; manually inspect the tall
+inspector for readable Color controls. The instruction-overlay capture does not
+contain the displayed photograph. These are offscreen layout evidence, not
+keyboard, pointer, VoiceOver or macOS 14 runtime acceptance. The performance probe separates
+Fit-preview setup, the first full-source sample and later linear-cache samples;
+it records packaged-engine identity, worker RSS and unchanged originals/catalog.
+The generated gradient is not a camera fixture, and OS caches are not flushed.
+
 ## Native culling shortcuts
 
 `NativeCullingShiftRegression` uses five generated originals and catalog-only
