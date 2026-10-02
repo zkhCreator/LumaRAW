@@ -2,6 +2,8 @@
 // Inputs: visible IDs/revisions and a shared command transport. Outputs: retained
 // file-backed images or per-photo errors. No pixels, SQL, or recipe ownership.
 // A separate client generation cancels obsolete page work without touching export.
+// Retained image objects are immutable. Publish only changed images/errors while
+// preserving forced cache/source validation even when a page looks unchanged.
 import AppKit
 import Foundation
 
@@ -27,6 +29,8 @@ struct ThumbnailFrame {
     private var task: Task<Void,Never>?
     private let call: (String,[String:Any]) async throws -> [String:Any]
     private let changed: ([Int:NSImage],[Int:String]) -> Void
+    private var publishedImages: [Int: NSImage] = [:]
+    private var publishedErrors: [Int: String] = [:]
 
     init(call: @escaping (String,[String:Any]) async throws -> [String:Any] = Backend.call,
          changed: @escaping ([Int:NSImage],[Int:String]) -> Void = { _,_ in }) {
@@ -97,5 +101,16 @@ struct ThumbnailFrame {
         return true
     }
 
-    private func publish() { changed(frames.mapValues(\.image),errors) }
+    private func publish() {
+        let images = frames.mapValues(\.image)
+        let sameImages = images.count == publishedImages.count && images.allSatisfy {
+            publishedImages[$0.key] === $0.value
+        }
+        guard !sameImages || errors != publishedErrors else { return }
+        // Retain the last bounded image set, rather than just pointer values:
+        // a released object's address could otherwise be reused by a new frame.
+        publishedImages = images
+        publishedErrors = errors
+        changed(images, errors)
+    }
 }

@@ -1594,3 +1594,33 @@ SQL paging and compact state-poll costs, not photographic processing or desktop
 frame rate. Record complete count-plus-page requests, first and repeated timings,
 query plans/VM work, reply sizes and sampled RSS. A newly opened SQL connection
 still has warm OS caches after seeding; do not describe it as a cold disk test.
+
+## Thumbnail publication during catalog actions
+
+`NativeThumbnailPublicationRegression` uses gated cache/direct replies and real
+Store publishers to check unchanged-state suppression, forced cache validation,
+error clearing, image replacement, page clearing and obsolete-response rejection.
+The existing `NativeThumbnailRegression` supplies separate live-engine evidence
+for recipe changes, relinking and cache eviction.
+
+```sh
+.venv/bin/python tests/run_native.py --work work/new-thumbnail-publication-native \
+  --engine /absolute/LumaRAW.app/Contents/Resources/Engine/LumaRAWEngine \
+  --suite NativeThumbnailPublicationRegression --suite NativeThumbnailRegression \
+  --suite NativeResponsivenessRegression
+.venv/bin/python tests/run_thumbnail_probe.py --work work/new-thumbnail-publication-probe \
+  --engine /absolute/LumaRAW.app/Contents/Resources/Engine/LumaRAWEngine
+```
+
+Run the measurement separately from tests and builds. It compiles current native
+sources and uses five and sixty generated 160 by 100 PNGs in separate disposable
+catalogs. Warm-up completes before collection membership and metadata-title
+actions. Report renderer callbacks, Store publications, cache/cancellation/direct
+thumbnail calls, worker flags and retained image identities. The 100-ms stable
+window is a synchronization barrier, excluded from reported operation times;
+those action times do not guarantee thumbnail completion or displayed latency.
+RSS is the native probe's process-lifetime high-water mark, including warm-up,
+not per-action or whole-app memory. No periodic Store polling is started.
+This is state/IPC evidence, not RAW throughput, desktop frame rate, VoiceOver or
+macOS 14 runtime acceptance. Counts are regression evidence; one action sample
+per page size does not establish a repeatable elapsed-time improvement.

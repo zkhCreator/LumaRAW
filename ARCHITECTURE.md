@@ -822,6 +822,10 @@ Native page requests retain matching images, reject mismatched or late revisions
 and cancel obsolete thumbnail generations through their own client ID. All visible
 photo summaries are polled; active inspector recipes keep their separate edit
 barrier. Refresh rechecks source state, and per-photo errors remain visible.
+The native thumbnail renderer compares retained immutable image object identities
+and error dictionaries before publishing. A forced refresh still validates the
+same bounded page with the broker; unchanged retained images do not invalidate
+Store again. Image replacement/removal and error changes continue to publish.
 Offline-source cache lookup is not yet supported.
 
 Library Compare retains at most two revision-keyed frames and Survey at most 60

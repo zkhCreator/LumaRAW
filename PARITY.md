@@ -4782,3 +4782,53 @@ deep strict ad-hoc signature verification matched. The app targets macOS 14 and
 was checked on macOS 26.6.2. macOS 14 runtime, native List/desktop drag and hover,
 VoiceOver and Adobe gesture equivalence remain unverified. Desktop automation
 was not retried; no processing-speed claim is made for this UI increment.
+
+## Quiet thumbnail refresh after catalog actions (October 2, 2026)
+
+A warm collection-membership or metadata change refreshed the bounded photo page
+and correctly reused its image objects, but the thumbnail renderer published the
+same image/error dictionaries twice. The Store callback then assigned both
+published fields twice, creating four avoidable workspace notifications. The
+renderer now compares immutable image identities and errors before publishing.
+It retains the previous bounded image set to avoid confusing a reused object
+address with an unchanged image. Forced cache/source validation, cancellation,
+miss fallback, image replacement/removal and error clearing remain active.
+
+An isolated native measurement used the same generation-53 packaged engine before
+and after the native change, on Apple M3 Max, 128 GiB, macOS 26.6.2. Separate
+disposable catalogs contain five or sixty generated 160 by 100 PNGs. Each page is
+warmed before one collection-membership addition and one metadata-title edit;
+periodic Store polling is not started. All four before/after pairs retain the
+same visible photo IDs and NSImage objects, execute one cancellation and one
+bulk cache validation, make no direct thumbnail requests and report no cache
+worker spawn. Original bytes remain unchanged.
+
+| Observable updates per action, at both page sizes | Before | After |
+| --- | --- | --- |
+| Thumbnail renderer callback, either action | 2 | 0 |
+| Store notifications, collection membership addition | 17 | 13 |
+| Store notifications, metadata title edit | 16 | 12 |
+
+These counts establish removal of redundant publication. Necessary library,
+selection and metadata updates still occur. Single-sample action times were
+27.87 to 28.42 ms and 33.75 to 32.76 ms for five photos, and 35.13 to 33.46 ms
+and 38.38 to 39.07 ms for sixty photos (membership, then metadata). They do not
+establish an elapsed-time improvement. The separate 100-ms stable-state barrier
+is not included in those action times; action return is not displayed completion.
+Native process RSS high-water marks were 32.38 to 32.22 MiB and 35.66 to 35.67
+MiB, including warm-up and prior operations, not per-action or whole-app peaks.
+No new pixel processing or RAW throughput is measured.
+
+The relevant Python thumbnail and cache regressions pass **11 tests in 4.28 s**.
+The final packaged engine passes **45 native state/IPC assertions**: Thumbnail
+Publication 15, Thumbnails 14 and Responsiveness 16. Gated replies verify
+same-target force validation, cache failure fallback, error clearing, same-path
+image replacement and obsolete responses; live-engine checks also cover source
+relinking and cache eviction. Unchanged background polls still emit zero Store
+notifications. The Mac app builds for macOS 14, passes deep strict ad-hoc signature
+verification, and matches source/client/broker identity, all 149 MCP schemas and
+the bundled guide. These checks run on macOS 26.6.2, without desktop automation.
+Engine generation 53, schema 37 and the 149 command contracts are unchanged.
+Desktop scrolling/input/frame rate, VoiceOver and macOS 14 runtime acceptance
+remain unverified; this measured publication defect does not explain every
+possible cause of the reported interface lag. Full non-AI parity remains open.

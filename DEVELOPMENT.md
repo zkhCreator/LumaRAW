@@ -29,6 +29,11 @@ when a clear function is more maintainable. Avoid unrelated formatting churn.
   orientation state, photo-family/reference summaries and snapshot pages must not
   invalidate the workspace. Track conditional snapshot reads without toggling
   published loading state; explicit reads still show progress.
+  Forced thumbnail refreshes must still revalidate source/cache identity, but
+  unchanged immutable image objects and errors must not republish the page.
+  Retain the previous bounded image set when comparing identities so a reused
+  object address cannot conceal a replacement image. Cache misses, error clearing
+  and generation cancellation must retain their observable behavior.
 - Reference and active roles are independent. Keep inspector edits scoped to
   active selection, retain reference identity across source/filter changes, and
   clear an unlocked reference only when leaving the module. The lock is session
