@@ -2,6 +2,31 @@
 
 All probes use explicit read-only input photographs and new disposable catalog/output directories. They never use a personal photo library by default.
 
+## Export with Previous
+
+`test_previous_export.py` exercises genuine schema-34 upgrades, initial absence,
+atomic queue/settings/request receipts, all-target validation, captured conflicts,
+current photo snapshots and replay after later configuration changes. Existing
+ordinary export request digests remain compatible with migrated receipts. Previous
+requests use a separate method-bound digest; cross-command key reuse fails.
+Generated raster output checks exercise the accepted pipeline without establishing
+camera accuracy or Lightroom pixel equivalence.
+
+`NativePreviousExportRegression` uses the real packaged service for manual and
+preset-derived submissions, captured selection, pending edits and the Previous
+action. Availability travels in existing queue polls; unchanged polling must not
+publish the workspace again. Native state probes do not establish desktop shortcut
+dispatch, folder-panel behavior or VoiceOver acceptance.
+
+```sh
+.venv/bin/python -m pytest -q tests/test_previous_export.py tests/test_export_presets.py \
+  tests/test_export_metadata.py tests/test_service.py
+.venv/bin/python tests/run_native.py --work work/new-previous-export-native \
+  --engine /absolute/LumaRAW.app/Contents/Resources/Engine/LumaRAWEngine \
+  --suite NativePreviousExportRegression --suite NativeExportPresetRegression \
+  --suite NativeExportMetadataRegression --suite NativeResponsivenessRegression
+```
+
 ## Saved export settings
 
 `test_export_presets.py` exercises complete/default settings, literal destinations

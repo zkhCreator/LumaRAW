@@ -317,6 +317,15 @@ when a clear function is more maintainable. Avoid unrelated formatting churn.
   catalog lock; storage switches neither copy records nor alter loaded values.
   Existing numeric output sharpening is not Adobe's screen/matte/glossy behavior.
 
+- Previous export settings record an accepted manual submission, never the newest
+  job inferred from queue history. Persist them atomically with jobs and the request
+  receipt. Reuse freezes current photo recipes/metadata and never advances Previous.
+  Check request replay before revision validation; preserve legacy ordinary-export
+  digests and distinguish commands. In native state, compare effective copied
+  preset values and capture selection before awaiting pending edits. Unchanged
+  availability polls must not republish the workspace. Fail stale or uncertain
+  submissions visibly without automatic retry.
+
 ## Engine changes and handoff
 
 `runtime.ENGINE_GENERATION` orders portable-engine releases. Increment it when

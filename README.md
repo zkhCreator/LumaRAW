@@ -17,8 +17,8 @@ LumaRAW preserves your originals. Add references files in place; Copy imports by
 | Local adjustments | Radial, gradient, luminance-range, and brush masks; manual lens distortion, vignette, and chromatic-aberration correction |
 | Library | Folder tree/search/favorites/labels, ratings, flags, catalog metadata/keywords, regular/live smart collections, nested sets, Quick/target collections, SQL filters/sorting, manual/capture-time stacks, duplicate/missing indexing, virtual copies/shared snapshots, selective sync, and backup/restore |
 | Culling | Grid/Loupe/Compare/Survey, anchored page selections, active-photo review actions, linked or independent full-resolution comparison viewports |
-| Export | JPEG and 16-bit TIFF with embedded sRGB, Display P3, Adobe RGB, or ProPhoto RGB ICC profiles; shared or catalog-local export presets, frozen catalog XMP/keyword policies, persistent queue, pause/cancel/retry, and collision-safe filenames |
-| Agents | 143 MCP tools, equivalent JSON CLI commands, and a bundled skill; app and agent edits share conflict detection |
+| Export | JPEG and 16-bit TIFF with embedded sRGB, Display P3, Adobe RGB, or ProPhoto RGB ICC profiles; shared or catalog-local export presets, Export with Previous, frozen catalog XMP/keyword policies, persistent queue, pause/cancel/retry, and collision-safe filenames |
+| Agents | 145 MCP tools, equivalent JSON CLI commands, and a bundled skill; app and agent edits share conflict detection |
 
 ## Build and run
 
@@ -54,6 +54,17 @@ or uncertain exports still require explicit review/retry.
 5. Press **1–5** to rate, **0** to clear the rating, **P** to pick, **X** to reject, or **U** to clear the flag. With the gallery focused, arrow keys select photos and Return opens Loupe.
 6. Command-click to toggle selection; Shift-click selects a contiguous range on the current page. **⌘A** in the focused grid selects the visible page. Grid rating/flag/metadata actions apply to the selection; Loupe, Compare, Survey and Develop actions apply to the active photo. **Photo → Sync Selected Photos** copies selected adjustment groups; composition, masks, and camera profiles are excluded by default.
 7. Press **⇧⌘E** to export. Choose a format, color space, long-edge size, and filename template, or load saved export settings. Presets can optionally remember the export folder; a preset without a folder requires choosing one before **Add to Queue**. Existing files are preserved.
+
+**File → Export with Previous** (**⌥⇧⌘E**) immediately queues the captured photo
+selection using this catalog's last accepted manual export settings, including its
+destination. Pending edits save first; each new job freezes the selected photo's
+current edits and metadata. The configuration survives restarting and belongs to
+the catalog. Exporting an unchanged named preset leaves it alone; changing any
+output value, including the destination, makes that submission a manual session.
+Queue acceptance records the settings even if a worker later fails or is cancelled.
+An older catalog starts without Previous settings until a manual export is accepted.
+If another client changes the configuration during submission, review the error
+and invoke the action again explicitly.
 
 Press **G / E / C / N** with a photo view focused to open Grid / Loupe / Compare / Survey.
 Compare keeps a Select photo beside a changing Candidate: use arrows to navigate,

@@ -4,7 +4,9 @@ Inputs: bounded JSON objects. Outputs: JSON schemas and validated domain command
 including bounded full-resolution import viewport requests and saved export settings.
 No transport, pixels or UI dependencies. Library pages may include true 1-based
 ordinals for scoped stack members; collection pages expose catalog-local color
-labels and a separate tree revision. IDs refer only to the selected catalog.
+labels and a separate tree revision. Export queue reads expose only the availability
+and revision of catalog-local Previous settings; a separate read returns their values.
+IDs refer only to the selected catalog.
 Tool annotations describe effects; they never substitute for user authorization.
 """
 from .model import LIMITS, Recipe, SYNC_GROUPS, POINT_CURVE_FIELDS, PARAMETRIC_FIELDS, MIXER_FIELDS, BW_FIELDS
@@ -221,9 +223,11 @@ tool('cancel_preview','Invalidate older preview generations for one client and s
 tool('photo_summaries','Read existing photo summaries for at most 60 IDs without recipe or EXIF payloads.',{'photo_ids':array(ID,60)},['photo_ids'],True)
 tool('thumbnail','Create/read a source thumbnail (default) or a developed recipe-aware 320-pixel thumbnail.',{'photo_id':ID,'kind':{'enum':['source','developed']},'client_id':string(128),'generation':integer()},['photo_id'],True)
 tool('cached_thumbnails','Read completed source (default) or developed thumbnail paths for up to 60 photos without image workers. Developed entries include recipe revisions.',{'photo_ids':array(ID,60),'kind':{'enum':['source','developed']}},['photo_ids'],True)
-tool('enqueue_exports','Durably enqueue immutable recipe snapshots. Reusing request_key with the same arguments returns original jobs; different arguments fail.',{'photo_ids':array(ID),'destination':PATH,'format':{'enum':['tiff16','jpeg']},'options':EXPORT_OPTIONS,'request_key':string(128)},['photo_ids','destination','format','request_key'])
+tool('enqueue_exports','Durably enqueue immutable recipe snapshots. Reusing request_key with the same arguments returns original jobs; different arguments fail. Set remember_previous only for an accepted manually configured session; it commits the canonical settings with the queue receipt.',{'photo_ids':array(ID),'destination':PATH,'format':{'enum':['tiff16','jpeg']},'options':EXPORT_OPTIONS,'request_key':string(128),'remember_previous':BOOL},['photo_ids','destination','format','request_key'])
+tool('get_previous_export','Read the catalog-local last accepted manual export configuration and its revision. The settings contain only format, canonical options, and the effective destination.',read=True)
+tool('enqueue_previous_exports','Use the current catalog-local Previous settings and current photo recipes to durably enqueue new immutable jobs. Requires the captured Previous revision; request-key replay returns its original jobs even if Previous later changes.',{'photo_ids':array(ID),'expected_revision':REV,'request_key':string(128)},['photo_ids','expected_revision','request_key'])
 tool('get_job','Read a specific durable export receipt, including its recipe snapshot.',{'job_id':ID},['job_id'],True)
-tool('list_jobs','Read the latest 60 export jobs and aggregate queue counts.',read=True)
+tool('list_jobs','Read the latest 60 export jobs, aggregate queue counts, and a compact availability/revision token for catalog-local Previous export settings. Full Previous settings require get_previous_export.',read=True)
 tool('queue_control','Pause after the current export, resume, cancel, or retry failed/interrupted exports. Cancelled exports require explicit retry_cancelled.',{'action':{'enum':['pause','resume','cancel','retry','retry_cancelled']},'job_id':ID},['action'])
 tool('save_version','Create a named snapshot shared by all variants. Pass expected_revision to capture current settings safely; optional step_id copies a retained history state without selecting it and requires that revision. Duplicate names are rejected, never overwritten.',{'photo_id':ID,'name':string(120),'expected_revision':REV,'step_id':REV},['photo_id','name'])
 tool('list_versions','Page up to 60 snapshot summaries alphabetically. after_id requires expected_snapshots_revision; known_revision returns a compact unchanged receipt when the family list is unchanged. Recipes are never included.',{'photo_id':ID,'after_id':ID,'expected_snapshots_revision':REV,'known_revision':REV},['photo_id'],True)

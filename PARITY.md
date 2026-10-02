@@ -70,7 +70,7 @@ gaps. Nothing below is full Lightroom parity merely because historical tests pas
 | Local editing | Partial: radial/gradient/brush/luma | Mask list/edit/reorder/intersection, range masks, clone/heal, red-eye (non-AI) |
 | History and presets | Partial: durable paged Develop history with undo/redo, state selection/rename/clear, persistent Before assignment/copy/swap, separate 50-batch orientation undo, alphabetical shared snapshots with current/history capture, rename/update/delete and Before copy, partial Develop presets/groups/favorites/shared or local storage, batch/Painter and reviewed-import application | Unified application Undo/Redo, history/snapshot hover, preset hover preview/Amount/ISO adaptation/Adobe exchange and rendered reference acceptance |
 | Preview/performance | Partial: Metal, proxies, 1:1 viewport, developed thumbnail fast path, on-demand Before with independent cache, four paired layouts, persistent command relay, background image preparation, quiet polling, fused readout maps and validated completed-preview reuse | Real-RAW catalog/slider latency, offline previews, cache controls and desktop/reference acceptance |
-| Export | Partial: JPEG/16-bit TIFF, ICC, shared or catalog-local saved export settings with optional destinations, durable jobs with frozen catalog/rights IPTC XMP and keyword hierarchy options | Multi-preset batch export, Adobe preset exchange, complete EXIF/IPTC Extension/GPS metadata policies, watermark, additional formats, publish workflows |
+| Export | Partial: JPEG/16-bit TIFF, ICC, shared or catalog-local saved export settings with optional destinations, catalog-local Export with Previous, durable jobs with frozen catalog/rights IPTC XMP and keyword hierarchy options | Multi-preset batch export, Adobe preset exchange, complete EXIF/IPTC Extension/GPS metadata policies, watermark, additional formats, publish workflows |
 | External editing and video | Missing | External-editor setup and derivative round trips; supported video import/playback, frame capture, trimming and export |
 | Merge | Missing | Non-AI HDR merge and panorama with bounded resources and reference acceptance |
 | Map | Missing | GPS metadata, map navigation, track import, location editing with explicit persistence |
@@ -4248,7 +4248,8 @@ preset and loads them before an explicit export. Its multi-preset workflow can
 retain each preset's destination or choose replacement locations. This increment
 implements single-preset configuration reuse for the existing JPEG/16-bit TIFF
 pipeline. It does not implement multi-preset batch submission, Adobe preset
-exchange, built-in export presets or Export with Previous.
+exchange or built-in export presets. Export with Previous follows in the next
+increment below.
 
 Engine generation 48 / schema 34 adds shared-default and optional catalog-local
 export preset libraries. Names have stable UUID identities and normalized unique
@@ -4342,10 +4343,91 @@ strict local ad-hoc signature verification. Packaged MCP initialization and all
 - Engine SHA-256: `1dc0d8b94a2fb2db8558b9f99c5f1a9feaee153c5243702af3b7b8b2d6a9211e`
 - Native SHA-256: `9ad6cba7d423a122c7010dd66f512022f9a1d7a5e1979f930277bd691dc73259`
 
-Remaining export work includes multi-preset batch submission, Export with Previous,
+Remaining export work includes multi-preset batch submission,
 Adobe exchange/built-ins, groups and more destination policies, complete metadata,
 watermarking, additional formats, plugins/postprocessing and publish services.
 The separate browser differs from Adobe's Export dialog sidebar. macOS 14 runtime,
 current desktop input, VoiceOver, official MCP SDK and Lightroom reference acceptance
 were not tested; desktop automation was not retried. This remains partial export
 coverage within the full Lightroom parity goal.
+
+### Export with Previous
+
+Adobe documents this action as reusing the latest manually configured export
+session, including modified presets while excluding unchanged presets. Its Mac
+shortcut is Command-Option-Shift-E. LumaRAW now follows that distinction for its
+existing JPEG/16-bit TIFF options. Catalog-local persistence, queue acceptance as
+the session boundary and destination-only changes counting as modifications are
+explicit LumaRAW policies; the cited documentation does not establish all of these
+details as Adobe behavior.
+
+Engine generation 49 / schema 35 introduces one catalog-local configuration with
+canonical output values, a destination and a revision. New and upgraded catalogs
+start empty without inferring manual intent from old export jobs. An optional
+`remember_previous` flag on ordinary submission defaults to false and saves the
+configuration atomically with accepted jobs and the request receipt. Identical
+canonical settings retain their token; later cancellation or worker failure does
+not erase the session. Catalog backups include this configuration.
+
+The new Previous command reads the captured configuration and all current target
+photos inside one write transaction. It freezes fresh recipes, metadata and
+orientation into new jobs without changing Previous. Receipt lookup precedes the
+revision check, allowing an explicit identical replay to recover accepted jobs
+after the configuration changes. Existing ordinary-export digests retain their
+historical bytes; Previous digests include their command identity, so cross-command
+request-key reuse fails. No uncertain request is retried automatically.
+
+The Mac File menu captures selected photo IDs before awaiting pending edits and
+then performs a fresh configuration read and one revision-checked submission.
+Export drafts keep a copied preset baseline; unmodified presets preserve Previous,
+and any changed output value makes a submitted draft manual. Queue polling carries
+only the configuration's availability and revision, with no additional recurring
+command or full-settings payload. Repeated equal state stays quiet in the shell.
+
+Focused Previous, preset, metadata-export and service regression passed **63 tests
+in 8.99 s**. Coverage includes a genuine schema-34 catalog with an old raw-argument
+request digest, exact receipt replay after upgrade, no inference from historical
+jobs and product backup/restore. Denying the schema-version update after creating
+the new table proves transactional DDL rollback. Failures at the second photo,
+configuration update and request-receipt insert leave no partial jobs or settings;
+Previous receipt failure also rolls back already-created jobs.
+
+Equal canonical manual settings keep their revision, while current photo edits
+and metadata are captured afresh on reuse. A deliberately corrupt settings payload
+still permits compact queue polling but fails explicit settings retrieval. Worker
+failure/cancellation retain Previous. A generated 64 x 48 PNG produces a 32 x 24
+ICC-tagged JPEG through the actual worker and preserves the original bytes. This
+small raster check does not establish camera accuracy or Adobe pixel equivalence.
+
+The full Python suite passed **993 tests in 136.17 s**, with required actual Metal
+and the real 4284 x 2844 Nikon D3S NEF fixture, with no skips. Existing RAW and
+export processing remains covered alongside the new configuration workflow.
+
+Four native suites passed **94 assertions** against the packaged engine: Previous
+24, export presets 38, export metadata 16 and responsiveness 16. The new suite
+changes selection while submission is awaiting edits and invokes both submission
+paths again; only the originally captured photo is added once. It verifies manual,
+unchanged/updated/modified preset distinctions, captured save baselines, deletion
+without losing draft values, stale rejection and immutable submitted snapshots.
+Repeated equal queue polls and a revision-only Previous response cause no Store
+publication. The general responsiveness suite also reports zero unchanged-poll
+publications. These state checks are not desktop frame-rate measurements.
+
+The Export sheet's offscreen image was inspected: configuration-retention guidance
+and submission controls remain visible. The additional preset suite renders cover
+the existing preset browser/editor/settings layouts. They are limited layout
+evidence, not desktop shortcut dispatch, native folder panels or VoiceOver.
+
+The macOS 14-target application builds without Swift diagnostics and passes deep/
+strict local ad-hoc signature verification. Packaged MCP initialization and all
+**145 tool schemas**, broker/client/source identities and bundled-guide bytes match:
+
+- Source digest: `14df64b2e86a52feb9b99fad1d0f8a9eafaa31098c22719a55e80117c5e4367a`
+- Engine SHA-256: `fca9bcde890834c1a63b2f4b6fe3e8e7e9764478d8240f04f08457d8a19788af`
+- Native SHA-256: `4287cd895b2d4d9260eaeb0191c979b6e74e612e9a1ab8f30c3f1e71cde90f13`
+
+Multi-preset batch export, Adobe preset exchange/built-ins, complete output metadata,
+watermarking, additional formats, plugins/postprocessing and publish services remain
+open. The macOS 14 runtime, current desktop input, VoiceOver, official MCP SDK and
+Lightroom reference acceptance were not tested; desktop automation was not retried.
+This increment does not complete the full Lightroom parity inventory.

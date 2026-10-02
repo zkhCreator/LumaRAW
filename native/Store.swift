@@ -1,7 +1,8 @@
 // Purpose: main-thread presentation state and user workflows for the native shell.
 // Inputs: native controls and service replies. Outputs: reversible recipe edits,
-// preview paths and queue state. Revisions belong to the service; stale edits are
-// rejected, never silently retried. Photo results and collection browsers use bounded pages.
+// preview paths and queue state, including one revision-bound Previous export action.
+// Revisions belong to the service; stale edits are rejected, never silently retried.
+// Photo results and collection browsers use bounded pages.
 import SwiftUI
 import AppKit
 import UniformTypeIdentifiers
@@ -217,6 +218,8 @@ import UniformTypeIdentifiers
     @Published var message="Originals are read-only · Edits save automatically"
     @Published var jobs: [[String: Any]] = []
     @Published var paused=false
+    @Published private(set) var previousExportAvailable=false
+    @Published private(set) var exportSubmissionBusy=false
     @Published var budget=4096.0
     @Published var computeBackend="auto"
     @Published var processingSummary="No photos processed yet"
@@ -258,6 +261,7 @@ import UniformTypeIdentifiers
     private var copied: [String: Any]?
     private var polling: Task<Void,Never>?
     private var started=false
+    private var previousExportRevision:Int?
     private var selectionAnchor: Int?
     var canChangePhoto: Bool { !browsing && !editing && pendingPatch.isEmpty }
     var hasPendingEdits: Bool { editing || !pendingPatch.isEmpty }
@@ -271,6 +275,7 @@ import UniformTypeIdentifiers
             await refreshMemory()
             await refreshCollections()
             await refresh()
+            await refreshJobs()
             let args=CommandLine.arguments
             if let i=args.firstIndex(of:"--import"),args.count>i+1 { await reviewImport([args[i+1]]) }
             polling=Task { [weak self] in
@@ -307,7 +312,7 @@ import UniformTypeIdentifiers
             serviceUpgradeNeeded=false;serviceConnectionMessage="Connected with this version of LumaRAW"
             error=nil
             if !started { await start() }
-            else { await refreshMemory();await refreshCollections();await refresh() }
+            else { await refreshMemory();await refreshCollections();await refresh();await refreshJobs() }
         } catch {
             serviceConnectionMessage=error.localizedDescription
             serviceUpgradeNeeded=(error as? EngineFailure)?.canActivateService ?? false
@@ -624,18 +629,62 @@ import UniformTypeIdentifiers
         }
     }
     func refreshJobs() async {
-        if let r=try? await Backend.call("list_jobs") {
-            let next=r["jobs"] as? [[String:Any]] ?? [],nextPaused=r["paused"] as? Bool ?? false
-            if !NSArray(array:jobs).isEqual(to:next) {jobs=next}
-            if paused != nextPaused {paused=nextPaused}
-        }
+        if let r=try? await Backend.call("list_jobs") { adoptJobsResponse(r) }
+    }
+    func adoptJobsResponse(_ result:[String:Any]) {
+        let next=result["jobs"] as? [[String:Any]] ?? [],nextPaused=result["paused"] as? Bool ?? false
+        if !NSArray(array:jobs).isEqual(to:next) {jobs=next}
+        if paused != nextPaused {paused=nextPaused}
+        adoptPreviousExportAvailability(result["previous_export"] as? [String:Any])
+    }
+    private func adoptPreviousExportAvailability(_ result:[String:Any]?) {
+        guard let result,let available=result["available"] as? Bool,
+              let revision=(result["revision"] as? NSNumber)?.intValue ?? result["revision"] as? Int,
+              revision >= 0 else { return }
+        if let previousExportRevision,revision<previousExportRevision { return }
+        previousExportRevision=revision
+        if previousExportAvailable != available { previousExportAvailable=available }
     }
     func queue(_ action:String,_ id:Int?=nil){Task{do{var p:[String:Any]=["action":action];if let id{p["job_id"]=id};_=try await Backend.call("queue_control",p);await refreshJobs()}catch{self.error=error.localizedDescription}}}
-    func export(_ destination:String,_ format:String,_ options:[String:Any]) async {
-        guard await flushEdits() else{return}
+    func export(_ destination:String,_ format:String,_ options:[String:Any],rememberPrevious:Bool=false) async {
+        guard !exportSubmissionBusy else { return }
         let ids=Array(selection).sorted()
         guard !ids.isEmpty else{error="Select photos to export";return}
-        do{_=try await Backend.call("enqueue_exports",["photo_ids":ids,"destination":destination,"format":format,"options":options,"request_key":UUID().uuidString]);showExport=false;workspace="exports";await refreshJobs()}catch{self.error=error.localizedDescription}
+        exportSubmissionBusy=true
+        defer { exportSubmissionBusy=false }
+        guard await flushEdits() else{return}
+        var params:[String:Any] = ["photo_ids":ids,"destination":destination,"format":format,
+            "options":options,"request_key":UUID().uuidString]
+        if rememberPrevious { params["remember_previous"]=true }
+        do{_=try await Backend.call("enqueue_exports",params);error=nil;showExport=false;workspace="exports";await refreshJobs()}catch{self.error=error.localizedDescription}
+    }
+    func exportWithPrevious() async {
+        let photoIDs=Array(selection).sorted()
+        guard !exportSubmissionBusy else { return }
+        guard !photoIDs.isEmpty else { error="Select photos to export";return }
+        exportSubmissionBusy=true
+        defer { exportSubmissionBusy=false }
+        guard await flushEdits() else { return }
+        do {
+            let result=try await Backend.call("get_previous_export")
+            guard let previous=PreviousExportSnapshot(result) else {
+                throw EngineFailure(message:"Previous export settings could not be read")
+            }
+            adoptPreviousExportAvailability(["available":previous.available,"revision":previous.revision])
+            guard previous.available,previous.settings != nil else {
+                error="No previous export settings have been saved for this catalog."
+                return
+            }
+            _=try await Backend.call("enqueue_previous_exports",[
+                "photo_ids":photoIDs,"expected_revision":previous.revision,"request_key":UUID().uuidString
+            ])
+            error=nil
+            workspace="exports"
+            await refreshJobs()
+        } catch {
+            self.error="Export with Previous could not confirm submission. Check Export Queue before trying again. \(error.localizedDescription)"
+            await refreshJobs()
+        }
     }
     func asset(_ kind:String) {
         let panel=NSOpenPanel();panel.canChooseDirectories=false;panel.allowsMultipleSelection=false

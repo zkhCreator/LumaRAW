@@ -41,6 +41,29 @@ request key only on an export request. Preset CRUD never queues work, and later
 preset changes do not affect already loaded values or frozen jobs. Additional
 formats, multi-preset batch export and Adobe preset exchange remain unsupported.
 
+## Export with Previous
+
+`get_previous_export` returns `available`, `revision`, and nullable `settings` for
+the current catalog's last accepted manual export configuration. New and upgraded
+catalogs have no Previous until an explicit submission records it. Presets and
+historical jobs do not populate this state automatically.
+`list_jobs.previous_export` contains only availability/revision for compact polling.
+
+Ordinary `enqueue_exports` accepts optional `remember_previous: true` to save its
+canonical output configuration atomically with the accepted jobs. The default is
+false. Use the flag only for an explicitly manual or modified-preset session;
+saving/loading a preset is not an export request. A later worker failure or job
+cancellation does not remove the recorded configuration.
+
+For an explicit reuse request, capture `get_previous_export.revision`, then call
+`enqueue_previous_exports(photo_ids,expected_revision,request_key)`. This freezes
+the chosen photos' current recipes and metadata into new jobs using Previous's
+format, options and destination. It does not requeue old photos or change Previous.
+Use one new request key for the invocation; never automatically retry an uncertain
+response. An identical explicit request can recover its existing receipt after
+Previous changes, while a reused key with different arguments or another command
+fails. Refresh after a stale revision and obtain a new explicit export decision.
+
 ## Develop history
 
 Read `get_photo` and capture its revision before calling `list_history`. Every

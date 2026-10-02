@@ -1,6 +1,6 @@
 // Purpose: bounded export-preset browsing and captured, non-destructive export drafts.
 // Inputs: versioned preset replies and explicit file-panel or queue actions.
-// Outputs: shared/catalog-local preset mutations and immutable export settings.
+// Outputs: shared/catalog-local preset mutations, immutable settings and preset baselines.
 // Browsing, choosing and managing presets never queues jobs or writes photo files.
 import AppKit
 import Foundation
@@ -56,6 +56,12 @@ struct ExportDraft {
     var keywordHierarchy=false
     var destination=""
     var loadedPreset: ExportPresetSelection?
+    var presetBaseline: ExportEffectiveSettings?
+
+    var shouldRememberPrevious: Bool {
+        guard let presetBaseline else { return true }
+        return ExportEffectiveSettings(draft:self) != presetBaseline
+    }
 
     var options: [String:Any] {
         ["space":space,"max_edge":maxEdge,"quality":quality,"output_sharpen":outputSharpen,
@@ -81,6 +87,8 @@ struct ExportDraft {
         keywordHierarchy=(savedOptions["keyword_hierarchy"] as? NSNumber)?.boolValue ?? false
         destination=settings["destination"] as? String ?? ""
         loadedPreset=receipt.selection
+        presetBaseline=ExportEffectiveSettings(format:format,options:savedOptions,
+            destination:destination.isEmpty ? nil:destination)
     }
 
     mutating func acknowledgeRename(_ renamed: ExportPresetSelection,sourceRevision: String) {
@@ -93,6 +101,59 @@ struct ExportDraft {
     mutating func forgetDeletedPreset(_ id: String) {
         guard loadedPreset?.id == id else { return }
         loadedPreset=nil
+        presetBaseline=nil
+    }
+
+    mutating func acknowledgeSavedPreset(_ selection: ExportPresetSelection,source: ExportPresetSaveSource,
+                                         includeDestination: Bool) {
+        loadedPreset=selection
+        presetBaseline=ExportEffectiveSettings(format:source.format,options:source.options,
+            destination:includeDestination && !source.destination.isEmpty ? source.destination:nil)
+    }
+}
+
+struct ExportEffectiveSettings: Equatable {
+    let format: String
+    let space: String
+    let maxEdge: Int
+    let quality: Int
+    let outputSharpen: Double
+    let filenameTemplate: String
+    let priority: Int
+    let metadata: String
+    let keywordHierarchy: Bool
+    let destination: String?
+
+    init(draft: ExportDraft) {
+        format=draft.format;space=draft.space;maxEdge=draft.maxEdge;quality=draft.quality
+        outputSharpen=draft.outputSharpen;filenameTemplate=draft.name;priority=draft.priority
+        metadata=draft.metadata;keywordHierarchy=draft.keywordHierarchy
+        destination=draft.destination.isEmpty ? nil:draft.destination
+    }
+
+    init?(format: String,options: [String:Any],destination: String?) {
+        func integer(_ value: Any?) -> Int? {
+            if let number=value as? NSNumber { return number.intValue }
+            return value as? Int
+        }
+        func decimal(_ value: Any?) -> Double? {
+            if let number=value as? NSNumber { return number.doubleValue }
+            return value as? Double
+        }
+        guard let space=options["space"] as? String,
+              let maxEdge=integer(options["max_edge"]),let quality=integer(options["quality"]),
+              let outputSharpen=decimal(options["output_sharpen"]),
+              let filenameTemplate=options["name"] as? String,
+              let priority=integer(options["priority"]),let metadata=options["metadata"] as? String,
+              let hierarchy=options["keyword_hierarchy"] as? NSNumber else { return nil }
+        self.format=format;self.space=space;self.maxEdge=maxEdge;self.quality=quality
+        self.outputSharpen=outputSharpen;self.filenameTemplate=filenameTemplate;self.priority=priority
+        self.metadata=metadata;keywordHierarchy=hierarchy.boolValue;self.destination=destination
+    }
+
+    var options: [String:Any] {
+        ["space":space,"max_edge":maxEdge,"quality":quality,"output_sharpen":outputSharpen,
+         "name":filenameTemplate,"priority":priority,"metadata":metadata,"keyword_hierarchy":keywordHierarchy]
     }
 }
 
@@ -429,11 +490,19 @@ enum ExportPresetEditorRoute: Identifiable {
             HStack {
                 Button("Cancel") { dismiss() }.keyboardShortcut(.cancelAction).disabled(model.mutating)
                 Spacer()
-                Button("Save") { Task {
-                    if let selection=await model.save(source,name:name,includeDestination:includeDestination) {
-                        draft.loadedPreset=selection;dismiss()
+                Button("Save") {
+                    let capturedName=name
+                    let capturedIncludeDestination=includeDestination
+                    let capturedSource=source
+                    Task {
+                        if let selection=await model.save(capturedSource,name:capturedName,
+                            includeDestination:capturedIncludeDestination) {
+                            draft.acknowledgeSavedPreset(selection,source:capturedSource,
+                                includeDestination:capturedIncludeDestination)
+                            dismiss()
+                        }
                     }
-                } }.buttonStyle(.borderedProminent).keyboardShortcut(.defaultAction)
+                }.buttonStyle(.borderedProminent).keyboardShortcut(.defaultAction)
                     .disabled(model.mutating || model.loading || model.loadingPreset || name.trimmingCharacters(in:.whitespacesAndNewlines).isEmpty || (includeDestination && source.destination.isEmpty))
             }
         }.padding(22).frame(width:500)

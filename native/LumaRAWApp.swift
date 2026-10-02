@@ -21,6 +21,10 @@ import AppKit
                 Button("New Snapshot…"){store.prepareSnapshot()}.keyboardShortcut("n")
                     .disabled(!store.develop || !store.snapshotReady || store.snapshotDraft != nil)
                 Button("Export Selected Photos…"){store.showExport=true}.keyboardShortcut("e",modifiers:[.command,.shift]).disabled(store.selected==nil)
+                Button("Export with Previous") { Task { await store.exportWithPrevious() } }
+                    .keyboardShortcut("e",modifiers:[.command,.option,.shift])
+                    .disabled(store.selection.isEmpty || !store.previousExportAvailable || store.exportSubmissionBusy)
+                    .help("Export the selected photos using the last export settings submitted in this catalog.")
             }
             CommandGroup(replacing:.undoRedo) {
                 Button("Undo Develop Adjustment"){store.undo()}.keyboardShortcut("z").disabled(!store.canUndoDevelop)

@@ -1,4 +1,4 @@
-"""SQLite catalog, history, and durable export queue; originals stay untouched.
+"""SQLite catalog, history, durable export queue, and previous-export context.
 
 Inputs: explicit local paths and validated recipes. Outputs: paginated rows/jobs.
 Responsibilities: store references, edits, undo history, and export snapshots.
@@ -10,6 +10,8 @@ Boundaries: never copy/write original photos; never eagerly load full catalogs.
 Each connection belongs to its creating thread. Bulk insertion commits in batches.
 Direct imports number successful new originals with item savepoints and retain a
 single import number across the invocation's bounded commit batches.
+Last accepted manual export settings are catalog-local and commit atomically with
+their queue submission; export workers never rewrite that session state.
 """
 from contextlib import contextmanager
 import json

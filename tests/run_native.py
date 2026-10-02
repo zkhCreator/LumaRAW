@@ -21,7 +21,7 @@ def main():
     parser=argparse.ArgumentParser()
     parser.add_argument('--work',type=Path,required=True)
     parser.add_argument('--engine',type=Path,default=Path(sys.executable).with_name('lumaraw'))
-    suites=('NativeStateRegression','NativeLibraryRegression','NativeSelectionRegression','NativeReviewRegression','NativeThumbnailRegression','NativeCollectionRegression','NativeVirtualCopyRegression','NativeConnectionRegression','NativeStackRegression','NativeAutoStackRegression','NativeFolderRegression','NativeKeywordRegression','NativeFolderRelocationRegression','NativeFolderSyncRegression','NativeExportMetadataRegression','NativeExportPresetRegression','NativeKeywordDetailsRegression','NativeKeywordVocabularyRegression','NativeKeywordExchangeRegression','NativeKeywordSetRegression','NativePainterRegression')
+    suites=('NativeStateRegression','NativeLibraryRegression','NativeSelectionRegression','NativeReviewRegression','NativeThumbnailRegression','NativeCollectionRegression','NativeVirtualCopyRegression','NativeConnectionRegression','NativeStackRegression','NativeAutoStackRegression','NativeFolderRegression','NativeKeywordRegression','NativeFolderRelocationRegression','NativeFolderSyncRegression','NativeExportMetadataRegression','NativeExportPresetRegression','NativePreviousExportRegression','NativeKeywordDetailsRegression','NativeKeywordVocabularyRegression','NativeKeywordExchangeRegression','NativeKeywordSetRegression','NativePainterRegression')
     suites+=('NativePainterKeywordPickerRegression',)
     suites+=('NativeTargetPainterRegression',)
     suites+=('NativeOrientationRegression',)

@@ -263,6 +263,33 @@ Preset update/deletion cannot change a draft already loaded or a submitted job.
 The Mac shell owns folder panels and captured forms, while app, CLI and MCP share
 the same validation and revision contract. No Adobe preset code is executed.
 
+## Previous export configuration
+
+Schema 35 adds a catalog-local singleton for the last accepted manual export
+configuration. It holds a revision plus canonical format/options and the effective
+destination, without photo IDs, recipes, preset references or request identities.
+Legacy catalogs start without a previous configuration; old job history is not
+interpreted as a manual session. Catalog backup preserves the singleton.
+
+An explicit `remember_previous` flag on ordinary submission updates this state in
+the same transaction as jobs and their idempotency receipt. The Mac sets it for
+manual settings and modified preset values, including a changed destination; an
+unchanged named preset does not replace Previous. Preset baseline comparison uses
+copied values rather than a live library reference. Acceptance into the durable
+queue defines the session, regardless of a later worker failure or cancellation.
+
+`enqueue_previous_exports` captures the singleton revision and selected photos'
+current recipes/metadata in one transaction, creating fresh jobs without changing
+the singleton. Its request receipt is checked before the revision, so an identical
+request can recover its original job IDs after Previous changes. A changed argument
+or cross-command request key fails. Native invocations capture selection before
+awaiting edits, create one request key, and never replay an uncertain mutation.
+Catalog-local scope and destination-only modification are explicit LumaRAW policies;
+Adobe's documentation does not establish equivalent cross-catalog persistence.
+Queue polling includes only Previous's availability and revision alongside the
+existing job response. The shell publishes an availability change once and keeps
+equal polling state quiet; full settings are read only for explicit reuse.
+
 ## Memory and performance
 
 Library pages contain at most 60 summaries; full recipes are fetched on demand. Preview and export share strip processing, with overlap for neighborhood filters. Full-resolution viewports are limited to 2048 × 1536. LibRaw still decodes a complete RAW frame; linear pixel caches live on disk.

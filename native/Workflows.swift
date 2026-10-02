@@ -63,7 +63,18 @@ struct ExportSheet:View {
                 Text("Available: {stem} {seq} {width} {height} {space}").font(.caption).foregroundStyle(.secondary)
                 HStack{Text(draft.destination.isEmpty ? "Choose an export folder":draft.destination).lineLimit(2).font(.callout).textSelection(.enabled);Spacer();Button("Choose…"){let panel=NSOpenPanel();panel.canChooseDirectories=true;panel.canChooseFiles=false;panel.canCreateDirectories=true;if panel.runModal() == .OK{draft.destination=panel.url?.path ?? ""}}}
             }.formStyle(.grouped)
-            HStack{Text("Existing files are preserved · ICC embedded").font(.caption).foregroundStyle(.secondary);Spacer();Button("Cancel"){dismiss()}.keyboardShortcut(.cancelAction);Button(submitting ? "Submitting…":"Add to Queue"){submitting=true;Task{await s.export(draft.destination,draft.format,draft.options);submitting=false}}.buttonStyle(.borderedProminent).keyboardShortcut(.defaultAction).disabled(draft.destination.isEmpty || s.selection.isEmpty || submitting)}
+            Text(draft.shouldRememberPrevious
+                ? "Submitting remembers these settings for Export with Previous in this catalog."
+                : "Unchanged preset settings keep this catalog’s existing Previous export.")
+                .font(.caption).foregroundStyle(.secondary)
+            HStack{Text("Existing files are preserved · ICC embedded").font(.caption).foregroundStyle(.secondary);Spacer();Button("Cancel"){dismiss()}.keyboardShortcut(.cancelAction);Button(submitting ? "Submitting…":"Add to Queue"){
+                let destination=draft.destination
+                let format=draft.format
+                let options=draft.options
+                let rememberPrevious=draft.shouldRememberPrevious
+                submitting=true
+                Task{await s.export(destination,format,options,rememberPrevious:rememberPrevious);submitting=false}
+            }.buttonStyle(.borderedProminent).keyboardShortcut(.defaultAction).disabled(draft.destination.isEmpty || s.selection.isEmpty || submitting || s.exportSubmissionBusy)}
         }.padding(24).frame(width:660)
             .sheet(isPresented:$showPresets) { ExportPresetBrowserSheet(draft:$draft) }
     }

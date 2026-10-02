@@ -4,7 +4,8 @@ Purpose: keep UI and agents on one transactional domain boundary. Each command
 opens its own SQLite connection under a short catalog lock. Expensive pixels run
 outside that lock, in one child at a time, with sampled RSS and time limits.
 Inputs: validated API commands. Outputs: JSON, file-backed previews, durable jobs,
-and revision-bound shared/catalog export preset workflows.
+revision-bound shared/catalog export preset workflows, and catalog-local Previous
+export settings committed with accepted manual queue submissions.
 Completed preview receipts are checked outside catalog locks without starting an
 image worker; source identity, revisions and cancellation still bind each reply.
 No GUI, HTTP listener, telemetry or original-file writes. Interrupted exports are
@@ -26,6 +27,7 @@ import psutil
 from .api import TOOLS
 from .catalog import Catalog, walk_images
 from .model import Recipe, ExportOptions, LIMITS, PRESETS, SYNC_GROUPS, POINT_CURVE_PRESETS
+from . import export_previous
 from .organization import Organization
 from .collections import Collections
 from .virtual_copies import VirtualCopies
@@ -124,6 +126,26 @@ class Service:
         if row['revision']!=revision:
             raise ConflictError(f"Edit conflict: current revision {row['revision']}, requested revision {revision}. Read the photo again.")
         return row
+
+    @staticmethod
+    def export_request_digest(method,params):
+        # Preserve enqueue_exports' historical receipt digest byte-for-byte.
+        # New Previous requests include their method name to prevent cross-method key reuse.
+        payload=params if method=='enqueue_exports' else {'method':method,'args':params}
+        return hashlib.sha256(json.dumps(payload,sort_keys=True).encode()).hexdigest()
+
+    def export_request_replay(self,c,method,params,digest=None):
+        digest=digest or self.export_request_digest(method,params)
+        row=c.db.execute('SELECT digest,result FROM requests WHERE key=?',(params['request_key'],)).fetchone()
+        if row is None:
+            return digest,None
+        if row['digest']!=digest:
+            raise ValueError('request_key is already used by a different export request')
+        return digest,json.loads(row['result'])
+
+    @staticmethod
+    def enqueue_export_rows(c,rows,destination,fmt,options):
+        return [c.enqueue_one(row,destination,fmt,options) for row in rows]
 
     def memory_status(self):
         """Keep the user's cap distinct from the currently affordable cap."""
@@ -391,19 +413,52 @@ class Service:
                     c.db.executemany('UPDATE photos SET '+','.join(f'{key}=?' for key in fields)+' WHERE id=?',
                                      [(*fields.values(),photo_id) for photo_id in ids])
                 return {'updated':[{'photo_id':photo_id,**fields} for photo_id in ids]}
+            if method=='get_previous_export':
+                return export_previous.state(c.db)
             if method=='enqueue_exports':
-                digest=hashlib.sha256(json.dumps(p,sort_keys=True).encode()).hexdigest()
-                previous=c.db.execute('SELECT digest,result FROM requests WHERE key=?',(p['request_key'],)).fetchone()
-                if previous:
-                    if previous[0]!=digest:raise ValueError('request_key is already used by a different export request')
-                    return json.loads(previous[1])
-                options=ExportOptions.parse(p.get('options'));rows=[self.require(c,i) for i in dict.fromkeys(p['photo_ids'])]
-                dest=Path(p['destination']).expanduser().resolve();dest.mkdir(parents=True,exist_ok=True)
-                ids=[]
+                digest,replay=self.export_request_replay(c,method,p)
+                if replay is not None:return replay
+                options=ExportOptions.parse(p.get('options'))
+                photo_ids=list(dict.fromkeys(p['photo_ids']))
+                # Match the existing preflight boundary: reject bad selections before
+                # creating the user-requested destination directory.
+                for photo_id in photo_ids:self.require(c,photo_id)
+                dest=Path(p['destination']).expanduser().resolve()
+                dest.mkdir(parents=True,exist_ok=True)
+                remember=bool(p.get('remember_previous',False))
+                saved_settings=(export_previous.canonical_settings(p['format'],options.dict(),str(dest))
+                                if remember else None)
                 with c.db:
                     c.db.execute('BEGIN IMMEDIATE')
-                    for row in rows:
-                        ids.append(c.enqueue_one(row,dest,p['format'],options))
+                    digest,replay=self.export_request_replay(c,method,p,digest)
+                    if replay is not None:return replay
+                    rows=[self.require(c,photo_id) for photo_id in photo_ids]
+                    ids=self.enqueue_export_rows(c,rows,dest,p['format'],options)
+                    result={'job_ids':ids,'queued':len(ids)}
+                    if saved_settings is not None:export_previous.remember(c.db,saved_settings)
+                    c.db.execute('INSERT INTO requests VALUES(?,?,?)',(p['request_key'],digest,json.dumps(result)))
+                self.wake.set();return result
+            if method=='enqueue_previous_exports':
+                digest,replay=self.export_request_replay(c,method,p)
+                if replay is not None:return replay
+                with c.db:
+                    c.db.execute('BEGIN IMMEDIATE')
+                    digest,replay=self.export_request_replay(c,method,p,digest)
+                    if replay is not None:return replay
+                    previous=export_previous.state(c.db)
+                    if not previous['available']:
+                        raise ValueError('No accepted Previous export settings are available')
+                    if previous['revision']!=p['expected_revision']:
+                        raise ValueError('Previous export settings changed; refresh and try again')
+                    settings=previous['settings']
+                    options=ExportOptions.parse(settings['options'])
+                    photo_ids=list(dict.fromkeys(p['photo_ids']))
+                    rows=[self.require(c,photo_id) for photo_id in photo_ids]
+                    # Keep this small filesystem side effect within the same write
+                    # transaction as the captured settings and recipe snapshots.
+                    dest=Path(settings['destination']).expanduser().resolve()
+                    dest.mkdir(parents=True,exist_ok=True)
+                    ids=self.enqueue_export_rows(c,rows,dest,settings['format'],options)
                     result={'job_ids':ids,'queued':len(ids)}
                     c.db.execute('INSERT INTO requests VALUES(?,?,?)',(p['request_key'],digest,json.dumps(result)))
                 self.wake.set();return result
@@ -411,7 +466,10 @@ class Service:
                 row=c.db.execute('SELECT '+c.job_columns()+' FROM jobs WHERE id=?',(p['job_id'],)).fetchone()
                 if not row:raise ValueError('Job does not exist')
                 return unpack(dict(row))
-            if method=='list_jobs':return {'jobs':[{k:v for k,v in unpack(j).items() if k!='recipe'} for j in c.jobs(60)],'counts':c.job_counts(),'paused':self.paused,'active':self.active}
+            if method=='list_jobs':
+                return {'jobs':[{k:v for k,v in unpack(j).items() if k!='recipe'} for j in c.jobs(60)],
+                        'counts':c.job_counts(),'paused':self.paused,'active':self.active,
+                        'previous_export':export_previous.summary(c.db)}
             if method=='save_version':
                 return {'saved':True,**c.save_version(p['photo_id'],p['name'],p.get('expected_revision'),p.get('step_id'))}
             if method=='list_versions':
