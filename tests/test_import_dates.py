@@ -19,6 +19,7 @@ from lumaraw import import_copy_io as copy_io
 from lumaraw.catalog import Catalog
 from lumaraw.import_copy_runner import CopyRunner
 from lumaraw.service import Service
+from lumaraw.runtime import CATALOG_VERSION
 from legacy_catalog import migrate_to
 from test_import_review import apply, library, picture, prepare, scan
 from test_xmp_read import packet
@@ -201,7 +202,7 @@ def test_schema_30_upgrade_defaults_existing_copy_and_preserves_old_journal_path
 
     catalog_module.migrate(catalog.db)
     catalog_module.migrate(catalog.db)
-    assert catalog.db.execute('PRAGMA user_version').fetchone()[0]==31
+    assert catalog.db.execute('PRAGMA user_version').fetchone()[0]==CATALOG_VERSION
     assert catalog.db.execute('SELECT date_format FROM import_copy_plans WHERE plan_id=?',(plan_id,)).fetchone()[0]=='year_date'
     assert catalog.db.execute('SELECT target FROM import_transfers WHERE plan_id=?',(plan_id,)).fetchone()[0]==str(old_target)
     assert catalog.db.execute('SELECT state,phase FROM import_plans WHERE id=?',(plan_id,)).fetchone()[:]==('interrupted','copying')

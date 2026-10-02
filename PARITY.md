@@ -58,7 +58,7 @@ gaps. Nothing below is full Lightroom parity merely because historical tests pas
 
 | Area | Current implementation | Remaining acceptance / work |
 | --- | --- | --- |
-| Import and catalogs | Partial: durable Add/Copy review with checked selection, Grid/Loupe source previews, suspected duplicates, bounded sorting/filtering, captured import-time presets and keywords, Copy destination/subfolder and flat/source/date organization, filename token editor and catalog-local templates with checked-sequence and catalog Import/Image numbering, byte-verified original/XMP transfers, optional original-state second copies, catalog-local saved import configurations with explicit rescans, explicit crash recovery and retained-copy cancellation, Previous Import navigation and catalog backup/restore | Move/Copy as DNG, destination-tree grouping and more date formats, numbering edge-case reference acceptance and wider EXIF/shared templates, shared/Adobe import-preset exchange and interaction acceptance, preview policies, cards/tethering, progressive Current Import, catalog switching/merge and desktop/reference acceptance |
+| Import and catalogs | Partial: durable Add/Copy review with checked selection, Grid/Loupe source previews, suspected duplicates, bounded sorting/filtering, captured import-time presets and keywords, Copy destination/subfolder and flat/source/date organization with three numeric date layouts and paged destination photo counts, filename token editor and catalog-local templates with checked-sequence and catalog Import/Image numbering, byte-verified original/XMP transfers, optional original-state second copies, catalog-local saved import configurations with explicit rescans, explicit crash recovery and retained-copy cancellation, Previous Import navigation and catalog backup/restore | Move/Copy as DNG, destination-tree grouping and more date formats, numbering edge-case reference acceptance and wider EXIF/shared templates, shared/Adobe import-preset exchange and interaction acceptance, preview policies, cards/tethering, progressive Current Import, catalog switching/merge and desktop/reference acceptance |
 | Library navigation | Partial: bounded grid/filmstrip, folder tree/search/favorites/labels, durable missing-folder relocation and folder synchronization, direct/recursive sources, filters/sorting including live snapshot status, regular/smart/Quick collections and nested sets | Multi-source selection, complete sync Import Dialog/duplicate policy, folder move/rename, relocation overlap/collision handling, collection drag/drop/color labels, full smart criteria/import-export, source-selection memory, desktop acceptance |
 | Organization | Partial: duplicate/missing detection, hierarchical keywords/synonyms/export flags/Will Export preview, text/CSV vocabulary exchange and manual person tags, custom nine-slot keyword sets/recent entries/shared or catalog storage, multi-keyword shortcuts and keyword/rating/flag/label/target-collection/rotation/Develop-preset/metadata-preset Painter strokes, independent catalog rotation/flips, title/caption/copyright plus thirty IPTC fields, selective metadata presets, labels, batch metadata, virtual copies, manual/split/capture-time scoped stacks | Keyword policy/file and preset reference acceptance, built-in sets/suggestions/undo, Painter desktop acceptance, IPTC Extension and complete metadata parity, stack interaction acceptance, rename and sidecars |
 | Culling | Partial: Loupe/Compare/Survey, linked detail, anchored page selection, Develop Reference/Active pairs with independent Fit/1:1 viewports, session lock and RGB/LAB readouts | Desktop and numerical reference acceptance, HDR readouts, scrubby/box zoom, cross-page selection, auto advance, persistent workspace state |
@@ -3873,3 +3873,100 @@ The official MCP SDK was not run. macOS 14, actual desktop interaction/VoiceOver
 localized date menus and Lightroom reference comparison remain unverified. No
 desktop automation was retried. Further date formats, destination grouping and
 the wider non-AI import/product scope remain open.
+
+### Copy destination-folder count preview
+
+Engine generation 44 / schema 32 adds `get_import_destinations` and the native
+Destination Folders sheet on a ready Copy review. It lists captured primary
+folders with checked, eligible original counts, plus a separate backup destination
+and count. Empty relative paths denote the destination root. It preserves Unicode
+source folder names and supports all captured flat/source/date layouts. Sidecars
+are transfers, not additional photos. Reading the preview never creates folders.
+
+[Adobe's hard-drive import documentation](https://helpx.adobe.com/lightroom-classic/desktop/import-photos/import-photos-video-catalog.html)
+describes grouping previews by target folder and showing destination counts. The
+current implementation covers a paged folder/count list; grouped thumbnails,
+collapsible trees, italic new-folder indicators and exact Adobe selection/count
+edge behavior still need implementation or reference acceptance.
+
+The directory rule is shared with Copy target construction and captured during
+bounded scan batches. Transactional triggers maintain separate selected new and
+duplicate counts; two partial indexes serve the corresponding duplicate policies.
+Pages seek after the last binary directory key and return at most 60 groups, with
+no whole-review GROUP BY, per-file clock parsing or naming-rank work. Each read
+requires the captured review revision. The native model reads on opening, explicit
+reload and paging, not on the import progress polling interval. A conflict keeps
+the old page visible with an error until an explicit reload.
+
+The same change removes a catalog-sized recount after an individual checkbox
+change. Selection validates all requested IDs first, computes count/byte deltas
+for rows whose checked state actually changes, and updates the plan totals in the
+same transaction. Bulk checking still performs work proportional to the affected
+rows; no-op checks preserve totals and keep existing revision semantics.
+
+Migration from schema 31 backfills retained Copy rows in bounded batches. It does
+not change plan revisions, global sequence allocation or retained transfer paths.
+Interrupted/active copies continue to use transfer details for recovery evidence;
+the new folder preview is available only for ready reviews.
+
+The focused import group passed **167 tests in 18.96 s**. Its migration fault test
+seeds a genuine schema-31 review with 125 rows, injects failure at row 61 after
+confirming 60 rows were updated, and verifies complete rollback of schema/data.
+Successful/idempotent retry preserves frozen journal paths, reservations, global
+counter values and plan revisions, including old `capture_date`-only clocks.
+Selection cases verify exact byte totals and repeated no-op behavior.
+
+The directory scale probe ran after the targeted tests ended and before the full
+tests/build. It used 10,000 and 100,000 generated SQLite originals, one per folder,
+on Apple M3 Max / 128 GiB / macOS 26.6.2. Pages contain 60 folders with one first
+request and five warm reads. Connections are new but OS caches warm from seeding.
+The probe times domain SQL/path construction, excluding seeding, JSON encoding, IPC, image/file
+I/O and desktop frames; no image dimensions, GPU dispatch or pixel workers apply.
+
+| Original/folder count / cursor position | First | Warm median / max |
+| --- | --- | --- |
+| 10,000 / first | 0.297 ms | 0.202 / 0.211 ms |
+| 10,000 / middle | 0.238 ms | 0.203 / 0.209 ms |
+| 10,000 / last | 0.220 ms | 0.200 / 0.202 ms |
+| 100,000 / first | 0.314 ms | 0.211 / 0.218 ms |
+| 100,000 / middle | 0.245 ms | 0.195 / 0.214 ms |
+| 100,000 / last | 0.225 ms | 0.193 / 0.213 ms |
+
+Pages used approximately 500–600 SQLite VM instructions at both sizes; JSON
+responses were 5,555–5,563 bytes. With 99% of folders containing only excluded
+duplicates, first/warm-median/max were 0.241/0.203/0.270 ms at 10,000 folders and
+0.314/0.191/0.217 ms at 100,000, with the same VM bound. Including duplicates at
+the last page remained 0.193 ms warm median at either size.
+
+Six single-item uncheck/recheck operations took 1.043–1.318 ms at 10,000 rows and
+1.016–1.359 ms at 100,000, including the ordinary bounded review reply. Both sizes
+used approximately 1,500–1,900 VM instructions. Process RSS sampled every 5 ms
+peaked at 32.938 / 37.094 MiB across the read, selection and duplicate-policy probe
+phases. This establishes size-independent indexed reads and individual selection
+work in the generated fixture, not camera throughput or real desktop frame rate.
+
+The complete required-Metal / real-NEF suite passed **921 tests in 101.53 s**,
+without skips. The app builds for the Mac 14 deployment target and passes local
+deep/strict ad-hoc signature verification. A Mac 14 runtime remains unavailable.
+
+Four packaged-engine native suites passed **141 assertions**: destination folders
+25, date formats 71, Add/Copy 29 and responsiveness 16. The destination suite uses
+65 generated source folders to exercise both cursor pages, previous navigation,
+empty cursors, stale-page retention, explicit reload, zero selections and separate
+backup counts. It verifies unchanged originals and no destination creation.
+Inspected offscreen snapshots show readable Unicode/long directory paths, counts,
+backup information and navigation, plus the ready Import window with long preset
+summaries wrapping below its action buttons. These are model/IPC and offscreen
+layout checks, not desktop pointer/keyboard, sheet-dismissal or VoiceOver tests.
+
+Packaged initialization, all **138 MCP schemas**, engine identity and the bundled
+guide match source. Build identities:
+
+- Source digest: `99ff0747ffd1f15177e4a927dd24c32a0df50bec1e126dfd2229ac2b03971fc3`
+- Engine SHA-256: `43ba45e6ba91c28a611b10828756904dd0ca7abb4704bf74d009aa0145164153`
+- Native SHA-256: `4a508a3563a1343c1402520252b8b8c23562902bf5a937c23d55f3ba87ddaec0`
+
+The official MCP SDK, macOS 14, actual desktop interaction/VoiceOver and Lightroom
+reference acceptance were not run. No desktop automation was retried. Grouped
+thumbnails, destination trees/new-folder styling and the broader non-AI scope
+remain unfinished.

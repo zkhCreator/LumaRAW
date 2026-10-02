@@ -744,6 +744,24 @@ filesystems. Neither preflight nor exclusive publication overwrites an existing
 target. Choosing a destination inside the catalog or a selected source directory
 is rejected.
 
+Schema 32 adds a nullable captured destination directory per staged import row
+and transactional directory counts for selected new/duplicate originals. The
+`import_destinations.py` read contract serves a ready Copy review at its captured
+revision, returning at most 60 folders in binary path order through a keyset
+cursor. Separate partial indexes cover new-only and duplicate-inclusive pages.
+Directory computation shares the pure path rule used by Copy and runs during
+bounded metadata scan batches. SQL triggers maintain counts on selection, state,
+directory changes and removal. Reads do not parse file clocks, compute naming
+ranks, load whole reviews or inspect destination filesystems. Sidecars and backup
+transfers never inflate original counts; the backup destination is separate.
+
+The additive migration backfills retained Copy rows in bounded batches without
+changing their revision, global numbering or transfer journal. Copy recovery still
+uses its frozen transfer paths. The native folder sheet reads on opening, explicit
+reload and page changes; it adds no work to the existing import progress polling.
+This is a folder-count preview, not a complete destination tree or a filesystem
+existence/new-folder claim.
+
 Each transfer records planned/writing/sealed/published state, a random scratch
 name, owned inode/device, source stat identity and sealed SHA-256/output identity.
 The sealed receipt commits before publication. A crash between link creation and

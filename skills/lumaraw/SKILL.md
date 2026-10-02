@@ -265,6 +265,16 @@ use `Unknown Date`, never modification time or host timezone. Review pages show
 computed destination paths. Originals and recognized XMP are copied byte-for-byte;
 existing targets are never overwritten, and all target names are preflighted.
 
+On a ready Copy review, `get_import_destinations(plan_id, expected_revision)`
+returns up to sixty target folders and counts of checked eligible originals.
+Pass `next_after` as `after` to continue; an empty string is a valid cursor and
+only null means the last page. `relative_path` includes the optional subfolder,
+and an empty relative path denotes the destination root. XMP and second copies
+do not increase photo counts; optional backup totals appear separately. This read
+creates no directories and does not inspect whether folders exist. If the review
+revision changes, explicitly read it again and restart paging. Do not use this
+preview as a recovery journal or infer transfer completion from it.
+
 Copy failures retain a journal and `interrupted` state. When phase is `copying` or
 `copy_preparing`, use `resume_import_copy(plan_id, expected_revision)` only on an
 explicit recovery request, not `scan_import`. Completed copies are revalidated;

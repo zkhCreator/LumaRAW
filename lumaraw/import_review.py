@@ -9,6 +9,8 @@ performs no filesystem writes, copying, moving, DNG conversion or AI selection.
 Unknown capture time never falls back to mtime for suspected-duplicate matching.
 Copy naming previews are bounded and use selection ranks; original names remain
 the duplicate identity even when verified destination basenames differ.
+Copy review rows retain the captured relative destination directory so selected
+folder counts can be paged without reparsing every row or clock on each read.
 Second copies are receipt-only backups; only verified primary paths are cataloged.
 Source receipts support explicit, atomic preset rescans of ready reviews.
 New originals receive catalog import/image provenance within their commit;
@@ -222,17 +224,20 @@ class ImportReview:
         with self.db:
             self.db.execute('BEGIN IMMEDIATE');plan=self.check(plan_id,revision,('scanning',));counts=json.loads(plan['counts'])
             selected_count,selected_bytes=plan['selected_count'],plan['selected_bytes']
+            from .import_copy import settings as copy_settings, relative_directory
+            copy=copy_settings(self.db,plan_id)
             for row,result in observations:
                 clock=result.get('clock',{});fingerprint=result.get('fingerprints',{}).get(row['path'])
                 size,mtime=fingerprint[2:] if fingerprint else (0,0);row['bytes']=size
                 if result.get('error') or result.get('missing'):state='error'
                 elif self.db.execute('SELECT 1 FROM photos WHERE path=? AND is_virtual=0',(row['path'],)).fetchone():state='existing'
                 else:state='duplicate' if self.duplicate(row,clock) else 'new'
+                destination=relative_directory(copy,{'path':row['path'],'clock':clock}) if copy else None
                 self.db.execute('UPDATE import_files SET state=?,bytes=?,mtime=?,taken_us=?,taken_submicro=?,capture_clock=?,'
-                    'fingerprints=?,patch=?,clock=?,notes=?,error=? WHERE id=?',
+                    'fingerprints=?,patch=?,clock=?,notes=?,error=?,destination_directory=? WHERE id=?',
                     (state,size,mtime,clock.get('taken_us'),clock.get('taken_submicro',''),clock.get('capture_clock','unknown'),
                      json.dumps(result.get('fingerprints',{})),json.dumps(result.get('patch',{})),json.dumps(clock),
-                     json.dumps(result.get('notes',[])),result.get('error',''),row['id']))
+                     json.dumps(result.get('notes',[])),result.get('error',''),destination,row['id']))
                 counts[state]=counts.get(state,0)+1
                 if row['selected'] and (state=='new' or state=='duplicate' and not plan['skip_duplicates']):
                     selected_count+=1;selected_bytes+=size
@@ -251,8 +256,15 @@ class ImportReview:
                 where+=' AND id IN ('+','.join('?' for _ in item_ids)+')';args.extend(item_ids)
                 if self.db.execute('SELECT count(*) FROM import_files WHERE '+where,args).fetchone()[0]!=len(set(item_ids)):
                     raise ValueError('Some import items are not selectable')
-            self.db.execute('UPDATE import_files SET selected=? WHERE '+where,[int(selected),*args])
-            self.recount(plan_id);self.db.execute('UPDATE import_plans SET revision=revision+1 WHERE id=?',(plan_id,))
+            selected=int(selected)
+            changed_count,changed_bytes=self.db.execute('SELECT count(*),COALESCE(sum(bytes),0) FROM import_files '
+                'WHERE '+where+' AND selected!=?',[*args,selected]).fetchone()
+            if changed_count:
+                self.db.execute('UPDATE import_files SET selected=? WHERE '+where+' AND selected!=?',
+                                [selected,*args,selected])
+            delta=1 if selected else -1
+            self.db.execute('UPDATE import_plans SET selected_count=selected_count+?,selected_bytes=selected_bytes+?,'
+                            'revision=revision+1 WHERE id=?',(delta*changed_count,delta*changed_bytes,plan_id))
         return self.get(plan_id)
 
     def options(self,plan_id,expected_revision,skip_duplicates):

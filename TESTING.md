@@ -1309,3 +1309,34 @@ alongside `--catalog-counters --rows 10000 100000`. It verifies every returned
 parent path from captured civil fields while timing the same bounded 60-row
 preview and selected ranks. Report synthetic fixtures, warm OS cache, no pixels/
 workers, elapsed times and sampled RSS; do not claim RAW or desktop throughput.
+
+## Copy destination-folder preview
+
+`tests/test_import_destinations.py` exercises captured folder layouts, checked
+selection and duplicate policy, original-only counts, separate backups, cursor
+paging, stale revisions and genuine schema-31 migration. Folder reads must neither
+write files nor parse all stored clocks or naming ranks. Migration preserves
+retained transfer paths and uses bounded batches rather than materializing reviews.
+
+`NativeImportDestinationRegression` uses five generated PNG originals through
+Backend IPC. Its folder sheet checks explicit reload after review changes and
+separate backup counts, with offscreen rendering for layout inspection. It does
+not establish pointer/keyboard behavior, native file panels or VoiceOver support.
+
+```sh
+.venv/bin/python tests/run_native.py --work work/new-destinations-native \
+  --engine /absolute/LumaRAW.app/Contents/Resources/Engine/LumaRAWEngine \
+  --suite NativeImportDestinationRegression --suite NativeImportRegression \
+  --suite NativeResponsivenessRegression
+.venv/bin/python tests/import_destinations_probe.py \
+  --work work/new-destinations-scale --rows 10000 100000
+```
+
+Run the scale probe after tests/builds stop. It seeds one original per directory
+to stress group cardinality and compares first/middle/last cursor pages. A second
+phase leaves 99% of groups duplicate-only, checking that new-only reads skip them
+through the partial index. It also unchecks/rechecks one original six times and
+bounds SQLite work so an individual checkbox cannot recount the whole review.
+Record first/warm times, VM steps, reply bytes and RSS
+sampled every 5 ms. New connections retain warm OS caches from seeding; there are
+no real photos, image dimensions, pixels, GPU work, IPC or desktop frames timed.

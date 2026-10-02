@@ -2,6 +2,8 @@
 
 Inputs: captured destination/source roots, bounded selected rows and I/O receipts.
 Outputs: deterministic target paths, collision checks and resumable ownership state.
+Captured folder layouts are also reduced to relative directory keys for bounded
+destination previews; those previews never inspect or create filesystem folders.
 Captured naming/counters affect destination basenames and associated XMP stems only.
 Date-folder format uses captured camera civil time, independent of host locale.
 Second-copy transfers retain original names/bytes and never become catalog photos.
@@ -55,25 +57,52 @@ def settings(db, plan_id):
     return result
 
 
-def target(settings, row, ordinal=None, total=0):
+def relative_directory(settings, row):
+    """Return the captured relative destination folder without rendering a name."""
     source = Path(row['path'])
-    clock = row['clock'] if isinstance(row['clock'], dict) else json.loads(row['clock'])
-    relative = Path(source.name)
-    if settings['organization'] == 'source':
+    organization = settings['organization']
+    relative = Path()
+    if organization == 'source':
         roots = [Path(value) for value in settings['roots'] if Path(value) in source.parents]
         if roots:
             root = max(roots, key=lambda p: len(p.parts))
-            relative = Path(root.name)/source.relative_to(root)
-    elif settings['organization'] == 'date':
+            relative = Path(root.name)/source.relative_to(root).parent
+    elif organization == 'date':
         # The original civil date is captured before UTC conversion; neither
         # the host timezone nor file modification time defines date folders.
+        clock = row.get('clock', {})
+        if not isinstance(clock, dict):
+            try:
+                clock = json.loads(clock) if isinstance(clock, (str, bytes, bytearray)) else {}
+            except (TypeError, json.JSONDecodeError):
+                clock = {}
+        if not isinstance(clock, dict):
+            clock = {}
         from .import_dates import folder
-        relative = Path(folder(clock,settings.get('date_format','year_date')))/source.name
+        relative = Path(folder(clock,settings.get('date_format','year_date')))
+    elif organization != 'flat':
+        raise ValueError('Unsupported Copy organization')
+    relative = Path(settings.get('subfolder',''))/relative
+    if relative.is_absolute() or '..' in relative.parts:
+        raise ValueError('Copy destination folder must remain relative to its selected root')
+    return '' if relative == Path('.') else relative.as_posix()
+
+
+def target(settings, row, ordinal=None, total=0):
+    clock = row.get('clock', {})
+    if not isinstance(clock, dict):
+        try:
+            clock = json.loads(clock) if isinstance(clock, (str, bytes, bytearray)) else {}
+        except (TypeError, json.JSONDecodeError):
+            clock = {}
+    if not isinstance(clock, dict):
+        clock = {}
+    decoded={**row,'clock':clock}
     from .import_naming import settings as naming_settings
     from .filename_templates import render
-    name = render(naming_settings(settings), {**row,'clock':clock}, ordinal or row.get('naming_index',0), total,
+    name = render(naming_settings(settings), decoded, ordinal or row.get('naming_index',0), total,
                   settings.get('sequence'))
-    result = Path(settings['destination'])/settings['subfolder']/relative.with_name(name)
+    result = Path(settings['destination'])/relative_directory(settings,decoded)/name
     if len(str(result).encode()) > 4096:
         raise ValueError('Copy destination exceeds the supported filesystem path length')
     return str(result)

@@ -34,6 +34,7 @@ def main():
     suites+=('NativeImportPresetRegression',)
     suites+=('NativeImportSequenceRegression',)
     suites+=('NativeImportDateRegression',)
+    suites+=('NativeImportDestinationRegression',)
     suites+=('NativePreviousImportRegression',)
     suites+=('NativeColorMixerRegression',)
     suites+=('NativePointCurveRegression',)
@@ -89,7 +90,7 @@ def main():
             'LUMARAW_PRESETS_ROOT':str(work/'presets'/suite)}
         if suite=='NativeReferenceRegression':env['LUMARAW_TEST_FIXTURES']='|'.join(paths)
         if suite=='NativeImportNamingRegression':env['LUMARAW_TEST_FIXTURES']='|'.join(paths)
-        if suite in ('NativeImportBackupRegression','NativeImportPresetRegression','NativeImportSequenceRegression','NativeImportDateRegression'):env['LUMARAW_TEST_FIXTURES']='|'.join(paths)
+        if suite in ('NativeImportBackupRegression','NativeImportPresetRegression','NativeImportSequenceRegression','NativeImportDateRegression','NativeImportDestinationRegression'):env['LUMARAW_TEST_FIXTURES']='|'.join(paths)
         if suite=='NativeResponsivenessRegression':env['LUMARAW_TEST_FIXTURES']='|'.join(paths)
         if suite=='NativeTransportRegression':
             relay=fixtures/'native-relay'

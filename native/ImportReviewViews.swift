@@ -5,6 +5,7 @@
 // Second-copy choices/progress are explicit; backups retain source names and bytes.
 // Presets are source-neutral; ready-review replacement uses explicit rescan.
 // Date folder layout is selected before scanning and frozen into the Copy review.
+// Ready Copy reviews expose a separate, read-only destination-folder preview.
 import SwiftUI
 import AppKit
 
@@ -13,12 +14,14 @@ struct ImportReviewSheet: View {
     @Environment(\.dismiss) private var dismiss
     @State private var thumbnailSize=150.0
     @State private var showCopies=false
+    @State private var destinationEditor: ImportDestinationModel?
     var body: some View {
         content.task { await model.load(initial:true) }.onDisappear { model.invalidate() }
             .interactiveDismissDisabled(model.busy)
             .sheet(item:$model.processingEditor) { ImportProcessingSheet(model:$0) }
             .sheet(item:$model.namingEditor) { ImportNamingSheet(model:$0) }
             .sheet(item:$model.presetEditor) { ImportPresetSheet(model:$0) }
+            .sheet(item:$destinationEditor) { ImportDestinationSheet(model:$0) }
             .sheet(isPresented:$showCopies) { if let plan=model.plan { ImportCopyReceipts(planID:plan.id) } }
     }
     var content: some View {
@@ -119,13 +122,22 @@ struct ImportReviewSheet: View {
                         if plan.isCopy {
                             Button(plan.copy["renaming"] as? Bool == true ? "File Renaming: On…":"File Renaming…") { model.openNaming() }
                                 .disabled(model.busy || model.loading || !plan.ready)
-                        }
-                        if let settings=plan.values["processing"] as? [String:Any] {
-                            let names=[settings["develop_name"] as? String ?? "",settings["metadata_name"] as? String ?? ""].filter{!$0.isEmpty}
-                            Text((names+[(settings["keyword_count"] as? Int ?? 0)>0 ? "Additional keywords":""]).filter{!$0.isEmpty}.joined(separator:" · "))
-                                .font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                            if plan.ready {
+                                Button("Destination Folders…") {
+                                    destinationEditor=ImportDestinationModel(planID:plan.id,revision:plan.revision)
+                                }.disabled(model.busy || model.loading)
+                            }
                         }
                         Spacer()
+                    }
+                    if let settings=plan.values["processing"] as? [String:Any] {
+                        let names=[settings["develop_name"] as? String ?? "",settings["metadata_name"] as? String ?? ""].filter{!$0.isEmpty}
+                        let summary=(names+[(settings["keyword_count"] as? Int ?? 0)>0 ? "Additional keywords":""]).filter{!$0.isEmpty}.joined(separator:" · ")
+                        if !summary.isEmpty {
+                            Text(summary).font(.caption).foregroundStyle(.secondary)
+                                .frame(maxWidth:.infinity,alignment:.leading)
+                                .fixedSize(horizontal:false,vertical:true)
+                        }
                     }
                     HStack {
                         Picker("Show",selection:Binding(get:{model.kind},set:{value in Task { await model.browse(kind:value) }})) {

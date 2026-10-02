@@ -109,6 +109,14 @@ another review. Copy currently requires a destination filesystem supporting hard
 links; Finder tags, resource forks and ACLs are not copied. Move and Copy as DNG
 remain unimplemented.
 
+After scanning a Copy review, **Destination Folders…** lists the target folders
+and number of checked, eligible photos in each. Pages contain up to 60 folders;
+second-copy totals appear separately. Unchecked photos and excluded duplicates do
+not count, and XMP sidecars do not add photos. The preview creates no directories.
+Use **Reload** after a review changes; an older page cannot silently mix new counts.
+This folder list does not yet provide a collapsible destination tree or grouped
+thumbnail selection.
+
 **Make a Second Copy To** captures an extra destination before scanning or on a
 ready Copy review. It preserves original filenames, file bytes, modification time
 and recognized XMP in an `Imported on YYYY-MM-DD` folder. Import naming and presets

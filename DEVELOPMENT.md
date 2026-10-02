@@ -107,6 +107,14 @@ when a clear function is more maintainable. Avoid unrelated formatting churn.
   resetting checked selections only after all validation succeeds. Recheck both
   captured revisions after unlocked filesystem work. Interrupted transfers cannot
   be retargeted through a preset. Restores rebind nested LUT assets by hash.
+- Destination-folder previews count only checked eligible originals. Maintain
+  aggregates in the selection/state transaction and use indexed cursor pages;
+  never hide an all-row GROUP BY or clock/rank decode behind a page limit. Keep
+  separate duplicate-policy indexes, revision-bound pages and explicit native
+  reload. Preview performs no destination filesystem work or directory creation.
+  Associated XMP and second-copy transfers are not additional photographs.
+  Individual checkbox updates must adjust selected totals from the changed IDs;
+  do not recount every selected original after a page-scoped change.
 - Copy naming captures token values, never a live template reference. Keep original
   names for duplicate identity while displaying verified destination basenames.
   Rename associated XMP to the same stem; validate every target before filesystem

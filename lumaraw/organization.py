@@ -137,6 +137,8 @@ def migrate(db):
     migrate_import_sequence(db)
     from .import_dates import migrate as migrate_import_dates
     migrate_import_dates(db)
+    from .import_destinations import migrate as migrate_import_destinations
+    migrate_import_destinations(db)
 
 
 def text_predicate(text):
