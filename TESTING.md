@@ -872,6 +872,28 @@ path using synthetic missing originals and empty discovered files.
   --rows 100000
 ```
 
+`folder_sync_mutation_probe.py` separates new-only, unchanged-plus-new, removal
+and mixed transactions, with SQL-category timing and exact count/provenance checks.
+`folder_sync_insert_probe.py` alternates the current INSERT with the former
+trigger-repaired original-name INSERT, using fresh backups in one process. It
+changes only that SQL in the disposable probe connection, checks the expected
+statement shape, and asserts one fewer SQLite row change per imported photo.
+Keep first samples separate from warm samples and report outliers; transaction
+finalization and host/cache variation can dominate a small insertion improvement.
+Neither probe controls desktop interaction or processes actual photograph pixels.
+
+```sh
+.venv/bin/python tests/folder_sync_mutation_probe.py --work work/new-sync-mutation \
+  --rows 100000 --new-rows 10000 --warm-samples 3
+.venv/bin/python tests/folder_sync_insert_probe.py --work work/new-sync-insert-pairs \
+  --rows 100000 --new-rows 10000 --pairs 5
+```
+
+The duplicate suite also applies a genuine schema-36 ready plan after migration,
+with a decomposed Unicode basename and a deliberately incorrect staged name.
+Original-name identity must come from the source path, survive virtual-copy
+creation and preserve original bytes.
+
 The sync metadata detail checks exercise complete long descriptions, twenty-path
 paging, wrong-item/plan/revision rejection and full application. The two
 `test_folder_sync_metadata.py` cases reproduce 60 long Unicode descriptions through

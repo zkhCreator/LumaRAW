@@ -123,6 +123,12 @@ when a clear function is more maintainable. Avoid unrelated formatting churn.
   never automatically replayed. Resumption retains captured selection and source
   identity, and must not silently accept changed files. Copy uses the explicit
   destination/collision/recovery contract below; Move remains separate scope.
+- Folder synchronization inserts `name` and `original_name` from the validated
+  source path, including legacy ready plans with empty staging names. Do not
+  replace that provenance with a staging cache to avoid a basename computation.
+  Keep virtual-copy inheritance and Unicode names intact. Compare actual trigger
+  write counts as well as elapsed time; fewer SQL writes do not by themselves
+  establish faster desktop interaction or whole-workflow throughput.
 - Import Loupe 100% must request physical-pixel ROIs, not enlarge a fitted image.
   Keep Import viewport state separate from Library. Pan from the returned clamped
   ROI center; reject stale focus, plan, frame and pane geometry before applying a

@@ -5067,3 +5067,54 @@ keys and exact Adobe sorted/filter-removal selection behavior remain open. The
 state suite does not dispatch physical keyboard events or verify international
 keyboard layouts, text-focus routing, VoiceOver or macOS 14 runtime behavior.
 Desktop automation remains unavailable, and full Lightroom parity is not claimed.
+
+## Folder Sync original-name insertion (October 2, 2026)
+
+New synchronized originals now insert both `name` and `original_name` from the
+validated source path. Schema 19's fallback trigger no longer has to update each
+new row just to fill its original name. Staged name caches remain irrelevant to
+this identity, including an empty migrated schema-36 name or an incorrect cache.
+The duplicate/synchronization suites pass **41 tests in 8.46 s**, including a
+genuine legacy ready plan, decomposed Unicode basename, actual apply through the
+runner, virtual-copy inheritance and unchanged original bytes.
+
+The domain-only mutation probe uses absent synthetic originals, 100,000 existing
+catalog rows and 10,000 new rows where applicable. Each case has one first sample
+and three later samples from fresh SQLite backups/connections. On Apple M3 Max,
+128 GiB, macOS 26.6.2, Python 3.12.0 and SQLite 3.42.0, the sequential old/new runs
+record the following complete-apply times; OS caches were not flushed:
+
+| Case | Old first / warm median | New first / warm median |
+| --- | ---: | ---: |
+| 10,000 new only | 421.476 / 1,275.015 ms | 355.826 / 373.015 ms |
+| 100,000 unchanged + 10,000 new | 1,129.456 / 1,112.181 ms | 1,015.420 / 1,061.650 ms |
+| Remove 100,000 missing catalog entries | 2,168.805 / 2,210.110 ms | 2,178.035 / 2,202.485 ms |
+| Remove 99,999 + add 10,000 | 2,622.251 / 2,659.222 ms | 2,700.817 / 2,786.028 ms |
+
+Transaction-finalization outliers make these unsuitable for a general speedup
+claim; the mixed median increased. Process peak RSS is 111.55 / 116.50 MiB and
+includes seeding, database copies and prior samples, not just one application.
+
+A second probe alternates only the old/new INSERT SQL in the same process, with
+five pairs per case and reversed order on alternate pairs. Every application
+checks counts, original names, folder state, numbering, Previous Import and staging
+cleanup. The 10,000-photo INSERT plus its triggers makes exactly **60,000 versus
+50,000 SQLite row changes** in both cases: one fewer update per new photo. Its
+warm INSERT medians are **388.892 / 387.895 ms** for new-only and **297.664 /
+224.212 ms** with 100,000 existing rows. Large timing outliers persist in both
+variants; peak process RSS is 117.28 MiB. The retained improvement is fewer writes
+with preserved semantics, not a guaranteed elapsed-time reduction.
+
+Both reproducible probes are public under `tests`. They exclude discovery,
+filesystem revalidation, IPC, image workers, pixel processing and desktop input.
+No camera-throughput, frame-rate or Lightroom performance equivalence is implied.
+Engine generation advances to **56**; catalog schema **37** and the **149** command
+contracts remain unchanged. The complete Python suite passes **1,039 tests in
+176.08 s**, with required actual Metal execution and the public Nikon D3S NEF
+fixture; no tests are skipped. The Mac app builds for a macOS 14 deployment target
+and passes deep strict ad-hoc signature verification. Source/client/broker
+identities, all command schemas and bundled guide bytes match on macOS 26.6.2.
+The final packaged engine passes **89 native state/IPC assertions**: Folder Sync
+41, Library 13, Previous Import 19 and responsiveness 16. These generated-fixture
+checks are not desktop-input or Lightroom acceptance; macOS 14 runtime remains
+unavailable. A fresh fetch finds no unmerged local or remote branches.

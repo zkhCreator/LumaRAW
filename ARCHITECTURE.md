@@ -816,6 +816,9 @@ but keep independent descriptive metadata and recipes. Export snapshots/receipts
 survive removal. SQL trigger guards suppress repeated ancestor counts during the
 batch; folder membership remains maintained and aggregated deltas restore counts
 before commit. Failed transactions restore guards and all catalog changes.
+New originals insert both displayed and original filenames directly from the
+verified source path. This avoids schema 19's fallback name-repair UPDATE per
+photo and preserves legacy plans whose staged name is empty or incorrect.
 
 Schema 37 adds suspected-duplicate review to new synchronization plans. A captured
 `duplicate_detection` marker keeps legacy plans on their original classification

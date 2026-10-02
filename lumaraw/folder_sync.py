@@ -10,6 +10,7 @@ New imports reference files in place. Removal is catalog-only and includes a
 missing original's variants; descriptive XMP updates apply to its master only.
 Catalog sequence allocation is part of the same transaction for new originals;
 metadata-only synchronization and removal do not consume import/image numbers.
+Inserted original-name identity is derived from the source path, not staging data.
 Application keyset-pages the indexed candidate states; unchanged rows only take
 a bounded missing-flag repair path for library-index updates made after scanning.
 Duplicate identity follows reviewed-import matching: original name, bytes and
@@ -417,8 +418,8 @@ class FolderSync:
             self.db.execute('DELETE FROM versions WHERE source_id IN ('+sources+')',remove_params)
             self.db.execute('DELETE FROM photos WHERE source_id IN ('+sources+')',remove_params)
             if allocation:
-                self.db.execute('INSERT INTO photos(path,name,bytes,mtime,recipe,created,import_number,image_number) '
-                    'SELECT path,folder_name(path),bytes,mtime,?,?,?,?+row_number() OVER (ORDER BY id)-1 '
+                self.db.execute('INSERT INTO photos(path,name,original_name,bytes,mtime,recipe,created,import_number,image_number) '
+                    'SELECT path,folder_name(path),folder_name(path),bytes,mtime,?,?,?,?+row_number() OVER (ORDER BY id)-1 '
                     'FROM folder_sync_files WHERE '+new_filter,
                     (json.dumps(Recipe().dict()),time.time(),allocation['import_number'],allocation['image_number'],*new_params))
             # Existing sources still refresh stats even when their import row

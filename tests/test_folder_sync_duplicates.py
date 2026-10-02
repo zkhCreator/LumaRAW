@@ -1,9 +1,10 @@
-"""Regression evidence for Folder Sync's reviewed duplicate boundary.
+"""Regression evidence for Folder Sync's reviewed duplicate and identity boundary.
 
 Inputs: generated originals, captured folder plans and controlled catalog races.
 Outputs: exact duplicate identities, explicit selection behavior, atomic apply,
-numbering/Previous Import provenance, and additive schema compatibility. These
-fixtures prove catalog semantics only; they do not claim Lightroom equivalence.
+numbering/Previous Import provenance, path-derived original names and additive
+schema compatibility. These fixtures prove catalog semantics only; they do not
+claim Lightroom equivalence.
 """
 import hashlib
 import json
@@ -385,6 +386,110 @@ def test_genuine_schema_36_duplicate_migration_is_additive_atomic_and_grandfathe
     assert 'state IN (\'new\',\'duplicate\')' in indexes['folder_sync_file_duplicate']
     assert 'photo_import_duplicate' in indexes
     catalog.close()
+
+
+def test_genuine_v36_ready_plan_derives_original_name_from_unicode_path(tmp_path, monkeypatch):
+    import lumaraw.catalog as catalog_module
+    from legacy_catalog import migrate_to, seed_photo
+    from lumaraw.folder_sync_io import directory_identity, inspect_file
+
+    root = tmp_path / 'Library' / '旅行'
+    anchor = plain_jpeg(root / 'anchor.jpg')
+    candidate = plain_jpeg(root / 'Cafe\u0301.jpg')
+    original_hash = hashlib.sha256(candidate.read_bytes()).digest()
+    catalog_root = tmp_path / 'schema-36-unicode-original-name'
+
+    with monkeypatch.context() as patch:
+        patch.setattr(catalog_module, 'migrate', lambda db: migrate_to(db, 36))
+        legacy = Catalog(catalog_root)
+    seed_photo(legacy.db, anchor)
+    folder_id = legacy.db.execute(
+        'SELECT id FROM catalog_folders WHERE path=?', (str(root),),
+    ).fetchone()[0]
+    folder_revision = legacy.db.execute(
+        'SELECT revision FROM folder_state WHERE id=1',
+    ).fetchone()[0]
+    candidate_stat = candidate.stat()
+    observation = inspect_file({'path': str(candidate), 'source_id': 0}, False, lambda: False)
+    assert not observation.get('error')
+    with legacy.db:
+        plan_id = legacy.db.execute(
+            "INSERT INTO folder_sync_plans(folder_id,path,fingerprint,folder_revision,scan_metadata,state,phase,revision,"
+            "file_count,directory_count,directories_done,scanned,checked,counts,selected_counts,created) "
+            "VALUES(?,?,?,?,0,'ready','files',4,1,1,1,1,1,?,?,1)",
+            (folder_id, str(root), json.dumps(directory_identity(root)), folder_revision,
+             json.dumps({'new': 1}), json.dumps({'new': 1})),
+        ).lastrowid
+        legacy.db.execute(
+            'INSERT INTO folder_sync_directories(plan_id,path,fingerprint,done) VALUES(?,?,?,1)',
+            (plan_id, str(root), json.dumps(directory_identity(root))),
+        )
+        legacy.db.execute(
+            "INSERT INTO folder_sync_files(plan_id,path,source_id,state,selected,bytes,mtime,fingerprints,patch,clock,notes,error) "
+            "VALUES(?,?,0,'new',1,?,?,?,?,?,'[]','')",
+            (plan_id, str(candidate), candidate_stat.st_size, candidate_stat.st_mtime_ns,
+             json.dumps(observation['fingerprints']), json.dumps(observation['patch']),
+             json.dumps(observation['clock'])),
+        )
+    assert legacy.db.execute('PRAGMA user_version').fetchone()[0] == 36
+    legacy.close()
+
+    service = Service(catalog_root)
+    try:
+        expected_name = candidate.name
+        with service.catalog() as upgraded:
+            assert upgraded.db.execute('PRAGMA user_version').fetchone()[0] == 37
+            assert upgraded.db.execute(
+                'SELECT duplicate_detection FROM folder_sync_plans WHERE id=?', (plan_id,),
+            ).fetchone()[0] == 0
+            staged = upgraded.db.execute(
+                'SELECT name FROM folder_sync_files WHERE plan_id=?', (plan_id,),
+            ).fetchone()
+            assert staged['name'] == ''
+
+        # Old ready plans can contain incomplete or untrusted staged names. The
+        # eventual catalog identity must come from the checked source path.
+        forged_stage_name = 'untrusted-staging-name.jpg'
+        with service.catalog() as upgraded, upgraded.db:
+            upgraded.db.execute('UPDATE folder_sync_files SET name=? WHERE plan_id=?',
+                                (forged_stage_name, plan_id))
+            assert upgraded.db.execute(
+                'SELECT name FROM folder_sync_files WHERE plan_id=?', (plan_id,),
+            ).fetchone()[0] == forged_stage_name
+
+        applied = service.dispatch('apply_folder_sync', {
+            'plan_id': plan_id,
+            'expected_revision': 4,
+            'import_new': True,
+            'remove_missing': False,
+            'read_metadata': False,
+        })['plan']
+        assert applied['state'] == 'applied'
+        assert applied['imported'] == 1
+        with service.catalog() as upgraded:
+            physical = upgraded.db.execute(
+                'SELECT id,name,original_name,is_virtual FROM photos WHERE path=?',
+                (str(candidate),),
+            ).fetchone()
+            assert tuple(physical[key] for key in ('name', 'original_name', 'is_virtual')) == (
+                expected_name, expected_name, 0,
+            )
+            physical_id = physical['id']
+
+        master = service.dispatch('get_photo', {'photo_id': physical_id})
+        copied = service.dispatch('create_virtual_copies', {'targets': [{
+            'photo_id': physical_id,
+            'expected_revision': master['revision'],
+            'expected_metadata_revision': master['metadata_revision'],
+        }]})['photos'][0]
+        with service.catalog() as upgraded:
+            virtual = upgraded.db.execute(
+                'SELECT name,original_name,is_virtual FROM photos WHERE id=?', (copied['id'],),
+            ).fetchone()
+            assert tuple(virtual) == (expected_name, expected_name, 1)
+        assert hashlib.sha256(candidate.read_bytes()).digest() == original_hash
+    finally:
+        service.close()
 
 
 def test_genuine_v36_pending_plan_resumes_with_legacy_new_file_semantics(tmp_path, monkeypatch):
