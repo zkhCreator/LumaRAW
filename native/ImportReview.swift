@@ -5,6 +5,7 @@
 // Closing preserves a plan; an uncertain apply is read back before any next action.
 // Optional second copies retain original state independently of import naming.
 // Preset choices are revision-bound; explicit rescans atomically replace ready plans.
+// Counter-dependent naming stays bound to the sequence revision captured by the plan.
 import AppKit
 import Foundation
 
@@ -18,6 +19,7 @@ struct ImportPlan {
     var isCopy: Bool { text("mode") == "copy" }
     var copy: [String:Any] { values["copy"] as? [String:Any] ?? [:] }
     var backup: [String:Any]? { copy["backup"] as? [String:Any] }
+    var sequence: [String:Any]? { values["sequence"] as? [String:Any] }
     var primaryCopied: Int { (copy["copied"] as? Int ?? 0)-(backup?["copied"] as? Int ?? 0) }
     var primaryTransferCount: Int { (copy["transfer_count"] as? Int ?? 0)-(backup?["transfer_count"] as? Int ?? 0) }
     var interruptedCopy: Bool { isCopy && state == "interrupted" && ["copying","copy_preparing"].contains(text("phase")) }
@@ -242,7 +244,11 @@ struct ImportItem: Identifiable {
 
     func apply() async {
         guard canApply,let captured=plan else { return }
-        await mutate("apply_import",["plan_id":captured.id,"expected_revision":captured.revision])
+        var params: [String:Any]=["plan_id":captured.id,"expected_revision":captured.revision]
+        if let sequence=captured.sequence,let revision=sequence["revision"] as? Int {
+            params["expected_sequence_revision"]=revision
+        }
+        await mutate("apply_import",params)
         // If the reply was lost, inspect the receipt. Do not retry apply.
         if error != nil,!closed { await load() }
     }

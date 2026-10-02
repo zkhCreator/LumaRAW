@@ -6,6 +6,8 @@ Library orientation is independent of Develop recipes and frozen in each job.
 Photo details keep complete keyword IDs; large display paths use explicit pages.
 Boundaries: never copy/write original photos; never eagerly load full catalogs.
 Each connection belongs to its creating thread. Bulk insertion commits in batches.
+Direct imports number successful new originals with item savepoints and retain a
+single import number across the invocation's bounded commit batches.
 """
 from contextlib import contextmanager
 import json
@@ -86,6 +88,7 @@ class Catalog:
 
     def import_paths(self, paths, cancelled=lambda: False):
         count = skipped = 0
+        batch_number = None
         for path in paths:
             if cancelled():
                 break
@@ -98,22 +101,40 @@ class Catalog:
                 stat = p.stat()
                 if not p.is_file():
                     continue
-                cur = self.db.execute(
-                    'INSERT OR IGNORE INTO photos(path,name,bytes,mtime,recipe,created) VALUES(?,?,?,?,?,?)',
-                    (str(p), p.name, stat.st_size, stat.st_mtime_ns, json.dumps(Recipe().dict()), time.time()))
-                count += cur.rowcount
-                skipped += 1 - cur.rowcount
+                if not self.db.in_transaction:
+                    self.db.execute('BEGIN')
+                self.db.execute('SAVEPOINT import_path')
+                allocation = None
+                try:
+                    cur = self.db.execute(
+                        'INSERT OR IGNORE INTO photos(path,name,bytes,mtime,recipe,created) VALUES(?,?,?,?,?,?)',
+                        (str(p), p.name, stat.st_size, stat.st_mtime_ns, json.dumps(Recipe().dict()), time.time()))
+                    if cur.rowcount:
+                        from .previous_import import append
+                        append(self.db,cur.lastrowid,first=count == 0)
+                        from .capture_time import read_capture_time
+                        try:
+                            clock=read_capture_time(p)
+                        except OSError:
+                            clock=None  # The reference is imported; capture metadata remains unknown.
+                        if clock:
+                            self.db.execute('UPDATE photos SET taken=?,taken_us=?,taken_submicro=?,capture_clock=?,camera=? WHERE id=?',
+                                            (clock['taken'],clock['taken_us'],clock['taken_submicro'],clock['capture_clock'],clock['camera'],cur.lastrowid))
+                        from .import_sequence import allocate
+                        allocation = allocate(self.db,1,import_number=batch_number)
+                        self.db.execute('UPDATE photos SET import_number=?,image_number=? WHERE id=?',
+                                        (allocation['import_number'],allocation['image_number'],cur.lastrowid))
+                    self.db.execute('RELEASE import_path')
+                except BaseException:
+                    self.db.execute('ROLLBACK TO import_path')
+                    self.db.execute('RELEASE import_path')
+                    raise
                 if cur.rowcount:
-                    from .previous_import import append
-                    append(self.db,cur.lastrowid,first=count == 1)
-                    from .capture_time import read_capture_time
-                    try:
-                        clock=read_capture_time(p)
-                    except OSError:
-                        clock=None  # The reference is imported; capture metadata remains unknown.
-                    if clock:
-                        self.db.execute('UPDATE photos SET taken=?,taken_us=?,taken_submicro=?,capture_clock=?,camera=? WHERE id=?',
-                                        (clock['taken'],clock['taken_us'],clock['taken_submicro'],clock['capture_clock'],clock['camera'],cur.lastrowid))
+                    if batch_number is None:
+                        batch_number = allocation['import_number']
+                    count += 1
+                else:
+                    skipped += 1
                 if (count + skipped) % 100 == 0:
                     self.db.commit()
             except OSError:

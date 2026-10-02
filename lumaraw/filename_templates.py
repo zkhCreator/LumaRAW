@@ -1,10 +1,10 @@
 """Portable filename templates for explicit Copy imports.
 
-Inputs: bounded token sequences, captured source clocks and selected ordinals.
+Inputs: bounded tokens, captured clocks, selected ordinals and allocated counters.
 Outputs: a single validated basename with its original extension. No filesystem,
 catalog access, implicit sanitization, pixel reads or inferred capture metadata.
-Catalog-wide Import/Image counters and Adobe template-file translation are not
-implemented here. Sequence numbers belong only to the current checked batch.
+Counter allocation and Adobe template-file translation are outside this module.
+Sequence is batch-local; Import/Image tokens require explicit catalog snapshots.
 """
 from pathlib import Path
 import re
@@ -12,7 +12,7 @@ import re
 
 TOKENS = ('literal', 'filename', 'original_number', 'folder', 'custom_text',
           'shoot_name', 'sequence', 'index', 'total', 'year', 'month', 'day',
-          'hour', 'minute', 'second', 'camera')
+          'hour', 'minute', 'second', 'camera', 'import_number', 'image_number')
 TOKEN_SCHEMA = {'type':'object', 'properties':{
     'kind':{'enum':list(TOKENS)}, 'text':{'type':'string','maxLength':120},
     'digits':{'type':'integer','minimum':1,'maximum':10}},
@@ -68,7 +68,7 @@ def validate(template):
             if set(part) != {'kind','text'} or not part['text']:
                 raise ValueError('Literal tokens require nonempty text only')
             safe_text(part['text'])
-        elif kind in ('sequence','index','total'):
+        elif kind in ('sequence','index','total','import_number','image_number'):
             if set(part)-{'kind','digits'}:
                 raise ValueError('Number tokens accept only optional padding digits')
         elif set(part) != {'kind'}:
@@ -84,7 +84,7 @@ def validate_settings(value):
     return value
 
 
-def render(value, row, ordinal, total):
+def render(value, row, ordinal, total, sequence=None):
     source = Path(row['path'])
     if not value['enabled']:
         return source.name
@@ -105,6 +105,13 @@ def render(value, row, ordinal, total):
             item = part['text']
         elif kind in ('sequence','index','total'):
             number = {'sequence':value['start']+ordinal-1,'index':ordinal,'total':total}[kind]
+            item = str(number).zfill(part.get('digits',1))
+        elif kind in ('import_number','image_number'):
+            if sequence is None or kind not in sequence or ordinal < 1:
+                raise ValueError('Catalog numbering requires a captured sequence and checked item rank')
+            number = sequence[kind] + (ordinal-1 if kind == 'image_number' else 0)
+            if not 1 <= number <= 9999999999:
+                raise ValueError('Import sequence exhausted; set new starting numbers before importing')
             item = str(number).zfill(part.get('digits',1))
         else:
             item = values[kind]

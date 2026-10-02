@@ -1255,3 +1255,36 @@ Record reply bytes, first/warm timing distributions, 5 ms sampled broker RSS and
 worker count. Generated catalogs warm the OS cache; this does not measure RAW,
 desktop frame latency or cold filesystem performance. The native preset sheet must
 release after replacement so long scans expose cancellation on the parent review.
+
+## Catalog import and image numbering
+
+`tests/test_import_sequence.py` verifies shared counters across reviewed Add,
+direct and folder-sync imports, no-op/virtual/sidecar exclusions, numeric bounds,
+genuine schema-29 migration rollback, Copy preview revisions, collisions before
+reservation, concurrent counter changes, frozen ranges and explicit recovery.
+Run it with existing naming/Copy/backup/preset/previous-import/folder-sync tests.
+Do not replace a genuine old migration fixture by lowering a current schema number.
+
+The packaged `NativeImportSequenceRegression` uses generated photos to exercise
+counter editing, stale draft preservation, explicit reload and revised Copy names
+through real Backend IPC. Its Settings and counter-sheet PNGs are offscreen layout
+evidence only. Run existing naming, import, presets and responsiveness suites too;
+record unavailable desktop input/VoiceOver and macOS 14 runtime explicitly.
+
+```sh
+.venv/bin/python -m pytest -q tests/test_import_sequence.py
+.venv/bin/python tests/run_native.py --work work/new-import-sequence-native \
+  --engine /absolute/LumaRAW.app/Contents/Resources/Engine/LumaRAWEngine \
+  --suite NativeImportSequenceRegression --suite NativeImportNamingRegression \
+  --suite NativeImportRegression --suite NativeImportPresetRegression \
+  --suite NativeResponsivenessRegression
+.venv/bin/python tests/import_naming_probe.py --catalog-counters \
+  --work work/new-import-sequence-scale --rows 10000 100000
+```
+
+The scale probe uses only generated SQLite rows and warmed OS caches, with a new
+connection for the first read. Record first/warm page times, VM work, reply size,
+rank-freeze elapsed time and 5 ms sampled RSS. No pixel dimensions/backend are
+applicable; no image workers, IPC or desktop frames are timed. Run separately from
+compilation and test activity. Numeric preview correctness does not establish
+Adobe failure/cancellation/reset semantics or gapless numbering.

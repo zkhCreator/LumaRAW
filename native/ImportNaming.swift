@@ -9,7 +9,7 @@ struct FilenameToken: Identifiable {
     var kind: String
     var text=""
     var digits=4
-    var numbered: Bool { ["sequence","index","total"].contains(kind) }
+    var numbered: Bool { ["sequence","index","total","import_number","image_number"].contains(kind) }
     var value: [String:Any] {
         if kind == "literal" { return ["kind":kind,"text":text] }
         if numbered { return ["kind":kind,"digits":digits] }
@@ -42,6 +42,7 @@ struct FilenameToken: Identifiable {
     @Published var templateRevision=0
     @Published var templateName=""
     @Published var previewRows: [[String:Any]]=[]
+    @Published var sequence: [String:Any]?
     @Published var previewOffset=0
     @Published var previewTotal=0
     @Published var previewDraft=""
@@ -71,6 +72,7 @@ struct FilenameToken: Identifiable {
         customText=value["custom_text"] as? String ?? "";shootName=value["shoot_name"] as? String ?? ""
         start=String(value["start"] as? Int ?? 1);extensionCase=value["extension"] as? String ?? "preserve"
         builtins=result["builtins"] as? [[String:Any]] ?? [];kinds=result["tokens"] as? [String] ?? []
+        sequence=result["sequence"] as? [String:Any] ?? sequence
         savedDraft=draftKey
     }
     private func receiveLibrary(_ result: [String:Any]) {
@@ -137,6 +139,7 @@ struct FilenameToken: Identifiable {
             guard !closed else { return }
             previewRows=value["items"] as? [[String:Any]] ?? [];previewOffset=value["offset"] as? Int ?? 0
             previewTotal=value["total"] as? Int ?? 0;previewDraft=draft
+            sequence=value["sequence"] as? [String:Any] ?? sequence
         } catch { if !closed { self.error=error.localizedDescription } }
     }
     @discardableResult func save() async -> Bool {

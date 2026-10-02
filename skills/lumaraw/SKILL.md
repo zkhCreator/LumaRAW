@@ -300,7 +300,7 @@ Settings contain `enabled`, `template` (1–48 token objects), `custom_text`,
 `shoot_name`, `start` (1–9999999999) and `extension` (`preserve`, `lower`, `upper`).
 Token kinds are `literal` (required `text`), `filename`, `original_number`,
 `folder`, `custom_text`, `shoot_name`, `sequence`, `index`, `total`, `year`,
-`month`, `day`, `hour`, `minute`, `second`, `camera`. Number tokens accept optional
+`month`, `day`, `hour`, `minute`, `second`, `camera`, `import_number`, `image_number`. Number tokens accept optional
 `digits` (1–10); other nonliteral tokens accept no additional fields.
 
 `filename` is the source stem; the extension is appended automatically.
@@ -318,8 +318,26 @@ template, expected_revision, template_id?)`; delete via
 `delete_filename_template(template_id, expected_revision)`. Keep the loaded
 template revision with its draft; listing a newer library never authorizes
 overwriting it. Saved imports contain values independent of library edits/deletion.
-Catalog-wide Import/Image counters, shared/Adobe template exchange, wider EXIF
-tokens, Library renaming and export reuse remain unsupported.
+Shared/Adobe template exchange, wider EXIF tokens, Library renaming and export
+reuse remain unsupported.
+
+`get_import_sequence` reads `{revision,next_import,next_image}`. Explicit
+`set_import_sequence(expected_revision,next_import,next_image)` sets starts from
+1 through 9999999999 and rejects stale revisions or an active reserved Copy.
+Import # advances per nonempty import; Image # advances per newly cataloged
+original. Virtual copies retain original provenance. Migration leaves historical
+photo numbers unknown and initializes new counters at 1.
+
+Plan/naming/preview replies contain `sequence` with `revision`, `import_number`,
+`image_number` and `frozen`. Previews and saved presets do not consume numbers.
+When enabled Copy naming uses either global token, `apply_import` requires
+`expected_sequence_revision` from the reviewed plan. Copy captures tentative
+values, checks every output, then atomically reserves the range with its copying
+phase. If a concurrent import changes that revision before reservation, it returns
+to `ready` with an explanation and refreshed names, without destination writes.
+Review and explicitly apply again. Frozen reservations survive interruption,
+cancellation and recovery; gaps are intentional. Never reset or reclaim them to
+repair a failed Copy. Add/direct/folder-sync advance only upon new photo insertion.
 
 For a ready review, `set_import_processing(plan_id, expected_revision, ...)` changes
 one or more of `develop_preset`, `metadata_preset` and `keywords`. A preset choice

@@ -1,7 +1,8 @@
-// Purpose: export, recipe, batch, calibration and agent connection workflows.
+// Purpose: native export, recipe, batch, calibration, settings and agent workflows.
 // Inputs: explicit native panels and user-entered settings. Outputs: domain calls.
 // Exports retain snapshots; app never overwrites an original or existing output.
 // Calibration rectangles address full decoded sources before catalog/Develop edits.
+// Import sequence settings are revision-bound catalog commands; views own no SQL.
 import SwiftUI
 import AppKit
 
@@ -125,6 +126,7 @@ struct AgentView:View {
 }
 struct SettingsView:View {
     @EnvironmentObject var s:Store
+    @State private var showImportSequence=false
     var body:some View {
         Form {
             Section("Import") {
@@ -132,6 +134,9 @@ struct SettingsView:View {
                     Task { await s.setImportNavigation(value) }
                 })).disabled(s.importPreferenceBusy)
                 Text("Show the completed import in Library Grid with filters cleared. Turn this off to keep the current source and filters. This preference is saved with the catalog.").font(.caption).foregroundStyle(.secondary)
+                Button("Edit Import and Image Counters…") { showImportSequence=true }
+                Text("Set counter values used by future imports and filename previews. Existing files are never renamed by a counter change.")
+                    .font(.caption).foregroundStyle(.secondary)
             }
             Section("Acceleration"){
                 Picker("Image Processing",selection:$s.computeBackend){Text("Auto (Prefer Metal)").tag("auto");Text("CPU").tag("cpu");Text("Metal (Report Failures)").tag("metal")}
@@ -167,6 +172,8 @@ struct SettingsView:View {
                 if !s.serviceConnectionMessage.isEmpty { Text(s.serviceConnectionMessage).font(.caption) }
             }
             Section("Color"){Text("Non-destructive editing leaves originals unchanged. NEF decoding uses LibRaw; HE / HE* support and camera-specific color require testing.").font(.callout).foregroundStyle(.secondary)}
-        }.formStyle(.grouped).padding(12).task{await s.refreshMemory();await s.refreshKeywordSets();await s.refreshDevelopPresets();await s.refreshMetadataPresets()}
+        }.formStyle(.grouped).padding(12)
+            .sheet(isPresented:$showImportSequence) { CatalogImportSequenceSheet() }
+            .task{await s.refreshMemory();await s.refreshKeywordSets();await s.refreshDevelopPresets();await s.refreshMetadataPresets()}
     }
 }

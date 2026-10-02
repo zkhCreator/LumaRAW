@@ -7,6 +7,8 @@ metadata stays out of list queries and is read explicitly in bounded detail page
 Filesystem I/O belongs to folder_sync_io/runner; this module never opens or deletes originals.
 New imports reference files in place. Removal is catalog-only and includes a
 missing original's variants; descriptive XMP updates apply to its master only.
+Catalog sequence allocation is part of the same transaction for new originals;
+metadata-only synchronization and removal do not consume import/image numbers.
 """
 import json
 import os
@@ -319,6 +321,10 @@ class FolderSync:
             sources = 'SELECT source_id FROM folder_sync_files WHERE '+remove_filter
             removed = self.db.execute('SELECT count(*) FROM photos WHERE source_id IN ('+sources+')',remove_params).fetchone()[0]
             imported = self.db.execute('SELECT count(*) FROM folder_sync_files WHERE '+new_filter,new_params).fetchone()[0]
+            allocation = None
+            if imported:
+                from .import_sequence import allocate
+                allocation = allocate(self.db,imported)
             modified = 0
             self.db.execute('CREATE TEMP TABLE sync_deltas(path TEXT NOT NULL,delta INTEGER NOT NULL)')
             self.db.execute('INSERT INTO sync_deltas SELECT folder_path(path),-count(*) FROM photos WHERE source_id IN ('+sources+') GROUP BY folder_path(path)',remove_params)
@@ -334,8 +340,11 @@ class FolderSync:
                 self.db.execute(f'DELETE FROM {table} WHERE {column} IN (SELECT id FROM photos WHERE source_id IN ('+sources+'))',remove_params)
             self.db.execute('DELETE FROM versions WHERE source_id IN ('+sources+')',remove_params)
             self.db.execute('DELETE FROM photos WHERE source_id IN ('+sources+')',remove_params)
-            self.db.execute('INSERT INTO photos(path,name,bytes,mtime,recipe,created) SELECT path,folder_name(path),bytes,mtime,?,? FROM folder_sync_files WHERE '+new_filter,
-                (json.dumps(Recipe().dict()),time.time(),*new_params))
+            if allocation:
+                self.db.execute('INSERT INTO photos(path,name,bytes,mtime,recipe,created,import_number,image_number) '
+                    'SELECT path,folder_name(path),bytes,mtime,?,?,?,?+row_number() OVER (ORDER BY id)-1 '
+                    'FROM folder_sync_files WHERE '+new_filter,
+                    (json.dumps(Recipe().dict()),time.time(),allocation['import_number'],allocation['image_number'],*new_params))
             # Source stats are refreshed for every existing original. XMP edits
             # are separately selected and never replace a virtual copy's metadata.
             for rows in self.pages(plan_id):

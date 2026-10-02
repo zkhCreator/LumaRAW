@@ -5,6 +5,7 @@ Outputs: bounded previews, immutable per-plan settings and frozen selected ranks
 SQL owns no original writes. Filename order is NOCASE then stable import item ID;
 UI sort/page never defines the sequence. Range counts scan disjoint index spans,
 not a complete prefix once per visible item. Templates affect only future choices.
+Catalog Import/Image values accompany previews but are never stored in templates.
 """
 import json
 import sqlite3
@@ -92,7 +93,7 @@ class ImportNaming:
         if copy is None:
             raise ValueError('File renaming requires Copy mode; Add preserves originals')
         return {'plan_id':plan_id,'revision':plan['revision'],'state':plan['state'],
-                'settings':settings(copy),'order':'filename','builtins':names.builtins(),'tokens':list(names.TOKENS)}
+                'settings':settings(copy),'sequence':copy['sequence'],'order':'filename','builtins':names.builtins(),'tokens':list(names.TOKENS)}
 
     def set(self,plan_id,expected_revision,settings):
         from .import_review import ImportReview
@@ -126,7 +127,8 @@ class ImportNaming:
             try:result['destination'] = target(copy,item,ranks[item['id']],plan['selected_count'])
             except ValueError as error:result['error'] = str(error)
             previews.append(result)
-        return {'items':previews,'total':plan['selected_count'],'offset':offset,'page_size':60,'revision':plan['revision']}
+        return {'items':previews,'total':plan['selected_count'],'offset':offset,'page_size':60,
+                'revision':plan['revision'],'sequence':copy['sequence']}
 
     def library_revision(self):
         return self.db.execute('SELECT revision FROM filename_template_state WHERE id=1').fetchone()[0]

@@ -4,6 +4,8 @@ Inputs: a revision-bound import, cancellation and read-only source verification.
 Outputs: collision preflight, durable copy progress and one catalog transaction.
 Primary and original-state second copies have independent pinned destinations;
 both must verify before the main copies enter the catalog.
+Catalog counter reservations and the copying phase commit together after preflight.
+Before that boundary, a changed numbered preview returns to explicit review.
 No pixels or automatic replay. A failed transfer remains interrupted for explicit
 resume/cancel. Cancellation removes owned scratch links and retains completed files.
 """
@@ -11,6 +13,7 @@ from .import_copy import ImportCopy, settings, COPY_PHASES
 from .import_review import ImportReview
 from . import import_copy_io as io
 from . import import_backup
+from . import import_sequence
 
 
 class CopyRunner:
@@ -58,9 +61,8 @@ class CopyRunner:
                 catalog.db.execute("UPDATE import_files SET catalog_path='' WHERE plan_id=?", (plan_id,))
                 catalog.db.execute('UPDATE import_copy_plans SET transfer_count=0,copied=0,copied_bytes=0,'
                     'backup_copied=0,backup_bytes=0,backup_transfer_count=0 WHERE plan_id=?', (plan_id,))
-                from .import_naming import freeze, settings as naming_settings
-                if naming_settings(value)['enabled']:
-                    freeze(catalog.db,plan,cancelled)
+                from .import_naming import freeze
+                freeze(catalog.db,plan,cancelled)
             after = 0
             while True:
                 io.check_cancel(cancelled)
@@ -74,8 +76,38 @@ class CopyRunner:
                 for row in rows:
                     io.check_cancel(cancelled)
                     io.preflight(row, import_backup.destination(value,row))
+            try:
+                with self.service.catalog() as catalog, catalog.db:
+                    catalog.db.execute('BEGIN IMMEDIATE')
+                    ImportReview(catalog).check(plan_id,revision,('verifying',))
+                    io.check_cancel(cancelled)
+                    import_sequence.reserve_copy(catalog.db,plan,value)
+                    catalog.db.execute("UPDATE import_plans SET phase='copying' WHERE id=?", (plan_id,))
+            except import_sequence.SequenceChanged as error:
+                # Nothing has been written. Discard tentative paths instead of
+                # silently replacing the names the user approved.
+                with self.service.catalog() as catalog, catalog.db:
+                    catalog.db.execute('BEGIN IMMEDIATE')
+                    ImportReview(catalog).check(plan_id,revision,('verifying',))
+                    catalog.db.execute('DELETE FROM import_transfers WHERE plan_id=?',(plan_id,))
+                    catalog.db.execute('DELETE FROM import_sequence_plans WHERE plan_id=? AND frozen=0',(plan_id,))
+                    catalog.db.execute("UPDATE import_files SET catalog_path='',naming_index=0 WHERE plan_id=?",(plan_id,))
+                    catalog.db.execute('UPDATE import_copy_plans SET transfer_count=0,copied=0,copied_bytes=0,'
+                        'backup_copied=0,backup_bytes=0,backup_transfer_count=0 WHERE plan_id=?',(plan_id,))
+                    catalog.db.execute("UPDATE import_plans SET state='ready',checked=0,error=?,revision=revision+1 WHERE id=?",
+                                       (str(error),plan_id))
+                with self.service.catalog() as catalog:
+                    return ImportReview(catalog).get(plan_id)
+        else:
+            # A schema-29 interrupted Copy has immutable output paths but no
+            # numbering receipt yet. Allocate provenance once without renaming.
             with self.service.catalog() as catalog, catalog.db:
-                catalog.db.execute("UPDATE import_plans SET phase='copying' WHERE id=?", (plan_id,))
+                catalog.db.execute('BEGIN IMMEDIATE')
+                ImportReview(catalog).check(plan_id,revision,('verifying',))
+                if not import_sequence.for_plan(catalog.db,plan_id)['frozen']:
+                    from .import_naming import freeze
+                    freeze(catalog.db,plan,cancelled)
+                    import_sequence.reserve_copy(catalog.db,plan,value)
         for rows in self.pages(plan_id):
             for row in rows:
                 io.transfer(row, import_backup.destination(value,row), self.save, cancelled)

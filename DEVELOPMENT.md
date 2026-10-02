@@ -115,6 +115,15 @@ when a clear function is more maintainable. Avoid unrelated formatting churn.
   them across recovery and support cancellation during bulk SQL. Preview ranks
   must seek disjoint index ranges, including same-name IDs; test SQLite VM work
   rather than trusting that an index appearing in EXPLAIN prevents repeated scans.
+- Keep catalog Import/Image counters separate from batch Sequence. Preview and
+  preset/template storage never consume or freeze global starts. Add, direct and
+  folder-sync imports number only successful new originals within their insertion
+  transaction; virtual copies inherit provenance without advancing counters. Copy
+  reserves its entire checked range after all target preflight and before writes,
+  together with the copying phase. Recheck the reviewed counter revision there;
+  a race returns to ready with refreshed names and requires explicit application.
+  Retain reserved ranges across cancellation, crashes and SQL rollback. Never
+  guess historical provenance during migration or reset counters automatically.
 - Second copies preserve original names, bytes and recognized XMP independently
   of primary naming and presets. Pin both destinations, validate collisions across
   all transfers before writes, and verify both roles before cataloging main copies.

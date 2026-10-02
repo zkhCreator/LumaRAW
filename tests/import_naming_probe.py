@@ -2,6 +2,7 @@
 
 Inputs: a new disposable work directory and synthetic staged-row counts. Outputs:
 warm/cold connection page timings, SQLite VM work, RSS and frozen rank checks.
+Optional catalog tokens measure global-counter lookup plus the same bounded ranks.
 No photos/pixels, real source reads, broker IPC or desktop input are measured.
 """
 import argparse
@@ -27,11 +28,15 @@ def seed(c,count):
 
 def main():
     parser=argparse.ArgumentParser();parser.add_argument('--work',type=Path,required=True)
-    parser.add_argument('--rows',type=int,nargs='+',default=[10000,100000]);args=parser.parse_args()
+    parser.add_argument('--rows',type=int,nargs='+',default=[10000,100000])
+    parser.add_argument('--catalog-counters',action='store_true');args=parser.parse_args()
     args.work.mkdir(parents=True,exist_ok=False);results=[]
     for count in args.rows:
         root=args.work/str(count);c=Catalog(root);seed(c,count);c.close()
         value={**names.defaults(),'enabled':True,'template':names.builtins()[2]['template'],'custom_text':'Batch'}
+        if args.catalog_counters:
+            value['template']=[names.token('import_number',digits=4),names.token('literal',text='-'),
+                               names.token('image_number',digits=8)]
         c=Catalog(root);domain=ImportNaming(c);samples=[]
         process=psutil.Process();peak=[process.memory_info().rss];stop=threading.Event()
         def sample():
@@ -47,6 +52,9 @@ def main():
                 runs.append((time.perf_counter()-start)*1000);vm.append(steps[0]);c.db.set_progress_handler(None,0)
                 assert len(result['items'])==60 and result['items'][0]['index']==offset+1
                 assert result['items'][-1]['index']==offset+60
+                if args.catalog_counters:
+                    assert Path(result['items'][0]['destination']).name==f'0001-{offset+1:08}.jpg'
+                    assert result['sequence']=={'revision':0,'import_number':1,'image_number':1,'frozen':False}
             samples.append({'offset':offset,'first_ms':runs[0],'warm_median_ms':statistics.median(runs[1:]),
                             'warm_max_ms':max(runs[1:]),'vm_steps':vm,'reply_bytes':len(json.dumps(result).encode())})
         start=time.perf_counter()
@@ -57,7 +65,8 @@ def main():
         peak[0]=max(peak[0],process.memory_info().rss);stop.set();sampler.join()
         results.append({'rows':count,'pages':samples,'freeze_ms':elapsed,'sampled_peak_mb':peak[0]/1024**2,'sample_interval_ms':5})
         c.close()
-    report={'results':results,'pixel_workers':0,'fixtures':'synthetic SQLite rows only','desktop_ui':'NOT_VERIFIED'}
+    report={'results':results,'pixel_workers':0,'fixtures':'synthetic SQLite rows only','desktop_ui':'NOT_VERIFIED',
+            'catalog_counters':args.catalog_counters,'cache':'new SQLite connection; OS cache warm from seeding'}
     (args.work/'report.json').write_text(json.dumps(report,indent=2));print(json.dumps(report,indent=2))
 
 

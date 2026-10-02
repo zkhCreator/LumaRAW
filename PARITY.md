@@ -58,7 +58,7 @@ gaps. Nothing below is full Lightroom parity merely because historical tests pas
 
 | Area | Current implementation | Remaining acceptance / work |
 | --- | --- | --- |
-| Import and catalogs | Partial: durable Add/Copy review with checked selection, Grid/Loupe source previews, suspected duplicates, bounded sorting/filtering, captured import-time presets and keywords, Copy destination/subfolder and flat/source/date organization, filename token editor and catalog-local templates with checked-sequence previews, byte-verified original/XMP transfers, optional original-state second copies, catalog-local saved import configurations with explicit rescans, explicit crash recovery and retained-copy cancellation, Previous Import navigation and catalog backup/restore | Move/Copy as DNG, destination-tree grouping and more date formats, catalog-wide Import/Image numbering and wider EXIF/shared templates, shared/Adobe import-preset exchange and interaction acceptance, preview policies, cards/tethering, progressive Current Import, catalog switching/merge and desktop/reference acceptance |
+| Import and catalogs | Partial: durable Add/Copy review with checked selection, Grid/Loupe source previews, suspected duplicates, bounded sorting/filtering, captured import-time presets and keywords, Copy destination/subfolder and flat/source/date organization, filename token editor and catalog-local templates with checked-sequence and catalog Import/Image numbering, byte-verified original/XMP transfers, optional original-state second copies, catalog-local saved import configurations with explicit rescans, explicit crash recovery and retained-copy cancellation, Previous Import navigation and catalog backup/restore | Move/Copy as DNG, destination-tree grouping and more date formats, numbering edge-case reference acceptance and wider EXIF/shared templates, shared/Adobe import-preset exchange and interaction acceptance, preview policies, cards/tethering, progressive Current Import, catalog switching/merge and desktop/reference acceptance |
 | Library navigation | Partial: bounded grid/filmstrip, folder tree/search/favorites/labels, durable missing-folder relocation and folder synchronization, direct/recursive sources, filters/sorting including live snapshot status, regular/smart/Quick collections and nested sets | Multi-source selection, complete sync Import Dialog/duplicate policy, folder move/rename, relocation overlap/collision handling, collection drag/drop/color labels, full smart criteria/import-export, source-selection memory, desktop acceptance |
 | Organization | Partial: duplicate/missing detection, hierarchical keywords/synonyms/export flags/Will Export preview, text/CSV vocabulary exchange and manual person tags, custom nine-slot keyword sets/recent entries/shared or catalog storage, multi-keyword shortcuts and keyword/rating/flag/label/target-collection/rotation/Develop-preset/metadata-preset Painter strokes, independent catalog rotation/flips, title/caption/copyright plus thirty IPTC fields, selective metadata presets, labels, batch metadata, virtual copies, manual/split/capture-time scoped stacks | Keyword policy/file and preset reference acceptance, built-in sets/suggestions/undo, Painter desktop acceptance, IPTC Extension and complete metadata parity, stack interaction acceptance, rename and sidecars |
 | Culling | Partial: Loupe/Compare/Survey, linked detail, anchored page selection, Develop Reference/Active pairs with independent Fit/1:1 viewports, session lock and RGB/LAB readouts | Desktop and numerical reference acceptance, HDR readouts, scrubby/box zoom, cross-page selection, auto advance, persistent workspace state |
@@ -3721,3 +3721,86 @@ remain open. Move/DNG, preview policies, catalog-wide numbering and the complete
 non-AI feature inventory remain part of the active goal. Actual desktop inputs,
 file panels, VoiceOver and macOS 14 runtime are unavailable; no desktop automation
 was retried and offscreen/model evidence is not desktop acceptance.
+
+### Catalog Import # and Image # numbering
+
+Engine generation 42 / schema 30 adds catalog starting numbers and the corresponding
+Copy naming tokens. [Adobe's filename editor documentation](https://helpx.adobe.com/lightroom-classic/desktop/import-photos/filename-template-editor-text-template.html)
+defines Import # per import operation and Image # per imported photo; its catalog
+settings reference permits setting starting values. Failed, cancelled, partial,
+duplicate-only and exhausted counter behavior is not established by those sources.
+The rules below are explicit LumaRAW contracts, not claimed Lightroom edge parity.
+
+Mac Settings and File Renaming share an editor for revision-bound starts. Conflicts
+keep drafts; explicit Reload displays current values alongside the retained draft.
+Import # is distinct from batch-local Sequence. Add, direct and folder-sync imports
+allocate only successful new originals inside their insertion transaction. Direct
+imports retain one import number across their bounded commit batches. Virtual
+copies inherit provenance without advancing counters; backups and XMP consume no
+extra photo numbers. Historical photos keep NULL provenance on migration; new
+catalog starts initialize at 1, with explicit adjustment available.
+
+Previews and saved templates/configurations consume nothing and store no live
+global starts. A numbered Copy requires the reviewed sequence revision, captures
+tentative values, then preflights all targets. Counter revision validation,
+reservation of the whole selected range and transition to copying share one
+transaction before writes. A concurrent change returns the plan to ready with
+refreshed names, requiring explicit review/application. Frozen ranges survive
+crashes, partial cancellation and catalog-commit failure; gaps are intentional.
+Schema-29 interrupted copies receive provenance on explicit resume without
+changing retained destination paths. Existing files are never overwritten by a
+counter reset or exhausted range.
+
+The complete required-Metal/real-NEF suite passed **893 tests in 95.99 s**, no
+skips. The focused import/folder/previous-import group passed **173 tests in
+16.10 s**. Coverage includes genuine schema-29 migration rollback/idempotency,
+unpublished and already-published old Copy journal recovery, missing/stale sequence
+revisions, concurrent direct import during Copy preflight, plain-name Copy adopting
+current provenance, Add SQL rollback, no-op/virtual/XMP/backup exclusions, direct
+import crossing the 100-item commit boundary, full-range retention after partial
+cancel, explicit resume and numeric exhaustion/reset. A recovered Add initially
+retained an unnecessary tentative row; limiting tentative capture to Copy fixed
+that duplicate-insert regression before the final full run.
+
+Five packaged-engine native suites passed **124 assertions**: counters 26, naming
+30, Add/Copy 29, saved configurations 23 and responsiveness 16. Counter draft
+conflicts, explicit reload, revision-bound Copy apply, refreshed filenames and
+original byte preservation use real Backend IPC. Inspected offscreen renders cover
+the counter editor, Settings Import section and existing naming window; the new
+controls/readouts are readable. These are model/IPC and offscreen layout checks,
+not actual pointer, keyboard, sheet-dismissal or VoiceOver acceptance.
+
+The catalog-counter naming probe used 10,000 and 100,000 generated SQLite staged
+rows on Apple M3 Max / 128 GiB / macOS 26.6.2. Each page returns 60 names and has
+one first request plus five warm requests. The new connection's OS cache is warm
+from seeding; the first 10,000-row request also includes lazy Python setup. Timings
+exclude seeding, IPC, file I/O, pixels and desktop rendering. No GPU or image worker
+is involved, so image dimensions/backend are not applicable. Tests/builds had ended.
+
+| Staged rows / offset | First | Warm median / max | Reply bytes |
+| --- | --- | --- | --- |
+| 10,000 / 0 | 27.172 ms | 3.685 / 3.748 ms | 7,529 |
+| 10,000 / 5,000 | 4.218 ms | 4.080 / 4.133 ms | 7,660 |
+| 10,000 / 9,940 | 4.685 ms | 4.539 / 4.645 ms | 7,532 |
+| 100,000 / 0 | 4.022 ms | 3.688 / 3.960 ms | 7,590 |
+| 100,000 / 50,000 | 9.935 ms | 9.134 / 9.214 ms | 7,782 |
+| 100,000 / 99,940 | 15.015 ms | 14.305 / 14.710 ms | 7,594 |
+
+One-time rank freeze took 12.754 / 187.615 ms; process RSS sampled every 5 ms peaked
+at 36.50 / 45.125 MiB. Final-page VM work was about 115,000 / 1,105,000 steps, with
+disjoint rank ranges retained. This establishes bounded counter preview work,
+not desktop frame rate or cold-storage import throughput.
+
+The Mac 14 deployment-target app builds and passes deep/strict local ad-hoc signing.
+Packaged initialization, **137 full MCP schemas**, engine identity and bundled guide
+match source. Build identities:
+
+- Source digest: `363abde1bc8c3aa26256f65b68a9931f3aacebd006c1500947db336d491b3f72`
+- Engine SHA-256: `53480525f4296e835baf23fe55fa6a0ac4e3e685488b2754b0f8755d3e48dabf`
+- Native SHA-256: `b4e8baf2531cc28ed56b5f8e0641d8259704d6288d5a84385135b11313603bec`
+
+Official MCP SDK execution was not run. macOS 14, actual desktop input/VoiceOver
+and a Lightroom reference interaction comparison remain unavailable. No desktop
+automation was retried. Full import parity still needs Move/DNG, further date
+formats/destination grouping, preview policies, shared/Adobe preset exchange,
+camera/card workflows and reference acceptance; the overall non-AI goal is open.

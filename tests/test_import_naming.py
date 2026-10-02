@@ -197,9 +197,11 @@ def test_schema_26_upgrade_atomic_existing_copy_and_photo_preserved(tmp_path,mon
     assert c.db.execute('PRAGMA user_version').fetchone()[0]==26
     assert 'naming_index' not in {r[1] for r in c.db.execute('PRAGMA table_info(import_files)')}
     c.db.set_authorizer(None);migrate(c.db);migrate(c.db)
-    assert ImportNaming(c).get(1)['settings']==names.defaults()
+    assert json.loads(c.db.execute('SELECT naming FROM import_copy_plans').fetchone()[0])=={}
     assert c.db.execute('SELECT name FROM photos').fetchone()[0]=='a.jpg'
     assert c.db.execute('PRAGMA user_version').fetchone()[0]==27
+    module.migrate(c.db)  # Current commands require the complete current schema.
+    assert ImportNaming(c).get(1)['settings']==names.defaults()
     c.close()
 
 

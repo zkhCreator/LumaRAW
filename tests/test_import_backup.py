@@ -263,8 +263,10 @@ def test_schema_27_migration_is_atomic_and_keeps_old_journal_primary(tmp_path,mo
     assert c.db.execute('PRAGMA user_version').fetchone()[0]==27
     assert 'backup' not in {r[1] for r in c.db.execute('PRAGMA table_info(import_copy_plans)')}
     c.db.set_authorizer(None);import_backup.migrate(c.db);import_backup.migrate(c.db)
-    assert import_backup.summary(settings(c.db,1)) is None
+    assert json.loads(c.db.execute('SELECT backup FROM import_copy_plans').fetchone()[0])=={}
     assert c.db.execute('SELECT role FROM import_transfers').fetchone()[0]=='primary'
     assert c.db.execute('SELECT name FROM photos').fetchone()[0]=='a.jpg'
     assert c.db.execute('PRAGMA user_version').fetchone()[0]==28
+    module.migrate(c.db)  # Current settings also read the later sequence schema.
+    assert import_backup.summary(settings(c.db,1)) is None
     c.close()

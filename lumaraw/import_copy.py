@@ -2,7 +2,7 @@
 
 Inputs: captured destination/source roots, bounded selected rows and I/O receipts.
 Outputs: deterministic target paths, collision checks and resumable ownership state.
-Captured naming affects destination basenames and associated XMP stems only.
+Captured naming/counters affect destination basenames and associated XMP stems only.
 Second-copy transfers retain original names/bytes and never become catalog photos.
 This domain owns SQL only; import_copy_io owns filesystem writes. Originals and
 existing targets are never overwritten. Cancelled copies retain published files.
@@ -49,6 +49,8 @@ def settings(db, plan_id):
     result = dict(row)
     for key in ('destination_identity', 'roots'):
         result[key] = json.loads(result[key])
+    from .import_sequence import for_plan
+    result['sequence'] = for_plan(db,plan_id)
     return result
 
 
@@ -69,7 +71,8 @@ def target(settings, row, ordinal=None, total=0):
     from .import_naming import settings as naming_settings
     from .filename_templates import render
     clock = row['clock'] if isinstance(row['clock'],dict) else json.loads(row['clock'])
-    name = render(naming_settings(settings), {**row,'clock':clock}, ordinal or row.get('naming_index',0), total)
+    name = render(naming_settings(settings), {**row,'clock':clock}, ordinal or row.get('naming_index',0), total,
+                  settings.get('sequence'))
     result = Path(settings['destination'])/settings['subfolder']/relative.with_name(name)
     if len(str(result).encode()) > 4096:
         raise ValueError('Copy destination exceeds the supported filesystem path length')

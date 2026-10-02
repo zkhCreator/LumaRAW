@@ -11,6 +11,8 @@ Copy naming previews are bounded and use selection ranks; original names remain
 the duplicate identity even when verified destination basenames differ.
 Second copies are receipt-only backups; only verified primary paths are cataloged.
 Source receipts support explicit, atomic preset rescans of ready reviews.
+New originals receive catalog import/image provenance within their commit;
+Copy consumes its already durable reservation without allocating a second time.
 """
 import json
 import os
@@ -96,6 +98,8 @@ class ImportReview:
             if row is None:return {'plan':None,'items':[],'total':0,'offset':0,'page_size':60}
             plan_id=row[0]
         plan=self.row(plan_id);plan['counts']=json.loads(plan['counts'])
+        from .import_sequence import for_plan
+        plan['sequence']=for_plan(self.db,plan_id)
         from .import_processing import brief
         plan['processing']=brief(self.catalog,plan_id)
         from .import_copy import settings, target
@@ -258,10 +262,13 @@ class ImportReview:
             self.recount(plan_id)
         return self.get(plan_id)
 
-    def start_apply(self,plan_id,expected_revision):
+    def start_apply(self,plan_id,expected_revision,expected_sequence_revision=None):
         with self.db:
             self.db.execute('BEGIN IMMEDIATE');plan=self.check(plan_id,expected_revision,('ready',))
             if not plan['selected_count']:raise ValueError('Check at least one new photo to import')
+            from .import_copy import settings
+            from .import_sequence import capture
+            capture(self.db,plan,settings(self.db,plan_id),expected_sequence_revision)
             self.db.execute("UPDATE import_plans SET state='verifying',checked=0,error='',revision=revision+1,"
                 "phase=CASE WHEN EXISTS(SELECT 1 FROM import_copy_plans WHERE plan_id=?) THEN 'copy_preparing' ELSE phase END WHERE id=?",(plan_id,plan_id))
         return self.row(plan_id)
@@ -315,16 +322,22 @@ class ImportReview:
                     'AND p.taken_us=f.taken_us AND p.taken_submicro=f.taken_submicro WHERE '+where+' LIMIT 1',(plan_id,)).fetchone():
                     raise ValueError('A suspected duplicate appeared after review; create a fresh review')
                 imported=self.db.execute('SELECT count(*) FROM import_files f WHERE '+where,(plan_id,)).fetchone()[0]
+                from .import_sequence import commit_plan
+                if not copy:
+                    from .import_naming import freeze
+                    freeze(self.db,plan,cancelled)
+                    self.db.set_progress_handler(lambda:int(cancelled()),2000)
+                allocation=commit_plan(self.db,plan,imported,copy)
                 self.db.execute('CREATE TEMP TABLE import_deltas(path TEXT PRIMARY KEY,delta INTEGER NOT NULL)')
                 self.db.execute('INSERT INTO import_deltas SELECT folder_path('+PHOTO_PATH+'),count(*) FROM import_files f WHERE '+where+' GROUP BY folder_path('+PHOTO_PATH+')',(plan_id,))
                 self.db.execute('INSERT OR IGNORE INTO catalog_folders(path,name,parent_path) WITH RECURSIVE paths(path) AS '
                     '(SELECT path FROM import_deltas UNION SELECT folder_parent(path) FROM paths WHERE folder_parent(path) IS NOT NULL) '
                     'SELECT path,folder_name(path),folder_parent(path) FROM paths')
                 self.db.execute('UPDATE folder_maintenance SET enabled=0 WHERE id=1')
-                self.db.execute('INSERT INTO photos(path,name,original_name,bytes,mtime,recipe,created,taken,taken_us,taken_submicro,capture_clock,camera) '
+                self.db.execute('INSERT INTO photos(path,name,original_name,bytes,mtime,recipe,created,taken,taken_us,taken_submicro,capture_clock,camera,import_number,image_number) '
                     'SELECT '+PHOTO_PATH+',folder_name('+PHOTO_PATH+'),f.name,f.bytes,f.mtime,?,?,COALESCE(json_extract(f.clock,\'$.taken\'),0),'
-                    'f.taken_us,f.taken_submicro,f.capture_clock,COALESCE(json_extract(f.clock,\'$.camera\'),\'\') FROM import_files f WHERE '+where,
-                    (json.dumps(recipe),time.time(),plan_id))
+                    'f.taken_us,f.taken_submicro,f.capture_clock,COALESCE(json_extract(f.clock,\'$.camera\'),\'\'),?,?+f.naming_index-1 FROM import_files f WHERE '+where,
+                    (json.dumps(recipe),time.time(),allocation['import_number'],allocation['image_number'],plan_id))
                 after=0
                 while True:
                     rows=self.db.execute('SELECT f.id,f.patch,p.id AS photo_id FROM import_files f JOIN photos p ON p.path='+PHOTO_PATH+' AND p.is_virtual=0 '

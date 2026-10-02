@@ -136,6 +136,10 @@ class Service:
         if method=='metadata_schema':
             from .iptc import FIELDS, SCHEMA
             return {'iptc_fields':list(FIELDS.values()),'iptc_schema':SCHEMA}
+        if method in ('get_import_sequence','set_import_sequence'):
+            from . import import_sequence
+            with self.catalog() as c:
+                return import_sequence.state(c.db) if method=='get_import_sequence' else import_sequence.set_state(c,**p)
         if method in ('list_import_presets','get_import_preset','save_import_preset','import_preset_action'):
             from .import_presets import ImportPresets
             with self.catalog() as c:

@@ -714,7 +714,7 @@ Thumbnail and fitted Loupe requests use the existing bounded worker/cache with
 separate client generations and no catalog-photo requirement. The native model
 retains one page of images and rejects late replies. This Add contract never
 copies/moves originals. Filesystem stat checks cannot provide an OS-wide snapshot;
-Copy uses the separate adapter below. Move/DNG, saved import configurations and
+Copy uses the separate adapter below. Move/DNG and
 offline preview policy still need explicit adapters and acceptance evidence.
 
 ## Reviewed Copy imports
@@ -812,8 +812,27 @@ Final basenames are limited to 255 UTF-8 bytes and paths to 4096 bytes. Naming a
 only to copied originals and the matching XMP stem. Final photos use destination
 basenames while `original_name` preserves duplicate identity. Existing collision,
 exclusive publication, cancellation and restored-catalog restrictions still apply.
-Catalog-wide Import/Image counters, wider EXIF tokens, shared/Adobe template exchange,
+Wider EXIF tokens, shared/Adobe template exchange,
 Library renaming and export reuse remain separate scope.
+
+Schema 30 adds catalog Import/Image starts, a revision, per-plan tentative/frozen
+reservations and nullable photo provenance. `import_sequence.py` owns allocation;
+the pure filename renderer only receives captured values. Historical photos stay
+NULL because old import batches cannot be reconstructed. Add/folder-sync allocate
+inside their atomic photo insertion; direct import uses item savepoints and one
+import number across its bounded commit batches. Virtual copies inherit provenance.
+
+Copy requires the reviewed global revision only when enabled naming uses those
+tokens. Source verification and complete collision preflight precede a transaction
+that checks the counter revision, reserves every selected photo number and marks
+the phase copying. A race discards unwritten staging and returns to ready with
+refreshed names for explicit review. A frozen range survives crashes, cancellation
+and catalog-commit failure; retry never allocates again. A schema-29 interrupted
+Copy receives provenance on explicit resume without changing its retained paths.
+Presets/templates omit live starts. Resetting starts is explicit and revision-bound,
+blocked while an active Copy owns a frozen range. Add/Copy rank filenames NOCASE/id;
+folder sync ranks staged IDs, and direct import follows successful input traversal.
+These edge semantics are LumaRAW contracts, not established Lightroom equivalence.
 
 `import_processing.py` owns schema 20's per-plan Develop/metadata snapshots and
 additional keyword choices. Preset libraries are read with captured revision

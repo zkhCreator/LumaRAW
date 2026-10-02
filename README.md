@@ -18,7 +18,7 @@ LumaRAW preserves your originals. Add references files in place; Copy imports by
 | Library | Folder tree/search/favorites/labels, ratings, flags, catalog metadata/keywords, regular/live smart collections, nested sets, Quick/target collections, SQL filters/sorting, manual/capture-time stacks, duplicate/missing indexing, virtual copies/shared snapshots, selective sync, and backup/restore |
 | Culling | Grid/Loupe/Compare/Survey, anchored page selections, active-photo review actions, linked or independent full-resolution comparison viewports |
 | Export | JPEG and 16-bit TIFF with embedded sRGB, Display P3, Adobe RGB, or ProPhoto RGB ICC profiles; frozen catalog XMP/keyword policies, persistent queue, pause/cancel/retry, and collision-safe filenames |
-| Agents | 122 MCP tools, equivalent JSON CLI commands, and a bundled skill; app and agent edits share conflict detection |
+| Agents | 137 MCP tools, equivalent JSON CLI commands, and a bundled skill; app and agent edits share conflict detection |
 
 ## Build and run
 
@@ -124,7 +124,7 @@ files and equal-name collisions are never silently overwritten or auto-renamed.
 
 After a Copy scan, **File Renaming** offers nine built-in templates and a token
 editor with literal/custom/shoot text, original filename/number, folder, padded
-sequence, position/total, local capture date/time and camera model. Preview Names
+sequence, catalog Import #/Image #, position/total, local capture date/time and camera model. Preview Names
 shows sixty checked destinations at a time without saving or copying. Save Import
 Settings captures the token values, start number and extension case. Missing
 metadata is an explicit error; names are never silently truncated or sanitized.
@@ -135,7 +135,17 @@ stem. The catalog retains original filenames for suspected-duplicate detection.
 Saved filename templates belong to this catalog, with create/update/rename/delete
 and revision checks. Editing/deleting a template does not alter captured imports.
 Library/export renaming, shared template storage, Adobe template exchange, wider
-EXIF tokens and catalog-wide Import/Image counters remain incomplete.
+EXIF tokens remain incomplete.
+
+**Settings → Import → Edit Import and Image Counters…** sets the next catalog
+numbers. Import # advances once per nonempty import; Image # advances per new
+original. Sequence remains local to the checked batch. Previews and saved presets
+do not consume numbers. Copy reserves all checked numbers after checking every
+destination, then retains that range through cancellation or recovery; gaps are
+possible. A changed counter before reservation requires reviewing the updated
+names and importing again. Existing photos are never renamed. Older catalogs
+start these new counters at 1 without inventing historical numbers; explicitly
+adjust the starts when needed. The editor is also available from File Renaming.
 
 After scanning, choose **Apply During Import…** to select a Develop preset,
 metadata preset or None. Search and page the preset lists, or use **New…** to

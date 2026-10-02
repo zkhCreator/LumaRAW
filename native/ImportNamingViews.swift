@@ -9,6 +9,7 @@ struct ImportNamingSheet: View {
     @Environment(\.dismiss) private var dismiss
     @State private var showDiscard=false
     @State private var showDelete=false
+    @State private var showImportSequence=false
     @State private var insertKind="literal"
     var body: some View {
         content.task { await model.load() }.onDisappear { model.invalidate() }
@@ -19,12 +20,21 @@ struct ImportNamingSheet: View {
             .confirmationDialog("Delete this saved template?",isPresented:$showDelete) {
                 Button("Delete Template",role:.destructive) { Task { await model.deleteTemplate() } }
             } message: { Text("Previously saved import settings are preserved.") }
+            .sheet(isPresented:$showImportSequence,onDismiss: {
+                Task { await model.preview(offset:model.previewOffset) }
+            }) { CatalogImportSequenceSheet() }
     }
     var content: some View {
         VStack(alignment:.leading,spacing:12) {
             Text("File Renaming").font(.title2)
             Text("Rename copies using filename, text, sequence and capture information.").foregroundStyle(.secondary)
             Toggle("Rename Files",isOn:$model.enabled).disabled(model.busy || !model.ready)
+            HStack(alignment:.top,spacing:12) {
+                ImportSequenceReadout(sequence:model.sequence)
+                Spacer(minLength:8)
+                Button("Edit Catalog Counters…") { showImportSequence=true }
+                    .disabled(model.busy || !model.ready)
+            }
             HStack(alignment:.top,spacing:20) {
                 VStack(alignment:.leading,spacing:10) {
                     Menu("Built-in Templates") {
@@ -118,7 +128,7 @@ struct ImportNamingSheet: View {
                             Text("Preserve").tag("preserve");Text("Lowercase").tag("lower");Text("Uppercase").tag("upper")
                         }
                     }
-                    Text("Sequence follows checked filenames in ascending order, regardless of review sorting. Capture tokens use the camera's local date and time.")
+                    Text("Sequence follows checked filenames in ascending order, regardless of review sorting. Import # identifies the Copy batch; Image # follows newly cataloged photos. Capture tokens use the camera's local date and time.")
                         .font(.caption).foregroundStyle(.secondary)
                 }.frame(maxWidth:.infinity)
             }.disabled(model.busy || !model.ready)
@@ -157,7 +167,8 @@ struct ImportNamingSheet: View {
     private func label(_ kind: String) -> String {
         ["literal":"Text","filename":"Filename","original_number":"Original Number","folder":"Folder Name",
          "custom_text":"Custom Text","shoot_name":"Shoot Name","sequence":"Sequence","index":"Position",
-         "total":"Total Checked","year":"Year","month":"Month","day":"Day","hour":"Hour",
+         "total":"Total Checked","import_number":"Import #","image_number":"Image #",
+         "year":"Year","month":"Month","day":"Day","hour":"Hour",
          "minute":"Minute","second":"Second","camera":"Camera Model"][kind] ?? kind
     }
 }
