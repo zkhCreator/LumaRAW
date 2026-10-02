@@ -4832,3 +4832,66 @@ Engine generation 53, schema 37 and the 149 command contracts are unchanged.
 Desktop scrolling/input/frame rate, VoiceOver and macOS 14 runtime acceptance
 remain unverified; this measured publication defect does not explain every
 possible cause of the reported interface lag. Full non-AI parity remains open.
+
+## Photo-list reads during catalog writes (October 2, 2026)
+
+`list_photos` previously waited for the service-wide catalog lock, including the
+entire atomic application of a large folder synchronization. It now uses a short
+read-only SQLite snapshot without constructing the writable Catalog or running
+migrations. Exact count, clamped page, stack/family rows and all returned state
+revisions share that snapshot. A write committed between query statements cannot
+produce a mixed response; the next request sees the new committed data. Shared
+Library query code preserves the existing source/filter/sort/stack behavior.
+Writes retain their original lock, transaction and conflict barriers.
+
+The connection uses a read-only URI and query_only, registers the existing SQL
+functions, checks the exact schema in its transaction and closes before returning
+the response. It cannot create a missing catalog or silently migrate a mismatched
+one. Normal Service startup still upgrades old catalogs. This engine release is
+generation **54**, with schema **37** and **149** public commands unchanged.
+
+An isolated before/after run on Apple M3 Max, 128 GiB, macOS 26.6.2, Python 3.12.0
+and SQLite 3.42.0 used 100,000 synthetic catalog originals: 99,999 missing paths,
+one empty existing placeholder and 10,000 new empty PNG placeholders. It exercises
+real service/SQL/stat work with warm catalog and directory caches, without file
+hashing, valid photographic pixels, IPC or native display. Each side runs once;
+the concurrent reader samples throughout planning/scanning/application.
+
+| Measurement | Before | After |
+| --- | --- | --- |
+| Concurrent list requests | 660 | 879 |
+| List median / p95 | 6.359 / 8.609 ms | 6.120 / 7.699 ms |
+| Longest list request | 2,788.433 ms | 82.988 ms |
+| Atomic apply | 2,779.576 ms | 2,916.068 ms |
+| Complete apply, including verification | 8,895.306 ms | 9,096.350 ms |
+| Process peak RSS, including setup and earlier phases | 86.70 MiB | 83.20 MiB |
+
+The observation is reduced photo-list lock waiting, not faster synchronization.
+The write transaction and complete apply did not improve in this pair. Both runs
+retain correct final photo/folder counts, clear staging, restore maintenance and
+start no image workers. One run per side does not establish repeatable maximum
+latency or a desktop responsiveness budget.
+
+The targeted suite passes **52 tests in 6.22 s**, including snapshot consistency
+when another connection commits, service-level import between count and page,
+reads while a writer holds the service lock, real schema-32 startup migration,
+URI-sensitive Unicode catalog paths, and physical read-only enforcement even
+after query_only is disabled. Missing or mismatched schemas do not trigger writes.
+
+The full Python suite passes **1,031 tests in 153.23 s**, with actual Metal required
+and the read-only Nikon D3S NEF fixture enabled; no tests are skipped. The Mac app
+builds for macOS 14 and passes deep strict ad-hoc signature verification. Its
+generation-54 source, packaged client and broker identities match, together with
+all 149 MCP schemas and the bundled guide. Execution is on macOS 26.6.2.
+The packaged engine passes **163 native state/IPC assertions**: Library 13,
+Stacks 27, Collections 42, Folder Sync 41, Thumbnails 14, Responsiveness 16 and
+Connection 10. These are generated-fixture integration checks, not desktop input
+or scrolling/frame-rate acceptance.
+
+This first read path covers only `list_photos`. Store refresh still awaits
+collection/orientation state and sometimes folders/keywords; summary polling and
+thumbnail queries also retain their previous locking. Saturated broker admission
+and expensive filters may delay readers independently of the service lock.
+Those waits, desktop interaction/frame rate, VoiceOver and macOS 14 runtime remain
+open acceptance work. This does not complete the interface-lag investigation or
+the full non-AI Lightroom Classic inventory.

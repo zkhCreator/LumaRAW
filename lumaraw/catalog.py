@@ -1,7 +1,8 @@
 """SQLite catalog, history, durable export queue, and previous-export context.
 
 Inputs: explicit local paths and validated recipes. Outputs: paginated rows/jobs.
-Responsibilities: store references, edits, undo history, and export snapshots.
+Responsibilities: store references, edits, undo history, and export snapshots;
+delegate bounded Library filter/count/page SQL to the shared query module.
 Library orientation is independent of Develop recipes and frozen in each job.
 Photo details keep complete keyword IDs; large display paths use explicit pages.
 Stack-enabled page rows carry true scoped ordinals; raw unstacked pages expose a
@@ -25,7 +26,7 @@ import time
 
 from .runtime import CATALOG_VERSION
 from .model import Recipe, ExportOptions, SYNC_GROUPS, IMAGE_EXTENSIONS
-from .organization import Organization, SORTS, criteria, folded, migrate, text_predicate
+from .organization import folded, migrate
 
 FAMILY_COLUMNS = ('source_id,is_virtual,copy_name,'
                   '(SELECT revision FROM photo_sources WHERE id=photos.source_id) AS source_revision,'
@@ -150,7 +151,7 @@ class Catalog:
         return count, skipped
 
     def count(self, stars=False):
-        return self.db.execute('SELECT count(*) FROM photos' + (' WHERE rating>=3' if stars else '')).fetchone()[0]
+        return self._library_queries().count(stars)
 
     def page(self, offset=0, limit=60, stars=False):
         return [dict(r) for r in self.db.execute(
@@ -260,60 +261,22 @@ class Catalog:
             self.db.execute("UPDATE jobs SET state='pending',error='' WHERE state IN ('failed','interrupted','cancelled')")
 
 
-    def filter_sql(self,mode='all',search='',filters=None,collection_id=None,folder_id=None,include_subfolders=True,*,ordered_page=False):
-        if collection_id is not None and folder_id is not None:
-            raise ValueError('Choose either a folder or collection source')
-        if mode=='previous_import' and (collection_id is not None or folder_id is not None):
-            raise ValueError('Previous Import cannot be combined with a folder or collection source')
-        clauses=[];params=[]
-        if mode=='stars': clauses.append('rating>=3')
-        elif mode=='rejects': clauses.append('flag=-1')
-        elif mode=='keepers': clauses.append('flag=1')
-        elif mode=='missing': clauses.append('missing=1')
-        elif mode=='previous_import': clauses.append('source_id IN (SELECT source_id FROM previous_import_sources)')
-        elif mode=='duplicates': clauses.append("sha256!='' AND sha256 IN (SELECT sha256 FROM photos WHERE sha256!='' GROUP BY sha256 HAVING count(DISTINCT source_id)>1)")
-        elif mode.startswith('burst:'):
-            clauses.append('burst=?');params.append(int(mode.split(':')[1]))
-        if search:
-            clause, values = text_predicate(search[:200])
-            clauses.append(clause);params.extend(values)
-        if filters:
-            clause, values = criteria(filters,ordered_page=ordered_page)
-            clauses.append(clause);params.extend(values)
-        if collection_id is not None:
-            clause, values = Organization(self).collection_predicate(collection_id,ordered_page=ordered_page)
-            clauses.append(clause);params.extend(values)
-        if folder_id is not None:
-            from .folders import Folders
-            clause, values = Folders(self).predicate(folder_id,include_subfolders)
-            clauses.append(clause);params.extend(values)
-        return (' WHERE '+' AND '.join(clauses) if clauses else ''),params
+    def _library_queries(self):
+        from .library_queries import LibraryQueries
+        return LibraryQueries(self)
 
-    def filtered_page(self,offset=0,mode='all',search='',filters=None,collection_id=None,sort='imported',descending=True,stacked=True,folder_id=None,include_subfolders=True,*,match_count=None):
-        # Dense import-order pages can stop after sixty correlated family checks
-        # instead of sorting every matching source. Keep indexed membership for
-        # sparse results, other sorts and actual stack projection. match_count
-        # comes from the service's exact count under the same catalog lock.
-        ordered_page=False
-        if (sort=='imported' and match_count is not None and match_count>=60 and
-                ('has_snapshots' in (filters or {}) or collection_id is not None)):
-            ordered_page=match_count*20>=self.count()
-        if stacked and ordered_page:
-            from .stacks import Stacks
-            scope=Stacks(self).scope(collection_id)
-            if scope is not None and self.db.execute('SELECT 1 FROM photo_stacks WHERE scope=? LIMIT 1',(scope,)).fetchone():
-                ordered_page=False
-        where,params=self.filter_sql(mode,search,filters,collection_id,folder_id,include_subfolders,ordered_page=ordered_page)
-        if stacked:
-            from .stacks import Stacks
-            return Stacks(self).projection(where,params,collection_id,sort,descending,offset)
-        if sort not in SORTS:
-            raise ValueError('Unsupported library sort')
-        order = 'DESC' if descending else 'ASC'
-        # Keep large recipe/decoder metadata JSON out of the grid query entirely.
-        return [dict(r) for r in self.db.execute(
-            f'SELECT {SUMMARY_COLUMNS},NULL AS stack_ordinal FROM photos{where} ORDER BY {SORTS[sort]} {order},id {order} LIMIT 60 OFFSET ?',
-            params+[max(0,offset)])]
+    def filter_sql(self, mode='all', search='', filters=None, collection_id=None,
+                   folder_id=None, include_subfolders=True, *, ordered_page=False):
+        return self._library_queries().filter_sql(
+            mode, search, filters, collection_id, folder_id, include_subfolders,
+            ordered_page=ordered_page)
+
+    def filtered_page(self, offset=0, mode='all', search='', filters=None, collection_id=None,
+                      sort='imported', descending=True, stacked=True, folder_id=None,
+                      include_subfolders=True, *, match_count=None):
+        return self._library_queries().filtered_page(
+            offset, mode, search, filters, collection_id, sort, descending, stacked,
+            folder_id, include_subfolders, match_count=match_count)
 
     def summaries(self, ids):
         if not 1 <= len(ids) <= 60:
@@ -322,15 +285,10 @@ class Catalog:
         return [dict(row) for row in self.db.execute(
             f'SELECT {SUMMARY_COLUMNS} FROM photos WHERE id IN ({placeholders}) ORDER BY id',ids)]
 
-    def filtered_count(self,mode='all',search='',filters=None,collection_id=None,stacked=True,folder_id=None,include_subfolders=True):
-        if folder_id is not None and collection_id is None and mode=='all' and not search and not filters:
-            from .folders import Folders
-            return Folders(self).count(folder_id,include_subfolders,stacked)
-        where,params=self.filter_sql(mode,search,filters,collection_id,folder_id,include_subfolders)
-        if stacked:
-            from .stacks import Stacks
-            return Stacks(self).projection(where,params,collection_id)
-        return self.db.execute('SELECT count(*) FROM photos'+where,params).fetchone()[0]
+    def filtered_count(self, mode='all', search='', filters=None, collection_id=None,
+                       stacked=True, folder_id=None, include_subfolders=True):
+        return self._library_queries().filtered_count(
+            mode, search, filters, collection_id, stacked, folder_id, include_subfolders)
 
     def filtered_ids(self,mode='all',search=''):
         where,params=self.filter_sql(mode,search)

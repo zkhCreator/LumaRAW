@@ -1624,3 +1624,32 @@ not per-action or whole-app memory. No periodic Store polling is started.
 This is state/IPC evidence, not RAW throughput, desktop frame rate, VoiceOver or
 macOS 14 runtime acceptance. Counts are regression evidence; one action sample
 per page size does not establish a repeatable elapsed-time improvement.
+
+## Library read snapshots during catalog writes
+
+`tests/test_catalog_read.py` checks current-catalog query parity across Unicode
+names and URI-safe catalog paths, source predicates, stack projections and page
+clamping. A write committed after the exact count cannot alter that request's
+page or revision fields; the next request must see it. Event-gated write/read
+threads verify that an uncommitted writer holding Service.lock does not block
+the photo-list command and that its changes appear only after commit. This is a
+dependency assertion, not a latency budget. Read connections must reject writes
+even with query_only disabled, avoid Catalog construction, preserve schema and
+refuse absent or mismatched catalogs. A genuine schema-32 catalog verifies normal
+Service startup migration before read access.
+
+```sh
+.venv/bin/python -m pytest -q tests/test_catalog_read.py tests/test_organization.py \
+  tests/test_stacks.py tests/test_folders.py tests/test_snapshot_status.py \
+  tests/test_folder_sync_apply.py
+.venv/bin/python tests/folder_sync_probe.py --work work/new-library-read-scale --rows 100000
+```
+
+Run the existing synchronization probe alone, against each frozen engine source.
+Its concurrent list reader sees either the full pre-commit or post-commit count;
+record request median/p95/maximum, sample count, complete apply and atomic SQL
+timings, cache conditions and process RSS. Synthetic missing originals and empty
+new PNG placeholders exercise SQL/stat work, without hashes, pixels, IPC or UI.
+Do not describe reduced list waiting as a fix for every native refresh: subsequent
+collection/orientation/folder/keyword reads, summary polling and image work still
+use their existing locks. Slow filters and broker admission can also delay reads.

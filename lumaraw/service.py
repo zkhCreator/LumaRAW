@@ -1,15 +1,17 @@
 """Single-owner catalog service and bounded disposable-worker supervisor.
 
-Purpose: keep UI and agents on one transactional domain boundary. Each command
-opens its own SQLite connection under a short catalog lock. Expensive pixels run
-outside that lock, in one child at a time, with sampled RSS and time limits.
+Purpose: keep UI and agents on one transactional domain boundary. Mutations and
+most catalog commands open their own SQLite connection under a short catalog
+lock; list_photos uses an independent read-only snapshot. Expensive pixels run
+outside the write lock, in one child at a time, with sampled RSS and time limits.
 Inputs: validated API commands. Outputs: JSON, file-backed previews, durable jobs,
 revision-bound shared/catalog export preset workflows, catalog-local Previous
 settings and immutable, pageable multi-preset export batches. Same-policy batch
 jobs reuse only bounded serialized metadata during the batch write transaction.
 Completed preview receipts are checked outside catalog locks without starting an
 image worker; source identity, revisions and cancellation still bind each reply.
-No GUI, HTTP listener, telemetry or original-file writes. Interrupted exports are
+Other catalog commands retain the serialized write-capable connection path. No
+GUI, HTTP listener, telemetry or original-file writes. Interrupted exports are
 never automatically replayed. Optimistic revisions prevent lost recipe updates.
 """
 from contextlib import contextmanager
@@ -28,6 +30,8 @@ import jsonschema
 import psutil
 from .api import TOOLS
 from .catalog import Catalog, walk_images
+from .catalog_read import CatalogReadSnapshot
+from .library_queries import LibraryQueries
 from .model import Recipe, ExportOptions, LIMITS, PRESETS, SYNC_GROUPS, POINT_CURVE_PRESETS
 from . import export_previous, export_batches, export_presets as export_preset_domain
 from .organization import Organization
@@ -431,6 +435,24 @@ class Service:
             return {**result,'photo_id':row['id'],'revision':row['revision'],'source':row['path'],
                     **({'before_label':before_state[1]} if before_state else {}),
                     'curve_draft':'curve_patch' in p,'mixer_draft':'mixer_patch' in p}
+        if method=='list_photos':
+            mode=p.get('mode','all');search=p.get('search','');offset=p.get('offset',0)
+            filters=p.get('filters');collection=p.get('collection_id')
+            stacked=p.get('stacked',True)
+            folder=p.get('folder_id');subfolders=p.get('include_subfolders',True)
+            with CatalogReadSnapshot(self.root) as snapshot:
+                queries=LibraryQueries(snapshot)
+                total=queries.filtered_count(mode,search,filters,collection,stacked,folder,subfolders)
+                offset=min(offset,max(0,((total-1)//60)*60))
+                return {'photos':queries.filtered_page(
+                            offset,mode,search,filters,collection,p.get('sort','imported'),
+                            p.get('descending',True),stacked,folder,subfolders,match_count=total),
+                        'total':total,'offset':offset,'page_size':60,
+                        'stack_revision':Stacks(snapshot).revision(),
+                        'folder_revision':Folders(snapshot).revision(),
+                        'keyword_revision':Keywords(snapshot).revision(),
+                        'previous_import':previous_import_state(snapshot.db),
+                        'snapshot_filter_revision':snapshot_filter_revision(snapshot.db)}
         if method=='queue_control':return self.control(p)
         with self.catalog() as c:
             if method in ('orientation_state','orient_photos','undo_orientation'):
@@ -465,14 +487,6 @@ class Service:
                         if q.is_dir() and not q.is_symlink():yield from walk_images(q)
                         else:yield q
                 count,skipped=c.import_paths(paths());return {'imported':count,'skipped':skipped,'total':c.count()}
-            if method=='list_photos':
-                mode=p.get('mode','all');search=p.get('search','');offset=p.get('offset',0)
-                filters=p.get('filters');collection=p.get('collection_id')
-                stacked=p.get('stacked',True)
-                folder=p.get('folder_id');subfolders=p.get('include_subfolders',True)
-                total=c.filtered_count(mode,search,filters,collection,stacked,folder,subfolders)
-                offset=min(offset,max(0,((total-1)//60)*60))
-                return {'photos':c.filtered_page(offset,mode,search,filters,collection,p.get('sort','imported'),p.get('descending',True),stacked,folder,subfolders,match_count=total),'total':total,'offset':offset,'page_size':60,'stack_revision':Stacks(c).revision(),'folder_revision':Folders(c).revision(),'keyword_revision':Keywords(c).revision(),'previous_import':previous_import_state(c.db),'snapshot_filter_revision':snapshot_filter_revision(c.db)}
             if method=='stack_state':return {'revision':Stacks(c).revision()}
             if method=='preview_export_metadata':return KeywordExports(c).preview(**p)
             if method=='stack_photos':return Stacks(c).change(**p)

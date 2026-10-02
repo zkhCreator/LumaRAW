@@ -20,6 +20,15 @@ when a clear function is more maintainable. Avoid unrelated formatting churn.
 
 ## Contracts and persistence
 
+- Library photo lists use an independent read-only WAL transaction. Keep exact
+  count, page, stack projection and returned revision/state fields on the same
+  connection and snapshot, including when a writer commits between statements.
+  Reuse the shared Library SQL; never construct a writable Catalog to serve this
+  path. Reject schema mismatches and missing catalogs without creating files or
+  silently migrating. Close every read snapshot promptly; do not retain it for
+  polling or move filesystem/image work into its lifetime. Writes remain serialized
+  and revision-bound. Measure the complete native request chain separately from
+  list_photos: subsequent state/image requests may still wait on the write lock.
 - Keep native command encoding/IO/parsing and preview file decoding off the main
   actor. Reuse the bounded native relay while retaining broker identity checks
   for every call. Reserve cancellation/control capacity independently of image
