@@ -52,7 +52,7 @@ after navigation or source/revision changes. Do not rebase or retry a stale or
 uncertain edit. An unchanged recipe is a successful no-op and retains its revision
 and history. `cancel_preview` with a newer generation stops an older sample
 for that client without cancelling exports or another client. The Mac selector
-is one-shot and accepts active After pixels only, with W to enter and Escape to
+uses Auto Dismiss by default and accepts active After pixels only, with W to enter and Escape to
 cancel on a focused Develop surface. It does not sample the screen or on hover.
 If a native save fails while newer slider values are pending, those drafts remain
 visible until an explicit discard/reload decision; no automatic retry occurs.
@@ -1042,3 +1042,14 @@ Memory estimates and sampled RSS guard risk; they are not a hard OS allocation c
 Preview replies and completed `lumaraw_get_job` receipts include `processing`: actual backend/device, `metal_grade_tiles`, `metal_output_tiles`, `cpu_tiles`, shared-buffer peak, fallback reasons, GPU/dispatch/initialization durations, worker duration and named stage timings. `status`/`settings` expose the latest worker report. Use these receipts before claiming Metal ran. Masks/LUTs can retain CPU grading and use GPU output conversion; geometry and neighborhood filters remain CPU.
 
 NEF decompression, metadata parsing, white balance and AHD demosaicing still use LibRaw CPU; Metal accelerates subsequent pixel grading/output conversion. Compare identical source/recipe/output and distinguish empty application cache from warm cache. Include initialization, transfers and encoding in end-to-end timings; a kernel-only speedup is not whole-photo throughput. FP32 GPU results have small numerical differences from the CPU reference. Keep memory preflight and the dynamic 70% cap enabled.
+
+The Mac selector toolbar offers Auto Dismiss, Show Loupe, visual Scale and Done.
+When Auto Dismiss is off, each accepted paired edit retires its sample generation
+and waits for the saved revision's matching After frame before another click.
+Done during a pending edit prevents later rearming; it does not undo a saved edit.
+The loupe magnifies retained Fit-preview or 1:1-output pixels and reuses matching
+engine RGB readouts. Hover never issues a sampler/render command. Visual scale
+does not change the source sample region or command point. These are local app
+presentation preferences, separate from the catalog and recipe. Navigator hover
+WB-effect previews, desktop interaction and Adobe numerical equivalence remain
+unverified.

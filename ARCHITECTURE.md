@@ -105,8 +105,22 @@ crops are the supported boundary; unknown maker/Fujifilm and other layouts fail
 explicitly. Camera accuracy, broader RAW acceptance and Kelvin remain unverified.
 
 The Mac shell maps Fit/detail coordinates, captures frame and interaction state,
-and submits both values in one ordinary history-producing edit. It does no pixel
-processing and admits no hover work. Reference and Before remain independent.
+and submits both values in one ordinary history-producing edit. Auto Dismiss
+preserves the original one-shot default. With it disabled, a retired sample
+enters a visible waiting state: clicks stay blocked until the saved revision's
+matching After frame and source token arrive. Done, navigation, new view context,
+pending slider edits or failures prevent late rearming; uncertain edits retain
+the existing explicit recovery boundary. Reference and Before remain independent.
+
+`WhiteBalancePreferences` stores only local presentation choices behind a small
+replaceable adapter; the Mac adapter uses UserDefaults. It never stores pointer
+positions, photos, recipes or catalog revisions. Preferences and loupe hover own
+separate observable objects. `WhiteBalanceHoverState.move` uses bounded native
+point mapping and a matching retained engine color map, with no file/worker IO.
+The loupe clips drawing of the already loaded image, accounts for Retina screen
+pixels, labels Fit-preview versus 1:1-output magnification and keeps scale separate
+from solver coordinates/footprints. No native WB/color equations or Navigator
+WB-effect preview are introduced.
 If the paired save fails while newer slider values are pending, Store retains
 those drafts and suspends automatic commits. A captured recovery action can
 explicitly discard them and reload only the same photo/revision. The native

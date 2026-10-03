@@ -59,6 +59,7 @@ def main():
     suites+=('NativeColorReadoutRegression',)
     suites+=('NativeWhiteBalanceRegression',)
     suites+=('NativeRawWhiteBalanceRegression',)
+    suites+=('NativeWhiteBalanceOptionsRegression',)
     parser.add_argument('--raw-fixture', type=Path, help='Explicit read-only RAW input for the optional RAW WB suite')
     parser.add_argument('--suite',choices=suites,action='append',help='Run selected suites; default: all')
     args=parser.parse_args()
@@ -115,9 +116,11 @@ def main():
             else:Image.new('RGB',(2400,1800) if suite in ('NativeComparisonLayoutRegression','NativeReferenceRegression','NativeResponsivenessRegression','NativeColorReadoutRegression') else (160,100),color).save(path)
             paths.append(str(path))
         executable=work/suite
+        helpers=[root/'tests/WhiteBalancePreferenceFixture.swift'] if suite in (
+            'NativeWhiteBalanceRegression','NativeRawWhiteBalanceRegression','NativeWhiteBalanceOptionsRegression') else []
         subprocess.run(['xcrun','swiftc','-swift-version','5','-parse-as-library',
             '-target','arm64-apple-macosx14.0','-module-cache-path',str(work/'module-cache'),
-            *map(str,sources),str(root/'tests'/f'{suite}.swift'),'-o',str(executable)],check=True)
+            *map(str,sources),*map(str,helpers),str(root/'tests'/f'{suite}.swift'),'-o',str(executable)],check=True)
         suite_paths=paths if suite in ('NativeSelectionRegression','NativeReviewRegression','NativeThumbnailRegression','NativeCollectionRegression','NativeCollectionDropRegression','NativeCollectionNodeDropRegression','NativeVirtualCopyRegression','NativeStackRegression','NativeAutoStackRegression','NativeFolderRegression','NativeKeywordRegression','NativeFolderRelocationRegression','NativeFolderSyncRegression','NativePainterRegression','NativeTargetPainterRegression','NativeOrientationRegression','NativeDevelopPresetRegression','NativeMetadataPresetRegression','NativeImportRegression','NativeImportProcessingRegression','NativePreviousImportRegression','NativeExportBatchRegression') else paths[:2]
         env={**os.environ,'LUMARAW_ENGINE':str(args.engine.resolve()),
             'LUMARAW_CATALOG':str(work/'catalogs'/suite),'LUMARAW_TEST_FIXTURES':'|'.join(suite_paths),

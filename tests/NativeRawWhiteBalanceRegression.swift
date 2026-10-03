@@ -10,7 +10,7 @@ import SwiftUI
 @main struct NativeRawWhiteBalanceRegression {
     @MainActor static func main() async {
         _=NSApplication.shared
-        let store=Store()
+        let store=Store(whiteBalancePreferences:WhiteBalancePreferences(storage:MemoryWhiteBalancePreferences()))
         var checks:[String:Bool]=[:]
         var diagnostics:[String:Any]=[:]
         func check(_ value:Bool,_ name:String)throws {
@@ -56,6 +56,7 @@ import SwiftUI
             store.cx=0.5;store.cy=0.5
             store.render(debounce:false)
             try await ready(id)
+            store.whiteBalancePreferences.setAutoDismiss(false)
             await store.armWhiteBalanceSelector()
             try await wait {store.whiteBalanceTargetActive && store.whiteBalanceArmPreview != nil}
             let display=WhiteBalanceDisplayGeometry(available:CGSize(width:640,height:480),
@@ -94,6 +95,19 @@ import SwiftUI
             try check(saved.revision==original.revision+1 &&
                 ((savedHistory["steps"] as? [[String:Any]])?.count ?? 0)==initialSteps+1,
                 "raw_paired_edit_is_one_revision_and_history_step")
+            guard let next=store.whiteBalanceArmPreview else {throw EngineFailure(message:"RAW continuous selector did not capture its saved frame")}
+            try check(store.whiteBalanceTargetActive && next.context.revision==saved.revision && next != identity,
+                      "raw_continuous_selection_requires_the_saved_revision_frame")
+            let noOp=await store.sampleWhiteBalance(localPoint:CGPoint(x:0.5,y:0.5),previewIdentity:next,display:display,call:call)
+            try check(noOp && store.whiteBalanceTargetActive && calls.map{$0.0}==[
+                "sample_white_balance","edit_photo","sample_white_balance","edit_photo"],
+                "raw_continuous_noop_uses_one_new_sample_and_one_edit")
+            let repeated=try await photo(id)
+            let repeatedHistory=try await Backend.call("list_history",["photo_id":id,"expected_revision":repeated.revision])
+            try check(repeated.revision==saved.revision &&
+                ((repeatedHistory["steps"] as? [[String:Any]])?.count ?? 0)==initialSteps+1,
+                "raw_continuous_noop_preserves_revision_and_history")
+            store.cancelWhiteBalanceSelector()
             _=try await Backend.call("undo_photo",["photo_id":id,"expected_revision":saved.revision])
             await store.load(id)
             try await ready(id)

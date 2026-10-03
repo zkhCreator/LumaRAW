@@ -63,7 +63,7 @@ gaps. Nothing below is full Lightroom parity merely because historical tests pas
 | Library navigation | Partial: bounded grid/filmstrip, folder tree/search/favorites/labels, durable missing-folder relocation and folder synchronization with reviewed suspected-duplicate inclusion, direct/recursive sources, filters/sorting including live snapshot status, regular/smart/Quick collections and nested sets, photo drops into regular and Quick collections, collection-node moves into sets, single/batch collection color labels and global color filtering | Multi-source selection, complete sync Import Dialog, folder move/rename, relocation overlap/collision handling, collection-node drag/drop desktop/reference acceptance, custom label names/sets and sidebar multi-selection interaction, full smart criteria/import-export, source-selection memory, desktop/reference acceptance |
 | Organization | Partial: duplicate/missing detection, hierarchical keywords/synonyms/export flags/Will Export preview, text/CSV vocabulary exchange and manual person tags, custom nine-slot keyword sets/recent entries/shared or catalog storage, multi-keyword shortcuts and keyword/rating/flag/label/target-collection/rotation/Develop-preset/metadata-preset Painter strokes, independent catalog rotation/flips, title/caption/copyright plus thirty IPTC fields, selective metadata presets, labels, batch metadata, virtual copies, manual/split/capture-time scoped stacks | Keyword policy/file and preset reference acceptance, built-in sets/suggestions/undo, Painter desktop acceptance, IPTC Extension and complete metadata parity, stack interaction acceptance, rename and sidecars |
 | Culling | Partial: Loupe/Compare/Survey, linked detail, anchored page selection, rating/flag/color keys with guarded Shift advance in single-target Grid/Loupe, Develop Reference/Active pairs with independent Fit/1:1 viewports, session lock and RGB/LAB readouts | Desktop and numerical reference acceptance, exact sorted/filter-removal behavior, HDR readouts, scrubby/box zoom, cross-page selection, Auto Advance preference/Caps Lock, persistent workspace state |
-| Basic development | Partial: light/WB/color, source-bound one-shot raster and limited API 2 Bayer RAW neutral-point selection, eight-band HSL and B&W Mix with photo-targeted adjustment and selective resets/sync | Broader RAW selector camera/runtime acceptance, calibrated absolute WB, selector loupe/scale/hover/Auto Dismiss options, texture/clarity/dehaze, Point Color, Auto B&W mix, color grading and Adobe processing/reference acceptance |
+| Basic development | Partial: light/WB/color, source-bound raster and limited API 2 Bayer RAW neutral-point selection, native loupe/scale/Auto Dismiss/Done options, eight-band HSL and B&W Mix with photo-targeted adjustment and selective resets/sync | Broader RAW selector camera/runtime acceptance, calibrated absolute WB, Navigator hover WB-effect preview and desktop selector acceptance, texture/clarity/dehaze, Point Color, Auto B&W mix, color grading and Adobe processing/reference acceptance |
 | Curves and profiles | Partial: four-region parametric curves with movable splits and photo-targeted adjustment, interactive RGB/channel point curves, shared temporary previews, legacy luminance curve, LUT/ICC | Point/channel targeting, curve exchange, camera/profile browser, Adobe processing and rendered/reference acceptance |
 | Detail and optics | Partial: noise/sharpen, manual lens | Complete manual detail controls, automatic lens profiles, bounded full-resolution acceptance |
 | Geometry | Partial: crop/straighten/perspective, independent rotation/flips with attached masks and displayed crop ratios | Interactive retained handles, guided transforms, full crop state and rendered/reference parity |
@@ -5359,3 +5359,46 @@ has camera evidence; other camera models, actual flipped RAW files,
 macOS 14 runtime, desktop pointer/keyboard/VoiceOver, absolute Kelvin and Adobe
 pixel equivalence remain unverified. Broad RAW selector parity and full Lightroom
 reproduction are incomplete.
+
+
+## White-balance selector options and continuous sessions (October 2, 2026)
+
+The native selector now includes Auto Dismiss, Show Loupe, visual Scale and Done,
+following the documented [Adobe toolbar functions](https://helpx.adobe.com/lightroom-classic/desktop/process-and-develop-photos/image-tone-color.html).
+Local presentation preferences use a replaceable storage adapter with Mac
+UserDefaults; pointer/frame/in-flight state stays transient. Auto Dismiss on,
+Show Loupe on, default **8×**, and the **4–24×** visual range are LumaRAW choices;
+Adobe's guide does not publish the corresponding defaults/range. These controls
+do not add catalog data, commands or source-sampling parameters.
+
+Auto Dismiss off retires each worker generation and holds a visible waiting state
+after one paired edit. It accepts another click only after the saved revision's
+matching After frame/source token arrives. Old frames and clicks during a pending
+edit fail before sending commands. Done during an accepted edit prevents later
+rearming. Context changes, pending slider edits and errors cancel continuation
+without repeating a sample or uncertain mutation.
+
+Hover observes separately from Store and reuses the existing matching engine RGB
+map. It issues no sampler/render request or image-file read. The loupe clips
+drawing of retained After pixels, distinguishes Fit preview from 1:1 output,
+counts physical pixels under Retina, and keeps visual scale separate from click
+coordinates and the engine's raster/RAW sampling region. It does not implement
+the Navigator's live WB-effect preview or replace engine statistics/color math.
+
+Preliminary native state/IPC checks pass **25 options assertions** and the earlier
+**39** white-balance guards. The current toolbar and Fit loupe offscreen images
+were inspected. Related Python regression passes **387 tests in 10.99 s**, with
+actual API 2 Nikon RAW sampling; no tests are skipped. The new self-contained
+Mac app builds for macOS 14 and reuses unchanged engine generation **60**, schema
+**37**, **150** commands and the same API **2** backend. Final package checks
+verify all MCP schemas, source/client/broker identity, bundled guide bytes and
+deep strict ad-hoc signatures. Native state/IPC suites pass **108 assertions**:
+selector options 25, actual RAW continuous/no-op flow 13, existing white-balance
+state/recovery 39, responsiveness 16 and primary workflow state 15. The final
+toolbar and actual 1:1-output loupe were inspected offscreen. A fresh fetch finds
+no unmerged local or remote branches. Current host evidence is macOS **26.6.2**;
+this native-only increment does not change engine algorithms/identity.
+
+Desktop pointer feel, hover latency, cursor/VoiceOver, macOS 14 runtime, Adobe
+visual/numerical acceptance and Navigator hover-effect parity remain unverified.
+Full Lightroom reproduction is incomplete.

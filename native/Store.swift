@@ -5,11 +5,16 @@
 // Collection refreshes and rating/flag replies remain generation-safe.
 // Revisions belong to the service; stale edits are rejected, never silently retried.
 // Photo results and collection browsers use bounded pages.
+// Selector preferences/hover observe separately; continuous WB waits for a new frame.
 import SwiftUI
 import AppKit
 import UniformTypeIdentifiers
 
 @MainActor final class Store: ObservableObject {
+    let whiteBalancePreferences:WhiteBalancePreferences
+    init(whiteBalancePreferences:WhiteBalancePreferences? = nil) {
+        self.whiteBalancePreferences=whiteBalancePreferences ?? WhiteBalancePreferences()
+    }
     @Published var photos: [Photo] = []
     @Published var photoStacks: [Int:PhotoStack] = [:]
     @Published var stackRevision=0
@@ -47,6 +52,7 @@ import UniformTypeIdentifiers
     let mixerTargetPreviews=CurvePreviewScheduler()
     @Published var whiteBalanceSampling=false
     @Published var whiteBalanceArming=false
+    @Published var whiteBalanceAwaitingFrame=false
     @Published var whiteBalanceEditRecovery:WhiteBalanceEditRecovery?
     @Published var whiteBalanceTargetPoint:CGPoint?
     @Published var whiteBalanceDisplayGeometry:WhiteBalanceDisplayGeometry?
@@ -662,7 +668,7 @@ import UniformTypeIdentifiers
     func set(_ key:String,_ value:Any) {
         guard !loading,!browsing,!orientationBusy,!developPresetBusy,!historyBusy,!snapshotBusy,let p=photo,p.id==selected else{return}
         if let recovery=whiteBalanceEditRecovery {error=recovery.message;return}
-        if whiteBalanceTargetActive || whiteBalanceSampling || whiteBalanceArming {cancelWhiteBalanceSelector()}
+        if whiteBalanceTargetActive || whiteBalanceSampling || whiteBalanceArming || whiteBalanceAwaitingFrame {cancelWhiteBalanceSelector()}
         clearColorReadout()
         clearColorReadout()
         saveFailed=false;recipe[key]=value;pendingPatch[key]=value
@@ -738,7 +744,7 @@ import UniformTypeIdentifiers
         moveDevelopHistory("undo_photo")
     }
     @discardableResult func recipeMutation(_ method:String,_ params:[String:Any],photoID:Int) async ->Bool {
-        if whiteBalanceTargetActive || whiteBalanceSampling || whiteBalanceArming {cancelWhiteBalanceSelector()}
+        if whiteBalanceTargetActive || whiteBalanceSampling || whiteBalanceArming || whiteBalanceAwaitingFrame {cancelWhiteBalanceSelector()}
         do {
             let row=try await Backend.call(method,params)
             if let updated=Photo(row),selected==photoID {

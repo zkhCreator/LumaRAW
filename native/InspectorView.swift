@@ -55,7 +55,7 @@ struct InspectorView:View {
                     edit("Temperature","temperature",-100...100)
                     edit("Tint","tint",-100...100)
                     if s.develop {
-                        if s.whiteBalanceTargetActive || s.whiteBalanceSampling || s.whiteBalanceArming {
+                        if s.whiteBalanceTargetActive || s.whiteBalanceSampling || s.whiteBalanceArming || s.whiteBalanceAwaitingFrame {
                             Button("Cancel Point Selection") {s.cancelWhiteBalanceSelector()}
                                 .accessibilityHint("Escape also cancels white-balance sampling.")
                         } else {

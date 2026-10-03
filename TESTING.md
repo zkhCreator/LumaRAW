@@ -2,6 +2,34 @@
 
 All probes use explicit read-only input photographs and new disposable catalog/output directories. They never use a personal photo library by default.
 
+## White-balance selector options and loupe
+
+`NativeWhiteBalanceOptionsRegression` uses memory preferences so it cannot change
+user settings. It verifies defaults/persistence, bounded scales, isolated hover
+publications, the production hover mapping with an existing engine RGB frame,
+continuous paired edits with fresh revisions/generations, stale/pending click
+rejection, Done during an accepted edit, Auto Dismiss and failure cancellation.
+Snapshots show the toolbar, two Fit scales and an actual detail-frame loupe.
+They do not establish physical hover latency, pointer/VoiceOver behavior or Adobe
+visual/numerical equivalence. The 4–24× scale and default 8×/enabled options are
+explicit LumaRAW choices, not claimed Adobe defaults. Scale counts physical
+screen pixels per retained image pixel, including Retina.
+
+```sh
+/absolute/isolated-runtime/bin/python tests/run_native.py \
+  --engine /absolute/LumaRAW.app/Contents/Resources/Engine/LumaRAWEngine \
+  --work work/new-selector-options \
+  --suite NativeWhiteBalanceOptionsRegression \
+  --suite NativeWhiteBalanceRegression
+```
+
+The RAW suite also selects continuously on an actual detail frame, then selects
+the same point again. This must produce one new sample/edit pair while preserving
+the revision/history for an unchanged candidate. It requires an explicit API 2
+engine and `--raw-fixture`. Native-only changes reuse the existing engine identity;
+package verification must still compare all contracts, source/client/broker
+identity, bundled guide bytes and signatures.
+
 ## RAW white-balance selector
 
 Use an isolated environment containing the verified greybox API 2 wheel. The

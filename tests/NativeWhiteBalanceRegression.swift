@@ -30,7 +30,7 @@ import SwiftUI
 @main struct NativeWhiteBalanceRegression {
     @MainActor static func main() async {
         _=NSApplication.shared
-        let store=Store()
+        let store=Store(whiteBalancePreferences:WhiteBalancePreferences(storage:MemoryWhiteBalancePreferences()))
         var checks:[String:Bool]=[:]
         var diagnostics:[String:Any]=[:]
         func check(_ value:Bool,_ name:String)throws {

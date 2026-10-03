@@ -278,9 +278,9 @@ struct PhotoCanvas:View {
                                     if s.mixerTargetActive {
                                         GeometryReader {frame in MixerTargetOverlay(imageSize:image.size,available:frame.size,fitted:false)}
                                     }
-                                    if s.whiteBalanceTargetActive && !s.compare {
+                                    if s.whiteBalanceToolVisible && !s.compare {
                                         GeometryReader {frame in WhiteBalanceTargetOverlay(imageSize:image.size,available:frame.size,
-                                            fitted:false,role:"active",after:true)}
+                                            fitted:false,role:"active",after:true,image:image)}
                                     }
                                 }
                                 .frame(minWidth:geo.size.width,minHeight:geo.size.height)
@@ -293,8 +293,8 @@ struct PhotoCanvas:View {
                         }
                         if s.curveTargetActive {CurveTargetOverlay(imageSize:image.size,available:geo.size)}
                         if s.mixerTargetActive {MixerTargetOverlay(imageSize:image.size,available:geo.size)}
-                        if s.whiteBalanceTargetActive && !s.compare {
-                            WhiteBalanceTargetOverlay(imageSize:image.size,available:geo.size,fitted:true,role:"active",after:true)
+                        if s.whiteBalanceToolVisible && !s.compare {
+                            WhiteBalanceTargetOverlay(imageSize:image.size,available:geo.size,fitted:true,role:"active",after:true,image:image)
                         }
                         if s.develop,!["view","curve","mixer","white-balance"].contains(s.canvasTool),!s.compare {DrawingOverlay(image:image,available:geo.size)}
                     }
@@ -312,7 +312,7 @@ struct PhotoCanvas:View {
         .onChange(of:s.comparisonMode) {_,mode in s.whiteBalanceComparisonDidChange(mode)}
         .onDisappear {s.cancelWhiteBalanceSelector()}
         .onKeyPress(.escape) {
-            if s.whiteBalanceTargetActive || s.whiteBalanceSampling || s.whiteBalanceArming {s.cancelWhiteBalanceSelector();return .handled}
+            if s.whiteBalanceTargetActive || s.whiteBalanceSampling || s.whiteBalanceArming || s.whiteBalanceAwaitingFrame {s.cancelWhiteBalanceSelector();return .handled}
             if s.mixerTargetActive {
                 if s.mixerTargetGesture != nil {s.cancelMixerTarget()} else {s.setMixerTargeting(nil)}
                 return .handled
