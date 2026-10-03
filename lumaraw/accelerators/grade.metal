@@ -3,6 +3,7 @@
 // Geometry, neighborhood filters, masks and LUTs remain independent stages.
 // Optional p[54] returns graded linear work for display plus readout conversion.
 // Optional p[55] fuses SDR RGB/Lab D50 readouts with ordinary display output.
+// p[56]/p[626:640] apply pointwise four-wheel toning after HSL/B&W mixing.
 #include <metal_stdlib>
 using namespace metal;
 float3 mat(float3 v,constant float *p,int offset) {
@@ -115,6 +116,28 @@ kernel void grade_output(device const float *input [[buffer(0)]],device float *o
                 gray*=exp2(shift*2.0f*neutral);
             }
             a=float3(gray);
+        }
+        if(p[56]!=0){
+            float originalLum=dot(a,L)/(L.x+L.y+L.z),tone=originalLum>=1.0f-1e-7f ? 1.0f:enc(max(originalLum,0.0f));
+            float shifted=clamp(tone+p[639],0.0f,1.0f);
+            float3 distance=(float3(shifted)-float3(0.0f,.5f,1.0f))/p[638];
+            float3 weights=exp(-.5f*distance*distance);
+            weights/=weights.x+weights.y+weights.z;
+            float shift=weights.x*p[628]+weights.y*p[631]+weights.z*p[634]+p[637];
+            float targetTone=clamp(tone+shift,0.0f,1.0f);
+            if(shift!=0){
+                float target=dec(targetTone);
+                a=originalLum<=1e-7f ? float3(target):a*(target/max(originalLum,1e-7f));
+            }
+            if((int(p[56]) & 2)!=0){
+                float strength=4.0f*targetTone*(1.0f-targetTone);
+                if(strength>0){
+                    float2 chroma=weights.x*float2(p[626],p[627])+weights.y*float2(p[629],p[630])+
+                                  weights.z*float2(p[632],p[633])+float2(p[635],p[636]);
+                    float3 lab=lab_from_work(a,p);lab.yz+=strength*chroma;
+                    float3 lms=mat(lab,p,147);a=mat(mat(lms*lms*lms,p,156),p,165);
+                }
+            }
         }
     }
     if(p[54]!=0){

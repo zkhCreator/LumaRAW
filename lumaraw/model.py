@@ -9,6 +9,8 @@ its -100…100 scale. Added mixer fields default to zero for existing recipes.
 Parametric regions are independent of older luminance and RGB point curves.
 Global Presence fields are additive zero-default controls; local masks remain
 limited to their explicitly validated exposure/saturation responsibilities.
+Color Grading adds independent H/S/L ranges and global toning, with neutral old
+JSON defaults. Its portable processing model does not claim Adobe pixel identity.
 """
 from dataclasses import asdict, dataclass, fields, field
 import math
@@ -18,6 +20,10 @@ IMAGE_EXTENSIONS = RAW_EXTENSIONS | {'.jpg', '.jpeg', '.png', '.tif', '.tiff'}
 MIXER_BANDS = ('red','orange','yellow','green','aqua','blue','purple','magenta')
 MIXER_FIELDS = tuple(f'{band}_{kind}' for band in MIXER_BANDS for kind in ('hue','sat','lum'))
 BW_FIELDS = tuple(f'{band}_bw' for band in MIXER_BANDS)
+GRADING_RANGES = ('shadows', 'midtones', 'highlights', 'global')
+GRADING_FIELDS = tuple(f'grading_{region}_{component}' for region in GRADING_RANGES
+                       for component in ('hue', 'saturation', 'luminance')) + (
+                           'grading_blending', 'grading_balance')
 POINT_CURVE_FIELDS = tuple(f'curve_{channel}_points' for channel in ('rgb','red','green','blue'))
 POINT_CURVE_GAP = 1 / 65535
 PARAMETRIC_FIELDS = tuple(f'parametric_{region}' for region in ('shadows','darks','lights','highlights'))
@@ -47,6 +53,9 @@ LIMITS = {
 LIMITS.update({f'{band}_{kind}':(-30,30) if kind=='hue' else (-100,100)
                for band in MIXER_BANDS for kind in ('hue','sat','lum','bw')})
 LIMITS.update({key:(-100,100) for key in PARAMETRIC_FIELDS})
+LIMITS.update({key: (0, 360) if key.endswith('_hue') else
+              (0, 100) if key.endswith(('_saturation', '_blending')) else (-100, 100)
+              for key in GRADING_FIELDS})
 
 @dataclass(frozen=True)
 class Recipe:
@@ -64,6 +73,20 @@ class Recipe:
     texture: float = 0
     clarity: float = 0
     dehaze: float = 0
+    grading_shadows_hue: float = 0
+    grading_shadows_saturation: float = 0
+    grading_shadows_luminance: float = 0
+    grading_midtones_hue: float = 0
+    grading_midtones_saturation: float = 0
+    grading_midtones_luminance: float = 0
+    grading_highlights_hue: float = 0
+    grading_highlights_saturation: float = 0
+    grading_highlights_luminance: float = 0
+    grading_global_hue: float = 0
+    grading_global_saturation: float = 0
+    grading_global_luminance: float = 0
+    grading_blending: float = 50
+    grading_balance: float = 0
     curve_shadows: float = 0
     curve_midtones: float = 0
     curve_lights: float = 0
@@ -263,6 +286,7 @@ SYNC_GROUPS = {
     'Light': ['exposure','contrast','highlights','shadows','whites','blacks','highlight_recovery'],
     'Color': ['saturation','vibrance','monochrome',*MIXER_FIELDS],
     'Presence': ['texture','clarity','dehaze'],
+    'Color Grading': list(GRADING_FIELDS),
     'Black & White Mix': list(BW_FIELDS),
     'Tone Curve': ['curve_shadows','curve_midtones','curve_lights','curve_points',*POINT_CURVE_FIELDS,*PARAMETRIC_FIELDS,'parametric_splits'],
     'Detail': ['luma_noise','chroma_noise','sharpen','sharpen_radius','detail_protect','defringe'],

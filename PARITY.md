@@ -29,6 +29,7 @@ Official references checked September 2026:
 - [Tone Curve controls and channels](https://helpx.adobe.com/lightroom-classic/desktop/process-and-develop-photos/image-tone-color.html)
 - [Texture frequency behavior and its distinction from Clarity, Adobe ACR engineering](https://blog.adobe.com/en/publish/2019/05/14/from-the-acr-team-introducing-the-texture-control) (checked October 2026)
 - [Color Mixer](https://helpx.adobe.com/lightroom-classic/desktop/process-and-develop-photos/color-mixer.html) and [Black & White Mix](https://www.adobe.com/learn/lightroom-classic/web/convert-photo-black-white)
+- [Four-wheel Color Grading and Mac interaction](https://blog.adobe.com/en/publish/2020/10/20/introducing-color-grading) and [tone/color controls](https://helpx.adobe.com/lightroom-classic/desktop/process-and-develop-photos/image-tone-color.html) (checked October 2026)
 - [Loupe, Compare and Survey](https://helpx.adobe.com/lightroom-classic/desktop/viewing-photos/browse-compare-photos.html)
 - [Keyboard shortcuts](https://helpx.adobe.com/lightroom-classic/desktop/introduction-to-lightroom-classic/keyboard-shortcuts.html)
 - [Photo stacks and source boundaries](https://helpx.adobe.com/lightroom-classic/desktop/organize-photos-in-lightroom-classic/grouping-photos-stacks.html)
@@ -64,7 +65,7 @@ gaps. Nothing below is full Lightroom parity merely because historical tests pas
 | Library navigation | Partial: bounded grid/filmstrip, folder tree/search/favorites/labels, durable missing-folder relocation and folder synchronization with reviewed suspected-duplicate inclusion, direct/recursive sources, filters/sorting including live snapshot status, regular/smart/Quick collections and nested sets, photo drops into regular and Quick collections, collection-node moves into sets, single/batch collection color labels and global color filtering | Multi-source selection, complete sync Import Dialog, folder move/rename, relocation overlap/collision handling, collection-node drag/drop desktop/reference acceptance, custom label names/sets and sidebar multi-selection interaction, full smart criteria/import-export, source-selection memory, desktop/reference acceptance |
 | Organization | Partial: duplicate/missing detection, hierarchical keywords/synonyms/export flags/Will Export preview, text/CSV vocabulary exchange and manual person tags, custom nine-slot keyword sets/recent entries/shared or catalog storage, multi-keyword shortcuts and keyword/rating/flag/label/target-collection/rotation/Develop-preset/metadata-preset Painter strokes, independent catalog rotation/flips, title/caption/copyright plus thirty IPTC fields, selective metadata presets, labels, batch metadata, virtual copies, manual/split/capture-time scoped stacks | Keyword policy/file and preset reference acceptance, built-in sets/suggestions/undo, Painter desktop acceptance, IPTC Extension and complete metadata parity, stack interaction acceptance, rename and sidecars |
 | Culling | Partial: Loupe/Compare/Survey, linked detail, anchored page selection, rating/flag/color keys with guarded Shift advance in single-target Grid/Loupe, Develop Reference/Active pairs with independent Fit/1:1 viewports, session lock and RGB/LAB readouts | Desktop and numerical reference acceptance, exact sorted/filter-removal behavior, HDR readouts, scrubby/box zoom, cross-page selection, Auto Advance preference/Caps Lock, persistent workspace state |
-| Basic development | Partial: light/WB/color, global Texture/Clarity/Dehaze with bounded shared processing and selective presets/sync/reset, source-bound raster and limited API 2 Bayer RAW neutral-point selection, native loupe/scale/Auto Dismiss/Done options, eight-band HSL and B&W Mix with photo-targeted adjustment and selective resets/sync | Broader RAW selector camera/runtime acceptance, calibrated absolute WB, Navigator hover WB-effect preview and desktop selector acceptance, local Presence and numerical/desktop reference acceptance, Point Color, Auto B&W mix, color grading and Adobe processing/reference acceptance |
+| Basic development | Partial: light/WB/color, global Texture/Clarity/Dehaze with bounded shared processing and selective presets/sync/reset, source-bound raster and limited API 2 Bayer RAW neutral-point selection, native loupe/scale/Auto Dismiss/Done options, eight-band HSL and B&W Mix with photo-targeted adjustment and selective resets/sync, four-wheel Color Grading with temporary previews, range/Global views, mute/boost and shared presets/history/sync | Broader RAW selector camera/runtime acceptance, calibrated absolute WB, Navigator hover WB-effect preview and desktop selector acceptance, local Presence and numerical/desktop reference acceptance, Point Color, Auto B&W mix, grading reference acceptance and Adobe processing/exchange |
 | Curves and profiles | Partial: four-region parametric curves with movable splits and photo-targeted adjustment, interactive RGB/channel point curves, shared temporary previews, legacy luminance curve, LUT/ICC | Point/channel targeting, curve exchange, camera/profile browser, Adobe processing and rendered/reference acceptance |
 | Detail and optics | Partial: noise/sharpen, manual lens | Complete manual detail controls, automatic lens profiles, bounded full-resolution acceptance |
 | Geometry | Partial: crop/straighten/perspective, independent rotation/flips with attached masks and displayed crop ratios | Interactive retained handles, guided transforms, full crop state and rendered/reference parity |
@@ -1990,8 +1991,9 @@ one camera file and these recipes do not establish general throughput, slider
 latency, calibrated color or reference processing parity.
 
 This delivers eight-band controls and their persistent processing path, not full
-Color Mixer parity. Targeted adjustment, Point Color, Auto B&W mix, Color Grading,
-Adobe-compatible parameters and reference pixel/treatment acceptance remain.
+Color Mixer parity. At this checkpoint, targeted adjustment, Point Color, Auto B&W
+mix, Color Grading, Adobe-compatible parameters and reference pixel/treatment
+acceptance remained. Subsequent targeting/grading entries record later progress.
 Rendered desktop interaction, keyboard/pointer dispatch, VoiceOver and macOS 14
 runtime are still unverified. No Adobe processing equivalence is claimed.
 
@@ -5725,3 +5727,70 @@ Evidence on M3 Max/128 GiB, macOS **26.6.2**:
 Desktop pointer-down/event routing, keyboard/VoiceOver and macOS 14 runtime remain
 unverified. Crop/mask reference acceptance and the full feature inventory remain
 incomplete. Synthetic typed events and offscreen display are not desktop testing.
+
+## Four-wheel Color Grading (October 2026)
+
+Implemented Shadows/Midtones/Highlights and independent Global H/S/L wheels,
+3-Way and individual views, hue-only edge handles, numeric H/S disclosure,
+Luminance, Blending and Balance. Inner handle drags support Shift saturation,
+Command hue and Option fine steps; hover Option arrows adjust H/S. Double-click
+resets, scoped context-menu resets, local wheel copy/paste, held wheel mute and
+Option Blending saturation boost are present. Soft-lock threshold/fine multiplier,
+wheel geometry and the encoded-tone/Oklab model are LumaRAW conventions.
+
+Fourteen additive recipe-v2 values flow through CPU/actual Metal, preview/detail/
+export, partial presets, captured Sync, durable history/undo and frozen jobs.
+Grading follows HSL/B&W and precedes local masks/LUT. Global ignores overlap
+controls; luminance works at zero saturation. Tint preserves black/white until
+luminance moves them, including normalization of the rounded legacy white matrix.
+Neutral controls bypass exactly. B&W recipes can be toned.
+
+Wheel/slider gestures capture photo/revision/reload epoch, coalesce read-only
+`grading_patch` previews, and save one paired patch on release. Temporary mute/
+boost never save. Selection ABA, changed revisions and cancellation never replay
+or retarget edits. Draft frames cannot be sampled as stored WB/readout/drawing
+contexts. Known inactive hue/overlap edits preserve recipes/history but reuse
+completed pixels and developed thumbnails. Unknown/invalid fields stay conservative.
+Target maps remain upstream and reusable after grading changes.
+
+Evidence on Apple M3 Max / macOS 26.6.2:
+
+- Related Python regression: **234 passed**. Complete engine/service suite:
+  **1,618 passed**, with required actual Metal and API 2 NEF dependency, no skips.
+  Sixteen grading GPU cases cover four output spaces and existing precision limits.
+- Final packaged-engine native state/IPC: **153 assertions** (grading 37,
+  white balance 39, drawing 25, Sync 26, mask cache frames 10, responsiveness 16).
+  Unchanged polling produces no workspace invalidation. Actual read-only previews,
+  paired saving, temporary modes, presets/Sync and stale/ABA protection pass.
+- Three-way, individual and Global PNGs were inspected offscreen; narrow labels
+  and snapshot bounds were corrected. This is layout evidence, not desktop input.
+- Signed app passes engine identity, 151 command contracts, matching bundled
+  guide and strict signature checks: generation **66**, schema **37**, protocol 1.
+- Paired CPU/Metal processing uses one read-only Nikon D3S NEF and the same two
+  four-wheel recipes. Twelve single requests cover Fit, 1:1 viewport and TIFF16;
+  cold/warm means engine source cache, with no OS cache flush. Warm changes an
+  active hue, so these are actual workers rather than completed-preview hits.
+  All six image pairs have equal ICC and at most **one encoded code** difference;
+  the original hash is unchanged. Measurements are not latency percentiles.
+
+| Output / engine cache | CPU elapsed | Metal elapsed | CPU / Metal sampled worker peak RSS |
+| --- | --- | --- | --- |
+| Fit 512×340 / cold | 613.4 ms | 597.0 ms | 230.7 / 214.9 MiB |
+| Fit 512×340 / warm | 434.8 ms | 375.3 ms | 100.2 / 110.4 MiB |
+| Viewport 640×480 / cold | 966.4 ms | 891.2 ms | 331.0 / 331.1 MiB |
+| Viewport 640×480 / warm | 492.0 ms | 368.7 ms | 124.4 / 117.6 MiB |
+| TIFF16 4284×2844 / cold | 4.986 s | 1.107 s | 667.6 / 456.5 MiB |
+| TIFF16 4284×2844 / warm | 4.293 s | 0.572 s | 459.4 / 250.3 MiB |
+
+Preview elapsed measures persistent-relay requests; export elapsed includes queue
+submission and observed completion. Each full Metal export dispatches 23 grading
+tiles, with a 19.61 MiB shared buffer peak and no fallback. Warm grade/output stage
+time is CPU **3.774 s** versus Metal **0.081 s**. Preview memory does not uniformly
+improve. These samples do not measure main-app RSS, desktop frame rate or camera
+color accuracy.
+
+This delivers a photographic workflow, not established 1:1 Adobe processing or
+desktop acceptance. Proprietary grading pixels/treatment, HDR grading, old Split
+Toning/Adobe XMP exchange, desktop pointer/keyboard routing, VoiceOver, broader
+camera accuracy and macOS 14 runtime remain unverified. Compilation targets
+macOS 14; only the current host runtime was available. Full parity remains incomplete.

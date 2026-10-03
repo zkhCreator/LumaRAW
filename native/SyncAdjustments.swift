@@ -20,9 +20,9 @@ struct SyncAdjustmentsSchema {
               }) else {return nil}
         self.groups=groups
         let order=["White Balance","Light","Color","Presence","Black & White Mix",
-                   "Tone Curve","Detail","Lens","Composition","Local Masks","Camera Profile","LUT"]
+                   "Tone Curve","Color Grading","Detail","Lens","Composition","Local Masks","Camera Profile","LUT"]
         names=order.filter {groups[$0] != nil} + groups.keys.filter {!order.contains($0)}.sorted()
-        initiallySelected=Set(order.prefix(7)).intersection(groups.keys)
+        initiallySelected=Set(order.prefix(8)).intersection(groups.keys)
     }
 }
 

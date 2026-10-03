@@ -16,14 +16,14 @@ import tempfile
 
 import numpy as np
 
-from .model import Recipe, PARAMETRIC_FIELDS, POINT_CURVE_FIELDS, MIXER_FIELDS, BW_FIELDS
+from .model import Recipe, PARAMETRIC_FIELDS, POINT_CURVE_FIELDS, MIXER_FIELDS, BW_FIELDS, GRADING_FIELDS
 from .source_identity import pixel_fingerprint
 
 MAGIC = b'LRTONE1\0'
 STAGE = 'pre-parametric-v1'
 MAX_PIXELS = 2048 * 1536
 DOWNSTREAM = (*PARAMETRIC_FIELDS, 'parametric_splits', *POINT_CURVE_FIELDS,
-              *MIXER_FIELDS, *BW_FIELDS, 'monochrome', 'masks', 'lut', 'lut_amount')
+              *MIXER_FIELDS, *BW_FIELDS, *GRADING_FIELDS, 'monochrome', 'masks', 'lut', 'lut_amount')
 
 
 def target_path(path, recipe, cache, geometry):

@@ -74,6 +74,7 @@ struct InspectorView:View {
                 section("Presence"){PresenceControls()}
                 section("Tone Curve"){ToneCurveControls()}
                 section((s.recipe["monochrome"] as? Bool ?? false) ? "Black & White Mix":"Color Mixer") { ColorMixerControls() }
+                section("Color Grading") {ColorGradingControls()}
                 section("Detail"){
                     edit("Luminance Noise Reduction","luma_noise",0...100)
                     edit("Color Noise Reduction","chroma_noise",0...100)

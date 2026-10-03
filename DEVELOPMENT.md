@@ -18,6 +18,20 @@ observable acceptance condition. New code should be normally formatted with
 named helpers and bounded responsibilities; do not extend dense one-line code
 when a clear function is more maintainable. Avoid unrelated formatting churn.
 
+## Color Grading edits and temporary previews
+
+Keep the four grading ranges, numeric limits and defaults aligned with
+`model.GRADING_FIELDS`/`LIMITS`. A wheel gesture captures its photo, revision and
+reload epoch, coalesces only the latest read-only draft, and saves H/S together on
+release. Temporary mute/Blending saturation boost must never enter history,
+presets or frozen exports. Another control cannot replace an active capture.
+
+Inactive grading may reuse pixel artifacts but must still preserve stored values,
+history and new revision-bound native frame contexts. Unknown/incomplete/invalid
+recipe fields stay conservative in cache keys. Keep target maps upstream. Verify
+white/black protection, zero bypass, independent Global, modifier constraints,
+selection ABA, stale/cancelled preview handoff, and actual GPU dispatch.
+
 ## RAW dependency build
 
 `scripts/rawpy-wheel/build_rawpy_wheel.py` is a Mac build adapter for the

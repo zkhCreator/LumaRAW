@@ -10,6 +10,7 @@
 // Unconfirmed mask management requires an explicit reload before another action.
 // Drawing gestures capture the preview generation; selection/reload ABA cancels them.
 // Pending drawing edits retain their captured source token for the final engine check.
+// Grading wheel gestures use independent observed drafts; temporary modes never save.
 import SwiftUI
 import AppKit
 import UniformTypeIdentifiers
@@ -54,6 +55,7 @@ import UniformTypeIdentifiers
     @Published var mixerTargetSample:MixerTargetSample?
     @Published var mixerTargetGesture:MixerTargetGesture?
     let mixerTargetPreviews=CurvePreviewScheduler()
+    let gradingInteraction=GradingInteraction()
     @Published var whiteBalanceSampling=false
     @Published var whiteBalanceArming=false
     @Published var whiteBalanceAwaitingFrame=false
@@ -497,6 +499,7 @@ import UniformTypeIdentifiers
         }
     }
     func clearPhoto() {
+        cancelGrading(restore:false)
         whiteBalanceInteractionGeneration+=1
         cancelWhiteBalanceSelector()
         clearColorReadout();colorReadoutFrame=nil
@@ -598,12 +601,13 @@ import UniformTypeIdentifiers
             render()
         } catch {if selected==id,token==generation{self.error=error.localizedDescription}}
     }
-    func render(curveDraft:CurvePreviewDraft?=nil,mixerDraft:MixerPreviewDraft?=nil,debounce:Bool=true) {
-        guard curveDraft == nil || mixerDraft == nil else {return}
+    func render(curveDraft:CurvePreviewDraft?=nil,mixerDraft:MixerPreviewDraft?=nil,gradingDraft:GradingPreviewDraft?=nil,debounce:Bool=true) {
+        guard [curveDraft != nil,mixerDraft != nil,gradingDraft != nil].filter({$0}).count<=1 else {return}
         if whiteBalanceTargetActive {cancelWhiteBalanceSelector()}
         clearColorReadout();colorReadoutFrame=nil
-        let isDraft=curveDraft != nil || mixerDraft != nil
+        let isDraft=curveDraft != nil || mixerDraft != nil || gradingDraft != nil
         if !isDraft {
+            cancelGrading(restore:false)
             if curveTargetGesture != nil {cancelCurveTarget(restore:false)} else {curveTargetPreviews.cancel()}
             curveTargetFrame=nil
             if mixerTargetGesture != nil {cancelMixerTarget(restore:false)} else {mixerTargetPreviews.cancel()}
@@ -619,6 +623,9 @@ import UniformTypeIdentifiers
         if let capture=mixerDraft {
             guard p.id == capture.photoID,p.revision == capture.revision,!hasPendingEdits else {return}
         }
+        if let capture=gradingDraft {
+            guard p.id==capture.photoID,p.revision==capture.revision,!hasPendingEdits else {return}
+        }
         generation += 1;let token=generation
         previewTask?.cancel()
         if !debounce {rendering=true}
@@ -630,9 +637,9 @@ import UniformTypeIdentifiers
             if develop && !isDraft {params["include_color_readouts"]=true;params["expected_revision"]=p.revision}
             params["include_before"]=needsBeforePreview && !isDraft
             let beforeContext=currentBeforeContext
-            let toneContext=curveTargetActive ? curveTargetContext:nil
+            let toneContext=curveTargetActive && gradingDraft==nil ? curveTargetContext:nil
             if toneContext != nil {params["include_curve_tones"]=true}
-            let mixerContext=mixerTargetActive ? curveTargetContext:nil,mixerMode=mixerTargetMode
+            let mixerContext=mixerTargetActive && gradingDraft==nil ? curveTargetContext:nil,mixerMode=mixerTargetMode
             if mixerContext != nil {params["mixer_target"]=mixerMode}
             if let capture=curveDraft {
                 params["curve_patch"]=capture.patch;params["expected_revision"]=capture.revision
@@ -640,6 +647,10 @@ import UniformTypeIdentifiers
             }
             if let capture=mixerDraft {
                 params["mixer_patch"]=capture.patch;params["expected_revision"]=capture.revision
+                params["include_before"]=false
+            }
+            if let capture=gradingDraft {
+                params["grading_patch"]=capture.patch;params["expected_revision"]=capture.revision
                 params["include_before"]=false
             }
             if detail{params["detail"]=["cx":cx,"cy":cy,"width":detailPixelWidth,"height":detailPixelHeight]}
@@ -665,16 +676,17 @@ import UniformTypeIdentifiers
                 metadata=r["metadata"] as? [String:Any] ?? [:]
                 previewGeometry=PhotoPreviewGeometry(r)
                 previewSourceFingerprint=r["source_fingerprint"] as? String
-                activeViewportFrame=beforeContext.flatMap {BeforeAfterFrame(r,context:$0)}
+                activeViewportFrame=gradingDraft==nil ? beforeContext.flatMap {BeforeAfterFrame(r,context:$0)}:nil
                 colorReadoutFrame=nextColors
                 if let toneContext {acceptCurveTones(r,context:toneContext)} else {curveTargetFrame=nil}
                 if let mixerContext {acceptMixerTarget(r,context:mixerContext,mode:mixerMode)} else {mixerTargetFrame=nil}
-                message=isDraft ? (mixerDraft != nil ? "Mixer preview · Release to save, Escape to cancel":"Curve preview · Release to save, Escape to cancel") : (detail ? "Full-resolution viewport · 1 image pixel = 1 screen pixel" : "Preview · Originals are read-only · Edits save automatically")
+                message=isDraft ? (gradingDraft != nil ? "Color Grading preview · Release to save, Escape to cancel":(mixerDraft != nil ? "Mixer preview · Release to save, Escape to cancel":"Curve preview · Release to save, Escape to cancel")) : (detail ? "Full-resolution viewport · 1 image pixel = 1 screen pixel" : "Preview · Originals are read-only · Edits save automatically")
                 rendering=false
             } catch {if token==generation {rendering=false;self.error=error.localizedDescription}}
         }
     }
     func set(_ key:String,_ value:Any) {
+        if gradingInteraction.edit != nil {cancelGrading(restore:false)}
         guard !loading,!browsing,!orientationBusy,!developPresetBusy,!historyBusy,!snapshotBusy,!syncBusy,!maskActionBusy,let p=photo,p.id==selected else{return}
         if let recovery=activeMaskRecovery {error=recovery.message;return}
         if let recovery=whiteBalanceEditRecovery {error=recovery.message;return}

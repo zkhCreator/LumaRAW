@@ -4,7 +4,8 @@ Inputs: captured render requests, engine/backend identity and disposable artifac
 Outputs: atomically published receipts or fully validated cached preview replies.
 The broker hashes bounded files in chunks; it never imports image/pixel libraries.
 Keys include source/asset stat identities and every render option, never client IDs
-or catalog revisions. Only non-pixel mask labels are omitted from recipe identities.
+or catalog revisions. Mask labels and provably inactive grading controls are
+omitted through the shared pixel identity helper; stored recipes remain intact.
 Callers must recheck revisions and cancellation on return, including after rename.
 Cache loss/corruption is a miss, not a catalog failure. No original writes or SQL.
 Cached replies report unused filter stages and zero new work, never old timings.

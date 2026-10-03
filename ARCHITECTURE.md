@@ -70,15 +70,38 @@ revalidation. Receipts are disposable, subject to the existing byte/count cache
 budget and do not require decoded-source arrays to survive. Hits preserve their
 requested Before, histogram, geometry, curve/mixer maps and readout outputs.
 Revision/source/generation checks still run before returning a cached result.
-Mask display names alone are omitted from pixel identities, including developed
-thumbnails and readout maps. Stored recipes, history and frozen exports keep the
-names. Native frames still reload under the new revision; an old sampling context
-cannot become current merely because its pixels are reusable. Other fields and
-mask ordering remain conservative parts of pixel identity.
+Mask display names and known inactive grading hue/overlap controls are omitted
+from pixel identities, including developed thumbnails and readout maps. Stored
+recipes, history and frozen exports retain them. Native frames still reload under
+the new revision; an old sampling context cannot become current merely because
+its pixels are reusable. Unknown fields and mask ordering remain conservative.
 Corruption repair removes only associated disposable maps under the image-writer
 lock, preventing older header-only caches from blessing a damaged body. Valid
 reads never wait for that lock. Concurrent LRU touches are harmless; an atomic
 file replacement is a transient miss and does not trigger destructive repair.
+
+## Four-wheel Color Grading
+
+`color_grading.py` owns bounded pointwise shading after HSL/B&W mixing and before
+local masks/LUT. Its white-normalized encoded working luminance selects overlapping
+Shadows/Midtones/Highlights; Balance shifts classification and Blending widens it.
+Global is independent. Luminance moves tone before bounded Oklab tinting; zero
+strength is an exact bypass and tint preserves black/white until luminance moves
+them. These are documented LumaRAW equations, not reconstructed Adobe equations.
+
+Four H/S/L triples plus Blending/Balance are additive recipe-v2 fields and one
+independent Sync/preset group. No SQL migration or precision reduction is needed.
+CPU and Metal share immutable coefficients, stage order and endpoint behavior.
+Curve/mixer targeting remains upstream and ignores grading when keying its maps.
+Stored/frozen recipes retain inactive controls; shared pixel identities omit only
+known inactive hue/overlap values in complete validated recipes.
+
+The Mac shell owns wheel geometry/gestures, an observed draft state and a local
+wheel clipboard. `grading_patch` is read-only, revision-bound and mutually exclusive
+with curve/mixer drafts. It uses the existing bounded preview scheduler/relay.
+Mouse release commits one captured patch; mute and Option Blending boost never
+save. Reload, selection ABA and revision changes cancel; no stale mutation replay.
+Temporary pixels are not valid WB/readout/drawing/targeted-curve sampling frames.
 
 ## Global Presence processing
 

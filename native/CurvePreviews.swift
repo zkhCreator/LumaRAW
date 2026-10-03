@@ -1,4 +1,4 @@
-// Purpose: bounded temporary previews shared by curve and color mixer controls.
+// Purpose: bounded temporary previews shared by curves, mixer and Color Grading.
 // Inputs: revision-bound, field-scoped drafts supplied by native editors.
 // Outputs: one in-flight Store render and one coalesced latest draft. No persistence
 // or pixel algorithms; committing/cancelling a gesture remains the editor's job.
@@ -29,6 +29,12 @@ extension PointCurveCapture {
         enqueue(store:store) {
             guard let draft=current() else {return}
             store.render(mixerDraft:draft,debounce:false)
+        }
+    }
+    func requestGrading(store:Store,current:@escaping () -> GradingPreviewDraft?) {
+        enqueue(store:store) {
+            guard let draft=current() else {return}
+            store.render(gradingDraft:draft,debounce:false)
         }
     }
     private func enqueue(store:Store,action:@escaping () -> Void) {

@@ -104,7 +104,7 @@ struct PointCurveCapture {
 
 extension Store {
     var canEditPointCurves: Bool {
-        !loading && !browsing && !orientationBusy && !developPresetBusy && !painterBusy && photo != nil && photo?.id == selected
+        gradingInteraction.edit==nil && !loading && !browsing && !orientationBusy && !developPresetBusy && !painterBusy && photo != nil && photo?.id == selected
     }
     func pointCurve(_ key: String) -> [[Double]] {
         recipe[key] as? [[Double]] ?? PointCurveFields.identity

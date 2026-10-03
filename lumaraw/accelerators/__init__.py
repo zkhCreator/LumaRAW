@@ -7,6 +7,7 @@ CPU handles geometry/detail and complex masks/LUTs; Presence can delegate scalar
 Gaussian passes to Metal while retaining the CPU reference and other equations.
 The Gaussian and color paths share one bounded buffer pool. A failed GPU command
 never exposes a partial output buffer. Statistics identify actual Gaussian work.
+Four-wheel Color Grading uses the same pointwise equations and fused dispatch.
 """
 import ctypes as C
 from functools import lru_cache
@@ -155,6 +156,9 @@ def packed(recipe,space,output_only=False,capture_work=False,capture_readouts=Fa
     p[28:37]=output_matrix(space).ravel();p[38]=['srgb','adobe','p3','prophoto'].index(space)
     p[54]=int(capture_work)
     p[55]=int(capture_readouts)
+    from ..color_grading import coefficients, flags
+    p[56]=flags(r)
+    if p[56]:p[626:640]=coefficients(r)
     if capture_readouts:
         p[608:617]=output_matrix('prophoto').ravel()
         p[617:626]=(PROPHOTO_XYZ/np.array([.96422,1,.82521])[:,None]).ravel()

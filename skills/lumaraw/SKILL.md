@@ -27,6 +27,21 @@ same-version implementations causes a normal cache miss. This namespace does not
 change the photograph's physical source-stat token or its catalog revisions.
 Do not infer camera support or RAW selector capability from a version label.
 
+## Four-wheel Color Grading
+
+Recipes expose `grading_{shadows,midtones,highlights,global}_{hue,saturation,luminance}`
+and `grading_blending`/`grading_balance`. Hue is 0–360 degrees, saturation and
+Blending are 0–100, and luminance/Balance are -100–100. Defaults are zero except
+Blending at 50. The independent `Color Grading` group supports partial presets
+and captured Sync; frozen exports retain submitted values.
+
+`preview_photo.grading_patch` previews these fields at `expected_revision` without
+saving. It cannot be combined with curve or mixer drafts. Save the reviewed patch
+with `edit_photo` and its original captured revision; never replay a stale edit.
+Pixel caches may reuse inactive hue/overlap settings, while catalog recipes and
+history retain them. LumaRAW's tonal/Oklab model is not Adobe's proprietary pixel
+algorithm or old Split Toning/XMP preset compatibility.
+
 ## Non-AI mask management
 
 `mask_action` manages one existing mask without opening photographs. Pass

@@ -20,6 +20,7 @@ Bounded point samplers reuse source_uv before channel-specific lens shifts.
 After PNG publication is atomic so completed-cache readers cannot see partial writes.
 Global Presence runs after noise/defringe and before sharpening. Filter halos sum
 sequential support, keeping full-frame, strip, viewport and oriented pixels equal.
+Pointwise Color Grading follows HSL/B&W mixing, before local masks and LUTs.
 """
 from dataclasses import replace
 import hashlib
@@ -44,7 +45,7 @@ from .parametric import apply as apply_parametric
 from .imaging import load_source, fingerprint, cache_key, write_thumbnail, LUMA
 from .source_identity import thumbnail_path, cached_thumbnail
 from .orientation import validate as validate_orientation, inverse_rect, apply_array
-from . import curve_tones, mixer_targets, color_readouts, presence
+from . import curve_tones, mixer_targets, color_readouts, presence, color_grading
 
 ROWS=128
 HALO=32
@@ -268,6 +269,7 @@ def grade_tile(a,r,x=0,y=0,total_w=None,total_h=None):
     a=apply_rgb_curves(a,r)
     a=mix_hues(a,r)
     if r.monochrome: a=mix_monochrome(a,r,LUMA)
+    a=color_grading.apply(a,r)
     total_w=total_w or a.shape[1];total_h=total_h or a.shape[0]
     for m in r.masks:
         if not m.get('enabled',True): continue

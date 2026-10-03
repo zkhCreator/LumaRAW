@@ -15,9 +15,10 @@ relative recipe candidates without changing the catalog or original.
 Sync can capture a source revision as well as every target revision; stale sources
 fail before any batch edit. IDs refer only to the selected catalog.
 Existing non-AI mask management binds a mask index to the captured photo revision.
+Color Grading drafts are field-scoped, revision-bound and separate from other drafts.
 Tool annotations describe effects; they never substitute for user authorization.
 """
-from .model import LIMITS, Recipe, SYNC_GROUPS, POINT_CURVE_FIELDS, PARAMETRIC_FIELDS, MIXER_FIELDS, BW_FIELDS
+from .model import LIMITS, Recipe, SYNC_GROUPS, POINT_CURVE_FIELDS, PARAMETRIC_FIELDS, MIXER_FIELDS, BW_FIELDS, GRADING_FIELDS
 from .organization import COLORS, SORTS, FILTER_SCHEMA
 from .iptc import SCHEMA as IPTC_SCHEMA
 from .metadata_presets import PATCH_SCHEMA as METADATA_PRESET_PATCH
@@ -234,8 +235,14 @@ MIXER_PATCH=obj({key:{'type':'number','minimum':LIMITS[key][0],'maximum':LIMITS[
 MIXER_PATCH['minProperties']=1
 TOOLS['preview_photo']['inputSchema']['properties'].update(mixer_patch=MIXER_PATCH,mixer_target={'enum':['hsl','bw']})
 TOOLS['preview_photo']['inputSchema']['dependentRequired']['mixer_patch']=['expected_revision']
-TOOLS['preview_photo']['inputSchema']['not']={'required':['curve_patch','mixer_patch']}
+TOOLS['preview_photo']['inputSchema']['not']={'anyOf':[
+    {'required':pair} for pair in (['curve_patch','mixer_patch'],['curve_patch','grading_patch'],['mixer_patch','grading_patch'])]}
 TOOLS['preview_photo']['description']+=' mixer_patch previews temporary HSL/B&W values at expected_revision, separately from curve_patch. mixer_target returns aligned sparse band weights before HSL or B&W mixing.'
+GRADING_PATCH=obj({key:{'type':'number','minimum':LIMITS[key][0],'maximum':LIMITS[key][1]} for key in GRADING_FIELDS})
+GRADING_PATCH['minProperties']=1
+TOOLS['preview_photo']['inputSchema']['properties']['grading_patch']=GRADING_PATCH
+TOOLS['preview_photo']['inputSchema']['dependentRequired']['grading_patch']=['expected_revision']
+TOOLS['preview_photo']['description']+=' grading_patch previews temporary four-wheel Color Grading without saving edits or history. Curve, mixer and grading drafts are mutually exclusive.'
 tool('sample_white_balance','Sample one neutral point in the full post-geometry, post-orientation After image. Returns relative Temperature/Tint without saving; supports rendered raster originals and square-pixel RGB/RGBG Bayer RAW with verified greybox API 2. Other RAW layouts fail explicitly. Source-stat identity, revision and client generation are required.',{
     'photo_id':ID,'expected_revision':REV,'expected_source_fingerprint':SOURCE_FINGERPRINT,
     'client_id':string(128),'generation':REV,

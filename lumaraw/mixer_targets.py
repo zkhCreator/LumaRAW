@@ -18,7 +18,7 @@ import tempfile
 import numpy as np
 
 from .color import oklab, mixer_weight, mixer_neutral_weight, MIXER_CENTERS
-from .model import Recipe, MIXER_FIELDS, BW_FIELDS, MIXER_BANDS
+from .model import Recipe, MIXER_FIELDS, BW_FIELDS, MIXER_BANDS, GRADING_FIELDS
 from .source_identity import pixel_fingerprint
 
 MAGIC = b'LRMIX1\0\0'
@@ -54,7 +54,7 @@ def target_path(path, recipe, cache, geometry, mode):
         raise ValueError('Unknown mixer target stage')
     upstream = recipe.dict()
     defaults = Recipe().dict()
-    downstream = (*BW_FIELDS, 'monochrome', 'masks', 'lut', 'lut_amount')
+    downstream = (*BW_FIELDS, *GRADING_FIELDS, 'monochrome', 'masks', 'lut', 'lut_amount')
     if mode == 'hsl':
         downstream += MIXER_FIELDS
     for key in downstream:

@@ -67,7 +67,7 @@ extension Store {
     }
 
     var canStartWhiteBalanceSelector:Bool {
-        workspace=="library" && develop && selected != nil && photo?.id==selected &&
+        gradingInteraction.edit==nil && workspace=="library" && develop && selected != nil && photo?.id==selected &&
         !loading && !browsing && !orientationBusy && !historyBusy && !snapshotBusy && !developPresetBusy &&
         whiteBalanceEditRecovery == nil &&
         !whiteBalanceSampling && !whiteBalanceArming && !whiteBalanceAwaitingFrame

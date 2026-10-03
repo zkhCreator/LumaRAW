@@ -65,6 +65,7 @@ def main():
     suites+=('NativeLocalMaskActionsRegression',)
     suites+=('NativeMaskPixelCacheRegression',)
     suites+=('NativeDrawingRegression',)
+    suites+=('NativeColorGradingRegression',)
     parser.add_argument('--raw-fixture', type=Path, help='Explicit read-only RAW input for the optional RAW WB suite')
     parser.add_argument('--suite',choices=suites,action='append',help='Run selected suites; default: all')
     args=parser.parse_args()

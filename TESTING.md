@@ -2,6 +2,33 @@
 
 All probes use explicit read-only input photographs and new disposable catalog/output directories. They never use a personal photo library by default.
 
+## Four-wheel Color Grading
+
+`test_color_grading.py` verifies additive defaults/strict limits, exact neutral
+bypass, black/white protection, range/Balance/Blending behavior, independent Global,
+zero-saturation luminance, hue wrapping, finite extremes, B&W tinting and strip/
+viewport agreement. Its sixteen actual Metal cases cover four output spaces,
+tint/luminance combinations and the existing linear/encoded precision policies.
+Real workers check read-only draft scope, upstream target map reuse, stale/cancelled
+cache handoff, inactive control worker bypass, active/source invalidation, one-step
+history, partial presets/Sync, old JSON and immutable export recipes.
+
+`NativeColorGradingRegression` checks the real native relay/controller, paired
+wheel save, temporary mute/boost, scoped resets, local wheel copy/paste, selected
+presets/Sync, selection ABA, external revision conflicts and typed modifier geometry.
+Three-way/detail/Global/wheel PNGs are offscreen layout evidence. This does not
+establish desktop pointer/keyboard event routing, VoiceOver or macOS 14 runtime.
+
+```sh
+LUMARAW_REQUIRE_METAL=1 python -m pytest -q tests/test_color_grading.py
+python tests/run_native.py --engine /absolute/LumaRAWEngine \
+  --work work/new-color-grading --suite NativeColorGradingRegression
+```
+
+Synthetic images and paired CPU/Metal RAW probes establish this model's behavior
+and adapter precision only. Adobe's proprietary grading equations, absolute camera
+accuracy, HDR grading and legacy Split Toning/Adobe XMP exchange remain unverified.
+
 ## Non-AI mask management
 
 `NativeDrawingRegression` drives typed gesture events through actual Store and

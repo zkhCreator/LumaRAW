@@ -9,7 +9,7 @@ No pixels, original writes, metadata/orientation undo or global application undo
 import json
 import time
 
-from .model import Recipe
+from .model import Recipe, GRADING_FIELDS
 
 PAGE = 60
 
@@ -157,6 +157,12 @@ class DevelopHistory:
 
 def adjustment_label(patch):
     keys = [key for key in patch if key != 'version']
+    if keys and all(key in GRADING_FIELDS for key in keys):
+        if len(keys)>1:
+            regions={key.split('_')[1] for key in keys}
+            return 'Color Grading: '+(next(iter(regions)).title() if len(regions)==1 else f'{len(keys)} settings')
+        label=keys[0].removeprefix('grading_').replace('_',' ').title()
+        return f'Color Grading {label}: {patch[keys[0]]:g}'[:120]
     if len(keys) == 1:
         key = keys[0]
         label = key.replace('_', ' ').title()

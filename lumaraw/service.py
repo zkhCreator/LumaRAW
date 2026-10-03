@@ -18,6 +18,7 @@ GUI, HTTP listener, telemetry or original-file writes. Interrupted exports are
 never automatically replayed. Optimistic revisions prevent lost recipe updates.
 Captured Sync source revisions are checked before validating or changing targets.
 Non-AI mask management uses the same revision-bound per-photo Develop history.
+Curve, mixer and Color Grading drafts are read-only recipes for the image worker.
 """
 from contextlib import contextmanager
 import hashlib
@@ -419,7 +420,7 @@ class Service:
                         self.cancelled=True
                         if self.process.poll() is None:self.process.kill()
             with self.catalog() as c:
-                draft_key='curve_patch' if 'curve_patch' in p else ('mixer_patch' if 'mixer_patch' in p else None)
+                draft_key=next((key for key in ('curve_patch','mixer_patch','grading_patch') if key in p),None)
                 row=self.check_revision(c,p['photo_id'],p['expected_revision']) if 'expected_revision' in p else self.require(c,p['photo_id'])
                 preview_recipe=json.loads(row['recipe'])
                 if draft_key:
@@ -433,7 +434,7 @@ class Service:
                             'cache_hit':True,'worker_spawned':False}
             request={'operation':{'preview_photo':'preview','thumbnail':'thumbnail','calibrate_camera':'calibrate','sample_white_balance':'white_balance_sample'}[method],
                      'path':row['path'],'recipe':preview_recipe,'orientation':row['orientation']}
-            request.update({k:v for k,v in p.items() if k not in ('photo_id','curve_patch','mixer_patch','expected_revision')})
+            request.update({k:v for k,v in p.items() if k not in ('photo_id','curve_patch','mixer_patch','grading_patch','expected_revision')})
             if before_state:
                 request['before_recipe']=before_state[0].dict()
             source_fingerprint=fingerprint(row['path']) if method in ('preview_photo','sample_white_balance') or 'expected_revision' in p else None
@@ -460,7 +461,7 @@ class Service:
             response={**result,'photo_id':row['id'],'revision':row['revision'],'source':row['path'],
                       **({'source_fingerprint':source_fingerprint} if source_fingerprint is not None else {}),
                       **({'before_label':before_state[1]} if before_state else {}),
-                      'curve_draft':'curve_patch' in p,'mixer_draft':'mixer_patch' in p}
+                      'curve_draft':'curve_patch' in p,'mixer_draft':'mixer_patch' in p,'grading_draft':'grading_patch' in p}
             if method in ('preview_photo','sample_white_balance'):
                 # A cancel can arrive while the final revision read waits for a
                 # writer. Serialize the response handoff with that generation.

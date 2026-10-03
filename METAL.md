@@ -4,13 +4,20 @@ The optional backend plugs into `lumaraw.accelerators.grade_output`. A small Obj
 
 ## CPU/GPU split
 
+Four-wheel Color Grading shares the CPU model's fourteen immutable coefficients
+with the fused shader. Existing uniform slots 626–639 and flag 56 keep the C ABI
+parameter count at 640. The stage follows HSL/B&W and precedes masks/LUT; hybrid
+recipes still grade once on CPU before GPU output/readout conversion. Neutral
+grading bypasses; white-normalized classification preserves endpoint tint guards.
+Actual `metal_grade_tiles` and stage timing establish dispatch, not library loading.
+
 | Stage | Implementation |
 | --- | --- |
 | NEF metadata, decompression, white balance, AHD demosaicing, camera matrix | LibRaw on CPU |
 | Crop/rotation/perspective/distortion sampling; denoise/sharpen/defringe | CPU with overlapping strips |
 | Global Presence scalar Gaussian passes | Optional two-pass Metal FIR with CPU reference/fallback |
 | Presence dark-channel minimum, log/gain and veil equations | CPU; same portable recipe model |
-| Exposure, tone, contrast, saturation/vibrance, curves, eight-band HSL/B&W mixer, camera profile matrix, monochrome | Fused Metal grading kernel, or CPU reference |
+| Exposure, tone, contrast, saturation/vibrance, curves, eight-band HSL/B&W mixer, camera profile matrix, monochrome, four-wheel Color Grading | Fused Metal grading kernel, or CPU reference |
 | Masks, LUT and very steep point curves | Complete CPU grading followed by Metal output conversion; reported as hybrid |
 | Output matrix, sRGB/P3/Adobe/ProPhoto encoding, gamut flags | Metal, or CPU fallback |
 | Optional Develop SDR RGB/Lab D50 readouts | Fused with Metal grade/output, or unchanged CPU reference |

@@ -67,7 +67,7 @@ struct DrawingGesture {
 
 extension Store {
     func drawingContext(image:NSImage,rect:CGRect)->DrawingContext? {
-        guard develop,!compare,!splitCompare,!detail,!rendering,!loading,!editing,!browsing,
+        guard gradingInteraction.edit==nil,develop,!compare,!splitCompare,!detail,!rendering,!loading,!editing,!browsing,
               !hasPendingEdits,!orientationBusy,!developPresetBusy,!historyBusy,!snapshotBusy,
               !syncBusy,!maskActionBusy,activeMaskRecovery==nil,whiteBalanceEditRecovery==nil,
               ["crop","radial","linear","brush"].contains(canvasTool),
