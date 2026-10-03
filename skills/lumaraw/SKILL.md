@@ -27,6 +27,17 @@ same-version implementations causes a normal cache miss. This namespace does not
 change the photograph's physical source-stat token or its catalog revisions.
 Do not infer camera support or RAW selector capability from a version label.
 
+## Global Presence
+
+`texture`, `clarity` and `dehaze` accept -100…100, default to zero and belong to
+the selectable `Presence` sync/preset group. Positive/negative Texture enhances/
+smooths medium-scale details; Clarity changes broader local contrast. Positive
+Dehaze removes a neutral veil; negative values add one. Preview, 1:1 view and
+export share bounded CPU neighborhood processing before CPU/Metal grading.
+These are explicit LumaRAW models, not Adobe equation or pixel-equivalence claims.
+Local mask Presence is not supported. Read at 1:1 as well as Fit when evaluating
+detail. Capture revisions for edits; queued exports retain their submitted values.
+
 ## White Balance Selector
 
 `preview_photo` returns `source_fingerprint`, a 24-character token derived from

@@ -2,6 +2,36 @@
 
 All probes use explicit read-only input photographs and new disposable catalog/output directories. They never use a personal photo library by default.
 
+## Global Presence
+
+`test_presence.py` verifies positive/negative frequency and veil behavior, neutral
+bypass, channel ratios, finite extremes, bounded sampling, additive old JSON,
+selected presets/sync, stale-batch atomicity, undo, recipe/backup exchange and
+frozen exports. Combined noise/Presence/sharpen spatial prefixes must agree exactly
+with the full frame at corners and interior regions. Encoded strips/viewports
+across eight orientations and three scales allow existing FP32 color rounding
+within one 8/16-bit code value. CPU/Metal output uses existing encoded and linear
+tolerances while requiring actual grading dispatch when the flag is set.
+
+```sh
+LUMARAW_REQUIRE_METAL=1 python -m pytest -q tests/test_presence.py
+python tests/presence_processing_probe.py --source /absolute/read-only.NEF \
+  --work work/new-presence-probe --compute metal
+python tests/run_native.py --engine /absolute/LumaRAWEngine \
+  --work work/new-native-presence --suite NativePresenceRegression
+```
+
+Use the same isolated API 2 environment as packaging. The processing probe creates
+six isolated cases (Fit/detail/export × baseline/Presence) and measures cold engine
+cache then warm linear cache with a changed recipe, plus completed preview hits.
+OS cache is not flushed. It records full recipes, fixture/backend identity, output
+dimensions, actual dispatches, worker stages, elapsed wall time, sampled worker
+RSS and source hashes. It measures processing, not native slider latency.
+`NativePresenceRegression` covers edits, scoped reset, undo, sync, preset selection,
+reload and conflicts through the real broker; its panel PNG is offscreen only.
+Neither synthetic nor one-camera evidence establishes Adobe numerical acceptance,
+desktop input, VoiceOver or macOS 14 runtime compatibility.
+
 ## White-balance selector options and loupe
 
 `NativeWhiteBalanceOptionsRegression` uses memory preferences so it cannot change

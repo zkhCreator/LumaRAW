@@ -27,6 +27,7 @@ Official references checked September 2026:
 - [History state selection, naming, clearing and snapshots](https://helpx.adobe.com/uk/lightroom-classic/desktop/process-and-develop-photos/develop-module-options.html)
 - [Snapshot creation, update, sharing and Before assignment, Adobe's Julieanne Kost](https://jkost.com/blog/2024/08/working-with-snapshots-in-lightroom-classic-and-photoshop.html)
 - [Tone Curve controls and channels](https://helpx.adobe.com/lightroom-classic/desktop/process-and-develop-photos/image-tone-color.html)
+- [Texture frequency behavior and its distinction from Clarity, Adobe ACR engineering](https://blog.adobe.com/en/publish/2019/05/14/from-the-acr-team-introducing-the-texture-control) (checked October 2026)
 - [Color Mixer](https://helpx.adobe.com/lightroom-classic/desktop/process-and-develop-photos/color-mixer.html) and [Black & White Mix](https://www.adobe.com/learn/lightroom-classic/web/convert-photo-black-white)
 - [Loupe, Compare and Survey](https://helpx.adobe.com/lightroom-classic/desktop/viewing-photos/browse-compare-photos.html)
 - [Keyboard shortcuts](https://helpx.adobe.com/lightroom-classic/desktop/introduction-to-lightroom-classic/keyboard-shortcuts.html)
@@ -63,7 +64,7 @@ gaps. Nothing below is full Lightroom parity merely because historical tests pas
 | Library navigation | Partial: bounded grid/filmstrip, folder tree/search/favorites/labels, durable missing-folder relocation and folder synchronization with reviewed suspected-duplicate inclusion, direct/recursive sources, filters/sorting including live snapshot status, regular/smart/Quick collections and nested sets, photo drops into regular and Quick collections, collection-node moves into sets, single/batch collection color labels and global color filtering | Multi-source selection, complete sync Import Dialog, folder move/rename, relocation overlap/collision handling, collection-node drag/drop desktop/reference acceptance, custom label names/sets and sidebar multi-selection interaction, full smart criteria/import-export, source-selection memory, desktop/reference acceptance |
 | Organization | Partial: duplicate/missing detection, hierarchical keywords/synonyms/export flags/Will Export preview, text/CSV vocabulary exchange and manual person tags, custom nine-slot keyword sets/recent entries/shared or catalog storage, multi-keyword shortcuts and keyword/rating/flag/label/target-collection/rotation/Develop-preset/metadata-preset Painter strokes, independent catalog rotation/flips, title/caption/copyright plus thirty IPTC fields, selective metadata presets, labels, batch metadata, virtual copies, manual/split/capture-time scoped stacks | Keyword policy/file and preset reference acceptance, built-in sets/suggestions/undo, Painter desktop acceptance, IPTC Extension and complete metadata parity, stack interaction acceptance, rename and sidecars |
 | Culling | Partial: Loupe/Compare/Survey, linked detail, anchored page selection, rating/flag/color keys with guarded Shift advance in single-target Grid/Loupe, Develop Reference/Active pairs with independent Fit/1:1 viewports, session lock and RGB/LAB readouts | Desktop and numerical reference acceptance, exact sorted/filter-removal behavior, HDR readouts, scrubby/box zoom, cross-page selection, Auto Advance preference/Caps Lock, persistent workspace state |
-| Basic development | Partial: light/WB/color, source-bound raster and limited API 2 Bayer RAW neutral-point selection, native loupe/scale/Auto Dismiss/Done options, eight-band HSL and B&W Mix with photo-targeted adjustment and selective resets/sync | Broader RAW selector camera/runtime acceptance, calibrated absolute WB, Navigator hover WB-effect preview and desktop selector acceptance, texture/clarity/dehaze, Point Color, Auto B&W mix, color grading and Adobe processing/reference acceptance |
+| Basic development | Partial: light/WB/color, global Texture/Clarity/Dehaze with bounded shared processing and selective presets/sync/reset, source-bound raster and limited API 2 Bayer RAW neutral-point selection, native loupe/scale/Auto Dismiss/Done options, eight-band HSL and B&W Mix with photo-targeted adjustment and selective resets/sync | Broader RAW selector camera/runtime acceptance, calibrated absolute WB, Navigator hover WB-effect preview and desktop selector acceptance, local Presence and numerical/desktop reference acceptance, Point Color, Auto B&W mix, color grading and Adobe processing/reference acceptance |
 | Curves and profiles | Partial: four-region parametric curves with movable splits and photo-targeted adjustment, interactive RGB/channel point curves, shared temporary previews, legacy luminance curve, LUT/ICC | Point/channel targeting, curve exchange, camera/profile browser, Adobe processing and rendered/reference acceptance |
 | Detail and optics | Partial: noise/sharpen, manual lens | Complete manual detail controls, automatic lens profiles, bounded full-resolution acceptance |
 | Geometry | Partial: crop/straighten/perspective, independent rotation/flips with attached masks and displayed crop ratios | Interactive retained handles, guided transforms, full crop state and rendered/reference parity |
@@ -5402,3 +5403,67 @@ this native-only increment does not change engine algorithms/identity.
 Desktop pointer feel, hover latency, cursor/VoiceOver, macOS 14 runtime, Adobe
 visual/numerical acceptance and Navigator hover-effect parity remain unverified.
 Full Lightroom reproduction is incomplete.
+
+## Global Presence processing (October 2, 2026)
+
+Implemented global Texture, Clarity and Dehaze from -100 to 100, with zero defaults
+for old recipe JSON. The native panel uses validated partial edits, a scoped reset,
+ordinary history/undo and the independent Presence sync/preset group. Selected
+preset fields, frozen exports, recipe exchange and catalog backups retain these
+values. Existing preset patches remain partial; no catalog schema rewrite occurs.
+
+Texture enhances/smooths a medium-frequency log-luminance band. Clarity uses a
+broader band with midtone weighting. They preserve linear channel ratios. Positive
+Dehaze uses a local dark channel, normalized neutral-white airlight and a bounded
+transmission; negative values add a neutral veil. These are explicit LumaRAW
+models implementing the documented functions, **not Adobe equations or accepted
+numerical parity**. Local mask Presence remains missing.
+
+All outputs use CPU neighborhood processing after noise/defringe and before
+sharpening, then shared CPU/Metal grading. Summed spatial support bounds requested
+strips and preserves full/detail/oriented agreement. No full-frame filter buffer
+is introduced. Six combined positive/negative/scale cases verify the spatial
+prefix exactly at three corner/interior regions each. Twenty-four orientation/
+scale cases preserve encoded pixels within one 8/16-bit code value; existing
+pointwise FP32 tail-lane rounding is tested separately. A private comparison of
+**32** float32/uint16, rotation, Fit/full and noise/sharpen cases with the preceding
+commit confirms zero Presence is **byte-identical** to the old renderer.
+
+Evidence on M3 Max/128 GiB, macOS **26.6.2**:
+
+- Presence regression: **45 passed in 4.48 s**, including actual Metal grading.
+- Full Python regression: **1488 passed in 180.57 s**, no skips; actual API 2
+  Nikon NEF and Metal requirements enabled.
+- Signed self-contained Mac app: generation **61**, schema **37**, protocol **1**,
+  **150** commands and the unchanged API **2** RAW backend. Package checks pass
+  all schemas, source/client/broker identity, bundled guide and strict signatures.
+- Packaged-engine native state/IPC: **97 assertions** (Presence 14, Develop presets
+  28, white balance 39, responsiveness 16). Presence panel and actual RAW baseline/
+  adjusted 1:1 outputs were inspected offscreen. This is not desktop testing.
+
+The reproducible processing probe uses read-only Nikon D3S fixture
+`iss030e122639.NEF` (10,656,312 bytes, SHA-256
+`5922721d13f11795557d97fdeb0a60b900086c402bc82a848ff280d15b99ffd4`).
+Six new catalogs measure baseline and Texture **45**/Clarity **30**/Dehaze **35**
+in Fit, detail and 16-bit TIFF export. Each measures a cold engine cache and then
+a warm linear cache with Exposure changed to **0.05**; OS cache is not flushed.
+All 12 requests run supervised workers and actual Metal grading; originals retain
+their hash. Measurements below are individual samples, not percentiles or stable
+throughput claims. Peak RSS is sampled by the supervisor, in MiB.
+
+| Output | Baseline cold / warm seconds | Presence cold / warm seconds | Presence cold / warm peak MiB |
+| --- | --- | --- | --- |
+| Fit, 1680×1115 | 0.829 / 0.492 | 1.068 / 0.735 | 303.3 / 178.0 |
+| 1:1 detail, 1024×768 | 1.302 / 0.434 | 1.521 / 0.614 | 348.8 / 159.4 |
+| TIFF16, 4284×2844 | 1.789 / 0.837 | 4.255 / 6.583 | 613.9 / 556.5 |
+
+Full-size Presence filtering itself takes **2.516 / 2.503 s** in those two samples;
+larger end-to-end variation remains unresolved. Neighborhood work is CPU, even
+when the report confirms Metal grading. All eight repeated completed previews
+reuse validated outputs without workers in **13.95–17.03 ms**. The first probe
+attempt rejected an invalid combined Fit/detail request; the corrected probe was
+rerun in a fresh directory and only its successful measurements are reported.
+
+Desktop slider feel, pointer/keyboard/VoiceOver interaction, macOS 14 runtime,
+broader-camera/color/reference acceptance, local Presence and Adobe numerical
+equivalence remain unverified. Full Lightroom reproduction remains incomplete.

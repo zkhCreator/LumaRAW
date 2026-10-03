@@ -70,6 +70,7 @@ struct InspectorView:View {
                     edit("Saturation","saturation",-100...100)
                     Picker("Treatment",selection:bool("monochrome")) { Text("Color").tag(false);Text("Black & White").tag(true) }
                 }.padding(.top,12)}
+                section("Presence"){PresenceControls()}
                 section("Tone Curve"){ToneCurveControls()}
                 section((s.recipe["monochrome"] as? Bool ?? false) ? "Black & White Mix":"Color Mixer") { ColorMixerControls() }
                 section("Detail"){

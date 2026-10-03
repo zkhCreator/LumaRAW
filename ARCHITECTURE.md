@@ -75,6 +75,30 @@ lock, preventing older header-only caches from blessing a damaged body. Valid
 reads never wait for that lock. Concurrent LRU touches are harmless; an atomic
 file replacement is a transient miss and does not trigger destructive repair.
 
+## Global Presence processing
+
+`presence.py` owns portable CPU neighborhood operations, with no catalog, shell
+or filesystem dependency. Zero controls bypass exactly. Texture uses a bounded
+medium-frequency log-luminance band; Clarity uses a broader band weighted toward
+midtones. Both preserve linear channel ratios. Positive Dehaze uses a local dark
+channel with normalized neutral-white airlight and a transmission floor; negative
+Dehaze adds a neutral veil. These are documented LumaRAW models, not Adobe equations
+or camera-derived airlight. Local mask Presence remains a separate missing workflow.
+
+The renderer applies these after noise/defringe and before sharpening. Spatial
+support sums sequential filters and scales to output/source pixels. Only expanded
+requested strips are sampled; no full-frame filtering buffer is allocated. The
+same prefix feeds preview, detail, export, tone/mixer targeting and color readouts,
+then the existing CPU/Metal grade/output adapter runs. Actual Metal grading does
+not mean Presence or LibRaw ran on GPU. Existing pointwise FP32 color rounding can
+differ at tail lanes; spatial-prefix agreement is verified separately.
+
+The three -100…100 values default to zero in old recipe JSON. The `Presence`
+sync/preset group is independent of Light, Color, Detail and Local Masks. Storage
+schema 37 and recipe version 2 remain compatible; generation 61 invalidates old
+engine output identities. Native controls emit bounded partial edits, with a
+scoped reset, ordinary optimistic revisions and one history step per saved burst.
+
 ## White-balance point sampling
 
 The selector binds the displayed frame, read-only sample and final edit to a

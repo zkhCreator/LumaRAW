@@ -7,6 +7,8 @@ Temperature and tint are relative adjustments to the camera's as-shot balance.
 Mixer hue values retain their original degree units; the Mac panel maps them to
 its -100…100 scale. Added mixer fields default to zero for existing recipes.
 Parametric regions are independent of older luminance and RGB point curves.
+Global Presence fields are additive zero-default controls; local masks remain
+limited to their explicitly validated exposure/saturation responsibilities.
 """
 from dataclasses import asdict, dataclass, fields, field
 import math
@@ -31,6 +33,7 @@ LIMITS = {
     'contrast': (-100, 100), 'highlights': (-100, 100), 'shadows': (-100, 100),
     'whites': (-100, 100), 'blacks': (-100, 100), 'saturation': (-100, 100),
     'vibrance': (-100, 100), 'curve_shadows': (-30, 30), 'curve_midtones': (-30, 30),
+    'texture': (-100, 100), 'clarity': (-100, 100), 'dehaze': (-100, 100),
     'curve_lights': (-30, 30), 'red_hue': (-30, 30), 'red_sat': (-100, 100),
     'orange_hue': (-30, 30), 'orange_sat': (-100, 100), 'green_hue': (-30, 30),
     'green_sat': (-100, 100), 'blue_hue': (-30, 30), 'blue_sat': (-100, 100),
@@ -58,6 +61,9 @@ class Recipe:
     blacks: float = 0
     saturation: float = 0
     vibrance: float = 0
+    texture: float = 0
+    clarity: float = 0
+    dehaze: float = 0
     curve_shadows: float = 0
     curve_midtones: float = 0
     curve_lights: float = 0
@@ -256,6 +262,7 @@ SYNC_GROUPS = {
     'White Balance': ['temperature','tint'],
     'Light': ['exposure','contrast','highlights','shadows','whites','blacks','highlight_recovery'],
     'Color': ['saturation','vibrance','monochrome',*MIXER_FIELDS],
+    'Presence': ['texture','clarity','dehaze'],
     'Black & White Mix': list(BW_FIELDS),
     'Tone Curve': ['curve_shadows','curve_midtones','curve_lights','curve_points',*POINT_CURVE_FIELDS,*PARAMETRIC_FIELDS,'parametric_splits'],
     'Detail': ['luma_noise','chroma_noise','sharpen','sharpen_radius','detail_protect','defringe'],

@@ -18,6 +18,8 @@ coordinates, then losslessly rotates/flips each tile. Masks/crops stay attached.
 Readout maps share the grade/output dispatch, before proofing or overlay pixels.
 Bounded point samplers reuse source_uv before channel-specific lens shifts.
 After PNG publication is atomic so completed-cache readers cannot see partial writes.
+Global Presence runs after noise/defringe and before sharpening. Filter halos sum
+sequential support, keeping full-frame, strip, viewport and oriented pixels equal.
 """
 from dataclasses import replace
 import hashlib
@@ -42,7 +44,7 @@ from .parametric import apply as apply_parametric
 from .imaging import load_source, fingerprint, cache_key, write_thumbnail, LUMA
 from .source_identity import thumbnail_path, cached_thumbnail
 from .orientation import validate as validate_orientation, inverse_rect, apply_array
-from . import curve_tones, mixer_targets, color_readouts
+from . import curve_tones, mixer_targets, color_readouts, presence
 
 ROWS=128
 HALO=32
@@ -157,6 +159,16 @@ class OrientedPlan:
         self.base.pixel_scale=value
 
 
+def detail_support(r,pixel_scale=1,output_sharpen=0):
+    """Sum sequential spatial dependencies; keep the legacy minimum halo."""
+    radius=0
+    if r.chroma_noise:radius+=math.ceil(4*max(.4,1.8*pixel_scale))
+    if r.luma_noise:radius+=math.ceil(4*max(.4,1.25*pixel_scale))
+    radius+=presence.support(r,pixel_scale)
+    if r.sharpen+output_sharpen:radius+=math.ceil(4*max(.3,r.sharpen_radius*pixel_scale))
+    return max(HALO,radius)
+
+
 def detail_filter(a,r,pixel_scale=1,output_sharpen=0):
     """Operate on an owned writable strip, reusing its memory where possible."""
     y=np.maximum(a@LUMA,1e-8)
@@ -176,6 +188,9 @@ def detail_filter(a,r,pixel_scale=1,output_sharpen=0):
         strength=np.minimum(strength/(y+.01),1)*r.defringe/100
         a=y[:,:,None]+(a-y[:,:,None])*(1-strength[:,:,None])
     amount=r.sharpen+output_sharpen
+    if r.texture or r.clarity or r.dehaze:
+        a=presence.apply(a,r,pixel_scale)
+        y=np.maximum(a@LUMA,1e-8)
     if amount:
         smooth=gaussian_filter(y,max(.3,r.sharpen_radius*pixel_scale),mode='nearest',truncate=4)
         detail=y-smooth
@@ -285,8 +300,9 @@ def _render_strip(plan,x,y,w,h,space='srgb',output_sharpen=0,capture_tones=False
         return (apply_array(pixels,plan.orientation),apply_array(gamut,plan.orientation),
                 apply_array(tones,plan.orientation) if tones is not None else None,
                 apply_array(mixer,plan.orientation) if mixer is not None else None)
-    start=max(0,y-HALO);end=min(plan.height,y+h+HALO)
-    left=max(0,x-HALO);right=min(plan.width,x+w+HALO)
+    halo=detail_support(plan.recipe,plan.pixel_scale,output_sharpen)
+    start=max(0,y-halo);end=min(plan.height,y+h+halo)
+    left=max(0,x-halo);right=min(plan.width,x+w+halo)
     with stage("geometry"):
         a=plan.sample(left,start,right-left,end-start)
     with stage("detail_filters"):

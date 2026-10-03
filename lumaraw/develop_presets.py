@@ -6,6 +6,7 @@ history. Unchecked fields, metadata, catalog orientation and queued jobs survive
 Shared storage locks precede catalog locks. LUT bytes stage outside either lock,
 then all captured state is revalidated before mutation. No pixels, Adobe parameter
 translation, inferred adjustments or platform directory conventions live here.
+Presence is a separately selectable group; legacy preset patches remain partial.
 """
 from contextlib import contextmanager
 import hashlib
@@ -25,7 +26,7 @@ from .develop_history import DevelopHistory
 
 FIELDS = tuple(k for k in Recipe().dict() if k != 'version')
 BASIC_FIELDS = ('exposure','temperature','tint','contrast','highlights','shadows','whites','blacks',
-                'saturation','vibrance','curve_shadows','curve_midtones','curve_lights',
+                'saturation','vibrance','texture','clarity','dehaze','curve_shadows','curve_midtones','curve_lights',
                 'red_hue','red_sat','orange_hue','orange_sat','green_hue','green_sat',
                 'blue_hue','blue_sat','monochrome')
 PAGE = 30
