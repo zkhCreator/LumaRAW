@@ -4,7 +4,8 @@ Inputs: captured render requests, engine/backend identity and disposable artifac
 Outputs: atomically published receipts or fully validated cached preview replies.
 The broker hashes bounded files in chunks; it never imports image/pixel libraries.
 Keys include source/asset stat identities and every render option, never client IDs
-or catalog revisions. Callers must recheck revisions and cancellation on return.
+or catalog revisions. Only non-pixel mask labels are omitted from recipe identities.
+Callers must recheck revisions and cancellation on return, including after rename.
 Cache loss/corruption is a miss, not a catalog failure. No original writes or SQL.
 Cached replies report unused filter stages and zero new work, never old timings.
 """
@@ -20,9 +21,9 @@ import struct
 import tempfile
 import time
 
-from .source_identity import fingerprint
+from .source_identity import fingerprint, pixel_recipe_key_data
 
-VERSION = 1
+VERSION = 2
 MAX_RECEIPT = 128 * 1024
 MAX_PIXELS = 2048 * 1536
 MAX_ARTIFACT_BYTES = 320 * 1024**2
@@ -55,7 +56,9 @@ def key(request, engine, backend):
             ('include_before', True), ('include_color_readouts', False),
             ('include_curve_tones', False), ('mixer_target', None))}
         payload = [VERSION, engine, backend, fingerprint(request['path']),
-                   recipe, before, display, options, assets]
+                   pixel_recipe_key_data(recipe),
+                   pixel_recipe_key_data(before) if before is not None else None,
+                   display, options, assets]
         return hashlib.sha256(json.dumps(payload, sort_keys=True, allow_nan=False).encode()).hexdigest()
     except (OSError, ValueError):
         return None

@@ -49,6 +49,13 @@ discards late UI adoption after a context change. Failed/incomplete mutation
 receipts require an explicit photo reload and review before another action.
 They are never automatically replayed. Rename drafts stay in their open form.
 
+Changing a mask name preserves its pixels. When matching completed artifacts are
+still valid, previews, Before/readout maps and developed thumbnails reuse them
+without an image worker. Names remain in catalog history and frozen exports.
+Keep the new photo revision on preview/sample requests; an old revision still
+fails even when its pixels are identical. Geometry, enabled/inverted state,
+adjustments and mask order remain part of pixel identity.
+
 ## Global Presence
 
 `texture`, `clarity` and `dehaze` accept -100…100, default to zero and belong to

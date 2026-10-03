@@ -4,6 +4,14 @@ All probes use explicit read-only input photographs and new disposable catalog/o
 
 ## Non-AI mask management
 
+`test_mask_pixel_cache.py` checks label-only Fit/detail and Before cache reuse,
+readout/target map and developed thumbnail worker bypass, preserved history and
+frozen export names, pixel-parameter invalidation, and concurrent rename conflicts
+during cache validation. `NativeMaskPixelCacheRegression` verifies that the native
+shell invalidates old sampling contexts, then loads the reused artifacts into
+new revision-bound readout/WB frames through the real relay. This is state/IPC
+evidence, not a desktop interaction or end-to-end latency benchmark.
+
 `test_mask_actions.py` checks deep-copy isolation, retained brush/settings fields,
 Unicode code-point limits, capacity/index validation, unchanged rename pixels,
 complementary duplicate/invert composition, service revision conflicts, one-step

@@ -4,6 +4,8 @@ Inputs: source stat information, recipe, orientation and catalog cache. Outputs:
 stable keys or an existing thumbnail path. Pixel keys include the process-cached
 RAW backend namespace initialized at engine startup. No NumPy, image decoding,
 SQL or UI; backend discovery/hashing runs only once per process, not per lookup.
+Pixel identities omit only mask display names; stored recipes and revision guards
+retain them. Every other field, including unknown future fields, stays in the key.
 Stat identity invalidates on path/size/mtime changes; it is not a content hash.
 Only the image worker creates pixels; the broker can reuse completed JPEG files.
 """
@@ -28,9 +30,24 @@ def pixel_fingerprint(path):
     return hashlib.sha256((fingerprint(path) + pixel_cache_namespace()).encode()).hexdigest()
 
 
+def pixel_recipe_key_data(recipe):
+    """Hashing only: omit mask labels without changing the captured recipe.
+
+    Callers supply validated recipe dictionaries. Preserve mask order, all pixel
+    controls and unknown fields conservatively; this is not storage normalization.
+    Only dictionaries/lists along the label path are copied, with no pixel imports.
+    """
+    masks = recipe.get('masks')
+    if not isinstance(masks, list):
+        return recipe
+    return {**recipe, 'masks': [
+        {key: value for key, value in mask.items() if key != 'name'}
+        if isinstance(mask, dict) else mask for mask in masks]}
+
+
 def cache_key(path, recipe, kind):
     return hashlib.sha256((pixel_fingerprint(path) + kind +
-                           json.dumps(recipe.dict(), sort_keys=True)).encode()).hexdigest()
+                           json.dumps(pixel_recipe_key_data(recipe.dict()), sort_keys=True)).encode()).hexdigest()
 
 
 def thumbnail_path(path, cache, recipe=None, orientation=0):

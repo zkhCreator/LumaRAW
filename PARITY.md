@@ -5621,3 +5621,55 @@ does not establish a general disk-pressure or desktop-latency improvement.
 macOS 14 runtime, desktop/reference acceptance, full mask-component/editing workflows,
 broader camera/color evidence and Adobe numerical equivalence remain unverified.
 Full Lightroom reproduction remains incomplete.
+
+## Pixel reuse after mask renaming (October 2, 2026)
+
+Mask display names previously changed the identities of completed previews,
+developed thumbnails and final color-readout maps, admitting a new image worker
+for identical pixels. Generation **65** omits only those names from pixel keys,
+including both captured comparison recipes. Other fields and mask order remain
+in the key. Catalog recipes, Develop history and frozen export recipes retain
+the original names; no schema or recipe migration is needed. Completed receipt
+format 2 rejects older receipt identities normally.
+
+The native shell still invalidates old readout/WB contexts and reloads artifacts
+under the saved revision. Physical source, asset, revision and cancellation checks
+remain active; a rename during cache validation rejects an old revision even
+though both recipes have identical pixels. Missing/corrupt artifacts still render.
+
+Evidence on M3 Max/128 GiB, macOS **26.6.2**:
+
+- Related Python checks: **69 passed in 26.98 s** before adding the concurrent
+  rename case. Full final regression: **1,570 passed in 178.71 s**, no skips,
+  requiring actual Metal and API 2 Nikon RAW sampling. Fit/detail, Before,
+  readout/target maps, developed thumbnail reuse, frozen names, undo/redo and
+  pixel-parameter invalidation pass. Existing cache corruption/cancellation and
+  source/asset/backend invalidation regressions remain green.
+- Signed self-contained app: generation **65**, schema **37**, protocol **1**,
+  **151** matching contracts, unchanged API **2** backend, matching source/client/
+  broker identities and bundled guide. Strict signature verification passes.
+- Final packaged-engine native state/IPC: **86 assertions** (mask pixel frames 10,
+  mask management 21, white balance 39, responsiveness 16). Sampling frames bind
+  the new revision while reusing identical map paths/values. This is not desktop
+  pointer/keyboard or VoiceOver evidence.
+- One paired packaged-engine CPU experiment uses the same read-only Nikon D3S
+  source (**10,656,312 bytes**), fresh engine caches and a persistent native relay.
+  Fit requests are **512 × 340**; detail requests are **640 × 480**, with color
+  readouts and no Before. Each engine/mode renders once, then processes two mask
+  renames with its source cache warm. OS caches are not flushed. Generation 64
+  starts workers after every rename: Fit **367.578–368.457 ms**, detail
+  **426.708–429.243 ms**. Generation 65 starts no rename workers: Fit
+  **15.301–15.572 ms**, detail **16.822–17.014 ms**. All twelve corresponding PNG
+  and readout-map hashes match, and the original hash remains unchanged. These
+  are individual engine-request samples, not percentile or desktop-latency claims.
+  Warm baseline workers peak at **101.2–118.4 MiB** sampled RSS. Cached candidate
+  replies report zero worker RSS because no worker exists; this does not measure
+  the app or broker's total memory. Cold worker samples peak at **210.3–331.1 MiB**.
+
+Space was reclaimed only from explicitly completed duplicate builds, isolated
+compiler caches and disposable decoded/target-map caches. Signed apps, originals,
+catalogs, exports, preview images and existing evidence were preserved. Cache
+cleanup does not establish a general disk-pressure improvement.
+
+macOS 14 runtime, desktop/reference interaction, broad camera/color evidence and
+full Lightroom reproduction remain incomplete.

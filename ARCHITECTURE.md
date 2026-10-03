@@ -57,7 +57,7 @@ On macOS/Linux, IPC uses a Unix socket in a user-only temporary directory (0700)
 
 Completed `preview_photo` replies can be reused by the broker without worker
 admission. A bounded receipt identifies the engine build, compute policy, source,
-external LUT/proof assets, complete After/Before recipes and every requested
+external LUT/proof assets, pixel-affecting After/Before recipes and every requested
 render option. Client IDs and visual revisions remain caller-side conflict and
 cancellation checks; they are not pixel identities. Lookup hashes bounded PNG/map
 artifacts in chunks outside catalog locks, without importing pixel libraries.
@@ -70,6 +70,11 @@ revalidation. Receipts are disposable, subject to the existing byte/count cache
 budget and do not require decoded-source arrays to survive. Hits preserve their
 requested Before, histogram, geometry, curve/mixer maps and readout outputs.
 Revision/source/generation checks still run before returning a cached result.
+Mask display names alone are omitted from pixel identities, including developed
+thumbnails and readout maps. Stored recipes, history and frozen exports keep the
+names. Native frames still reload under the new revision; an old sampling context
+cannot become current merely because its pixels are reusable. Other fields and
+mask ordering remain conservative parts of pixel identity.
 Corruption repair removes only associated disposable maps under the image-writer
 lock, preventing older header-only caches from blessing a damaged body. Valid
 reads never wait for that lock. Concurrent LRU touches are harmless; an atomic
