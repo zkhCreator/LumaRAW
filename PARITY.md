@@ -68,7 +68,7 @@ gaps. Nothing below is full Lightroom parity merely because historical tests pas
 | Curves and profiles | Partial: four-region parametric curves with movable splits and photo-targeted adjustment, interactive RGB/channel point curves, shared temporary previews, legacy luminance curve, LUT/ICC | Point/channel targeting, curve exchange, camera/profile browser, Adobe processing and rendered/reference acceptance |
 | Detail and optics | Partial: noise/sharpen, manual lens | Complete manual detail controls, automatic lens profiles, bounded full-resolution acceptance |
 | Geometry | Partial: crop/straighten/perspective, independent rotation/flips with attached masks and displayed crop ratios | Interactive retained handles, guided transforms, full crop state and rendered/reference parity |
-| Local editing | Partial: radial/gradient/brush/luma | Mask list/edit/reorder/intersection, range masks, clone/heal, red-eye (non-AI) |
+| Local editing | Partial: radial/gradient/brush/luma, captured non-AI mask rename/duplicate/duplicate-and-invert/invert/delete with Develop history | Complete mask list/edit/reorder/reference acceptance, components/intersection and range masks, local Presence, clone/heal, red-eye (non-AI) |
 | History and presets | Partial: durable paged Develop history with undo/redo, state selection/rename/clear, persistent Before assignment/copy/swap, separate 50-batch orientation undo, alphabetical shared snapshots with current/history capture, rename/update/delete and Before copy, partial Develop presets/groups/favorites/shared or local storage, batch/Painter and reviewed-import application | Unified application Undo/Redo, history/snapshot hover, preset hover preview/Amount/ISO adaptation/Adobe exchange and rendered reference acceptance |
 | Preview/performance | Partial: Metal, proxies, 1:1 viewport, developed thumbnail fast path, on-demand Before with independent cache, four paired layouts, persistent command relay, snapshot-based Library reads, background image preparation, quiet polling, fused readout maps and validated completed-preview reuse | Real-RAW catalog/slider latency, offline previews, cache controls and desktop/reference acceptance |
 | Export | Partial: JPEG/16-bit TIFF, ICC, shared or catalog-local saved export settings with optional destinations, multiple-preset batches with individual/parent destinations and paged receipts, catalog-local Export with Previous, durable jobs with frozen catalog/rights IPTC XMP and keyword hierarchy options | Full batch naming/reference acceptance, Adobe preset exchange, complete EXIF/IPTC Extension/GPS metadata policies, watermark, additional formats, publish workflows |
@@ -5568,4 +5568,56 @@ with the current Presence/point-curve suites on identical engine bytes, these
 cover **108 distinct assertions**. The initial candidate also passed primary
 native state checks; no desktop acceptance is inferred from any candidate.
 macOS 14 runtime, desktop keyboard/VoiceOver and Adobe reference acceptance remain unverified.
+Full Lightroom reproduction remains incomplete.
+
+## Captured non-AI mask management (October 2, 2026)
+
+The shared `mask_action` command and Mac panel add Rename, Duplicate, Duplicate
+and Invert, Invert and Delete for existing flat radial/linear/luminance/brush
+masks, corresponding to the documented [Adobe mask-management functions](https://helpx.adobe.com/lightroom-classic/desktop/process-and-develop-photos/masking.html).
+The command binds an index to a captured photo revision. Stale revisions fail
+before editing; names, geometry, brush points, enabled state and adjustments remain
+independent after copying. Other recipe groups, originals and queued exports are
+preserved. Each changed recipe has one Develop history step and supports undo/redo;
+an unchanged name is a no-op.
+
+Names retain Unicode with the existing eighty-code-point limit. An empty name
+uses a default native picker label. Copies are inserted after their source, with
+a bounded ` Copy` suffix as a LumaRAW naming convention; Adobe's guide does not
+establish those exact naming/insertion choices. Twelve masks remains the limit.
+This does not add stable IDs, components/intersection, ordering controls, local
+Presence, AI selection or new mask processing equations.
+
+The native shell flushes pending edits before capture, verifies photo/mask context
+before sending, blocks conflicting controls during management, and leaves a newly
+selected photo intact after a late accepted response. Failed/incomplete mutation
+receipts require explicit reload/review and never cause an automatic replay.
+An accepted-but-incomplete real response is tested by removing its selection
+receipt: exactly one catalog mutation remains and the second command is blocked.
+Rename drafts remain in their open form. Empty/default names and array shrinkage
+are handled without indexing an absent mask.
+
+Evidence on M3 Max/128 GiB, macOS **26.6.2**:
+
+- Related Python regression: **41 passed in 5.18 s**. Pure deep-copy/name/capacity
+  cases, real service history/conflicts/export freezes, original hashes and existing
+  mask-composition checks pass. Renaming retains exact reference pixels; duplicate
+  and inverse masks retain their complementary existing exposure behavior.
+- Full Python regression: **1,558 passed in 174.42 s**, no skips; actual Metal
+  and API 2 Nikon RAW sampling required. Later refinements are native presentation/
+  control gating only; processing and service code remain unchanged.
+- Final signed self-contained app: generation **64**, schema **37**, protocol **1**,
+  **151** matching MCP contracts and unchanged API **2** backend. Source/client/
+  broker identity, bundled guide bytes and strict signatures agree.
+- Final packaged-engine native state/IPC: **78 assertions** (mask management 21,
+  ordinary edits 15, Sync review 26, responsiveness 16). The rename form was inspected
+  offscreen. This is not desktop pointer/keyboard/VoiceOver acceptance.
+
+Completed duplicate engine-build outputs and isolated compiler caches were removed
+after checking that every app's signature and engine/native bytes were preserved.
+Photographs, catalogs, previews and existing receipts were retained. This cleanup
+does not establish a general disk-pressure or desktop-latency improvement.
+
+macOS 14 runtime, desktop/reference acceptance, full mask-component/editing workflows,
+broader camera/color evidence and Adobe numerical equivalence remain unverified.
 Full Lightroom reproduction remains incomplete.

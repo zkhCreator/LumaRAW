@@ -27,6 +27,28 @@ same-version implementations causes a normal cache miss. This namespace does not
 change the photograph's physical source-stat token or its catalog revisions.
 Do not infer camera support or RAW selector capability from a version label.
 
+## Non-AI mask management
+
+`mask_action` manages one existing mask without opening photographs. Pass
+`photo_id`, its captured `expected_revision`, `mask_index` (0–11) and `action`:
+`rename`, `duplicate`, `duplicate_invert`, `invert` or `delete`. Only `rename`
+accepts `name`, including empty names, up to 80 Unicode code points. Recipes still
+support at most twelve flat radial/linear/luminance/brush masks. The command does
+not add components, ordering changes, AI selections or new local adjustments.
+
+The photo revision binds the index; never adopt a new revision to retry an old
+index. Each changed recipe has one Develop history step, while equal names are
+no-ops. Copies retain all fields and independent brush points, are inserted after
+their source, and use an 80-character-bounded ` Copy` suffix as a LumaRAW naming
+convention. `duplicate_invert` toggles the copied selection. Originals and queued
+exports retain their existing data. Replies contain the photo and `mask_index`
+for selection; zero is also returned when deletion leaves no masks.
+
+The Mac uses captured targets, blocks source sliders during management and
+discards late UI adoption after a context change. Failed/incomplete mutation
+receipts require an explicit photo reload and review before another action.
+They are never automatically replayed. Rename drafts stay in their open form.
+
 ## Global Presence
 
 `texture`, `clarity` and `dehaze` accept -100…100, default to zero and belong to

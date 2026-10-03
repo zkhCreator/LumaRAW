@@ -7,6 +7,7 @@
 // Photo results and collection browsers use bounded pages.
 // Selector preferences/hover observe separately; continuous WB waits for a new frame.
 // Sync review captures source/target revisions and never follows a changed selection.
+// Unconfirmed mask management requires an explicit reload before another action.
 import SwiftUI
 import AppKit
 import UniformTypeIdentifiers
@@ -284,6 +285,8 @@ import UniformTypeIdentifiers
     @Published var showRecipe=false
     @Published var showSync=false
     @Published var syncBusy=false
+    @Published var maskActionBusy=false
+    @Published var maskActionRecovery:LocalMaskRecovery?
     @Published var showCalibration=false
     private let previewClient=UUID().uuidString
     private var generation=0
@@ -668,7 +671,8 @@ import UniformTypeIdentifiers
         }
     }
     func set(_ key:String,_ value:Any) {
-        guard !loading,!browsing,!orientationBusy,!developPresetBusy,!historyBusy,!snapshotBusy,!syncBusy,let p=photo,p.id==selected else{return}
+        guard !loading,!browsing,!orientationBusy,!developPresetBusy,!historyBusy,!snapshotBusy,!syncBusy,!maskActionBusy,let p=photo,p.id==selected else{return}
+        if let recovery=activeMaskRecovery {error=recovery.message;return}
         if let recovery=whiteBalanceEditRecovery {error=recovery.message;return}
         if whiteBalanceTargetActive || whiteBalanceSampling || whiteBalanceArming || whiteBalanceAwaitingFrame {cancelWhiteBalanceSelector()}
         clearColorReadout()

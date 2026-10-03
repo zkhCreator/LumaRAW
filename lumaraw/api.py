@@ -14,6 +14,7 @@ White-balance samples bind a source-stat token and photo revision; they return
 relative recipe candidates without changing the catalog or original.
 Sync can capture a source revision as well as every target revision; stale sources
 fail before any batch edit. IDs refer only to the selected catalog.
+Existing non-AI mask management binds a mask index to the captured photo revision.
 Tool annotations describe effects; they never substitute for user authorization.
 """
 from .model import LIMITS, Recipe, SYNC_GROUPS, POINT_CURVE_FIELDS, PARAMETRIC_FIELDS, MIXER_FIELDS, BW_FIELDS
@@ -36,6 +37,10 @@ def tool(name,description,properties=None,required=(),read=False):
 tool('service_connection','Inspect engine compatibility or explicitly activate this build when the broker is idle. Preserves pending jobs on a clean handoff; never interrupts active work.',{'action':{'enum':['status','activate']}},['action'])
 tool('status','Service version, catalog location, queue and processing state.',read=True)
 tool('recipe_schema','Supported recipe ranges, defaults, presets and sync groups.',read=True)
+tool('mask_action','Rename, duplicate, duplicate and invert, invert or delete one existing non-AI mask at a captured photo revision. Preserve other settings, originals and queued exports.',{
+    'photo_id':ID,'expected_revision':REV,'mask_index':integer(0,11),
+    'action':{'enum':['rename','duplicate','duplicate_invert','invert','delete']},
+    'name':{'type':'string','maxLength':80}},['photo_id','expected_revision','mask_index','action'])
 tool('metadata_schema','Read supported IPTC fields, groups and value formats. These descriptive fields do not replace source EXIF capture time.',read=True)
 from .develop_presets import FIELDS as DEVELOP_FIELDS
 PRESET_ID=string(80)

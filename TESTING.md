@@ -2,6 +2,27 @@
 
 All probes use explicit read-only input photographs and new disposable catalog/output directories. They never use a personal photo library by default.
 
+## Non-AI mask management
+
+`test_mask_actions.py` checks deep-copy isolation, retained brush/settings fields,
+Unicode code-point limits, capacity/index validation, unchanged rename pixels,
+complementary duplicate/invert composition, service revision conflicts, one-step
+undo/redo, no-op names, frozen export recipes and unchanged original hashes.
+These synthetic processing checks do not establish Lightroom numerical parity.
+
+`NativeLocalMaskActionsRegression` uses the actual broker. It covers pending-edit
+flush, captured targets, rename/copy/delete, changed selection, stale indices,
+explicit recovery and undo. Its deliberately incomplete accepted receipt must
+leave exactly one catalog edit and block a second call. A delayed real response
+must retain its original mutation while leaving the newly selected photo intact.
+The rename form PNG is offscreen layout evidence only.
+
+```sh
+python -m pytest -q tests/test_mask_actions.py tests/test_service.py
+python tests/run_native.py --engine /absolute/LumaRAWEngine \
+  --work work/new-mask-actions --suite NativeLocalMaskActionsRegression
+```
+
 ## Captured Sync reviews
 
 `test_sync_source_revision.py` exercises the real service with a changed source,

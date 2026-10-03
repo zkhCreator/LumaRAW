@@ -17,6 +17,7 @@ Other catalog commands retain the serialized write-capable connection path. No
 GUI, HTTP listener, telemetry or original-file writes. Interrupted exports are
 never automatically replayed. Optimistic revisions prevent lost recipe updates.
 Captured Sync source revisions are checked before validating or changing targets.
+Non-AI mask management uses the same revision-bound per-photo Develop history.
 """
 from contextlib import contextmanager
 import hashlib
@@ -600,6 +601,14 @@ class Service:
                     from .library import load_recipe
                     c.edit(row['id'],load_recipe(p['path'],self.root),'Import Recipe Bundle')
                 return unpack(c.photo(row['id']))
+            if method=='mask_action':
+                from . import mask_actions
+                row=self.check_revision(c,p['photo_id'],p['expected_revision'])
+                recipe,index,label=mask_actions.apply(Recipe.parse(json.loads(row['recipe'])),
+                    p['mask_index'],p['action'],p.get('name'))
+                with c.db:
+                    DevelopHistory(c.db).edit(row['id'],recipe,label)
+                return {**unpack(c.photo(row['id'])),'mask_index':index}
             if method=='rate_photo':
                 self.require(c,p['photo_id'])
                 if 'rating' in p:c.rate(p['photo_id'],p['rating'])

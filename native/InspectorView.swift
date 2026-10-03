@@ -3,6 +3,7 @@
 // patches and explicit metadata/edit/export-preview workflows through Store.
 // Temperature is relative to camera white balance; lens controls are manual.
 // Crop bounds and mask coordinates follow the independent displayed orientation.
+// Mask management submits captured revision/index commands; views own no history.
 import SwiftUI
 
 struct InspectorView:View {
@@ -156,6 +157,8 @@ struct CropControls:View {
 struct MaskControls:View {
     @EnvironmentObject var s:Store
     @State private var selected=0
+    @State private var preparing=false
+    @State private var renameSource:LocalMaskRenameSource?
     var masks:[[String:Any]]{s.recipe["masks"] as? [[String:Any]] ?? []}
     func update(_ key:String,_ value:Any){var m=masks;guard m.indices.contains(selected)else{return};m[selected][key]=value;s.set("masks",m)}
     func add(_ name: String,kind: String) {
@@ -167,11 +170,22 @@ struct MaskControls:View {
         s.set("masks",rows);selected=rows.count-1
     }
     var body:some View {
+        let photoID=s.photo?.id
         VStack(alignment:.leading,spacing:12){
-            HStack{Menu("Add Mask"){ForEach([("Radial","radial"),("Gradient","linear"),("Luminance Range","luminance"),("Brush Point","brush")],id:\.1){name,kind in Button(name){add(name,kind:kind)}}};Spacer();Text("\(masks.count)/12").font(.caption).foregroundStyle(.secondary)}
+            HStack{Menu("Add Mask"){ForEach([("Radial","radial"),("Gradient","linear"),("Luminance Range","luminance"),("Brush Point","brush")],id:\.1){name,kind in Button(name){add(name,kind:kind)}}}.disabled(preparing || s.maskActionBusy || s.activeMaskRecovery != nil || s.hasPendingEdits);Spacer();Text("\(masks.count)/12").font(.caption).foregroundStyle(.secondary)}
             if !masks.isEmpty {
-                Picker("Mask",selection:$selected){ForEach(masks.indices,id:\.self){i in Text(masks[i]["name"] as? String ?? "Mask \(i+1)").tag(i)}}
+                Picker("Mask",selection:$selected){ForEach(masks.indices,id:\.self){i in Text(LocalMaskPresentation.name(masks[i],index:i)).tag(i)}}
+                    .disabled(s.maskActionBusy || s.activeMaskRecovery != nil)
                 if masks.indices.contains(selected){
+                    Group {
+                    Menu("Mask Actions") {
+                        Button("Rename…") {manage("rename",photoID:photoID)}
+                        Button("Duplicate") {manage("duplicate",photoID:photoID)}.disabled(masks.count>=12)
+                        Button("Duplicate and Invert") {manage("duplicate_invert",photoID:photoID)}.disabled(masks.count>=12)
+                        Button("Invert Mask") {manage("invert",photoID:photoID)}
+                        Divider()
+                        Button("Delete Mask",role:.destructive) {manage("delete",photoID:photoID)}
+                    }.disabled(preparing || s.maskActionBusy || s.activeMaskRecovery != nil || s.hasPendingEdits)
                     Toggle("Enabled",isOn:Binding(get:{masks[selected]["enabled"] as? Bool ?? true},set:{update("enabled",$0)}))
                     Toggle("Invert",isOn:Binding(get:{masks[selected]["invert"] as? Bool ?? false},set:{update("invert",$0)}))
                     maskRow("Exposure","exposure",-4...4,0.05,0)
@@ -181,17 +195,43 @@ struct MaskControls:View {
                     if masks[selected]["kind"] as? String == "linear" {coordinateRow("End X",axis:0,end:true);coordinateRow("End Y",axis:1,end:true)}
                     maskRow("Feather","feather",0.01...1,0.01,0.5)
                     if masks[selected]["kind"] as? String == "brush" {Text("Use the full recipe editor to set brush path points.").font(.caption);Button("Edit Brush Path…"){s.showRecipe=true}}
-                    Button("Delete This Mask",role:.destructive){var m=masks;m.remove(at:selected);selected=max(0,selected-1);s.set("masks",m)}
+                    }.disabled(s.maskActionBusy || s.activeMaskRecovery != nil)
                 }
             }
+            if let recovery=s.activeMaskRecovery {
+                Text(recovery.message).font(.caption).foregroundStyle(.red)
+                Button("Reload Photo") {Task {await s.reloadAfterMaskFailure(recovery)}}.disabled(s.maskActionBusy)
+            }
         }.font(.callout)
+            .sheet(item:$renameSource) {LocalMaskRenameSheet(source:$0).environmentObject(s)}
+            .onChange(of:s.photo?.id) {_,_ in selected=0}
+            .onChange(of:masks.count) {_,count in selected=min(selected,max(0,count-1))}
+    }
+    func manage(_ action:String,photoID:Int?) {
+        guard !preparing,!s.maskActionBusy,let photoID,s.selected==photoID else {return}
+        let index=selected
+        preparing=true
+        Task {
+            defer {preparing=false}
+            guard s.selected==photoID,let target=await s.prepareLocalMaskTarget(index),
+                  target.photoID==photoID else {return}
+            if action=="rename" {
+                guard s.selected==photoID,selected==index else {return}
+                renameSource=LocalMaskRenameSource(target:target)
+            } else if case .accepted(let next)=await s.performLocalMaskAction(action,target:target),
+                      s.selected==photoID,selected==index,let next {selected=next}
+        }
     }
     func maskRow(_ label:String,_ key:String,_ range:ClosedRange<Double>,_ step:Double,_ initial:Double)->some View{
-        ParameterRow(label:label,value:Binding(get:{(masks[selected][key] as? NSNumber)?.doubleValue ?? initial},set:{update(key,$0)}),range:range,step:step)
+        ParameterRow(label:label,value:Binding(get:{
+            guard masks.indices.contains(selected) else {return initial}
+            return (masks[selected][key] as? NSNumber)?.doubleValue ?? initial
+        },set:{update(key,$0)}),range:range,step:step)
     }
     func coordinateRow(_ label: String,axis: Int,end: Bool=false) -> some View {
         let xKey=end ? "x2":"x",yKey=end ? "y2":"y"
         func displayed() -> CGPoint {
+            guard masks.indices.contains(selected) else {return CGPoint(x:0.5,y:0.5)}
             let row=masks[selected]
             return PhotoOrientation.forward(CGPoint(x:(row[xKey] as? NSNumber)?.doubleValue ?? 0.5,
                 y:(row[yKey] as? NSNumber)?.doubleValue ?? (end ? 1:0.5)),orientation:s.photo?.orientation ?? 0)
@@ -203,6 +243,7 @@ struct MaskControls:View {
             if axis == 0 { point.x=value } else { point.y=value }
             let canonical=PhotoOrientation.inverse(point,orientation:s.photo?.orientation ?? 0)
             var rows=masks
+            guard rows.indices.contains(selected) else {return}
             rows[selected][xKey]=canonical.x;rows[selected][yKey]=canonical.y
             s.set("masks",rows)
         }),range:0...1,step:0.01)

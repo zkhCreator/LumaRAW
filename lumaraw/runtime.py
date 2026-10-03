@@ -12,7 +12,7 @@ import json
 from pathlib import Path
 import sys
 
-ENGINE_GENERATION = 63
+ENGINE_GENERATION = 64
 CATALOG_VERSION = 37
 BROKER_PROTOCOL = 1
 
