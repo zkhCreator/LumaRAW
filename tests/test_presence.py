@@ -23,6 +23,13 @@ from lumaraw.service import Service, ConflictError
 KEYS = ('texture', 'clarity', 'dehaze')
 
 
+@pytest.fixture(autouse=True)
+def cpu_reference_default():
+    accelerators.configure('cpu')
+    yield
+    accelerators.configure('auto')
+
+
 @pytest.mark.parametrize('key', KEYS)
 def test_additive_defaults_and_strict_finite_ranges(key):
     old = Recipe.parse({'version': 1, 'exposure': .25})

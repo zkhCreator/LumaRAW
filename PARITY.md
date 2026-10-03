@@ -5467,3 +5467,62 @@ rerun in a fresh directory and only its successful measurements are reported.
 Desktop slider feel, pointer/keyboard/VoiceOver interaction, macOS 14 runtime,
 broader-camera/color/reference acceptance, local Presence and Adobe numerical
 equivalence remain unverified. Full Lightroom reproduction remains incomplete.
+
+## Optional Presence Gaussian acceleration (October 2, 2026)
+
+The replaceable Metal adapter now accelerates only the scalar Gaussian passes in
+the existing global Presence models. CPU retains the dark-channel minimum,
+logarithms, gain/veil equations, geometry, noise and sharpening. Both backends use
+nearest edges, truncate-at-four-sigma support and the same requested strips. Two
+completed GPU passes constitute one Gaussian filter. Center differences preserve
+constant planes exactly; compensated summation bounds broad-kernel edge errors.
+Small automatic-mode planes, unsupported radii/capacity and GPU failures use the
+unchanged CPU reference. No recipe, catalog schema, command or native UI changes
+are needed.
+
+Gaussian work borrows the grading adapter's bounded buffers and adds one scalar
+scratch plane to the same allocation cap; it does not create another pixel pool.
+Readout grading can retire scratch before allocating its larger layout. Failed
+commands never copy incomplete GPU output into caller storage. Reports separate
+actual Gaussian filter/pass counts and timing from CPU Presence operations.
+Completed preview hits explicitly report no dispatch, workers or Gaussian work.
+
+Evidence on M3 Max/128 GiB, macOS **26.6.2**:
+
+- Full Python regression: **1,536 passed in 162.41 s**, no skips, with actual
+  Metal and API 2 Nikon RAW sampling required. The new cases cover one-row/column
+  planes, broad kernels, exact constants, capacity sharing with readouts, failure
+  fallback, untouched caller buffers, oriented combined filters and cached reports.
+- Signed self-contained Mac app: generation **62**, schema **37**, protocol **1**,
+  **150** matching commands and unchanged API **2** backend. Both shader resources,
+  source/client/broker identity, bundled guide and strict signatures are verified.
+- Packaged-engine native state/IPC: **63 assertions** (Presence 14, actual RAW
+  white balance 13, color readouts 20, responsiveness 16). The Presence panel was
+  inspected offscreen. Unchanged polls publish no workspace updates. These checks
+  do not establish desktop interaction or slider latency.
+
+The reproducible worker probe repeats the preceding read-only Nikon D3S fixture
+and six baseline/Presence cases with the same generation **62** CPU and Metal
+engine. Twenty-four requests run sequentially without concurrent builds/tests:
+each case has a cold engine cache and a warm linear cache with Exposure **0.05**.
+OS cache is not flushed. All twelve corresponding PNG/TIFF16 comparisons retain
+ICC bytes and differ by at most **one encoded code value**; original bytes are
+unchanged. These are individual paired samples, not percentiles or a stable
+throughput guarantee. End-to-end differences include Metal grading as well as
+the newly accelerated Gaussian passes.
+
+| Presence output | CPU cold / warm seconds | Metal cold / warm seconds | CPU / Metal warm peak MiB |
+| --- | --- | --- | --- |
+| Fit, 1680×1115 | 1.055 / 0.842 | 0.791 / 0.603 | 173.7 / 166.9 |
+| 1:1 detail, 1024×768 | 1.136 / 0.662 | 0.959 / 0.474 | 117.3 / 153.8 |
+| TIFF16, 4284×2844 | 5.452 / 4.889 | 2.100 / 1.568 | 458.5 / 515.5 |
+
+The full-size neighborhood/model stage itself measures CPU **2.560 / 2.522 s**
+and Metal **1.162 / 1.157 s** (cold/warm). Actual full-size GPU work reports **115
+filters / 230 passes**, with shared pixel buffers peaking at **30.33 MiB**. Sampled
+worker RSS is higher in some warm Metal cases, so no uniform memory reduction is
+claimed. RAW decoding and the remaining Presence equations still run on CPU.
+
+macOS 14 runtime, desktop pointer/keyboard/VoiceOver, broader-camera/color
+acceptance, local Presence and Adobe numerical equivalence remain unverified.
+Full Lightroom reproduction remains incomplete.

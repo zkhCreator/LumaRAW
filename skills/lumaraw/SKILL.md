@@ -33,7 +33,12 @@ Do not infer camera support or RAW selector capability from a version label.
 the selectable `Presence` sync/preset group. Positive/negative Texture enhances/
 smooths medium-scale details; Clarity changes broader local contrast. Positive
 Dehaze removes a neutral veil; negative values add one. Preview, 1:1 view and
-export share bounded CPU neighborhood processing before CPU/Metal grading.
+export share bounded neighborhood processing before CPU/Metal grading. Supported
+scalar Gaussian passes may run on Metal; geometry, noise/sharpen, dark-channel
+minimum and remaining Presence equations retain CPU behavior. Read
+`presence_gaussian_backend` and successful pass counts for actual work; the ordinary
+`backend` field describes grading/output. Unsupported/failed Gaussian requests
+use the CPU reference under the same worker and buffer limits.
 These are explicit LumaRAW models, not Adobe equation or pixel-equivalence claims.
 Local mask Presence is not supported. Read at 1:1 as well as Fit when evaluating
 detail. Capture revisions for edits; queued exports retain their submitted values.

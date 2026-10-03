@@ -3,10 +3,14 @@
 Inputs: linear FP32 tiles, validated recipes and output spaces. Outputs: encoded
 RGB/gamut, optional fused RGB/Lab maps and per-request evidence. NEF unpack/demosaic stay in LibRaw. Metal never
 changes RAW decoding, ICC definitions, recipe semantics or publication rules.
-CPU handles geometry/detail and complex masks/LUTs; their output can use Metal's
-color transform. A failed GPU command never exposes a partial output buffer.
+CPU handles geometry/detail and complex masks/LUTs; Presence can delegate scalar
+Gaussian passes to Metal while retaining the CPU reference and other equations.
+The Gaussian and color paths share one bounded buffer pool. A failed GPU command
+never exposes a partial output buffer. Statistics identify actual Gaussian work.
 """
 import ctypes as C
+from functools import lru_cache
+import math
 from pathlib import Path
 import os
 import sys
@@ -18,14 +22,18 @@ _mode=os.environ.get('LUMARAW_COMPUTE','auto')
 _limit=100*1024**2
 _stats={}
 _disabled=''
+_gaussian_disabled=''
 PARAMETER_COUNT=640
 
 def configure(mode='auto',budget_mb=4096):
-    global _mode,_limit,_stats,_disabled,_context
+    global _mode,_limit,_stats,_disabled,_gaussian_disabled,_context
     if mode not in ('auto','cpu','metal'):raise ValueError('Compute backend must be auto, cpu or metal')
     if _context is not None:_context.close()
-    _context=None;_mode=mode;_limit=min(100*1024**2,int(budget_mb*1024**2*.15));_disabled=''
+    _context=None;_mode=mode;_limit=min(100*1024**2,int(budget_mb*1024**2*.15));_disabled='';_gaussian_disabled=''
     _stats={'requested':mode,'metal_grade_tiles':0,'metal_output_tiles':0,'metal_readout_tiles':0,'cpu_tiles':0,'cpu_readout_tiles':0,'cpu_readout_output_tiles':0,'gpu_seconds':0.,'dispatch_seconds':0.,'initialization_seconds':0.,'shared_buffer_peak_mb':0.,'fallback_reasons':[]}
+    _stats.update(presence_metal_gaussian_filters=0,presence_metal_gaussian_passes=0,
+                  presence_cpu_gaussian_filters=0,presence_gaussian_gpu_seconds=0.,
+                  presence_gaussian_dispatch_seconds=0.)
 
 class Metal:
     def __init__(self):
@@ -36,6 +44,7 @@ class Metal:
         try:
             parameter_count=lib.lr_metal_parameter_count
             run=lib.lr_metal_run_v3
+            gaussian=lib.lr_metal_gaussian_v1
         except AttributeError as error:
             raise RuntimeError('Metal adapter is outdated; rebuild it for this engine') from error
         parameter_count.argtypes=[];parameter_count.restype=C.c_uint
@@ -46,11 +55,14 @@ class Metal:
         lib.lr_metal_run_v2.argtypes=[C.c_void_p,C.c_void_p,C.c_void_p,C.c_void_p,C.c_uint,C.c_void_p,C.c_uint,C.c_char_p,C.c_size_t];lib.lr_metal_run_v2.restype=C.c_int
         run.argtypes=[C.c_void_p,C.c_void_p,C.c_void_p,C.c_void_p,C.c_void_p,C.c_uint,C.c_void_p,C.c_uint,C.c_char_p,C.c_size_t]
         run.restype=C.c_int
+        gaussian.argtypes=[C.c_void_p,C.c_void_p,C.c_void_p,C.c_uint,C.c_uint,C.c_void_p,C.c_uint,C.c_uint,C.c_char_p,C.c_size_t]
+        gaussian.restype=C.c_int
         lib.lr_metal_device.argtypes=[C.c_void_p];lib.lr_metal_device.restype=C.c_char_p
         lib.lr_metal_allocated.argtypes=[C.c_void_p];lib.lr_metal_allocated.restype=C.c_size_t
         lib.lr_metal_seconds.argtypes=[C.c_void_p];lib.lr_metal_seconds.restype=C.c_double
         error=C.create_string_buffer(4096)
-        self.handle=lib.lr_metal_create((root/'grade.metal').read_bytes(),_limit,error,len(error))
+        shader=(root/'grade.metal').read_bytes()+b'\n'+(root/'gaussian.metal').read_bytes()
+        self.handle=lib.lr_metal_create(shader,_limit,error,len(error))
         if not self.handle:raise RuntimeError(error.value.decode(errors='replace'))
         self.device=lib.lr_metal_device(self.handle).decode()
     def close(self):
@@ -67,6 +79,69 @@ class Metal:
         if rc:raise RuntimeError(error.value.decode(errors='replace') or f'Metal error {rc}')
         result=(out,mask.astype(bool))
         return (*result,readouts) if readouts is not None else result
+
+    def gaussian(self,a,weights,radius):
+        a=np.ascontiguousarray(a,dtype=np.float32)
+        if a.ndim!=2 or not all(a.shape) or weights.dtype!=np.float32 or weights.shape!=(2*radius+1,) or not weights.flags.c_contiguous:
+            raise RuntimeError('Invalid Metal Gaussian buffers')
+        output=np.empty_like(a);error=C.create_string_buffer(4096)
+        rc=self.lib.lr_metal_gaussian_v1(self.handle,a.ctypes.data,output.ctypes.data,
+            a.shape[1],a.shape[0],weights.ctypes.data,radius,weights.size,error,len(error))
+        if rc:raise RuntimeError(error.value.decode(errors='replace') or f'Metal Gaussian error {rc}')
+        return output
+
+
+@lru_cache(maxsize=64)
+def _gaussian_weights(sigma):
+    radius=int(4*sigma+.5)
+    positions=np.arange(-radius,radius+1,dtype=np.float64)
+    weights=np.exp(-.5*(positions/sigma)**2)
+    weights/=weights.sum()
+    weights=weights.astype(np.float32);weights.setflags(write=False)
+    return weights,radius
+
+
+def presence_gaussian(a,sigma,*,mode='nearest',truncate=4):
+    """Optional scalar FIR dispatch; CPU retains unsupported/failed requests."""
+    global _context,_gaussian_disabled
+    from scipy.ndimage import gaussian_filter
+    if (not isinstance(a,np.ndarray) or a.ndim!=2 or a.dtype!=np.float32 or not all(a.shape)
+            or type(sigma) not in (int,float) or not math.isfinite(sigma) or sigma<=0
+            or mode!='nearest' or truncate!=4):
+        raise ValueError('Presence Gaussian requires a finite positive scalar and FP32 plane')
+    if not _stats:configure(_mode)
+    def cpu():
+        _stats['presence_cpu_gaussian_filters']+=1
+        return gaussian_filter(a,sigma,mode=mode,truncate=truncate)
+    if _mode=='cpu':return cpu()
+    radius=int(4*sigma+.5);count=a.size
+    if radius>64 or count>4000000 or count*29>_limit:
+        reason('presence_gaussian_exceeds_gpu_capacity');return cpu()
+    if not radius or (_mode=='auto' and (count<16384 or radius<3)):
+        reason('presence_small_gaussian_uses_cpu');return cpu()
+    if _disabled or _gaussian_disabled:
+        reason(_disabled or _gaussian_disabled);return cpu()
+    try:
+        if _context is None:
+            started=time.perf_counter()
+            try:_context=Metal()
+            finally:_stats['initialization_seconds']+=time.perf_counter()-started
+        weights,radius=_gaussian_weights(sigma)
+        started=time.perf_counter();output=_context.gaussian(a,weights,radius)
+        elapsed=time.perf_counter()-started
+        gpu_seconds=_context.lib.lr_metal_seconds(_context.handle)
+        _stats['presence_metal_gaussian_filters']+=1
+        _stats['presence_metal_gaussian_passes']+=2
+        _stats['presence_gaussian_dispatch_seconds']+=elapsed
+        _stats['presence_gaussian_gpu_seconds']+=gpu_seconds
+        _stats['dispatch_seconds']+=elapsed;_stats['gpu_seconds']+=gpu_seconds
+        _stats['shared_buffer_peak_mb']=max(_stats['shared_buffer_peak_mb'],
+            _context.lib.lr_metal_allocated(_context.handle)/1024**2)
+        return output
+    except (OSError,RuntimeError) as error:
+        _gaussian_disabled='presence_gaussian_failed: '+str(error)
+        reason(_gaussian_disabled)
+        return cpu()
 
 def packed(recipe,space,output_only=False,capture_work=False,capture_readouts=False):
     from ..imaging import LUMA
@@ -172,6 +247,10 @@ def report():
     if not _stats:configure(_mode)
     gpu=_stats['metal_grade_tiles']+_stats['metal_output_tiles']
     result={**_stats,'backend':'hybrid' if gpu and (_stats['cpu_tiles'] or _stats['metal_output_tiles'] or _stats['cpu_readout_output_tiles']) else 'metal' if gpu else 'cpu','device':_context.device if _context else None,'raw_decode_backend':'LibRaw CPU','gpu_buffer_limit_mb':round(_limit/1024**2,2)}
+    gaussian_gpu=_stats['presence_metal_gaussian_filters']
+    gaussian_cpu=_stats['presence_cpu_gaussian_filters']
+    result['presence_gaussian_backend']='hybrid' if gaussian_gpu and gaussian_cpu else 'metal' if gaussian_gpu else 'cpu' if gaussian_cpu else 'unused'
+    result['presence_other_operations_backend']='CPU'
     return {k:round(v,6) if isinstance(v,float) else v for k,v in result.items()}
 
 def availability():

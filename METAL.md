@@ -8,6 +8,8 @@ The optional backend plugs into `lumaraw.accelerators.grade_output`. A small Obj
 | --- | --- |
 | NEF metadata, decompression, white balance, AHD demosaicing, camera matrix | LibRaw on CPU |
 | Crop/rotation/perspective/distortion sampling; denoise/sharpen/defringe | CPU with overlapping strips |
+| Global Presence scalar Gaussian passes | Optional two-pass Metal FIR with CPU reference/fallback |
+| Presence dark-channel minimum, log/gain and veil equations | CPU; same portable recipe model |
 | Exposure, tone, contrast, saturation/vibrance, curves, eight-band HSL/B&W mixer, camera profile matrix, monochrome | Fused Metal grading kernel, or CPU reference |
 | Masks, LUT and very steep point curves | Complete CPU grading followed by Metal output conversion; reported as hybrid |
 | Output matrix, sRGB/P3/Adobe/ProPhoto encoding, gamut flags | Metal, or CPU fallback |
@@ -88,6 +90,27 @@ RAW admission estimates, the dynamic 70% memory cap, RSS sampling, cancellation,
 `MTLStorageModeShared` and `waitUntilCompleted` establish CPU/GPU ordering. Fast math is disabled. Shaders compile on first use; the OS shader cache may help later processes. No separate Metal command-line tool download is required.
 
 ## Public contract
+
+Presence uses a separate `presence_gaussian` shader and `lr_metal_gaussian_v1`
+entry point, with nearest edges and the CPU's truncated Gaussian support. Center
+differences preserve constant fields exactly; compensated summation limits broad
+kernel errors. RGB input/output buffers are borrowed for scalar planes plus one
+temporary plane. Both filters and grading share the same capacity and 100 MiB
+ceiling, rather than independent pools. Readout allocation can drop unneeded
+scratch before dispatch. Caller output is copied only after both passes succeed.
+
+The adapter bounds radius to 64, planes to four million pixels and total shared
+bytes to policy. Larger requests and failed filters use CPU reference; auto also
+keeps small planes/kernels on CPU. A failed Gaussian path is not attempted again
+in the same worker, while supported color dispatch remains available. No recipe,
+halo, schema, original, demosaic, grading parameter count or output contract changes.
+
+`presence_metal_gaussian_filters` counts completed filters and
+`presence_metal_gaussian_passes` counts their two actual dispatches. CPU Gaussian
+calls, separate Gaussian GPU/dispatch times and `presence_gaussian_backend` identify
+this stage; `presence_other_operations_backend=CPU` preserves the explicit split.
+The existing `backend` remains the grade/output classification. Total GPU/dispatch
+times include these passes, so the separate times must not be added again.
 
 `settings.compute_backend` accepts `auto`, `cpu`, or `metal` and defaults to `auto`. It is catalog processing policy, not a recipe change.
 

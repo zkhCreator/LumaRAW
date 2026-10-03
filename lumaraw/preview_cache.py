@@ -6,6 +6,7 @@ The broker hashes bounded files in chunks; it never imports image/pixel librarie
 Keys include source/asset stat identities and every render option, never client IDs
 or catalog revisions. Callers must recheck revisions and cancellation on return.
 Cache loss/corruption is a miss, not a catalog failure. No original writes or SQL.
+Cached replies report unused filter stages and zero new work, never old timings.
 """
 import hashlib
 from contextlib import nullcontext
@@ -259,6 +260,11 @@ def load(cache, cache_key, request, backend, checkpoint=lambda: None, repair_loc
             'metal_grade_tiles': 0, 'metal_output_tiles': 0, 'metal_readout_tiles': 0,
             'cpu_tiles': 0, 'cpu_readout_tiles': 0, 'cpu_readout_output_tiles': 0,
             'worker_seconds': 0, 'shared_buffer_peak_mb': 0, 'fallback_reasons': [],
+            'gpu_seconds': 0, 'dispatch_seconds': 0, 'initialization_seconds': 0,
+            'presence_metal_gaussian_filters': 0, 'presence_metal_gaussian_passes': 0,
+            'presence_cpu_gaussian_filters': 0, 'presence_gaussian_gpu_seconds': 0,
+            'presence_gaussian_dispatch_seconds': 0, 'presence_gaussian_backend': 'unused',
+            'presence_other_operations_backend': 'unused',
             'cache_lookup_seconds': round(time.perf_counter()-started, 6)}
         return result
     except InterruptedError:

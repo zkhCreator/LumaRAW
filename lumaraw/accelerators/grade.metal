@@ -1,6 +1,6 @@
 // Purpose: fuse linear ProPhoto D65 grading and ICC output encoding per RGB pixel.
 // Inputs mirror the CPU equations (FP32, fast math disabled); never decode RAW.
-// Geometry, neighborhood filters, masks and LUTs remain separate CPU stages.
+// Geometry, neighborhood filters, masks and LUTs remain independent stages.
 // Optional p[54] returns graded linear work for display plus readout conversion.
 // Optional p[55] fuses SDR RGB/Lab D50 readouts with ordinary display output.
 #include <metal_stdlib>

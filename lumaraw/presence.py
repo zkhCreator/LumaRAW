@@ -7,7 +7,8 @@ No I/O, catalog mutation, inferred scene airlight, local masks or Adobe equation
 Dehaze uses normalized neutral white as airlight and a bounded dark-channel model.
 Texture/Clarity share log luminance and preserve channel ratios; zero is an exact
 bypass. Radii follow source pixels, including half-size RAW and fitted previews.
-All operators run on CPU before the shared CPU/Metal grading/output adapter.
+The default is the CPU reference. A caller may supply a scalar Gaussian adapter;
+all other equations stay here before the shared grading/output adapter.
 """
 import math
 
@@ -35,14 +36,14 @@ def support(recipe, pixel_scale):
     return radius + contrast_radius
 
 
-def apply(pixels, recipe, pixel_scale=1):
+def apply(pixels, recipe, pixel_scale=1, *, gaussian=gaussian_filter):
     if not (recipe.texture or recipe.clarity or recipe.dehaze):
         return pixels
     if recipe.dehaze > 0:
         dark = np.clip(pixels.min(axis=2), 0, 1)
         radius = max(1, math.ceil(8 * pixel_scale))
         dark = minimum_filter(dark, size=2 * radius + 1, mode='nearest')
-        dark = gaussian_filter(dark, _sigma(2, pixel_scale), mode='nearest', truncate=4)
+        dark = gaussian(dark, _sigma(2, pixel_scale), mode='nearest', truncate=4)
         transmission = np.maximum(.25, 1 - (.9 * recipe.dehaze / 100) * dark)
         pixels = np.maximum(0, (pixels - 1) / transmission[:, :, None] + 1)
     elif recipe.dehaze < 0:
@@ -53,12 +54,12 @@ def apply(pixels, recipe, pixel_scale=1):
         log_luminance = np.log2(luminance)
         gain = np.zeros_like(luminance)
         if recipe.texture:
-            band = gaussian_filter(log_luminance, _sigma(.8, pixel_scale), mode='nearest', truncate=4)
-            band -= gaussian_filter(log_luminance, _sigma(4, pixel_scale), mode='nearest', truncate=4)
+            band = gaussian(log_luminance, _sigma(.8, pixel_scale), mode='nearest', truncate=4)
+            band -= gaussian(log_luminance, _sigma(4, pixel_scale), mode='nearest', truncate=4)
             gain += (.8 * recipe.texture / 100) * band
         if recipe.clarity:
-            band = gaussian_filter(log_luminance, _sigma(1.5, pixel_scale), mode='nearest', truncate=4)
-            band -= gaussian_filter(log_luminance, _sigma(12, pixel_scale), mode='nearest', truncate=4)
+            band = gaussian(log_luminance, _sigma(1.5, pixel_scale), mode='nearest', truncate=4)
+            band -= gaussian(log_luminance, _sigma(12, pixel_scale), mode='nearest', truncate=4)
             weight = 4 * luminance * .18 / (luminance + .18) ** 2
             gain += (recipe.clarity / 100) * band * weight
         pixels *= np.exp2(np.clip(gain, -1.5, 1.5))[:, :, None]

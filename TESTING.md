@@ -21,6 +21,15 @@ python tests/run_native.py --engine /absolute/LumaRAWEngine \
   --work work/new-native-presence --suite NativePresenceRegression
 ```
 
+`test_presence_gaussian.py` verifies real GPU planes across degenerate dimensions,
+kernel widths and a high-contrast log range, exact constant fields, capacity/radius
+fallback, failed private output suppression, malformed C requests and missing
+kernels. Its small shared-pool case must drop scratch to retain fused readouts
+within one limit, then return safely to filtering. Combined filters/complex masks
+compare complete CPU/GPU output and oriented viewports. CPU spatial-prefix tests
+explicitly select the reference; auto may choose different kernels for small
+tiles, with the documented FP32 CPU/GPU precision bounds.
+
 Use the same isolated API 2 environment as packaging. The processing probe creates
 six isolated cases (Fit/detail/export × baseline/Presence) and measures cold engine
 cache then warm linear cache with a changed recipe, plus completed preview hits.

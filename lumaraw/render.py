@@ -37,7 +37,7 @@ import tifffile
 
 from .model import Recipe, ExportOptions
 from .performance import stage
-from .accelerators import grade_output
+from .accelerators import grade_output, presence_gaussian
 from .color import to_output, output_matrix, encode, decode, icc_profile, mix_hues, mix_monochrome, apply_lut, soft_proof
 from .curves import apply_rgb_curves
 from .parametric import apply as apply_parametric
@@ -189,7 +189,7 @@ def detail_filter(a,r,pixel_scale=1,output_sharpen=0):
         a=y[:,:,None]+(a-y[:,:,None])*(1-strength[:,:,None])
     amount=r.sharpen+output_sharpen
     if r.texture or r.clarity or r.dehaze:
-        a=presence.apply(a,r,pixel_scale)
+        a=presence.apply(a,r,pixel_scale,gaussian=presence_gaussian)
         y=np.maximum(a@LUMA,1e-8)
     if amount:
         smooth=gaussian_filter(y,max(.3,r.sharpen_radius*pixel_scale),mode='nearest',truncate=4)

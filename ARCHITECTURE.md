@@ -89,14 +89,18 @@ The renderer applies these after noise/defringe and before sharpening. Spatial
 support sums sequential filters and scales to output/source pixels. Only expanded
 requested strips are sampled; no full-frame filtering buffer is allocated. The
 same prefix feeds preview, detail, export, tone/mixer targeting and color readouts,
-then the existing CPU/Metal grade/output adapter runs. Actual Metal grading does
-not mean Presence or LibRaw ran on GPU. Existing pointwise FP32 color rounding can
+then the existing CPU/Metal grade/output adapter runs. The CPU equations accept
+an optional scalar Gaussian callback. The Metal adapter accelerates those passes
+in the same bounded buffer pool; unsupported/failed requests use the reference.
+Actual Gaussian counters identify that stage. Remaining Presence operations and
+LibRaw stay on CPU. Existing pointwise FP32 color rounding can
 differ at tail lanes; spatial-prefix agreement is verified separately.
 
 The three -100…100 values default to zero in old recipe JSON. The `Presence`
 sync/preset group is independent of Light, Color, Detail and Local Masks. Storage
-schema 37 and recipe version 2 remain compatible; generation 61 invalidates old
-engine output identities. Native controls emit bounded partial edits, with a
+schema 37 and recipe version 2 remain compatible; generation 62 adds optional
+Gaussian dispatch to generation 61's model and invalidates older output identities.
+Native controls emit bounded partial edits, with a
 scoped reset, ordinary optimistic revisions and one history step per saved burst.
 
 ## White-balance point sampling
