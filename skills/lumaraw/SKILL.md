@@ -38,10 +38,13 @@ For an explicit neutral-point choice, call `sample_white_balance` with `photo_id
 `expected_revision`, `expected_source_fingerprint`, a dedicated `client_id` and
 `generation`, and `point: {x,y}` in normalized full After-image coordinates after
 recipe geometry and catalog orientation. Expand a detail ROI into full-output
-coordinates first. The command reads source-linear pixels in a worker, returns
+coordinates first. The command reads source-linear raster pixels or RAW greybox statistics in a worker, returns
 relative `temperature` and `tint`, and never saves a recipe or history step.
-This implementation supports the existing rendered raster inputs; RAW sampling
-currently fails explicitly. Values are relative recipe axes, not Kelvin.
+Rendered raster inputs are supported. RAW requires the verified greybox API 2
+backend and square-pixel RGB/RGBG Bayer geometry. Unknown manufacturers, Fujifilm,
+active-area crops, unsupported layouts and non-representable second-green results
+fail explicitly. RAW statistics use a 64×64 visible-sensor region; decoding remains
+a full-frame allocation. Values are relative recipe axes, not Kelvin.
 
 Apply a valid candidate with one `edit_photo` patch containing both fields and
 the same captured revision and `expected_source_fingerprint`. Discard results

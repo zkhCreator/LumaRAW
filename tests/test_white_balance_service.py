@@ -229,6 +229,7 @@ def test_raw_fails_explicitly_before_raster_decode(tmp_path, monkeypatch):
     from lumaraw import white_balance_worker
     raw = tmp_path / 'source.NEF'
     raw.write_bytes(b'RAW decoder must not be called by the raster adapter')
+    monkeypatch.delattr(white_balance_worker.rawpy, 'GREYBOX_WB_API_VERSION', raising=False)
     monkeypatch.setattr(white_balance_worker, 'base_image', lambda *a, **k: pytest.fail('RAW entered raster solve'))
     with pytest.raises(ValueError, match='not supported for this RAW'):
         white_balance_worker.sample(raw, {}, 0, {'x': .5, 'y': .5}, tmp_path / 'cache',

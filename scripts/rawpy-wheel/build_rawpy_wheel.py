@@ -80,7 +80,7 @@ SOURCES = (
 # These hashes pin the reviewed diffs, not merely the upstream versions. Keep
 # the capability patch hash synchronized with its final reviewed private copy.
 PATCH_SHA256 = {
-    "rawpy-greybox.patch": "444590f922c74072ba3c04b17e04ea16869a36bb4a622e516d5f6cc4a353d046",
+    "rawpy-greybox.patch": "316a06e3bc03204ef42cc40170f23fa406a0ef7b4df561dd0fc9314e3d6c3323",
     "rawpy-cmake-toolchain.patch": "913fa9a8bc63154fdda1231b3b88d1418110b3a437e9202e9c583b52d526f51f",
     "libraw-greybox-validity.patch": "14738c53a795f0c5a0690659dfd0e47f8d9d186bbd357334bdb9e2144554d8b3",
 }
@@ -561,9 +561,9 @@ def verify_importable_capability(python: Path, unpacked: Path, *, log: BuildLog,
     check_env["PYTHONPATH"] = str(unpacked)
     code = (
         "import rawpy; from rawpy import _rawpy; "
-        "assert getattr(_rawpy, 'GREYBOX_WB_API_VERSION', None) == 1; "
+        "assert getattr(_rawpy, 'GREYBOX_WB_API_VERSION', None) == 2; "
         "print('verified_rawpy=' + rawpy.__version__); "
-        "print('verified_greybox_api=1')"
+        "print('verified_greybox_api=2')"
     )
     log.command("Import wheel and verify greybox capability marker", (str(python), "-c", code), cwd=work, env=check_env)
 
@@ -609,7 +609,7 @@ def write_provenance(
             "arm64-only Mach-O extensions and bundled dylibs",
             "minimum macOS version no newer than 14.0",
             "non-system dylib dependencies resolve inside the wheel",
-            "greybox capability import marker equals 1",
+            "greybox capability import marker equals 2",
         ],
         "path_mapping": [
             "build/source paths -> ./_lumaraw_build",

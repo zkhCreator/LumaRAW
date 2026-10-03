@@ -230,7 +230,7 @@ TOOLS['preview_photo']['inputSchema']['properties'].update(mixer_patch=MIXER_PAT
 TOOLS['preview_photo']['inputSchema']['dependentRequired']['mixer_patch']=['expected_revision']
 TOOLS['preview_photo']['inputSchema']['not']={'required':['curve_patch','mixer_patch']}
 TOOLS['preview_photo']['description']+=' mixer_patch previews temporary HSL/B&W values at expected_revision, separately from curve_patch. mixer_target returns aligned sparse band weights before HSL or B&W mixing.'
-tool('sample_white_balance','Sample one neutral point in the full post-geometry, post-orientation After image. Returns relative Temperature/Tint without saving; supports rendered raster originals. RAW sampling is currently unsupported. Source-stat identity, revision and client generation are required.',{
+tool('sample_white_balance','Sample one neutral point in the full post-geometry, post-orientation After image. Returns relative Temperature/Tint without saving; supports rendered raster originals and square-pixel RGB/RGBG Bayer RAW with verified greybox API 2. Other RAW layouts fail explicitly. Source-stat identity, revision and client generation are required.',{
     'photo_id':ID,'expected_revision':REV,'expected_source_fingerprint':SOURCE_FINGERPRINT,
     'client_id':string(128),'generation':REV,
     'point':obj({'x':{'type':'number','minimum':0,'maximum':1},'y':{'type':'number','minimum':0,'maximum':1}},['x','y'])

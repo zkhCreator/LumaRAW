@@ -6,7 +6,7 @@ LibRaw/NumPy native allocations even after failure. Original files are read-only
 The engine identity must match its broker before any pixels or outputs are opened.
 Batch export requests may carry a captured collision suffix for safe output naming.
 Successful previews publish bounded completed receipts for later broker reuse.
-White-balance samples decode one captured raster and return only relative values;
+White-balance samples decode one captured original and return only relative values;
 they do not publish previews or change catalog state.
 """
 import json

@@ -2,6 +2,43 @@
 
 All probes use explicit read-only input photographs and new disposable catalog/output directories. They never use a personal photo library by default.
 
+## RAW white-balance selector
+
+Use an isolated environment containing the verified greybox API 2 wheel. The
+stock dependency must fail RAW sampling before decode while retaining raster
+support. `test_raw_white_balance_geometry.py` compares sensor X/Y images sampled
+by the actual renderer against bounded inverse clicks across four camera flips,
+four recipe rotations, eight catalog orientations and cropped/lens geometry.
+These synthetic cases establish coordinate algebra, not camera accuracy.
+
+```sh
+LUMARAW_REQUIRE_RAW_WB=1 LUMARAW_TEST_NEF=/absolute/read-only-fixture.NEF \
+  /absolute/isolated-runtime/bin/python -m pytest -q \
+  tests/test_raw_white_balance.py tests/test_raw_white_balance_geometry.py \
+  tests/test_raw_white_balance_worker.py tests/test_white_balance_service.py
+/absolute/isolated-runtime/bin/python tests/run_native.py \
+  --engine /absolute/LumaRAW.app/Contents/Resources/Engine/LumaRAWEngine \
+  --work work/new-native-raw-wb --suite NativeRawWhiteBalanceRegression \
+  --raw-fixture /absolute/read-only-fixture.NEF
+```
+
+The required flag fails instead of skipping missing RAW capability/fixtures.
+Service evidence checks unchanged originals/catalog/history after sampling, no
+new linear cache, absolute as-shot results after an existing WB edit, one paired
+revision/history step, undo and a real post-worker revision race. Admission tests
+reject incompatible APIs before open and excessive memory before unpack. The
+native RAW suite uses an actual detail preview and expands its ROI before one
+source-bound paired edit and undo; desktop input and VoiceOver remain separate.
+The native runner requires `--raw-fixture` for this suite and explicitly reports
+its omission from a default synthetic-only run.
+
+`tests/raw_backend_probe.py` requires API 2 and checks direct maker metadata before
+unpack, identical LINEAR/AHD greybox multipliers on the supplied Nikon fixture,
+repeat/reset state, invalid inputs and an in-memory empty-G2 case. Keep its fixture
+hashes, environment/backend, host, elapsed time and sampled/child RSS receipts
+private. Its measurements are diagnostic, not a throughput benchmark or evidence
+for other camera models or OS runtimes.
+
 ## RAW backend identity and cache isolation
 
 `test_runtime_backend.py` constructs same-version synthetic installed packages

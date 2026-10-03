@@ -16,6 +16,7 @@ collision; numeric fallback keeps generated components within 255 UTF-8 bytes.
 Independent catalog orientation maps output strips back to canonical Develop
 coordinates, then losslessly rotates/flips each tile. Masks/crops stay attached.
 Readout maps share the grade/output dispatch, before proofing or overlay pixels.
+Bounded point samplers reuse source_uv before channel-specific lens shifts.
 After PNG publication is atomic so completed-cache readers cannot see partial writes.
 """
 from dataclasses import replace
@@ -98,27 +99,33 @@ class RenderPlan:
             self.width=max(1,round(self.width*factor));self.height=max(1,round(self.height*factor))
         self.pixel_scale=max(self.width/cw,self.height/ch)
 
+    def source_uv(self, x, y, w, h):
+        """Map output pixel centers through the renderer's shared geometry inverse."""
+        r = self.recipe
+        xx = (np.arange(x, x + w, dtype=np.float32) + .5) / self.width
+        yy = (np.arange(y, y + h, dtype=np.float32) + .5) / self.height
+        u = (self.x0 + xx[None, :] * self.crop_w - self.sw / 2) / (self.sw / 2)
+        v = (self.y0 + yy[:, None] * self.crop_h - self.sh / 2) / (self.sh / 2)
+        u, v = np.broadcast_arrays(u, v)
+
+        angle = math.radians(r.straighten)
+        px, py = u * self.sw, v * self.sh
+        us = (math.cos(angle) * px + math.sin(angle) * py) / self.sw / r.geometry_scale
+        vs = (-math.sin(angle) * px + math.cos(angle) * py) / self.sh / r.geometry_scale
+        den = 1 + vs * r.perspective_v / 160 + us * r.perspective_h / 160
+        us, vs = us / den, vs / den
+        radius2 = us * us + vs * vs
+        radial = 1 + r.distortion / 400 * radius2
+        us *= radial
+        vs *= radial
+        return us, vs, radius2
+
     def sample(self,x,y,w,h):
         r=self.recipe
         if not any((r.straighten,r.perspective_v,r.perspective_h,r.distortion,r.ca_red,r.ca_blue,r.vignette)) and r.geometry_scale==1 and self.width==self.sw and self.height==self.sh and self.x0==0 and self.y0==0:
             a=self.source[y:y+h,x:x+w].astype(np.float32)
             return a/65535 if self.source.dtype==np.uint16 else a
-        # Pixel centers stay exactly aligned at full resolution when geometry is neutral.
-        xx=(np.arange(x,x+w,dtype=np.float32)+.5)/self.width
-        yy=(np.arange(y,y+h,dtype=np.float32)+.5)/self.height
-        u=(self.x0+xx[None,:]*self.crop_w-self.sw/2)/(self.sw/2)
-        v=(self.y0+yy[:,None]*self.crop_h-self.sh/2)/(self.sh/2)
-        u,v=np.broadcast_arrays(u,v)
-        angle=math.radians(r.straighten)
-        # Coordinates account for physical pixel aspect ratio, then inverse perspective.
-        px=u*self.sw;py=v*self.sh
-        us=(math.cos(angle)*px+math.sin(angle)*py)/self.sw/r.geometry_scale
-        vs=(-math.sin(angle)*px+math.cos(angle)*py)/self.sh/r.geometry_scale
-        den=1+vs*r.perspective_v/160+us*r.perspective_h/160
-        us=us/den;vs=vs/den
-        radius2=us*us+vs*vs
-        radial=1+r.distortion/400*radius2
-        us*=radial;vs*=radial
+        us,vs,radius2=self.source_uv(x,y,w,h)
         a=np.empty((h,w,3),np.float32)
         for c,ca in enumerate((r.ca_red,0,r.ca_blue)):
             scale=1+ca/10000

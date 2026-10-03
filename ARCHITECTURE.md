@@ -85,14 +85,24 @@ generation. Final source/revision checks precede a generation-locked response
 handoff. The optional edit fingerprint is checked under the ordinary mutation
 lock; stat identity cannot atomically lock an external file with a SQLite commit.
 
-`white_balance_worker.py` reuses the full linear source cache and geometry plan.
+`white_balance_worker.py` branches on the original type. Raster reuses the full
+linear source cache and geometry plan. RAW checks greybox API 2 before open and
+the full-frame memory budget before unpack; it creates only a constant-storage
+shape view for geometry and retains no linear cache.
 `white_balance.py` maps one normalized post-orientation point to at most 5 by 5
 full-resolution source-linear raster pixels. It disables vignette for this
 sample and excludes grading, profiles, LUTs, display proofing and readout maps.
 The solve reverses current relative WB gains, rejects predominantly invalid,
 dark or clipped samples, and solves the two existing relative recipe axes.
 It never silently clamps an out-of-range candidate. RAW is explicitly unsupported
-by this raster adapter; camera-channel WB needs a separately verified backend.
+by this raster adapter. `raw_white_balance.py` uses the verified API 2 backend
+for a 64×64 visible-sensor greybox. Shared `RenderPlan.source_uv` removes Develop
+geometry; exact inverse transforms remove catalog orientation, recipe rotation
+and camera flip. LibRaw supplies valid auto-WB multipliers rather than a guessed
+color matrix. The solve fits as-shot-relative axes, rejecting G2 residuals above
+0.01 stops and out-of-range values. Square RGB/RGBG Bayer layouts without active
+crops are the supported boundary; unknown maker/Fujifilm and other layouts fail
+explicitly. Camera accuracy, broader RAW acceptance and Kelvin remain unverified.
 
 The Mac shell maps Fit/detail coordinates, captures frame and interaction state,
 and submits both values in one ordinary history-producing edit. It does no pixel

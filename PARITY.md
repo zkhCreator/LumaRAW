@@ -63,7 +63,7 @@ gaps. Nothing below is full Lightroom parity merely because historical tests pas
 | Library navigation | Partial: bounded grid/filmstrip, folder tree/search/favorites/labels, durable missing-folder relocation and folder synchronization with reviewed suspected-duplicate inclusion, direct/recursive sources, filters/sorting including live snapshot status, regular/smart/Quick collections and nested sets, photo drops into regular and Quick collections, collection-node moves into sets, single/batch collection color labels and global color filtering | Multi-source selection, complete sync Import Dialog, folder move/rename, relocation overlap/collision handling, collection-node drag/drop desktop/reference acceptance, custom label names/sets and sidebar multi-selection interaction, full smart criteria/import-export, source-selection memory, desktop/reference acceptance |
 | Organization | Partial: duplicate/missing detection, hierarchical keywords/synonyms/export flags/Will Export preview, text/CSV vocabulary exchange and manual person tags, custom nine-slot keyword sets/recent entries/shared or catalog storage, multi-keyword shortcuts and keyword/rating/flag/label/target-collection/rotation/Develop-preset/metadata-preset Painter strokes, independent catalog rotation/flips, title/caption/copyright plus thirty IPTC fields, selective metadata presets, labels, batch metadata, virtual copies, manual/split/capture-time scoped stacks | Keyword policy/file and preset reference acceptance, built-in sets/suggestions/undo, Painter desktop acceptance, IPTC Extension and complete metadata parity, stack interaction acceptance, rename and sidecars |
 | Culling | Partial: Loupe/Compare/Survey, linked detail, anchored page selection, rating/flag/color keys with guarded Shift advance in single-target Grid/Loupe, Develop Reference/Active pairs with independent Fit/1:1 viewports, session lock and RGB/LAB readouts | Desktop and numerical reference acceptance, exact sorted/filter-removal behavior, HDR readouts, scrubby/box zoom, cross-page selection, Auto Advance preference/Caps Lock, persistent workspace state |
-| Basic development | Partial: light/WB/color, source-bound one-shot raster neutral-point selection, eight-band HSL and B&W Mix with photo-targeted adjustment and selective resets/sync | RAW selector, calibrated absolute WB, selector loupe/scale/hover/Auto Dismiss options, texture/clarity/dehaze, Point Color, Auto B&W mix, color grading and Adobe processing/reference acceptance |
+| Basic development | Partial: light/WB/color, source-bound one-shot raster and limited API 2 Bayer RAW neutral-point selection, eight-band HSL and B&W Mix with photo-targeted adjustment and selective resets/sync | Broader RAW selector camera/runtime acceptance, calibrated absolute WB, selector loupe/scale/hover/Auto Dismiss options, texture/clarity/dehaze, Point Color, Auto B&W mix, color grading and Adobe processing/reference acceptance |
 | Curves and profiles | Partial: four-region parametric curves with movable splits and photo-targeted adjustment, interactive RGB/channel point curves, shared temporary previews, legacy luminance curve, LUT/ICC | Point/channel targeting, curve exchange, camera/profile browser, Adobe processing and rendered/reference acceptance |
 | Detail and optics | Partial: noise/sharpen, manual lens | Complete manual detail controls, automatic lens profiles, bounded full-resolution acceptance |
 | Geometry | Partial: crop/straighten/perspective, independent rotation/flips with attached masks and displayed crop ratios | Interactive retained handles, guided transforms, full crop state and rendered/reference parity |
@@ -5303,3 +5303,59 @@ the native RAW selector, verify other camera formats/rotations, establish absolu
 Kelvin or Adobe pixels, measure throughput, or execute macOS 14. The current
 application remains on the normal dependency with raster-only selector support;
 RAW adapter/service/native integration and broader acceptance remain open.
+
+
+## Source-bound RAW neutral-point selector (October 2, 2026)
+
+The worker now supports visible-sensor greybox statistics using the separately
+verified rawpy **0.27.1** / LibRaw **0.22.1** API **2** backend. The new read-only
+`camera_make` property reads bounded header metadata before unpack. Stock/API 1
+decoders fail before RAW open. Full-frame memory admission precedes unpack; one
+constant-storage geometry view reuses `RenderPlan.source_uv` and orthogonal
+inverses to map a full After click to a clamped **64×64** visible-sensor region.
+No full coordinate image, decoded RGB output, preview receipt or linear cache is
+created by this RAW sample. LibRaw still allocates full native processing buffers.
+
+The two recipe axes are solved absolutely against the camera-as-shot baseline.
+Both green CFA phases are checked even for three-output-color RGBG files. Missing
+manufacturer metadata, Fujifilm, non-square pixels, active-area crops, unsupported
+Bayer/channel order, invalid statistics, a G2 residual above **0.01 stops** and
+values outside the existing recipe range fail visibly. The native Fit/detail
+selector shares its existing one-shot, source/revision/generation-bound command
+and paired Temperature/Tint edit. No schema or command-count change is needed;
+engine generation is **60**, catalog schema **37**, with **150** commands.
+
+Synthetic independent sensor X/Y renderer comparisons cover all four camera
+flips, four recipe rotations, eight catalog orientations and neutral/transformed
+geometry. Pre/post extraction checks retain byte-identical outputs across **64**
+float32/uint16, crop, rotation, perspective, lens/vignette and fit/full cases.
+The initial targeted suite passes **342 tests in 12.05 s**; the next worker/service
+set passes **7 tests in 4.00 s**, including actual RAW read-only sampling, an
+unchanged candidate after a WB edit, one history step/undo and a completed-worker
+revision conflict preserving the newer recipe.
+
+A fresh isolated offline API 2 build passes the arm64/minimum-macOS-14/loader
+closure checks. On the public Nikon D3S NEF (**4,284 × 2,844** visible pixels,
+flip **0**), maker metadata is available before unpack, LINEAR and AHD greybox
+statistics match exactly, repeated samples match, an in-memory empty-G2 region
+is invalid, and the original hash is unchanged. The supervised diagnostic records
+**1.836 s**, sampled **170,819,584 bytes** and child high-water **196,165,632 bytes**
+on macOS **26.6.2**; this multi-call library diagnostic is not a throughput
+benchmark. The ordinary locked environment remains the raster fallback.
+
+The complete suite passes **1,443 tests in 187.94 s**, requiring actual Metal and
+API 2 RAW sampling with the public NEF; no tests are skipped. The stock dependency
+passes **341 tests in 5.21 s**, with the two API 2 camera cases intentionally
+deselected. The signed self-contained Mac app reports API **2**, engine generation
+**60** and **150** matching MCP contracts; source/client/broker identities and
+bundled guide bytes agree. The actual-RAW native state/IPC suite passes **10
+assertions**, including a real detail frame, ROI expansion, one paired edit,
+history, undo and unchanged original bytes. Packaged native state/IPC suites
+pass **94 assertions**: RAW white balance 10, raster white balance 39,
+responsiveness 16, Before/After 19 and connection 10. The current Inspector/tool
+offscreen images were inspected; they are not desktop interaction evidence. A
+fresh fetch finds no unmerged local or remote branches. Only this Nikon fixture
+has camera evidence; other camera models, actual flipped RAW files,
+macOS 14 runtime, desktop pointer/keyboard/VoiceOver, absolute Kelvin and Adobe
+pixel equivalence remain unverified. Broad RAW selector parity and full Lightroom
+reproduction are incomplete.

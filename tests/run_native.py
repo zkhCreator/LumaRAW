@@ -1,8 +1,9 @@
 """Compile and run native state probes with generated images and new catalogs.
 
 Input: an explicit new work directory and optional engine. Output: Swift binaries,
-synthetic photographs and JSON receipts inside that directory. No personal library
-or desktop automation. Source engine uses this environment's installed CLI entry.
+synthetic photographs and JSON receipts inside that directory. The optional RAW
+suite requires an explicit read-only fixture. No personal library or desktop
+automation. Source engine uses this environment's installed CLI entry.
 """
 import argparse
 import json
@@ -57,15 +58,24 @@ def main():
     suites+=('NativeResponsivenessRegression',)
     suites+=('NativeColorReadoutRegression',)
     suites+=('NativeWhiteBalanceRegression',)
+    suites+=('NativeRawWhiteBalanceRegression',)
+    parser.add_argument('--raw-fixture', type=Path, help='Explicit read-only RAW input for the optional RAW WB suite')
     parser.add_argument('--suite',choices=suites,action='append',help='Run selected suites; default: all')
     args=parser.parse_args()
+    if args.suite and 'NativeRawWhiteBalanceRegression' in args.suite and args.raw_fixture is None:
+        parser.error('NativeRawWhiteBalanceRegression requires --raw-fixture')
+    if args.raw_fixture is not None:
+        args.raw_fixture=args.raw_fixture.resolve(strict=True)
     work=args.work.resolve()
     if work.exists():
         raise SystemExit('Choose a new work directory')
     work.mkdir(parents=True)
     root=Path(__file__).resolve().parents[1]
     sources=sorted(path for path in (root/'native').glob('*.swift') if path.name != 'LumaRAWApp.swift')
-    for suite in args.suite or suites:
+    selected=args.suite or tuple(suite for suite in suites if suite!='NativeRawWhiteBalanceRegression' or args.raw_fixture is not None)
+    if args.suite is None and args.raw_fixture is None:
+        print('NativeRawWhiteBalanceRegression not run: no --raw-fixture supplied')
+    for suite in selected:
         # Relink/eviction suites deliberately move their own originals. Every
         # suite needs fresh files as well as its own catalog, independent of order.
         fixtures=work/'fixtures'/suite
@@ -120,6 +130,7 @@ def main():
         if suite=='NativeFolderSyncRegression':env['LUMARAW_TEST_DUPLICATE_INCOMING']=str(duplicate_incoming)
         if suite in ('NativeImportBackupRegression','NativeImportPresetRegression','NativeImportSequenceRegression','NativeImportDateRegression','NativeImportDestinationRegression','NativeImportLoupeRegression'):env['LUMARAW_TEST_FIXTURES']='|'.join(paths)
         if suite=='NativeResponsivenessRegression':env['LUMARAW_TEST_FIXTURES']='|'.join(paths)
+        if suite=='NativeRawWhiteBalanceRegression':env['LUMARAW_TEST_RAW_FIXTURE']=str(args.raw_fixture)
         if suite=='NativeTransportRegression':
             relay=fixtures/'native-relay'
             relay.write_text('#!'+sys.executable+'\n'+(root/'tests/native_transport_fixture.py').read_text())

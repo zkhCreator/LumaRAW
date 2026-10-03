@@ -55,7 +55,7 @@ Before accepting the wheel, the workflow checks its exact CPython 3.12/macOS
 14/arm64 tag, verifies every extension and bundled dylib is arm64-only with a
 minimum OS no newer than 14.0, checks that non-system dylib dependencies
 resolve inside the wheel, then imports the wheel and checks the greybox API
-capability marker. No image is opened or decoded by this workflow.
+API 2 capability marker. No image is opened or decoded by this workflow.
 
 Pinned sources and build dependencies improve reviewability, but compiler,
 SDK, and signing details can still change wheel bytes. The output is not
@@ -77,6 +77,10 @@ auto processing and false when any active CFA channel has no usable sums. A
 three-color RGBG Bayer image still has a required second-green CFA slot. Read
 the processed `auto_whitebalance` only after validity is exactly true. These
 library primitives do not implement the application's RAW selector by themselves.
+
+API 2 also exposes read-only `camera_make` directly from LibRaw after opening
+the header, before unpacking. The application rejects unverified manufacturer
+and sensor-layout state instead of guessing it from decoded color pixels.
 
 For explicit read-only runtime evidence, install the exact verified wheel and
 NumPy in a separate disposable environment, then run its Python interpreter on

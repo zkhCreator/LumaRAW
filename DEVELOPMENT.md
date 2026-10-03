@@ -35,6 +35,24 @@ Use a separate disposable runtime environment for camera probes, then carry its
 actual backend descriptor into the app build. Pinned inputs do not imply identical
 wheel bytes, camera accuracy, a supported Windows wheel or binary release approval.
 
+RAW neutral-point sampling requires greybox API 2, including read-only maker
+metadata before unpack. The ordinary locked rawpy environment remains a valid
+raster-only fallback. To package RAW sampling, create a separate CPython 3.12
+environment, install the frozen project dependencies, then install the repaired
+wheel with its verified SHA-256 into that environment. Use that same interpreter
+for tests, `scripts/build_macos.py`, package identity checks and source-side probes.
+Do not overlay `PYTHONPATH` over a different installed distribution, update the
+shared `.venv`, or claim a stock-backend app supports this RAW path.
+
+The worker checks its capability before opening RAW and the full-frame memory
+budget before unpack. Its constant-storage geometry view maps one output pixel
+through shared renderer coordinates into a 64×64 visible-sensor rectangle.
+LibRaw owns RAW statistics and still allocates a full processing frame. Reject
+unknown maker, Fujifilm, non-square pixels, active-area crops, nonstandard channel
+order and non-representable G2/range results. Return an as-shot-relative candidate,
+never a delta to current WB or an inferred Kelvin value. Preserve source/revision/
+generation checks and submit both axes as one catalog edit.
+
 ## Contracts and persistence
 
 - Bind engine identity and every pixel-derived cache to actual installed RAW

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Bounded runtime check for the patched rawpy wheel.
 
-Purpose: verify the patched greybox API and LibRaw WB status behavior on one
+Purpose: verify the patched greybox API 2, direct maker metadata and LibRaw WB status behavior on one
 read-only public NEF fixture. Inputs: an isolated environment with the repaired
 wheel and locked NumPy, plus a fixture path. Outputs: JSON API, feature, geometry,
 WB, source-hash and child-RSS evidence, including an in-memory empty-G2 sample
@@ -52,7 +52,7 @@ def worker(raw_path: Path) -> dict[str, object]:
         raise AssertionError("rawpy did not import from this private runtime environment")
     if not Path(np.__file__).resolve().is_relative_to(runtime_root):
         raise AssertionError("NumPy did not import from this private runtime environment")
-    if rawpy.GREYBOX_WB_API_VERSION != 1:
+    if rawpy.GREYBOX_WB_API_VERSION != 2:
         raise AssertionError("patched greybox API identity is absent or unexpected")
 
     expected_flags = {
@@ -83,6 +83,14 @@ def worker(raw_path: Path) -> dict[str, object]:
         ("uint32-overflow", lambda: rawpy.Params(use_auto_wb=True, greybox=(0, 0, 1 << 32, 64))),
     ]
     validation = [must_reject(label, operation) for label, operation in invalid_inputs]
+
+    with rawpy.RawPy() as metadata_handle:
+        if metadata_handle.camera_make != "":
+            raise AssertionError("Fresh make metadata is not empty")
+        metadata_handle.open_file(str(raw_path))
+        make_before_unpack = metadata_handle.camera_make
+        if make_before_unpack != "Nikon":
+            raise AssertionError("Fixture maker before unpack is incorrect")
 
     with rawpy.imread(str(raw_path)) as raw:
         sizes = raw.sizes
@@ -129,7 +137,7 @@ def worker(raw_path: Path) -> dict[str, object]:
             if not empty_g2_roi_raw.flags.writeable:
                 raise AssertionError("in-memory RAW view is not writable for the isolated CFA test")
 
-        def process(box):
+        def process(box, algorithm=rawpy.DemosaicAlgorithm.AHD):
             raw.dcraw_process(
                 rawpy.Params(
                     use_auto_wb=True,
@@ -137,6 +145,7 @@ def worker(raw_path: Path) -> dict[str, object]:
                     no_auto_scale=False,
                     half_size=False,
                     greybox=box,
+                    demosaic_algorithm=algorithm,
                 )
             )
             return raw.auto_whitebalance_valid, raw.auto_whitebalance
@@ -144,6 +153,9 @@ def worker(raw_path: Path) -> dict[str, object]:
         full_valid, full_multipliers = process(None)
         roi_valid, roi_multipliers = process(roi)
         repeat_valid, repeat_multipliers = process(roi)
+        linear_valid, linear_multipliers = process(roi, rawpy.DemosaicAlgorithm.LINEAR)
+        if linear_valid != roi_valid or linear_multipliers != roi_multipliers:
+            raise AssertionError("LINEAR and AHD changed greybox statistics")
 
         if not isinstance(full_valid, bool) or not isinstance(roi_valid, bool) or not isinstance(repeat_valid, bool):
             raise AssertionError("auto-WB validity did not report a boolean after auto-WB processing")
@@ -250,19 +262,22 @@ def worker(raw_path: Path) -> dict[str, object]:
         aspect_square = math.isfinite(float(sizes.pixel_aspect)) and math.isclose(
             float(sizes.pixel_aspect), 1.0, rel_tol=0.0, abs_tol=1e-6
         )
-        dimensions_match = expected_decoded == (int(sizes.iwidth), int(sizes.iheight))
+        dimensions_match = (width, height) == (int(sizes.iwidth), int(sizes.iheight))
         adapter_geometry = {
             "supported_flip_code": camera_turns is not None,
             "camera_turns_clockwise": camera_turns,
             "expected_decoded_width_height": expected_decoded,
             "reported_iwidth_iheight": [int(sizes.iwidth), int(sizes.iheight)],
-            "decoded_dimensions_match_visible_and_flip": dimensions_match,
+            "preprocess_intermediate_dimensions_match_visible": dimensions_match,
             "pixel_aspect_is_square": aspect_square,
             "all_active_crop_values_zero": crop_clear,
             "supported_rgb_bayer_layout": cfa_layout_ok and active_set_ok,
-            "fujifilm_make_check": "not available from rawpy fields captured here",
+            "camera_make": make_before_unpack,
         }
         description = {
+            "make_before_unpack": make_before_unpack,
+            "linear_auto_valid": linear_valid,
+            "linear_multipliers": linear_multipliers,
             "raw_type": str(raw.raw_type),
             "num_colors": int(raw.num_colors),
             "color_desc": color_desc,
