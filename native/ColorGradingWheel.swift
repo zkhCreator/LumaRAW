@@ -3,6 +3,7 @@
 // Outputs: H/S drafts, hue-only edge edits, bounded slider drafts and release saves.
 // Shift constrains saturation, Command hue, Option gives fine steps. A six-degree
 // soft hue lock and 0.1 fine multiplier are LumaRAW interaction conventions.
+// Fine adjustment releases the soft lock; explicit Shift/Command constraints remain.
 // Keyboard Option arrows work only while this wheel is hovered in its key window.
 // No photo pixels, image decoding, catalog I/O or framework-global appearance changes.
 import AppKit
@@ -37,6 +38,7 @@ struct GradingWheelDrag {
         let factor=modifiers.contains(.option) ? 0.1:1.0
         let onlySaturation=modifiers.contains(.shift) && !hueOnly
         let onlyHue=hueOnly || modifiers.contains(.command)
+        if modifiers.contains(.option) {softLock=false}
         if softLock,abs(Self.delta(nextHue,lockedHue))>6 {softLock=false}
         if !onlySaturation && !softLock {
             hue=(hue+Self.delta(nextHue,lastHue)*factor+360).truncatingRemainder(dividingBy:360)

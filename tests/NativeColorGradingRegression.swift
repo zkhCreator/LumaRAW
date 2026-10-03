@@ -110,6 +110,11 @@ import SwiftUI
             var fine=GradingWheelDrag(hue:0,saturation:50,point:CGPoint(x:50,y:0),radius:100,hueOnly:true,onHandle:true)
             fine.update(CGPoint(x:0,y:80),radius:100,modifiers:.option)
             try check(abs(fine.hue-9)<0.001 && fine.saturation==50,"option_fine_hue_only_preserves_saturation")
+            var fineInner=GradingWheelDrag(hue:0,saturation:50,point:CGPoint(x:50,y:0),radius:100,hueOnly:false,onHandle:true)
+            let angle=2.0 * Double.pi/180
+            fineInner.update(CGPoint(x:50*cos(angle),y:50*sin(angle)),radius:100,modifiers:.option)
+            try check(abs(fineInner.hue-0.2)<0.00001 && abs(fineInner.saturation-50)<0.00001,
+                "option_fine_inner_handle_releases_soft_constraint_for_small_angle")
             try await snapshot(ColorGradingControls(),name:"grading-three-way.png",width:320,height:570)
             try await snapshot(ColorGradingControls(initialMode:"midtones"),name:"grading-detail.png",width:320,height:490)
             try await snapshot(ColorGradingControls(initialMode:"global"),name:"grading-global.png",width:320,height:410)

@@ -16,6 +16,9 @@ history, partial presets/Sync, old JSON and immutable export recipes.
 `NativeColorGradingRegression` checks the real native relay/controller, paired
 wheel save, temporary mute/boost, scoped resets, local wheel copy/paste, selected
 presets/Sync, selection ABA, external revision conflicts and typed modifier geometry.
+The fine-inner-handle case uses a two-degree movement inside the soft-lock range;
+Option must still change hue by the documented LumaRAW fine multiplier. Ordinary
+small-angle movement retains the lock, and explicit Shift/Command constraints hold.
 Three-way/detail/Global/wheel PNGs are offscreen layout evidence. This does not
 establish desktop pointer/keyboard event routing, VoiceOver or macOS 14 runtime.
 

@@ -5794,3 +5794,21 @@ desktop acceptance. Proprietary grading pixels/treatment, HDR grading, old Split
 Toning/Adobe XMP exchange, desktop pointer/keyboard routing, VoiceOver, broader
 camera accuracy and macOS 14 runtime remain unverified. Compilation targets
 macOS 14; only the current host runtime was available. Full parity remains incomplete.
+
+### Color Grading fine-mode constraint correction
+
+Adobe's [Classic shortcuts reference](https://jkost.com/blog/wp-content/uploads/2024/02/2024_LrC_v13_Shortcuts.pdf)
+states that fine adjustment does not use the soft hue constraint. The inner handle
+previously retained it with Option, suppressing intended small hue adjustments.
+Option now releases that constraint while explicit Shift/Command constraints remain.
+The six-degree ordinary threshold and 0.1 fine multiplier remain LumaRAW conventions.
+
+The fresh signed app uses byte-identical generation-66 engine code; the preceding
+1,618-test engine regression and RAW processing measurements still apply. Final
+packaged-engine native checks pass **54 assertions** (grading **38**, responsiveness
+**16**), including a two-degree fine inner-handle movement, ordinary soft locking,
+explicit constraints, saved/temporary edits and zero unchanged-poll publications.
+The newly generated three-way PNG was inspected offscreen. Signature, engine/client
+identity, 151 matching contracts and bundled guide checks pass. No pixel-processing
+or performance change is claimed. Desktop event routing, VoiceOver and the macOS 14
+runtime remain unverified; full reproduction is still incomplete.
