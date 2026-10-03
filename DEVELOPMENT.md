@@ -55,6 +55,13 @@ generation checks and submit both axes as one catalog edit.
 
 ## Contracts and persistence
 
+- Crop/mask pointer gestures capture the displayed photo revision, source token,
+  native preview generation, tool and rectangle at pointer-down. Cancel until
+  release when any context changes; never reuse points on another target or a
+  newly loaded frame. Bind their saved patch to the same photo/revision and send
+  the captured source-stat fingerprint to the final shared `edit_photo` check.
+  Stat checks do not atomically lock an external file with the catalog commit.
+
 - Sync reviews capture source and target photo revisions plus the selected IDs.
   Display parameter groups from `recipe_schema`, including future engine groups,
   instead of maintaining another membership list in the native form. Flush pending

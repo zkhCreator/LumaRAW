@@ -68,7 +68,7 @@ gaps. Nothing below is full Lightroom parity merely because historical tests pas
 | Curves and profiles | Partial: four-region parametric curves with movable splits and photo-targeted adjustment, interactive RGB/channel point curves, shared temporary previews, legacy luminance curve, LUT/ICC | Point/channel targeting, curve exchange, camera/profile browser, Adobe processing and rendered/reference acceptance |
 | Detail and optics | Partial: noise/sharpen, manual lens | Complete manual detail controls, automatic lens profiles, bounded full-resolution acceptance |
 | Geometry | Partial: crop/straighten/perspective, independent rotation/flips with attached masks and displayed crop ratios | Interactive retained handles, guided transforms, full crop state and rendered/reference parity |
-| Local editing | Partial: radial/gradient/brush/luma, captured non-AI mask rename/duplicate/duplicate-and-invert/invert/delete with Develop history | Complete mask list/edit/reorder/reference acceptance, components/intersection and range masks, local Presence, clone/heal, red-eye (non-AI) |
+| Local editing | Partial: captured crop/radial/gradient/brush gestures, luma masks, captured non-AI mask rename/duplicate/duplicate-and-invert/invert/delete with Develop history | Complete mask list/edit/reorder/reference acceptance, components/intersection and range masks, local Presence, clone/heal, red-eye (non-AI) |
 | History and presets | Partial: durable paged Develop history with undo/redo, state selection/rename/clear, persistent Before assignment/copy/swap, separate 50-batch orientation undo, alphabetical shared snapshots with current/history capture, rename/update/delete and Before copy, partial Develop presets/groups/favorites/shared or local storage, batch/Painter and reviewed-import application | Unified application Undo/Redo, history/snapshot hover, preset hover preview/Amount/ISO adaptation/Adobe exchange and rendered reference acceptance |
 | Preview/performance | Partial: Metal, proxies, 1:1 viewport, developed thumbnail fast path, on-demand Before with independent cache, four paired layouts, persistent command relay, snapshot-based Library reads, background image preparation, quiet polling, fused readout maps and validated completed-preview reuse | Real-RAW catalog/slider latency, offline previews, cache controls and desktop/reference acceptance |
 | Export | Partial: JPEG/16-bit TIFF, ICC, shared or catalog-local saved export settings with optional destinations, multiple-preset batches with individual/parent destinations and paged receipts, catalog-local Export with Previous, durable jobs with frozen catalog/rights IPTC XMP and keyword hierarchy options | Full batch naming/reference acceptance, Adobe preset exchange, complete EXIF/IPTC Extension/GPS metadata policies, watermark, additional formats, publish workflows |
@@ -5673,3 +5673,55 @@ cleanup does not establish a general disk-pressure improvement.
 
 macOS 14 runtime, desktop/reference interaction, broad camera/color evidence and
 full Lightroom reproduction remain incomplete.
+
+## Captured crop and mask drawing (October 2, 2026)
+
+The native drawing overlay previously accumulated points without retaining the
+photo/frame at gesture start. Release recomputed current geometry, allowing a
+changed context to accept old points. It also stopped updating non-brush endpoints
+after 500 events. Drawing now captures the displayed After photo revision, physical
+source-stat token, native preview generation, image identity, tool, crop geometry
+and display rectangle at pointer-down. A changed context cancels until release;
+returning to a photo or a later frame does not reuse the old gesture. Stale stroke
+previews are hidden. A tap and an outside start do not add a mask.
+
+Crop/radial/gradient paths retain two endpoints and continue updating during long
+drags. Brushes retain the existing 500-point bound, default radius/feather and
+exposure behavior. Orientation inversion and nested crop mapping preserve the
+existing engine coordinate contract. Completed drawings use ordinary partial
+edits and one Develop history step. Views add no SQL or pixel equations.
+
+The pending patch retains its captured photo/revision and passes the source token
+to the existing final `edit_photo` fence. An external catalog edit or source-stat
+change fails before writing the drawing; the request is never rebased or replayed.
+The frame gate also blocks editing/loading, unfinished patches, mask management
+and unconfirmed recovery states. Source stat is not a content hash and cannot
+atomically lock an external file with the catalog transaction.
+
+The image engine, recipe and schema are unchanged: generation **65**, schema
+**37**, protocol **1**, **151** commands and the same API **2** backend. Final
+app engine bytes exactly match the previously verified mask-cache candidate,
+so its **1,570-test** processing/service regression and paired CPU experiment
+remain applicable. This module changes native gesture/submission ownership.
+
+Evidence on M3 Max/128 GiB, macOS **26.6.2**:
+
+- Related Python direction/mask/cache contracts: **67 passed in 13.50 s**.
+- Source native drawing: **25 assertions**, including a real photo switch/return,
+  source-token/tool/window changes, pending/busy/recovery gates, external revision
+  conflicts, bounded paths, saved brush/history and nested crop. The harness
+  perturbs a generated original's modification time and restores it; the actual
+  engine rejects its old source token before any catalog write. Original byte
+  hashes remain unchanged, and the app never performs that test-only stat change.
+- Final signed app passes identity, matching contracts/guide and strict signature
+  checks. The current/stale stroke PNGs were inspected offscreen; sampled white
+  pixels also verify that only a matching context renders the stroke.
+- Final packaged-engine native state/IPC: **156 assertions** (drawing 25,
+  orientation 51, ordinary edits 15, mask cache frames 10, white balance 39,
+  responsiveness 16). Shared commit/recovery and sampling frame regressions pass;
+  unchanged polling publishes no workspace invalidations. These checks do not
+  establish desktop frame rate or pointer event routing.
+
+Desktop pointer-down/event routing, keyboard/VoiceOver and macOS 14 runtime remain
+unverified. Crop/mask reference acceptance and the full feature inventory remain
+incomplete. Synthetic typed events and offscreen display are not desktop testing.

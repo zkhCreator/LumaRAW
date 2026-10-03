@@ -8,6 +8,8 @@
 // Selector preferences/hover observe separately; continuous WB waits for a new frame.
 // Sync review captures source/target revisions and never follows a changed selection.
 // Unconfirmed mask management requires an explicit reload before another action.
+// Drawing gestures capture the preview generation; selection/reload ABA cancels them.
+// Pending drawing edits retain their captured source token for the final engine check.
 import SwiftUI
 import AppKit
 import UniformTypeIdentifiers
@@ -290,9 +292,11 @@ import UniformTypeIdentifiers
     @Published var showCalibration=false
     private let previewClient=UUID().uuidString
     private var generation=0
+    var drawingFrameGeneration:Int {generation}
     private var pageGeneration=0
     private var previewTask: Task<Void,Never>?
     private var pendingPatch: [String: Any] = [:]
+    private var pendingDrawingSource:DrawingEditSource?
     private var editTask: Task<Void,Never>?
     private var saveFailed=false
     private var copied: [String: Any]?
@@ -705,15 +709,28 @@ import UniformTypeIdentifiers
     func discardWhiteBalancePendingEdits(_ recovery:WhiteBalanceEditRecovery) async {
         guard whiteBalanceEditRecovery?.id==recovery.id,selected==recovery.photoID,
               photo?.id==recovery.photoID,photo?.revision==recovery.revision,!editing else {return}
-        editTask?.cancel();pendingPatch=[:];whiteBalanceEditRecovery=nil;saveFailed=false;error=nil
+        editTask?.cancel();pendingPatch=[:];pendingDrawingSource=nil;whiteBalanceEditRecovery=nil;saveFailed=false;error=nil
         await load(recovery.photoID)
+    }
+    func bindDrawingEditSource(_ context:DrawingContext) {
+        guard !pendingPatch.isEmpty else {return}
+        pendingDrawingSource=DrawingEditSource(photoID:context.frame.photoID,
+            revision:context.frame.revision,fingerprint:context.sourceFingerprint)
     }
     func commit() async {
         if let recovery=whiteBalanceEditRecovery {error=recovery.message;return}
         guard let p=photo,!editing,!pendingPatch.isEmpty else{return}
-        let patch=pendingPatch;pendingPatch=[:];editing=true
+        let patch=pendingPatch,source=pendingDrawingSource
+        pendingPatch=[:];pendingDrawingSource=nil;editing=true
         do {
-            let row=try await Backend.call("edit_photo",["photo_id":p.id,"expected_revision":p.revision,"patch":patch])
+            var params:[String:Any]=["photo_id":p.id,"expected_revision":p.revision,"patch":patch]
+            if let source {
+                guard source.photoID==p.id,source.revision==p.revision else {
+                    throw EngineFailure(message:"The drawing target changed before saving. Reload the photo and draw again.")
+                }
+                params["expected_source_fingerprint"]=source.fingerprint
+            }
+            let row=try await Backend.call("edit_photo",params)
             if let updated=Photo(row),selected==p.id {
                 photo=updated;recipe=updated.recipe.merging(pendingPatch){_,new in new}
                 if let i=photos.firstIndex(where:{$0.id==p.id}) {photos[i]=updated}
@@ -721,7 +738,7 @@ import UniformTypeIdentifiers
             editing=false
             if pendingPatch.isEmpty {render()}else{await commit()}
         } catch {
-            pendingPatch=[:];editing=false;saveFailed=true;self.error=error.localizedDescription
+            pendingPatch=[:];pendingDrawingSource=nil;editing=false;saveFailed=true;self.error=error.localizedDescription
             await load(p.id)
         }
     }
@@ -761,7 +778,7 @@ import UniformTypeIdentifiers
             if pendingPatch.isEmpty{render()}else{await commit()}
             return true
         }catch{
-            pendingPatch=[:];editing=false;saveFailed=true;self.error=error.localizedDescription
+            pendingPatch=[:];pendingDrawingSource=nil;editing=false;saveFailed=true;self.error=error.localizedDescription
             if selected==photoID{await load(photoID)}
             return false
         }

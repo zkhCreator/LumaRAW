@@ -56,6 +56,18 @@ Keep the new photo revision on preview/sample requests; an old revision still
 fails even when its pixels are identical. Geometry, enabled/inverted state,
 adjustments and mask order remain part of pixel identity.
 
+## Captured drawing
+
+Crop and local-mask drawing bind to the displayed After photo at pointer-down.
+Changing the photo, preview, tool or display rectangle cancels the stroke until
+release. Draw again after the new preview settles. A pointer tap does not add
+a mask. Crop/radial/gradient drags retain their current endpoint; brush strokes
+retain the existing 500-point limit. Completed drawings use ordinary saved edits,
+revision conflicts and Develop history; originals remain read-only.
+Drawing saves also carry the captured source-stat fingerprint to the engine.
+An externally changed original requires a reload and another explicit drawing;
+the failed stroke is not replayed. Stat identity is not a content hash/file lock.
+
 ## Global Presence
 
 `texture`, `clarity` and `dehaze` accept -100…100, default to zero and belong to

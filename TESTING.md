@@ -4,6 +4,17 @@ All probes use explicit read-only input photographs and new disposable catalog/o
 
 ## Non-AI mask management
 
+`NativeDrawingRegression` drives typed gesture events through actual Store and
+engine commands. It checks outside/tap admission, cancellation latch, real photo
+switch/return, source-token/tool/window changes, blocked/uncertain states, pending
+edits, external revision conflicts, long endpoints, bounded brush storage,
+one-step undo and nested crop geometry. Current/stale stroke PNGs and sampled
+white pixels verify offscreen display. No desktop pointer dispatch is performed.
+The harness temporarily changes a generated fixture's modification time, then
+restores it. The final engine source fence must reject the captured drawing before
+any catalog edit. Original byte hashes remain unchanged; the app never performs
+that test-only stat perturbation.
+
 `test_mask_pixel_cache.py` checks label-only Fit/detail and Before cache reuse,
 readout/target map and developed thumbnail worker bypass, preserved history and
 frozen export names, pixel-parameter invalidation, and concurrent rename conflicts
