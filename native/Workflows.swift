@@ -3,6 +3,7 @@
 // Exports retain snapshots; app never overwrites an original or existing output.
 // Calibration rectangles address full decoded sources before catalog/Develop edits.
 // Preset and import-counter settings are revision-bound catalog commands; views own no SQL.
+// Sync displays engine-owned groups and submits its immutable source/target review.
 import SwiftUI
 import AppKit
 
@@ -116,9 +117,52 @@ struct RecipeSheet:View {
 struct SyncSheet:View {
     @EnvironmentObject var s:Store
     @Environment(\.dismiss) var dismiss
-    @State private var groups:Set<String>=["White Balance","Light","Color","Black & White Mix","Tone Curve","Detail"]
-    let all=["White Balance","Light","Color","Black & White Mix","Tone Curve","Detail","Lens","Composition","Local Masks","Camera Profile","LUT"]
-    var body:some View{VStack(alignment:.leading,spacing:18){Text("Sync Adjustments").font(.title2.weight(.semibold));Text("Copy selected adjustments from \(s.photo?.name ?? "the current photo") to \(max(0,s.selection.count-1)) other photos.").foregroundStyle(.secondary);ForEach(all,id:\.self){g in Toggle(g,isOn:Binding(get:{groups.contains(g)},set:{if $0{groups.insert(g)}else{groups.remove(g)}}))};HStack{Spacer();Button("Cancel"){dismiss()};Button("Sync"){Task{await s.sync(Array(groups).sorted())}}.buttonStyle(.borderedProminent).disabled(groups.isEmpty || s.selection.count<2)}}.padding(24).frame(width:480)}
+    @State private var draft:SyncAdjustmentsDraft?
+    @State private var groups:Set<String>=[]
+    @State private var reviewing=true
+    @State private var issue:String?
+    var body:some View {
+        VStack(alignment:.leading,spacing:18) {
+            Text("Sync Adjustments").font(.title2.weight(.semibold))
+            if let draft {
+                Text("Copy selected adjustments from \(draft.source.displayName) to \(draft.targets.count) other photos.").foregroundStyle(.secondary)
+                ScrollView {
+                    VStack(alignment:.leading,spacing:10) {
+                        ForEach(draft.schema.names,id:\.self) {group in
+                            Toggle(group,isOn:Binding(get:{groups.contains(group)},set:{
+                                if $0 {groups.insert(group)} else {groups.remove(group)}
+                            }))
+                        }
+                    }.frame(maxWidth:.infinity,alignment:.leading)
+                }.frame(maxHeight:380).disabled(reviewing || s.syncBusy)
+                if !s.syncContextMatches(draft) {
+                    Text("The source, edits or selection changed. Review again before syncing.")
+                        .font(.callout).foregroundStyle(.red)
+                }
+            }
+            if reviewing {ProgressView("Preparing Sync review…")}
+            if let issue {Text(issue).font(.callout).foregroundStyle(.red)}
+            HStack {
+                Button("Review Again") {Task {await review()}}.disabled(reviewing || s.syncBusy)
+                Spacer()
+                Button("Cancel") {dismiss()}.keyboardShortcut(.cancelAction).disabled(s.syncBusy)
+                Button(s.syncBusy ? "Syncing…":"Sync") {
+                    guard let draft else {return}
+                    Task {if !(await s.sync(groups.sorted(),draft:draft)) {issue=s.error}}
+                }.buttonStyle(.borderedProminent).keyboardShortcut(.defaultAction)
+                    .disabled(reviewing || s.syncBusy || groups.isEmpty || draft.map {!s.syncContextMatches($0)} != false || issue != nil)
+            }
+        }.padding(24).frame(width:480).task {await review()}
+    }
+    func review() async {
+        reviewing=true
+        let next=await s.prepareSyncAdjustments()
+        if let next {
+            groups=draft == nil ? next.schema.initiallySelected:groups.intersection(next.schema.names)
+            draft=next;issue=nil
+        } else {issue=s.error ?? "Sync review could not be prepared"}
+        reviewing=false
+    }
 }
 struct CalibrationSheet:View {
     @EnvironmentObject var s:Store

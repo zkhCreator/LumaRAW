@@ -2,6 +2,27 @@
 
 All probes use explicit read-only input photographs and new disposable catalog/output directories. They never use a personal photo library by default.
 
+## Captured Sync reviews
+
+`test_sync_source_revision.py` exercises the real service with a changed source,
+an undo returning to the same recipe and concurrent source edit/Sync commands.
+An old `expected_source_revision` must reject the complete batch before target
+history changes; queued exports and originals retain their submitted bytes/state.
+The optional field preserves compatibility with older clients. New native reviews
+always send it with every captured target revision.
+
+`NativeSyncAdjustmentsRegression` verifies engine-owned group discovery (including
+Presence and future/removed groups), flushed source edits, immutable source/target
+review, selection/pending-edit rejection, external source and last-target conflicts,
+partial group preservation, one-step undo, equal-recipe no-op and busy protection.
+The offscreen form image is layout evidence, not desktop keyboard/VoiceOver testing.
+
+```sh
+python -m pytest -q tests/test_sync_source_revision.py tests/test_service.py
+python tests/run_native.py --engine /absolute/LumaRAWEngine \
+  --work work/new-sync-review --suite NativeSyncAdjustmentsRegression
+```
+
 ## Global Presence
 
 `test_presence.py` verifies positive/negative frequency and veil behavior, neutral

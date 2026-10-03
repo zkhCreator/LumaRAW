@@ -5526,3 +5526,46 @@ claimed. RAW decoding and the remaining Presence equations still run on CPU.
 macOS 14 runtime, desktop pointer/keyboard/VoiceOver, broader-camera/color
 acceptance, local Presence and Adobe numerical equivalence remain unverified.
 Full Lightroom reproduction remains incomplete.
+
+## Captured native Sync reviews (October 2, 2026)
+
+The Mac Sync form now reads every parameter group from `recipe_schema`, including
+the previously omitted Presence controls and future engine groups. The shell
+owns presentation order and default checks, while the engine owns membership.
+Malformed group contracts fail instead of falling back to an incomplete list.
+
+Review flushes pending source edits, reads the current source, captures its revision and up
+to sixty sorted target IDs/revisions, and retains those values while the form is
+open. Selection/source changes and new pending edits block submission. The shared
+`sync_photos` contract adds optional `expected_source_revision`; the Mac always
+sends it. Legacy callers may omit it and retain their previous behavior, with no
+source-revision protection. A changed source or any stale target rejects the whole
+batch before history writes. Review Again is explicit; uncertain responses never
+cause automatic replay. A new explicit review may adopt an externally edited
+source; failed old reviews remain frozen. Virtual-copy sources use their display names.
+
+Related Python regression passes **67 tests in 9.88 s**, including real-service
+source changes, an undo returning to identical values, concurrent source/edit
+commands, frozen exports and unchanged originals. Source-engine native state/IPC
+passes **25 assertions**, covering discovered/removed groups, source/last-target
+conflicts, selection/pending-edit rejection, partial Presence preservation, one
+undo, equal-recipe no-op and busy protection. The current form was inspected
+offscreen; this is not desktop interaction evidence.
+
+The full Python suite passes **1,539 tests in 177.24 s**, without skips, requiring
+actual Metal and API 2 Nikon RAW sampling. The final signed app targets macOS 14
+and reports generation **63**, schema **37**, protocol **1** and **150** matching
+commands, including the optional source revision. Source/client/broker identities,
+bundled guide bytes and strict signatures agree. The refined native Sync suite
+adds explicit source-refresh recovery (**26 assertions**); current Presence and
+point-curve state/IPC suites pass **14** and **28** assertions. They use the same
+packaged engine bytes as the final app. Only native review behavior changed after
+the complete Python run; processing and service contracts retain identical bytes.
+
+Final current-App native state/IPC passes **66 assertions**: Sync 26, color mixer
+24 and responsiveness 16. The final Sync form was inspected offscreen. Together
+with the current Presence/point-curve suites on identical engine bytes, these
+cover **108 distinct assertions**. The initial candidate also passed primary
+native state checks; no desktop acceptance is inferred from any candidate.
+macOS 14 runtime, desktop keyboard/VoiceOver and Adobe reference acceptance remain unverified.
+Full Lightroom reproduction remains incomplete.

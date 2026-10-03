@@ -61,6 +61,7 @@ def main():
     suites+=('NativeRawWhiteBalanceRegression',)
     suites+=('NativeWhiteBalanceOptionsRegression',)
     suites+=('NativePresenceRegression',)
+    suites+=('NativeSyncAdjustmentsRegression',)
     parser.add_argument('--raw-fixture', type=Path, help='Explicit read-only RAW input for the optional RAW WB suite')
     parser.add_argument('--suite',choices=suites,action='append',help='Run selected suites; default: all')
     args=parser.parse_args()
@@ -134,6 +135,7 @@ def main():
         if suite=='NativeFolderSyncRegression':env['LUMARAW_TEST_DUPLICATE_INCOMING']=str(duplicate_incoming)
         if suite in ('NativeImportBackupRegression','NativeImportPresetRegression','NativeImportSequenceRegression','NativeImportDateRegression','NativeImportDestinationRegression','NativeImportLoupeRegression'):env['LUMARAW_TEST_FIXTURES']='|'.join(paths)
         if suite=='NativeResponsivenessRegression':env['LUMARAW_TEST_FIXTURES']='|'.join(paths)
+        if suite=='NativeSyncAdjustmentsRegression':env['LUMARAW_TEST_FIXTURES']='|'.join(paths)
         if suite=='NativeRawWhiteBalanceRegression':env['LUMARAW_TEST_RAW_FIXTURE']=str(args.raw_fixture)
         if suite=='NativeTransportRegression':
             relay=fixtures/'native-relay'

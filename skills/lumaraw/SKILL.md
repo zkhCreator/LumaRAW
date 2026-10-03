@@ -1027,7 +1027,13 @@ original applies to its family, including eligible jobs from removed copies.
 
 ## Batch and output
 
-- `lumaraw_sync_photos` copies only named groups and requires every target's current revision; `Composition`, `Local Masks`, `Camera Profile` and `LUT` are separate explicit choices.
+- `lumaraw_sync_photos` copies only named groups from `recipe_schema`. Capture the
+  source revision and pass `expected_source_revision` together with each target's
+  captured revision. A changed source or target rejects the batch; do not rebase or
+  replay an uncertain result. Read the photos and explicitly review again. Older
+  clients may omit the source field, but then source changes are not guarded.
+  `Presence`, `Composition`, `Local Masks`, `Camera Profile` and `LUT` are separate
+  selectable groups; the Mac Sync form reads the engine's complete group list.
 - `lumaraw_enqueue_exports` requires a new `request_key` per logical submission. Persist and reuse that same key for an uncertain submission retry. The same key with changed arguments is rejected. Queue parameters are immutable snapshots; later edits do not change pending exports.
 - `preview_export_metadata` reads one photo's resolved metadata with `kind:keywords`
   or `hierarchy`, a 60-item `offset` page and optional export policies. Export

@@ -6,6 +6,7 @@
 // Revisions belong to the service; stale edits are rejected, never silently retried.
 // Photo results and collection browsers use bounded pages.
 // Selector preferences/hover observe separately; continuous WB waits for a new frame.
+// Sync review captures source/target revisions and never follows a changed selection.
 import SwiftUI
 import AppKit
 import UniformTypeIdentifiers
@@ -282,6 +283,7 @@ import UniformTypeIdentifiers
     @Published var showVersions=false
     @Published var showRecipe=false
     @Published var showSync=false
+    @Published var syncBusy=false
     @Published var showCalibration=false
     private let previewClient=UUID().uuidString
     private var generation=0
@@ -666,7 +668,7 @@ import UniformTypeIdentifiers
         }
     }
     func set(_ key:String,_ value:Any) {
-        guard !loading,!browsing,!orientationBusy,!developPresetBusy,!historyBusy,!snapshotBusy,let p=photo,p.id==selected else{return}
+        guard !loading,!browsing,!orientationBusy,!developPresetBusy,!historyBusy,!snapshotBusy,!syncBusy,let p=photo,p.id==selected else{return}
         if let recovery=whiteBalanceEditRecovery {error=recovery.message;return}
         if whiteBalanceTargetActive || whiteBalanceSampling || whiteBalanceArming || whiteBalanceAwaitingFrame {cancelWhiteBalanceSelector()}
         clearColorReadout()
@@ -998,12 +1000,4 @@ import UniformTypeIdentifiers
     func reveal(){if let p=photo{NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath:p.path)])}}
     func copyEdits(){copied=recipe;message="Adjustments copied"}
     func pasteEdits(){if let copied{apply(copied)}}
-    func sync(_ groups:[String]) async {
-        guard await flushEdits(),let p=photo else{return}
-        do{
-            var targets:[[String:Any]]=[]
-            for id in selection where id != p.id {let r=try await Backend.call("get_photo",["photo_id":id]);targets.append(["photo_id":id,"expected_revision":r["revision"] ?? 0])}
-            _=try await Backend.call("sync_photos",["source_id":p.id,"targets":targets,"groups":groups]);showSync=false;message="Synced \(targets.count) photos";await refresh()
-        }catch{self.error=error.localizedDescription}
-    }
 }

@@ -16,6 +16,7 @@ bind preview/sample/edit with a source-stat token; the token is not a file lock.
 Other catalog commands retain the serialized write-capable connection path. No
 GUI, HTTP listener, telemetry or original-file writes. Interrupted exports are
 never automatically replayed. Optimistic revisions prevent lost recipe updates.
+Captured Sync source revisions are checked before validating or changing targets.
 """
 from contextlib import contextmanager
 import hashlib
@@ -679,7 +680,9 @@ class Service:
                     c.db.execute('BEGIN IMMEDIATE')
                     return getattr(Snapshots(c.db),method.removesuffix('_version'))(**p)
             if method=='sync_photos':
-                source=Recipe.parse(json.loads(self.require(c,p['source_id'])['recipe'])).dict();changes=[]
+                source_row=(self.check_revision(c,p['source_id'],p['expected_source_revision'])
+                            if 'expected_source_revision' in p else self.require(c,p['source_id']))
+                source=Recipe.parse(json.loads(source_row['recipe'])).dict();changes=[]
                 for target in p['targets']:
                     row=self.check_revision(c,target['photo_id'],target['expected_revision']);values=json.loads(row['recipe'])
                     values.update({k:source[k] for g in p['groups'] for k in SYNC_GROUPS[g]});changes.append((row,Recipe.parse(values)))

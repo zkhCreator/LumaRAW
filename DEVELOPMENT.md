@@ -55,6 +55,14 @@ generation checks and submit both axes as one catalog edit.
 
 ## Contracts and persistence
 
+- Sync reviews capture source and target photo revisions plus the selected IDs.
+  Display parameter groups from `recipe_schema`, including future engine groups,
+  instead of maintaining another membership list in the native form. Flush pending
+  source edits before review, then reject changed selection or pending edits.
+  New clients send `expected_source_revision` as well as every target revision;
+  legacy callers may omit the optional source field. Never rebase a failed review
+  or replay an uncertain batch response. Explicit Review Again captures new state.
+
 - Bind engine identity and every pixel-derived cache to actual installed RAW
   wrapper/native/bundled-codec bytes, including distinct same-version builds.
   Enumerate RECORD but hash current bytes; preserve the independent physical

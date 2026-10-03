@@ -12,7 +12,8 @@ reviewed suspected-duplicate classification and requires an explicit apply optio
 to import those files.
 White-balance samples bind a source-stat token and photo revision; they return
 relative recipe candidates without changing the catalog or original.
-IDs refer only to the selected catalog.
+Sync can capture a source revision as well as every target revision; stale sources
+fail before any batch edit. IDs refer only to the selected catalog.
 Tool annotations describe effects; they never substitute for user authorization.
 """
 from .model import LIMITS, Recipe, SYNC_GROUPS, POINT_CURVE_FIELDS, PARAMETRIC_FIELDS, MIXER_FIELDS, BW_FIELDS
@@ -264,7 +265,7 @@ tool('update_version','Replace one shared snapshot with the current photo settin
 tool('delete_version','Delete a shared snapshot for the master and all virtual copies. Requires the captured snapshot revision; preserves originals, live edits, Before, history and exports. Cannot be undone.',SNAPSHOT_TARGET,SNAPSHOT_TARGET)
 TOOLS['update_version']['annotations']['destructiveHint']=True
 TOOLS['delete_version']['annotations']['destructiveHint']=True
-tool('sync_photos','Copy selected parameter groups atomically; every target requires its current revision.',{'source_id':ID,'targets':array(obj({'photo_id':ID,'expected_revision':REV},['photo_id','expected_revision']),60),'groups':array({'enum':list(SYNC_GROUPS)},len(SYNC_GROUPS))},['source_id','targets','groups'])
+tool('sync_photos','Copy selected parameter groups atomically; every target requires its captured revision. Pass expected_source_revision to reject changed source settings before editing any target.',{'source_id':ID,'expected_source_revision':REV,'targets':array(obj({'photo_id':ID,'expected_revision':REV},['photo_id','expected_revision']),60),'groups':array({'enum':list(SYNC_GROUPS)},len(SYNC_GROUPS))},['source_id','targets','groups'])
 tool('index_library','Hash originals read-only, detect duplicates, missing files and EXIF bursts.')
 tool('relink_photo','Relink a missing original; checks a known content fingerprint.',{'photo_id':ID,'path':PATH},['photo_id','path'])
 tool('backup_catalog','Write a new SQLite backup and asset directory; never overwrite.',{'path':PATH},['path'])

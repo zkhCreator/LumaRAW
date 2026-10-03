@@ -391,7 +391,14 @@ preview on release. Photo/revision/viewport/mode changes invalidate old drags.
 The shell does not reimplement processing or persist presentation in recipes.
 
 - `get_photo` returns a revision. Edits, undo, version restore, recipe import, and sync require the expected revision. Stale writes fail; the caller must read again and reconcile.
-- Service database access is serialized. Sync validates every target before one transaction writes all changes. Ratings and flags are separate explicit operations.
+- Service database access is serialized. Sync checks optional `expected_source_revision`
+  before validating every target and writing one transaction. New native reviews
+  always capture/send source and target revisions; older clients may omit the
+  source field. The form reads group membership from `recipe_schema`, includes
+  Presence and future groups, and preserves its captured source/selection until
+  explicit Review Again. Changed selection or pending edits block submission.
+  Conflicts and uncertain responses never trigger rebasing/replay. Ratings and
+  flags are separate explicit operations.
 - Export submission freezes the recipe, source, destination, output options and resolved descriptive metadata. The request key, normalized argument digest, and job IDs are stored atomically. The same key and arguments return the original result; different arguments with that key fail.
 - Originals are never written. Output is written to a temporary `.part`, flushed, then hard-linked to a new collision-safe name. A late cancellation preserves an output already published.
 - Running and pending jobs become interrupted after abnormal service restart. A sealed idle handoff has the narrowly scoped pending-job exception described above. They are never silently replayed. A forced exit can leave an uncertain publication outcome; inspect the destination before retrying.
